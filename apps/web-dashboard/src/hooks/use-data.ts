@@ -1,0 +1,594 @@
+/**
+ * Centralized data-fetching hooks with SWR.
+ * Provides caching, deduplication, revalidation, and optimistic mutations
+ * for all dashboard data needs.
+ *
+ * Falls back to mock data when APIs are unavailable (development mode).
+ */
+"use client";
+
+import useSWR, { mutate as globalMutate } from "swr";
+import type {
+  Order,
+  Product,
+  Category,
+  Payout,
+  OrderStatus,
+  Coupon,
+  AdCampaign,
+} from "@/lib/supabase/types";
+// Mock data imports removed
+import { authFetch } from "@/lib/api/auth-fetch";
+
+// ── Fetcher ───────────────────────────────────────────────────────────────
+
+async function fetcher<T>(url: string): Promise<T> {
+  const res = await authFetch(url);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `API error ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────
+
+export interface DashboardStats {
+  revenue: { today: number; week: number; month: number };
+  orders: { today: number; pending: number; total: number };
+  averageOrderValue: number;
+  totalCustomers: number;
+}
+
+export interface RevenueDataPoint {
+  label: string;
+  value: number;
+}
+
+interface OrdersResponse {
+  orders: Order[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+interface ProductsResponse {
+  products: Product[];
+  total: number;
+}
+
+interface CategoriesResponse {
+  categories: Category[];
+}
+
+interface StatsResponse {
+  stats: DashboardStats;
+  revenueChart: RevenueDataPoint[];
+}
+
+interface PayoutsResponse {
+  payouts: Payout[];
+}
+
+// ── Orders Hook ───────────────────────────────────────────────────────────
+
+export function useOrders(params?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  sort?: string;
+  payment?: string;
+  delivery?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.status && params.status !== "all")
+    searchParams.set("status", params.status);
+  if (params?.search) searchParams.set("search", params.search);
+  if (params?.page) searchParams.set("page", String(params.page));
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.sort) searchParams.set("sort", params.sort);
+  if (params?.payment && params.payment !== "all")
+    searchParams.set("payment", params.payment);
+  if (params?.delivery && params.delivery !== "all")
+    searchParams.set("delivery", params.delivery);
+
+  const qs = searchParams.toString();
+  const key = `/api/orders${qs ? `?${qs}` : ""}`;
+
+  const { data, error, isLoading, mutate } = useSWR<OrdersResponse>(
+    key,
+    fetcher,
+    {
+      revalidateOnFocus: true,
+    }
+  );
+
+  return {
+    orders: data?.orders ?? [],
+    total: data?.total ?? 0,
+    isLoading,
+    error,
+    mutate,
+  };
+}
+
+// ── Single Order Hook ─────────────────────────────────────────────────────
+
+export function useOrder(id: string) {
+  const { data, error, isLoading, mutate } = useSWR<{ order: Order }>(
+    id ? `/api/orders/${id}` : null,
+    fetcher
+  );
+
+  return {
+    order: data?.order ?? null,
+    isLoading,
+    error,
+    mutate,
+  };
+}
+
+// ── Update Order Status ───────────────────────────────────────────────────
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+  notes?: string,
+  preparationTimeMinutes?: number,
+  deliveryNote?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const payload: Record<string, unknown> = { status, notes };
+    if (typeof preparationTimeMinutes === "number") {
+      payload.preparation_time_minutes = preparationTimeMinutes;
+    }
+    if (status === "delivered" && deliveryNote) {
+      payload.delivery_note = deliveryNote;
+    }
+
+    const res = await authFetch(`/api/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { success: false, error: body.error ?? "Erreur" };
+    }
+
+    // Revalidate all orders-related SWR keys
+    globalMutate((key: string) => typeof key === "string" && key.startsWith("/api/orders"), undefined, { revalidate: true });
+    globalMutate("/api/dashboard/stats", undefined, { revalidate: true });
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+/**
+ * Issuance of a refund for a specific order.
+ */
+export async function refundOrder(
+  orderId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await authFetch(`/api/orders/${orderId}/refund`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { success: false, error: body.error ?? "Erreur" };
+    }
+
+    // Revalidate all orders-related SWR keys
+    globalMutate((key: string) => typeof key === "string" && key.startsWith("/api/orders"), undefined, { revalidate: true });
+    globalMutate("/api/dashboard/stats", undefined, { revalidate: true });
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+// ── Products Hook ─────────────────────────────────────────────────────────
+
+export function useProducts() {
+  const { data, error, isLoading, mutate } = useSWR<ProductsResponse>(
+    "/api/products",
+    fetcher
+  );
+
+  return {
+    products: data?.products ?? [],
+    total: data?.total ?? 0,
+    isLoading,
+    error,
+    mutate,
+  };
+}
+
+// ── Product Mutations ─────────────────────────────────────────────────────
+
+export async function createProduct(
+  productData: Partial<Product>
+): Promise<{ success: boolean; product?: Product; error?: string }> {
+  try {
+    const res = await authFetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(productData),
+    });
+
+    const body = await res.json();
+    if (!res.ok) return { success: false, error: body.error };
+
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/products"),
+      undefined,
+      { revalidate: true }
+    );
+    globalMutate("/api/dashboard/stats", undefined, { revalidate: true });
+
+    return { success: true, product: body.product };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+export async function updateProduct(
+  id: string,
+  productData: Partial<Product>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await authFetch(`/api/products/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(productData),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { success: false, error: body.error };
+    }
+
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/products"),
+      undefined,
+      { revalidate: true }
+    );
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+export async function deleteProduct(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await authFetch(`/api/products/${id}`, { method: "DELETE" });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { success: false, error: body.error };
+    }
+
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/products"),
+      undefined,
+      { revalidate: true }
+    );
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+// ── Categories Hook ───────────────────────────────────────────────────────
+
+export function useCategories() {
+  const { data, error, isLoading, mutate } = useSWR<CategoriesResponse>(
+    "/api/categories",
+    fetcher
+  );
+
+  return {
+    categories: data?.categories ?? [],
+    isLoading,
+    error,
+    mutate,
+  };
+}
+
+export async function createCategory(
+  categoryData: Partial<Category>
+): Promise<{ success: boolean; category?: Category; error?: string }> {
+  try {
+    const res = await authFetch("/api/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(categoryData),
+    });
+
+    const body = await res.json();
+    if (!res.ok) return { success: false, error: body.error };
+
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/categories"),
+      undefined,
+      { revalidate: true }
+    );
+
+    return { success: true, category: body.category };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+export async function importCategoryPack(
+  packId: string,
+  restaurantId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await authFetch("/api/categories/import-pack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ packId, restaurantId }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { success: false, error: body.error || "Erreur lors de l'importation du pack" };
+    }
+
+    // Revalidate the cache
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/categories"),
+      undefined,
+      { revalidate: true }
+    );
+    // Also revalidate products since we might have imported some
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/products"),
+      undefined,
+      { revalidate: true }
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur d'importation de pack:", error);
+    return { success: false, error: "Erreur de connexion" };
+  }
+}
+
+export async function updateCategory(
+  id: string,
+  categoryData: Partial<Category>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await authFetch(`/api/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(categoryData),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { success: false, error: body.error };
+    }
+
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/categories"),
+      undefined,
+      { revalidate: true }
+    );
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/products"),
+      undefined,
+      { revalidate: true }
+    );
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+export async function deleteCategory(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await authFetch(`/api/categories/${id}`, { method: "DELETE" });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { success: false, error: body.error };
+    }
+
+    globalMutate(
+      (key: string) => typeof key === "string" && key.startsWith("/api/categories"),
+      undefined,
+      { revalidate: true }
+    );
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+// ── Dashboard Stats Hook ──────────────────────────────────────────────────
+
+export function useDashboardStats(period?: "7d" | "30d" | "3m") {
+  const key = period && period !== "7d"
+    ? `/api/dashboard/stats?period=${period}`
+    : "/api/dashboard/stats";
+
+  const { data, error, isLoading } = useSWR<StatsResponse>(
+    key,
+    fetcher
+  );
+
+  return {
+    stats: data?.stats ?? { revenue: { today: 0, week: 0, month: 0 }, orders: { today: 0, pending: 0, total: 0 }, averageOrderValue: 0, totalCustomers: 0 },
+    revenueChart: data?.revenueChart ?? [],
+    isLoading,
+    error,
+  };
+}
+
+// ── Payouts Hook ──────────────────────────────────────────────────────────
+
+export function usePayouts() {
+  const { data, error, isLoading } = useSWR<PayoutsResponse>(
+    "/api/payouts",
+    fetcher
+  );
+
+  return {
+    payouts: data?.payouts ?? [],
+    isLoading,
+    error,
+  };
+}
+
+// ── Pending Order Count (for sidebar badge) ───────────────────────────────
+
+export function usePendingOrderCount() {
+  const { data } = useSWR<OrdersResponse>(
+    "/api/orders?status=pending&limit=0",
+    fetcher
+  );
+
+  return data?.total ?? 0;
+}
+
+// ── Coupons ───────────────────────────────────────────────────────────────────
+
+interface CouponsResponse {
+  coupons: Coupon[];
+  total: number;
+}
+
+export function useCoupons() {
+  const { data, error, isLoading, mutate } = useSWR<CouponsResponse>(
+    "/api/coupons",
+    fetcher,
+    { fallbackData: { coupons: [], total: 0 } }
+  );
+
+  async function createCoupon(body: Partial<Coupon>) {
+    const res = await authFetch("/api/coupons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "Erreur création coupon");
+    }
+    await mutate();
+    return res.json();
+  }
+
+  async function updateCoupon(id: string, body: Partial<Coupon>) {
+    const res = await authFetch(`/api/coupons/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "Erreur mise à jour coupon");
+    }
+    await mutate();
+    return res.json();
+  }
+
+  async function deleteCoupon(id: string) {
+    const res = await authFetch(`/api/coupons/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "Erreur suppression coupon");
+    }
+    await mutate();
+  }
+
+  return {
+    coupons: data?.coupons ?? [],
+    total: data?.total ?? 0,
+    isLoading,
+    error,
+    createCoupon,
+    updateCoupon,
+    deleteCoupon,
+    mutate,
+  };
+}
+
+// ── Ad Campaigns ──────────────────────────────────────────────────────────────
+
+interface CampaignsResponse {
+  campaigns: AdCampaign[];
+  activeCampaign: AdCampaign | null;
+  total: number;
+}
+
+export function useCampaigns() {
+  const { data, error, isLoading, mutate } = useSWR<CampaignsResponse>(
+    "/api/marketing/campaigns",
+    fetcher,
+    { fallbackData: { campaigns: [], activeCampaign: null, total: 0 } }
+  );
+
+  async function createCampaign(body: {
+    package: "basic" | "premium" | "elite";
+    starts_at?: string;
+    include_push?: boolean;
+    push_message?: string;
+    notes?: string;
+  }) {
+    const res = await authFetch("/api/marketing/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "Erreur création campagne");
+    }
+    await mutate();
+    return res.json();
+  }
+
+  async function cancelCampaign(id: string) {
+    const res = await authFetch(`/api/marketing/campaigns/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "Erreur annulation campagne");
+    }
+    await mutate();
+  }
+
+  return {
+    campaigns: data?.campaigns ?? [],
+    activeCampaign: data?.activeCampaign ?? null,
+    total: data?.total ?? 0,
+    isLoading,
+    error,
+    createCampaign,
+    cancelCampaign,
+    mutate,
+  };
+}

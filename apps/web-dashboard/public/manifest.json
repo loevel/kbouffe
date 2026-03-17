@@ -1,0 +1,26 @@
+{
+  "name": "Kbouffe — Restaurant en ligne",
+  "short_name": "Kbouffe",
+  "description": "Créez votre boutique de commande en ligne en 2 minutes. 0% de commission.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/icon",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

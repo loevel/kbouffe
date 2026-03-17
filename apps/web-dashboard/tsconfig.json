@@ -1,0 +1,87 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@kbouffe/module-core": [
+        "../../packages/modules/core/src/api/index.ts"
+      ],
+      "@kbouffe/module-core/*": [
+        "../../packages/modules/core/src/*"
+      ],
+      "@kbouffe/module-core/ui": [
+        "../../packages/modules/core/src/ui/index.ts"
+      ],
+      "@kbouffe/module-catalog": [
+        "../../packages/modules/catalog/src/index.ts"
+      ],
+      "@kbouffe/module-catalog/*": [
+        "../../packages/modules/catalog/src/*"
+      ],
+      "@kbouffe/module-orders": [
+        "../../packages/modules/orders/src/index.ts"
+      ],
+      "@kbouffe/module-orders/*": [
+        "../../packages/modules/orders/src/*"
+      ],
+      "@kbouffe/module-reservations": [
+        "../../packages/modules/reservations/src/index.ts"
+      ],
+      "@kbouffe/module-reservations/*": [
+        "../../packages/modules/reservations/src/*"
+      ],
+      "@kbouffe/module-marketing": [
+        "../../packages/modules/marketing/src/index.ts"
+      ],
+      "@kbouffe/module-marketing/*": [
+        "../../packages/modules/marketing/src/*"
+      ],
+      "@kbouffe/module-hr": [
+        "../../packages/modules/hr/src/index.ts"
+      ],
+      "@kbouffe/module-hr/*": [
+        "../../packages/modules/hr/src/*"
+      ],
+      "@kbouffe/module-crm": [
+        "../../packages/modules/crm/src/index.ts"
+      ],
+      "@kbouffe/module-crm/*": [
+        "../../packages/modules/crm/src/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
