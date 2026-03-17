@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { 
     Bell, 
     CheckCircle2, 
@@ -14,6 +14,7 @@ import {
 import { useUserSession, type UserPreferences } from "@/store/client-store";
 import toast from "react-hot-toast";
 import { useTheme, useLocale } from "@kbouffe/module-core/ui";
+import { motion, AnimatePresence } from "framer-motion";
 
 const LANGUAGES = [
     { code: "fr", label: "Français" },
@@ -48,6 +49,9 @@ export function PreferencesPanelReal() {
     const { setTheme } = useTheme();
     const { setLocale } = useLocale();
     const [saving, setSaving] = useState(false);
+    const [savedAt, setSavedAt] = useState<Date | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const saveTimeout = useRef<NodeJS.Timeout | null>(null);
     
     // Local state for the form
     const [prefs, setPrefs] = useState<UserPreferences>({
@@ -95,6 +99,7 @@ export function PreferencesPanelReal() {
 
     const handleSave = async () => {
         setSaving(true);
+        setError(null);
         try {
             // Apply immediately to UI contexts
             setTheme(prefs.theme as any);
@@ -113,13 +118,37 @@ export function PreferencesPanelReal() {
 
             // Update Zustand
             updateProfile({ preferences: prefs });
+            setSavedAt(new Date());
             toast.success("Préférences enregistrées");
         } catch (error: any) {
-            toast.error(error.message || "Impossible de sauvegarder vos préférences");
+            const message = error.message || "Impossible de sauvegarder vos préférences";
+            setError(message);
+            toast.error(message);
         } finally {
             setSaving(false);
         }
     };
+
+    // Autosave on prefs change (debounced)
+    useEffect(() => {
+        if (!session) return; // avoid on first mount without session
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        saveTimeout.current = setTimeout(() => {
+            void handleSave();
+        }, 800);
+        return () => {
+            if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [prefs]);
+
+    const savedLabel = useMemo(() => {
+        if (!savedAt) return null;
+        const delta = Math.floor((Date.now() - savedAt.getTime()) / 1000);
+        if (delta < 60) return `Enregistré il y a ${delta}s`;
+        if (delta < 3600) return `Enregistré il y a ${Math.floor(delta/60)} min`;
+        return `Enregistré à ${savedAt.toLocaleTimeString()}`;
+    }, [savedAt]);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -128,6 +157,34 @@ export function PreferencesPanelReal() {
                 <div>
                     <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">Mes préférences</h2>
                     <p className="text-sm text-surface-500 dark:text-surface-400">Personnalisez votre expérience Kbouffe.</p>
+                    <div className="flex items-center gap-2 text-xs font-semibold mt-2">
+                        <AnimatePresence>
+                            {saving && (
+                                <motion.span
+                                    key="saving"
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -4 }}
+                                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200"
+                                >
+                                    <Loader2 size={12} className="animate-spin" />
+                                    Sauvegarde…
+                                </motion.span>
+                            )}
+                        </AnimatePresence>
+                        {savedLabel && !saving && (
+                            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+                                <CheckCircle2 size={12} />
+                                {savedLabel}
+                            </span>
+                        )}
+                        {error && !saving && (
+                            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">
+                                <Volume2 size={12} />
+                                {error}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <button
                     onClick={handleSave}
@@ -157,7 +214,9 @@ export function PreferencesPanelReal() {
                                     <button
                                         key={lang.code}
                                         onClick={() => setPrefs({ ...prefs, language: lang.code })}
-                                        className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                                        role="radio"
+                                        aria-checked={prefs.language === lang.code}
+                                        className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
                                             prefs.language === lang.code
                                             ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
                                             : "border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800"
@@ -176,7 +235,9 @@ export function PreferencesPanelReal() {
                                     <button
                                         key={t.id}
                                         onClick={() => setPrefs({ ...prefs, theme: t.id as any })}
-                                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                                        role="radio"
+                                        aria-checked={prefs.theme === t.id}
+                                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
                                             prefs.theme === t.id
                                             ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
                                             : "border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800"
@@ -199,12 +260,12 @@ export function PreferencesPanelReal() {
 
                 {/* Shopping Preferences */}
                 <section className="p-6 rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 space-y-5">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400">
-                            <Truck size={20} />
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                                <Truck size={20} />
+                            </div>
+                            <h3 className="font-bold text-surface-900 dark:text-white">Mode par défaut</h3>
                         </div>
-                        <h3 className="font-bold text-surface-900 dark:text-white">Mode par défaut</h3>
-                    </div>
 
                     <div>
                         <label className="block text-xs font-bold text-surface-500 mb-3 uppercase tracking-wider">Type de commande préféré</label>
@@ -213,7 +274,9 @@ export function PreferencesPanelReal() {
                                 <button
                                     key={mode.id}
                                     onClick={() => setPrefs({ ...prefs, defaultDeliveryMode: mode.id as any })}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
+                                    role="radio"
+                                    aria-checked={prefs.defaultDeliveryMode === mode.id}
+                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
                                         prefs.defaultDeliveryMode === mode.id
                                         ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
                                         : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-800"
@@ -297,10 +360,13 @@ export function PreferencesPanelReal() {
                                 </div>
                                 <button
                                     onClick={() => updateNestedNotify(item.id, !prefs.notifications[item.id])}
-                                    className={`w-12 h-6 rounded-full transition-all relative ${
+                                    role="switch"
+                                    aria-checked={prefs.notifications[item.id]}
+                                    className={`w-12 h-6 rounded-full transition-all relative focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
                                         prefs.notifications[item.id] ? "bg-brand-500" : "bg-surface-200 dark:bg-surface-700"
                                     }`}
                                 >
+                                    <span className="sr-only">{prefs.notifications[item.id] ? "Activé" : "Désactivé"}</span>
                                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
                                         prefs.notifications[item.id] ? "right-1" : "left-1"
                                     }`} />

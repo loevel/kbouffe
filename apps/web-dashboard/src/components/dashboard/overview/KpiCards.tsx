@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, ShoppingBag, TrendingUp, Users } from "lucide-react";
+import { DollarSign, ShoppingBag, TrendingUp, Users, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card } from "@kbouffe/module-core/ui";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -26,21 +26,26 @@ export function KpiCards() {
         );
     }
 
+    // Approximations de tendance: comparaison à la moyenne glissante (semaine ou total)
+    const weekAvg = stats.revenue.week / 7 || 0;
+    const revenueDelta = weekAvg ? ((stats.revenue.today - weekAvg) / weekAvg) * 100 : null;
+    const orderDelta = stats.orders.total ? ((stats.orders.today / Math.max(stats.orders.total, 1)) * 100) : null;
+
     const kpis = [
         {
             label: t.dashboard.todayRevenue,
             value: formatCFA(stats.revenue.today),
             icon: DollarSign,
-            trend: null as string | null,
-            trendUp: true,
+            trend: revenueDelta !== null ? `${revenueDelta > 0 ? "+" : ""}${revenueDelta.toFixed(0)}% vs moy. 7j` : null,
+            trendUp: (revenueDelta ?? 0) >= 0,
             sub: `${formatCFA(stats.revenue.week)} ${t.dashboard.thisWeek}`,
         },
         {
             label: t.dashboard.ordersLabel,
             value: `${stats.orders.today} ${t.dashboard.today}`,
             icon: ShoppingBag,
-            trend: null,
-            trendUp: false,
+            trend: orderDelta !== null ? `${orderDelta.toFixed(0)}% des commandes totales` : null,
+            trendUp: true,
             sub: `${stats.orders.pending} ${t.dashboard.pending}`,
             subWarning: stats.orders.pending > 0,
         },
@@ -71,7 +76,8 @@ export function KpiCards() {
                             <kpi.icon className="h-6 w-6 text-brand-500" />
                         </div>
                         {kpi.trend && (
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${kpi.trendUp ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"}`}>
+                            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${kpi.trendUp ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"}`}>
+                                {kpi.trendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                                 {kpi.trend}
                             </span>
                         )}

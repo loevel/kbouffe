@@ -16,7 +16,7 @@ import {
     ArrowRight,
     SearchX
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useCart } from "@/contexts/cart-context";
 import { useSearchStore, usePreferencesStore } from "@/store/client-store";
 
@@ -74,6 +74,7 @@ const gradientFor = (id: string) => {
 function PromoCarousel() {
     const [index, setIndex] = useState(0);
     const [direction, setDirection] = useState(0);
+    const reduceMotion = useReducedMotion();
 
     const paginate = (newDirection: number) => {
         setDirection(newDirection);
@@ -93,15 +94,23 @@ function PromoCarousel() {
                 <motion.div
                     key={index}
                     custom={direction}
-                    variants={{
-                        enter: (direction: number) => ({ x: direction > 0 ? "100%" : "-100%", opacity: 0 }),
-                        center: { x: 0, opacity: 1 },
-                        exit: (direction: number) => ({ x: direction < 0 ? "100%" : "-100%", opacity: 0 })
-                    }}
+                    variants={
+                        reduceMotion
+                            ? { enter: { opacity: 0 }, center: { opacity: 1 }, exit: { opacity: 0 } }
+                            : {
+                                  enter: (direction: number) => ({ x: direction > 0 ? "100%" : "-100%", opacity: 0 }),
+                                  center: { x: 0, opacity: 1 },
+                                  exit: (direction: number) => ({ x: direction < 0 ? "100%" : "-100%", opacity: 0 })
+                              }
+                    }
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    transition={{ x: { type: "spring", stiffness: 200, damping: 25 }, opacity: { duration: 0.3 } }}
+                    transition={
+                        reduceMotion
+                            ? { opacity: { duration: 0.25 } }
+                            : { x: { type: "spring", stiffness: 200, damping: 25 }, opacity: { duration: 0.3 } }
+                    }
                     className="absolute inset-0 flex"
                 >
                     <div className="relative w-full h-full flex items-center">
@@ -110,6 +119,8 @@ function PromoCarousel() {
                                 src={promo.image} 
                                 alt="" 
                                 className="w-full h-full object-cover"
+                                loading="lazy"
+                                decoding="async"
                                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
                             <div className={`absolute inset-0 bg-gradient-to-r ${promo.color} mix-blend-multiply opacity-50`} />
@@ -182,6 +193,8 @@ function RestaurantTile({ r, promoLabel }: { r: RestaurantItem; promoLabel?: str
                             src={r.coverUrl} 
                             alt={r.name} 
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" 
+                            loading="lazy"
+                            decoding="async"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80" />
                     </div>
@@ -283,28 +296,38 @@ export function ClientDiscovery() {
     const router = useRouter();
     const { filters, updateFilters } = useSearchStore();
     const { itemCount } = useCart();
+    const reduceMotion = useReducedMotion();
     
     const [restaurants, setRestaurants] = useState<RestaurantItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchInput, setSearchInput] = useState("");
 
     const selectedCuisine = filters.cuisineTypes?.[0] ?? "";
 
     const fetchRestaurants = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const params = new URLSearchParams();
             if (filters.city) params.set("city", filters.city);
             if (filters.cuisineTypes?.length) params.set("cuisine", filters.cuisineTypes[0]);
             if (filters.sortBy) params.set("sort", filters.sortBy);
             
-            const res = await fetch(`/api/stores?${params}`);
-            if (res.ok) {
-                const data = await res.json();
-                setRestaurants(data.restaurants ?? []);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            const res = await fetch(`/api/stores?${params}`, { signal: controller.signal });
+            clearTimeout(timeout);
+
+            if (!res.ok) {
+                throw new Error(`Erreur ${res.status}`);
             }
+
+            const data = await res.json();
+            setRestaurants(data.restaurants ?? []);
         } catch (e) {
             console.error("Discovery fetch failed", e);
+            setError("Impossible de charger les restaurants. Vérifiez votre connexion et réessayez.");
         } finally {
             setLoading(false);
         }
@@ -329,9 +352,9 @@ export function ClientDiscovery() {
     const displayOthers   = allOthers.length ? allOthers : restaurants.slice(4, 12);
 
     return (
-        <div className="min-h-full bg-white dark:bg-surface-950 overflow-x-hidden pt-4 sm:pt-0">
+        <div className="min-h-full bg-white dark:bg-surface-950 overflow-x-hidden pt-4 sm:pt-0" aria-live="polite">
             {/* ── Impact Hero Section ────────────────────────────────────────── */}
-            <div className="relative -mx-4 sm:-mx-6 px-4 sm:px-6 py-20 sm:py-28 mb-12 overflow-hidden">
+            <div className="relative -mx-4 sm:-mx-6 px-4 sm:px-6 py-14 sm:py-20 mb-12 overflow-hidden">
                 <div className="absolute inset-0 z-0">
                     <div className="absolute top-0 -left-1/4 w-[60%] h-[60%] bg-brand-500/[0.07] blur-[160px] rounded-full animate-pulse" />
                     <div className="absolute bottom-0 -right-1/4 w-[60%] h-[60%] bg-amber-500/[0.07] blur-[160px] rounded-full animate-pulse transition-all duration-3000" />
@@ -339,7 +362,7 @@ export function ClientDiscovery() {
                 </div>
 
                 <div className="relative z-10 max-w-6xl mx-auto text-center">
-                    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, ease: "easeOut" }}>
+                    <motion.div initial={reduceMotion ? undefined : { opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, ease: "easeOut" }}>
                         <h1 className="text-5xl sm:text-7xl lg:text-8xl font-extrabold leading-[0.92] tracking-tight text-surface-900 dark:text-white mb-10 uppercase">
                             GOÛTEZ À<br />
                             <span className="text-transparent bg-clip-text bg-gradient-to-br from-brand-500 via-brand-600 to-amber-600">L'EXCELLENCE</span><br />
@@ -349,7 +372,7 @@ export function ClientDiscovery() {
                     
                     <div className="relative max-w-4xl mx-auto mb-16">
                         <motion.form 
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={reduceMotion ? undefined : { opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3, duration: 0.6 }}
                             onSubmit={handleSearchSubmit} 
@@ -402,6 +425,7 @@ export function ClientDiscovery() {
                     <h2 className="text-4xl font-black tracking-tight text-surface-900 dark:text-white uppercase italic">EXPLORER PAR CUISINE</h2>
                 </div>
                 <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide pb-8 -mx-1 px-1">
+                    <div className="hidden sm:block text-xs uppercase tracking-widest text-surface-400 font-bold mr-2">Glisser →</div>
                     <button
                         onClick={() => updateFilters({ cuisineTypes: [] })}
                         className={`shrink-0 flex flex-col items-center justify-center gap-5 w-40 h-40 rounded-[3rem] border-3 transition-all duration-500 font-black text-xs uppercase tracking-widest ${
@@ -437,6 +461,25 @@ export function ClientDiscovery() {
                         <SkeletonRow />
                         <SkeletonRow />
                     </>
+                ) : error ? (
+                    <div className="text-center py-24 bg-rose-50 dark:bg-rose-500/5 rounded-[2.5rem] border border-rose-100 dark:border-rose-900/40">
+                        <SearchX size={56} className="mx-auto text-rose-500 dark:text-rose-300 mb-4" />
+                        <p className="text-rose-700 dark:text-rose-200 font-bold text-lg mb-4">{error}</p>
+                        <div className="flex items-center justify-center gap-4">
+                            <button
+                                onClick={() => fetchRestaurants()}
+                                className="px-6 py-3 rounded-full bg-brand-500 text-white font-bold hover:bg-brand-600 transition-all"
+                            >
+                                Réessayer
+                            </button>
+                            <button
+                                onClick={() => updateFilters({ cuisineTypes: [], sortBy: "recommended", city: "" })}
+                                className="px-6 py-3 rounded-full bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-bold hover:border-brand-400 transition-all"
+                            >
+                                Réinitialiser les filtres
+                            </button>
+                        </div>
+                    </div>
                 ) : restaurants.length === 0 ? (
                     <div className="text-center py-32 bg-surface-50 dark:bg-surface-900/40 rounded-[3rem] border-2 border-dashed border-surface-200 dark:border-surface-800">
                         <ChefHat size={64} className="mx-auto text-surface-200 dark:text-surface-700 mb-6" />

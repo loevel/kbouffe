@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Spinner, toast, useLocale } from "@kbouffe/module-core/ui";
 import { 
     useReservations, 
@@ -24,6 +24,8 @@ export function ReservationsList() {
     const [search, setSearch] = useState("");
     const [dateFilter, setDateFilter] = useState(new Date().toISOString().split("T")[0]);
     const [page, setPage] = useState(1);
+    const [sort, setSort] = useState<"time" | "party" | "status">("time");
+    const [minParty, setMinParty] = useState<number | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -96,7 +98,27 @@ export function ReservationsList() {
         }
     };
 
-    const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+    const filteredAndSorted = useMemo(() => {
+        let list = reservations;
+        if (minParty) list = list.filter((r) => (r.party_size ?? 0) >= minParty);
+
+        list = [...list].sort((a, b) => {
+            if (sort === "party") return (b.party_size ?? 0) - (a.party_size ?? 0);
+            if (sort === "status") return (a.status ?? "").localeCompare(b.status ?? "");
+            // time sort by date + time
+            const aKey = `${a.date} ${a.time}`;
+            const bKey = `${b.date} ${b.time}`;
+            return aKey.localeCompare(bKey);
+        });
+
+        return list;
+    }, [reservations, sort, minParty]);
+
+    const totalPages = Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE);
+    const pageReservations = useMemo(() => {
+        const start = (page - 1) * ITEMS_PER_PAGE;
+        return filteredAndSorted.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredAndSorted, page]);
     
     // Calculate counts for badges in filters
     const pendingCount = allForStats.filter((r) => r.status === "pending").length;
@@ -120,6 +142,10 @@ export function ReservationsList() {
                 pendingCount={pendingCount}
                 confirmedCount={confirmedCount}
                 seatedCount={seatedCount}
+                sort={sort}
+                onSortChange={setSort}
+                minParty={minParty}
+                onMinPartyChange={setMinParty}
             />
 
             {isLoading ? (
@@ -129,7 +155,7 @@ export function ReservationsList() {
                 </div>
             ) : (
                 <ReservationsTable
-                    reservations={reservations}
+                    reservations={pageReservations}
                     page={page}
                     totalPages={totalPages}
                     onPageChange={setPage}
