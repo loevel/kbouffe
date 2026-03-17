@@ -1,0 +1,17 @@
+{
+    "extends": "../../../tsconfig.base.json",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": [
+                "../../../apps/web-dashboard/src/*"
+            ]
+        },
+        "types": [
+            "@cloudflare/workers-types"
+        ]
+    },
+    "include": [
+        "src/**/*"
+    ]
+}

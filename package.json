@@ -1,0 +1,9 @@
+{
+  "name": "kbouffe-plateforme",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "packages/modules/*"
+  ]
+}

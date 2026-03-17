@@ -1,0 +1,29 @@
+{
+    "name": "api",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "lint": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@kbouffe/shared-types": "^1.0.0",
+        "@kbouffe/module-catalog": "*",
+        "@kbouffe/module-hr": "*",
+        "@kbouffe/module-crm": "*",
+        "@kbouffe/module-core": "*",
+        "@kbouffe/module-marketing": "*",
+        "@kbouffe/module-orders": "*",
+        "@kbouffe/module-reservations": "*",
+        "@kbouffe/module-chat": "*",
+        "@supabase/supabase-js": "^2.98.0",
+        "hono": "^4.7.0"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250621.0",
+        "typescript": "^5",
+        "wrangler": "^4.69.0"
+    }
+}

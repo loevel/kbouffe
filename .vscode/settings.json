@@ -1,0 +1,9 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python3 _write_fr\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "./node_modules/.bin/tsc": true
+    }
+}

@@ -1,0 +1,179 @@
+/**
+ * Kbouffe API — Hono Worker
+ *
+ * Public + authenticated API serving both the mobile app and the web client.
+ * Deployed as a standalone Cloudflare Worker.
+ *
+ * All routes live under /api/* to match the path convention used by
+ * both the mobile-client and the web-dashboard proxy.
+ */
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import type { Env, Variables } from "./types";
+import { authMiddleware } from "./middleware/auth";
+import { adminMiddleware } from "./middleware/admin";
+import { requireModule } from "./middleware/module";
+
+// ── Public routes ────────────────────────────────────────────────────
+import { coreApi } from "@kbouffe/module-core";
+const { storesRoutes, uploadRoutes, authRoutes, usersRoutes } = coreApi;
+import { catalogApi } from "@kbouffe/module-catalog";
+const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute: productsRoutes } = catalogApi;
+import { storePublicRoutes } from "./modules/store/store-public";
+import { dashboardRoutes } from "./modules/store/dashboard";
+import { restaurantRoutes } from "./modules/store/restaurant";
+
+// ── Authenticated routes ─────────────────────────────────────────────
+import { ordersApi } from "@kbouffe/module-orders";
+const { ordersRoutes, paymentRoutes, paymentWebhookRoutes } = ordersApi;
+import { reservationsApi } from "@kbouffe/module-reservations";
+const { reservationsRoutes, publicReservationsRoutes, tablesRoutes } = reservationsApi;
+import { crmApi } from "@kbouffe/module-crm";
+const { customersRoutes } = crmApi;
+import { marketingApi } from "@kbouffe/module-marketing";
+const {
+    marketingRoutes,
+    adsRoutes,
+    couponsRoutes,
+    couponValidateRoutes,
+    smsRoutes,
+} = marketingApi;
+import { hrApi } from "@kbouffe/module-hr";
+const { teamRoutes, payoutsRoutes } = hrApi;
+import { chatApi } from "@kbouffe/module-chat";
+const { chatRoutes } = chatApi;
+import { notificationsRoutes } from "./modules/core/notifications";
+import { zonesRoutes } from "@kbouffe/module-orders";
+
+// ── Admin routes ─────────────────────────────────────────────────────
+import { adminRoutes } from "./modules/admin";
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Root app — health check lives at / (outside the /api scope)
+// ═══════════════════════════════════════════════════════════════════════
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+// ── Global middleware ────────────────────────────────────────────────
+app.use("*", logger());
+app.use(
+    "*",
+    cors({
+        origin: [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002",
+            "http://localhost:8081",
+            "http://localhost:8787",
+            "https://kbouffe.com",
+            "https://www.kbouffe.com",
+        ],
+        allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowHeaders: ["Content-Type", "Authorization"],
+        maxAge: 86400,
+    }),
+);
+
+// ── Health check — root ──────────────────────────────────────────────
+app.get("/", (c) =>
+    c.json({ name: "Kbouffe API", version: "1.0.0", status: "ok" }),
+);
+
+// ═══════════════════════════════════════════════════════════════════════
+//  /api/* — all business routes
+// ═══════════════════════════════════════════════════════════════════════
+const api = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+// ── Public routes (no auth) ──────────────────────────────────────────
+api.route("/stores", storesRoutes);
+api.route("/menu", menuRoutes);
+api.route("/store", storePublicRoutes);                   // guest orders
+api.route("/store", publicReservationsRoutes);             // public reservation booking
+api.route("/coupons/validate", couponValidateRoutes);
+api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
+api.route("/sms", smsRoutes);
+api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
+api.route("/sync-user", authRoutes);       // Combined in authRoutes
+
+// ── Auth middleware for merchant routes ───────────────────────────────
+const merchantPaths = [
+    "/orders", "/categories", "/products", "/reservations",
+    "/dashboard", "/coupons", "/tables", "/restaurant",
+    "/customers", "/account", "/security", "/register-restaurant",
+    "/marketing", "/notifications", "/payouts",
+    "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload", "/chat"
+] as const;
+
+for (const path of merchantPaths) {
+    api.use(`${path}/*`, authMiddleware);
+    api.use(path, authMiddleware);
+}
+
+// ── Module requirements ──────────────────────────────────────────────
+const moduleRequirements: Record<string, string> = {
+    "/reservations": "reservations",
+    "/tables": "reservations",
+    "/marketing": "marketing",
+    "/coupons": "marketing",
+    "/ads": "marketing",
+    "/team": "hr",
+    "/payouts": "hr",
+};
+
+for (const [path, moduleName] of Object.entries(moduleRequirements)) {
+    api.use(`${path}/*`, requireModule(moduleName));
+    api.use(path, requireModule(moduleName));
+}
+
+// ── Admin middleware ─────────────────────────────────────────────────
+api.use("/admin/*", adminMiddleware);
+api.use("/admin", adminMiddleware);
+
+// ── Merchant routes ──────────────────────────────────────────────────
+api.route("/orders", ordersRoutes);
+api.route("/categories", categoriesRoutes);
+api.route("/products", productsRoutes);
+api.route("/reservations", reservationsRoutes);
+api.route("/dashboard", dashboardRoutes);
+api.route("/restaurant", restaurantRoutes);
+api.route("/account", usersRoutes);
+api.route("/security", usersRoutes);
+api.route("/register-restaurant", authRoutes);
+api.route("/kyc", authRoutes);
+api.route("/upload", uploadRoutes);
+api.route("/marketing", marketingRoutes);
+api.route("/notifications", notificationsRoutes);
+api.route("/payouts", payoutsRoutes);
+api.route("/payments/mtn", paymentRoutes);
+api.route("/ads", adsRoutes);
+api.route("/team", teamRoutes);
+api.route("/zones", zonesRoutes);
+api.route("/upload", uploadRoutes);
+api.route("/chat", chatRoutes);
+
+// ── Admin routes ─────────────────────────────────────────────────────
+api.route("/admin", adminRoutes);
+
+// ── Mount /api/* on root ─────────────────────────────────────────────
+app.route("/api", api);
+
+// ── 404 fallback ─────────────────────────────────────────────────────
+app.notFound((c) => c.json({ error: "Route non trouvée" }, 404));
+
+// ── Global error handler ─────────────────────────────────────────────
+app.onError((err, c) => {
+    console.error("[API Error]", err);
+    return c.json({ error: "Erreur serveur interne" }, 500);
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Export Worker Handlers (Fetch + Queue)
+// ═══════════════════════════════════════════════════════════════════════
+import { processSmsQueue, type SmsMessage } from "./lib/sms-queue";
+
+export default {
+    fetch: app.fetch,
+    async queue(batch: MessageBatch<SmsMessage>, env: Env): Promise<void> {
+        await processSmsQueue(batch, env);
+    },
+};
