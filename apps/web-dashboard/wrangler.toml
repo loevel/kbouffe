@@ -1,0 +1,53 @@
+#:schema node_modules/wrangler/config-schema.json
+
+name = "kbouffe-dashboard"
+main = ".open-next/worker.js"
+compatibility_date = "2025-07-01"
+compatibility_flags = ["nodejs_compat"]
+minify = true
+
+
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+# --- R2 bucket (Chantier 2) ---
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "kbouffe-images"
+
+
+# ── MTN Developer API Keys ──────────────────────────────────────────────
+# Set via `wrangler secret put <KEY_NAME>`
+#
+# Collection (customer payments):
+#   MTN_BASE_URL              — https://sandbox.momodeveloper.mtn.com (sandbox) or https://momodeveloper.mtn.com (prod)
+#   MTN_API_USER              — UUID from MTN developer portal
+#   MTN_API_KEY               — API key for the created user
+#   MTN_COLLECTION_SUBSCRIPTION_KEY — Ocp-Apim-Subscription-Key
+#   MTN_TARGET_ENV            — "sandbox" or "mtnCameroon"
+#   MTN_CALLBACK_URL          — Webhook URL for payment callbacks
+#   MTN_WEBHOOK_SECRET        — Secret to validate webhooks
+#
+# Disbursement (payouts to restaurants/drivers):
+#   MTN_DISBURSEMENT_API_USER
+#   MTN_DISBURSEMENT_API_KEY
+#   MTN_DISBURSEMENT_SUBSCRIPTION_KEY
+#   MTN_DISBURSEMENT_CALLBACK_URL
+#
+# SMS v3:
+#   MTN_SMS_BASE_URL          — https://api.mtn.com
+#   MTN_SMS_CLIENT_ID         — OAuth 2.0 client ID
+#   MTN_SMS_CLIENT_SECRET     — OAuth 2.0 client secret
+#   MTN_SMS_SUBSCRIPTION_KEY  — Ocp-Apim-Subscription-Key for SMS product
+#   MTN_SMS_SENDER_ADDRESS    — Registered sender number/shortcode
+#
+# KYC Verification v1:
+#   MTN_KYC_BASE_URL          — https://api.mtn.com/v1/kycVerification (default)
+#   MTN_KYC_CLIENT_ID         — OAuth 2.0 client ID (can reuse MTN_SMS_CLIENT_ID)
+#   MTN_KYC_CLIENT_SECRET     — OAuth 2.0 client secret (can reuse MTN_SMS_CLIENT_SECRET)
+#   MTN_KYC_SUBSCRIPTION_KEY  — Ocp-Apim-Subscription-Key for KYC product
+#
+# Advertising API v1:
+#   MTN_ADS_BASE_URL           — https://api.mtn.com (default)
+#   MTN_ADS_CLIENT_ID          — OAuth 2.0 client ID (can reuse MTN_SMS_CLIENT_ID)
+#   MTN_ADS_CLIENT_SECRET      — OAuth 2.0 client secret (can reuse MTN_SMS_CLIENT_SECRET)
+#   MTN_ADS_SUBSCRIPTION_KEY   — Ocp-Apim-Subscription-Key for Advertising product

@@ -1,0 +1,458 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import {
+    X,
+    Minus,
+    Plus,
+    Trash2,
+    ShoppingBag,
+    ChefHat,
+    CreditCard,
+    Smartphone,
+    Loader2,
+    CheckCircle2,
+    MapPin,
+    Package,
+    Utensils,
+} from "lucide-react";
+import { useCart } from "@/contexts/cart-context";
+import { formatCFA } from "@/lib/format";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type DeliveryType = "delivery" | "pickup" | "dine_in";
+type PaymentMethod = "cash" | "mobile_money_mtn" | "mobile_money_orange";
+
+const DELIVERY_OPTIONS: { id: DeliveryType; label: string; icon: React.ReactNode; fee: number }[] = [
+    { id: "delivery", label: "Livraison",      icon: <MapPin   size={16} />, fee: 1000 },
+    { id: "pickup",   label: "À emporter",     icon: <Package  size={16} />, fee: 0    },
+    { id: "dine_in",  label: "Sur place",      icon: <Utensils size={16} />, fee: 0    },
+];
+
+const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
+    { id: "cash",                label: "Cash",          icon: <CreditCard  size={16} /> },
+    { id: "mobile_money_mtn",    label: "MTN Money",     icon: <Smartphone  size={16} /> },
+    { id: "mobile_money_orange", label: "Orange Money",  icon: <Smartphone  size={16} /> },
+];
+
+// ── CartDrawer ───────────────────────────────────────────────────────────────
+
+interface CartDrawerProps {
+    open: boolean;
+    onClose: () => void;
+}
+
+export function CartDrawer({ open, onClose }: CartDrawerProps) {
+    const { restaurant, items, itemCount, subtotal, updateQty, removeItem, clear } = useCart();
+
+    // Checkout step: "cart" | "checkout" | "success"
+    const [step, setStep] = useState<"cart" | "checkout" | "success">("cart");
+
+    // Checkout form state
+    const [deliveryType, setDeliveryType] = useState<DeliveryType>("delivery");
+    const [customerName, setCustomerName] = useState("");
+    const [customerPhone, setCustomerPhone] = useState("");
+    const [deliveryAddress, setDeliveryAddress] = useState("");
+    const [tableNumber, setTableNumber] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [orderId, setOrderId] = useState<string | null>(null);
+
+    // Reset step when drawer closes
+    const prevOpen = useRef(open);
+    useEffect(() => {
+        if (!open && prevOpen.current) {
+            setTimeout(() => setStep("cart"), 300);
+        }
+        prevOpen.current = open;
+    }, [open]);
+
+    const deliveryFee = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.fee ?? 0;
+    const total = subtotal + deliveryFee;
+
+    const handleSubmitOrder = async () => {
+        setError(null);
+        if (!customerName.trim()) { setError("Votre nom est requis."); return; }
+        if (!customerPhone.trim()) { setError("Votre numéro de téléphone est requis."); return; }
+        if (deliveryType === "delivery" && !deliveryAddress.trim()) {
+            setError("L'adresse de livraison est requise."); return;
+        }
+
+        setSubmitting(true);
+        try {
+            const res = await fetch("/api/store/order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    restaurantId: restaurant!.id,
+                    items: items.map((i) => ({
+                        productId: i.id,
+                        name: i.name,
+                        price: i.price,
+                        quantity: i.quantity,
+                    })),
+                    deliveryType,
+                    deliveryAddress: deliveryType === "delivery" ? deliveryAddress : undefined,
+                    tableNumber: deliveryType === "dine_in" ? tableNumber : undefined,
+                    customerName,
+                    customerPhone,
+                    paymentMethod,
+                    subtotal,
+                    deliveryFee,
+                    total,
+                }),
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error ?? "Erreur inconnue");
+
+            setOrderId(json.orderId);
+            clear();
+            setStep("success");
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : "Erreur lors de la commande. Réessayez.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div
+                className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${
+                    open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                }`}
+                onClick={onClose}
+            />
+
+            {/* Drawer */}
+            <aside
+                className={`fixed inset-y-0 right-0 z-50 flex flex-col w-full max-w-md bg-white dark:bg-surface-900 shadow-2xl transition-transform duration-300 ease-in-out ${
+                    open ? "translate-x-0" : "translate-x-full"
+                }`}
+                aria-label="Panier"
+                aria-modal="true"
+                role="dialog"
+            >
+                {/* ── Header ── */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200 dark:border-surface-700">
+                    <div className="flex items-center gap-2">
+                        {step === "cart" ? (
+                            <>
+                                <ShoppingBag size={20} className="text-brand-500" />
+                                <h2 className="font-bold text-surface-900 dark:text-white">
+                                    Mon panier
+                                    {itemCount > 0 && (
+                                        <span className="ml-2 text-sm font-normal text-surface-500">
+                                            ({itemCount} article{itemCount > 1 ? "s" : ""})
+                                        </span>
+                                    )}
+                                </h2>
+                            </>
+                        ) : step === "checkout" ? (
+                            <h2 className="font-bold text-surface-900 dark:text-white">Finaliser la commande</h2>
+                        ) : (
+                            <h2 className="font-bold text-surface-900 dark:text-white">Commande confirmée !</h2>
+                        )}
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                        aria-label="Fermer le panier"
+                    >
+                        <X size={20} className="text-surface-500" />
+                    </button>
+                </div>
+
+                {/* ── Body ── */}
+                <div className="flex-1 overflow-y-auto">
+
+                    {/* Step: cart */}
+                    {step === "cart" && (
+                        <>
+                            {items.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4 text-center px-6">
+                                    <ChefHat size={48} className="text-surface-200 dark:text-surface-700" />
+                                    <p className="text-surface-500 dark:text-surface-400">
+                                        Votre panier est vide.
+                                        <br />Ajoutez des plats pour commencer !
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="px-5 py-4 space-y-3">
+                                    {restaurant && (
+                                        <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                                            Commande chez <span className="font-medium text-brand-500">{restaurant.name}</span>
+                                        </p>
+                                    )}
+                                    {items.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="flex gap-3 items-start bg-surface-50 dark:bg-surface-800 rounded-xl p-3"
+                                        >
+                                            {/* Image */}
+                                            {item.imageUrl ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img
+                                                    src={item.imageUrl}
+                                                    alt={item.name}
+                                                    className="w-16 h-16 rounded-lg object-cover shrink-0"
+                                                />
+                                            ) : (
+                                                <div className="w-16 h-16 rounded-lg bg-surface-200 dark:bg-surface-700 flex items-center justify-center shrink-0">
+                                                    <ChefHat size={20} className="text-surface-400" />
+                                                </div>
+                                            )}
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-surface-900 dark:text-white line-clamp-1">
+                                                    {item.name}
+                                                </p>
+                                                <p className="text-xs text-brand-500 font-semibold mt-0.5">
+                                                    {formatCFA(item.price)}
+                                                </p>
+                                                {/* Qty controls */}
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <button
+                                                        onClick={() => updateQty(item.id, item.quantity - 1)}
+                                                        className="w-7 h-7 rounded-full border border-surface-200 dark:border-surface-600 flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+                                                        aria-label="Diminuer la quantité"
+                                                    >
+                                                        <Minus size={12} />
+                                                    </button>
+                                                    <span className="text-sm font-semibold text-surface-900 dark:text-white w-4 text-center">
+                                                        {item.quantity}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => updateQty(item.id, item.quantity + 1)}
+                                                        className="w-7 h-7 rounded-full border border-surface-200 dark:border-surface-600 flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+                                                        aria-label="Augmenter la quantité"
+                                                    >
+                                                        <Plus size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Line total + delete */}
+                                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                                <span className="text-sm font-bold text-surface-900 dark:text-white">
+                                                    {formatCFA(item.price * item.quantity)}
+                                                </span>
+                                                <button
+                                                    onClick={() => removeItem(item.id)}
+                                                    className="text-surface-400 hover:text-red-500 transition-colors p-1"
+                                                    aria-label={`Supprimer ${item.name}`}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* Step: checkout */}
+                    {step === "checkout" && (
+                        <div className="px-5 py-4 space-y-5">
+                            {/* Delivery type */}
+                            <div>
+                                <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-2">
+                                    Mode de réception
+                                </p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {DELIVERY_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => setDeliveryType(opt.id)}
+                                            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-xs font-medium transition-colors ${
+                                                deliveryType === opt.id
+                                                    ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400"
+                                                    : "border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:border-brand-300"
+                                            }`}
+                                            aria-pressed={deliveryType === opt.id}
+                                        >
+                                            {opt.icon}
+                                            {opt.label}
+                                            {opt.fee > 0 && (
+                                                <span className="text-surface-400 font-normal">+{formatCFA(opt.fee)}</span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Customer info */}
+                            <div className="space-y-3">
+                                <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide">
+                                    Vos informations
+                                </p>
+                                <input
+                                    type="text"
+                                    placeholder="Nom complet *"
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:border-brand-500"
+                                />
+                                <input
+                                    type="tel"
+                                    placeholder="Téléphone * (ex: 690 000 000)"
+                                    value={customerPhone}
+                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:border-brand-500"
+                                />
+                                {deliveryType === "delivery" && (
+                                    <input
+                                        type="text"
+                                        placeholder="Adresse de livraison *"
+                                        value={deliveryAddress}
+                                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:border-brand-500"
+                                    />
+                                )}
+                                {deliveryType === "dine_in" && (
+                                    <input
+                                        type="text"
+                                        placeholder="Numéro de table (optionnel)"
+                                        value={tableNumber}
+                                        onChange={(e) => setTableNumber(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:border-brand-500"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Payment method */}
+                            <div>
+                                <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-2">
+                                    Paiement
+                                </p>
+                                <div className="space-y-2">
+                                    {PAYMENT_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => setPaymentMethod(opt.id)}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${
+                                                paymentMethod === opt.id
+                                                    ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400"
+                                                    : "border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:border-brand-300"
+                                            }`}
+                                            aria-pressed={paymentMethod === opt.id}
+                                        >
+                                            {opt.icon}
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Order summary */}
+                            <div className="rounded-xl bg-surface-50 dark:bg-surface-800 p-4 space-y-2 text-sm">
+                                <div className="flex justify-between text-surface-600 dark:text-surface-400">
+                                    <span>Sous-total</span>
+                                    <span>{formatCFA(subtotal)}</span>
+                                </div>
+                                <div className="flex justify-between text-surface-600 dark:text-surface-400">
+                                    <span>Livraison</span>
+                                    <span>{deliveryFee === 0 ? "Gratuit" : formatCFA(deliveryFee)}</span>
+                                </div>
+                                <div className="flex justify-between font-bold text-surface-900 dark:text-white pt-2 border-t border-surface-200 dark:border-surface-700">
+                                    <span>Total</span>
+                                    <span className="text-brand-500">{formatCFA(total)}</span>
+                                </div>
+                            </div>
+
+                            {error && (
+                                <p className="text-sm text-red-500 bg-red-50 dark:bg-red-500/10 rounded-xl px-4 py-3">
+                                    {error}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Step: success */}
+                    {step === "success" && (
+                        <div className="flex flex-col items-center justify-center h-80 gap-4 text-center px-8">
+                            <div className="w-16 h-16 rounded-full bg-green-50 dark:bg-green-500/10 flex items-center justify-center">
+                                <CheckCircle2 size={36} className="text-green-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-surface-900 dark:text-white">
+                                    Commande reçue !
+                                </h3>
+                                <p className="text-sm text-surface-500 dark:text-surface-400 mt-2">
+                                    Votre commande a été transmise au restaurant.
+                                    Vous serez contacté dès confirmation.
+                                </p>
+                                {orderId && (
+                                    <p className="text-xs text-surface-400 mt-2 font-mono">
+                                        Réf : #{orderId.slice(0, 8).toUpperCase()}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Footer ── */}
+                {step !== "success" && items.length > 0 && (
+                    <div className="px-5 py-4 border-t border-surface-200 dark:border-surface-700">
+                        {step === "cart" && (
+                            <>
+                                <div className="flex justify-between text-sm mb-3">
+                                    <span className="text-surface-500 dark:text-surface-400">Sous-total</span>
+                                    <span className="font-bold text-surface-900 dark:text-white">
+                                        {formatCFA(subtotal)}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setStep("checkout")}
+                                    className="w-full py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold rounded-xl transition-colors"
+                                >
+                                    Commander — {formatCFA(subtotal)}
+                                </button>
+                            </>
+                        )}
+                        {step === "checkout" && (
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => { setError(null); setStep("cart"); }}
+                                    disabled={submitting}
+                                    className="px-4 py-3 rounded-xl border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors disabled:opacity-50"
+                                >
+                                    Retour
+                                </button>
+                                <button
+                                    onClick={handleSubmitOrder}
+                                    disabled={submitting}
+                                    className="flex-1 py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                                >
+                                    {submitting ? (
+                                        <><Loader2 size={16} className="animate-spin" /> En cours…</>
+                                    ) : (
+                                        `Confirmer — ${formatCFA(total)}`
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {step === "success" && (
+                    <div className="px-5 py-4 border-t border-surface-200 dark:border-surface-700">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-xl transition-colors"
+                        >
+                            Fermer
+                        </button>
+                    </div>
+                )}
+            </aside>
+        </>
+    );
+}

@@ -1,0 +1,53 @@
+{
+  "name": "web-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:worker": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare deploy",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "^1.33.1-dev20.0",
+    "@kbouffe/shared-types": "^1.0.0",
+    "@kbouffe/module-catalog": "*",
+    "@kbouffe/module-core": "*",
+    "@kbouffe/module-hr": "*",
+    "@kbouffe/module-crm": "*",
+    "@kbouffe/module-marketing": "*",
+    "@kbouffe/module-orders": "*",
+    "@kbouffe/module-reservations": "*",
+    "@squoosh/lib": "^0.3.1",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.98.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.34.3",
+    "immer": "^10.1.1",
+    "libsodium-wrappers": "^0.8.2",
+    "lucide-react": "^0.575.0",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-hot-toast": "^2.6.0",
+    "swr": "^2.4.1",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.17.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "1.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "wrangler": "^4.69.0"
+  }
+}
