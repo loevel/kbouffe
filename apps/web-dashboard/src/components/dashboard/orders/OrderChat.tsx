@@ -2,11 +2,11 @@
 
 import { useState, useRef } from "react";
 import { Send, Image as ImageIcon, Loader2, User, UserCheck } from "lucide-react";
-import { Card, Button, Input, Badge } from "@/components/ui";
+import { Card, Button, Input, Badge } from "@kbouffe/module-core/ui";
 import { useChat, type Message } from "@/hooks/use-chat";
-import { formatDateTime } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
-import { useDashboard } from "@/contexts/dashboard-context";
+import { formatDateTime } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
 
 interface OrderChatProps {
     orderId: string;

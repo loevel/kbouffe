@@ -19,8 +19,7 @@ import {
     Mail,
     Trash,
 } from "lucide-react";
-import { Badge, Button } from "@/components/ui";
-import { toast } from "@/components/ui/Toast";
+import { Badge, Button, toast } from "@kbouffe/module-core/ui";
 import { AddUserDialog } from "@/components/admin/users/AddUserDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";

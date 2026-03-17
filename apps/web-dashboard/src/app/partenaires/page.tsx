@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Store, Smartphone, Banknote, ShieldCheck, BarChart3, Globe, ClipboardEdit, Share2, UtensilsCrossed } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function PartenairesPage() {
     const { t } = useLocale();

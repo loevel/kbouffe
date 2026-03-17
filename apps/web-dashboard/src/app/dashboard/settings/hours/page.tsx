@@ -2,7 +2,7 @@
 
 import { SettingsNav } from "@/components/dashboard/settings/SettingsNav";
 import { OpeningHoursForm } from "@/components/dashboard/settings/OpeningHoursForm";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function HoursPage() {
     const { t } = useLocale();

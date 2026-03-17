@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Save, Plus, X } from "lucide-react";
-import { Card, Button, Input } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button, Input } from "@kbouffe/module-core/ui";
+import { toast } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import type { Json } from "@/lib/supabase/types";
 
 export function DeliverySettingsForm() {

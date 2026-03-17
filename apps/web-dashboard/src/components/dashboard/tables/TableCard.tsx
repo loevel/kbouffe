@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Users, MoreVertical, QrCode, X, Download, ExternalLink } from "lucide-react";
-import { Card, Badge, Dropdown, Button } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
-import { useDashboard } from "@/contexts/dashboard-context";
+import { Card, Badge, Dropdown, Button } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
 
 interface TableCardProps {
     table: {

@@ -2,10 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { Search, Edit, Trash2, Copy, UtensilsCrossed, Eye, EyeOff, Beer, GlassWater, CupSoda, Zap, Image as ImageIcon, ExternalLink } from "lucide-react";
-import { Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Toggle, Badge, EmptyState, Dropdown } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { formatCFA } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Toggle, Badge, EmptyState, Dropdown, toast, useLocale, formatCFA } from "@kbouffe/module-core/ui";
+
 import { useProducts, useCategories, updateProduct, deleteProduct as apiDeleteProduct, createProduct } from "@/hooks/use-data";
 
 const ITEMS_PER_PAGE = 10;

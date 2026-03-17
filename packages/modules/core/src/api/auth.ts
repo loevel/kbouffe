@@ -86,13 +86,18 @@ authRoutes.post("/", async (c) => {
             paymentProvider,
             paymentMomoNumber,
             paymentMomoName,
-            isPremium
+            isPremium,
+            lat,
+            lng
         } = body;
 
         if (!restaurantName?.trim()) return c.json({ error: "Nom du restaurant requis" }, 400);
         if (!phone?.trim()) return c.json({ error: "Téléphone requis" }, 400);
 
         const slug = `${slugify(restaurantName)}-${Date.now().toString(36)}`;
+        
+        const latitude = lat || 4.0511;
+        const longitude = lng || 9.7679;
 
         // 1. Create Restaurant
         const { data: restaurant, error: restaurantError } = await supabase
@@ -117,9 +122,9 @@ authRoutes.post("/", async (c) => {
                 is_premium: !!isPremium,
                 is_published: true,
                 is_verified: false,
-                lat: 4.0511, // Default Douala
-                lng: 9.7679,
-                geohash: encodeGeohash(4.0511, 9.7679),
+                lat: latitude,
+                lng: longitude,
+                geohash: encodeGeohash(latitude, longitude),
             })
             .select()
             .single();
@@ -185,9 +190,9 @@ authRoutes.post("/sync", async (c) => {
                     owner_id: user.id,
                     name: restaurantName.trim(),
                     slug,
-                    lat: 4.0511,
-                    lng: 9.7679,
-                    geohash: encodeGeohash(4.0511, 9.7679),
+                    lat: metadata.lat || 4.0511,
+                    lng: metadata.lng || 9.7679,
+                    geohash: encodeGeohash(metadata.lat || 4.0511, metadata.lng || 9.7679),
                     address: "À définir",
                     city: "Douala",
                     country: "CM",

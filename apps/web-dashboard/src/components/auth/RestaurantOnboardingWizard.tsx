@@ -8,8 +8,7 @@ import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { Mail, Lock, User, Phone, Eye, EyeOff, Store, Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { useLocale } from "@/contexts/locale-context";
-import { Turnstile } from "@/components/ui/Turnstile";
+import { useLocale, Turnstile } from "@kbouffe/module-core/ui";
 
 interface FormData {
     firstName: string;

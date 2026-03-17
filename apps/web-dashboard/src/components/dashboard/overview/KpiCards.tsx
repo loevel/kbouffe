@@ -1,9 +1,9 @@
 "use client";
 
 import { DollarSign, ShoppingBag, TrendingUp, Users } from "lucide-react";
-import { Card } from "@/components/ui";
-import { formatCFA } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
+import { Card } from "@kbouffe/module-core/ui";
+import { formatCFA } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useDashboardStats } from "@/hooks/use-data";
 
 export function KpiCards() {

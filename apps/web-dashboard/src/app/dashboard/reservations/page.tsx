@@ -1,7 +1,7 @@
 "use client";
 
 import { reservationsUi } from "@kbouffe/module-reservations";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function ReservationsPage() {
     const { t } = useLocale();

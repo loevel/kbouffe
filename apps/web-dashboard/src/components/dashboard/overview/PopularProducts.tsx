@@ -1,8 +1,8 @@
 "use client";
 
-import { Card, CardHeader, CardTitle } from "@/components/ui";
-import { formatCFA } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, CardHeader, CardTitle } from "@kbouffe/module-core/ui";
+import { formatCFA } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useProducts, useCategories } from "@/hooks/use-data";
 
 const gradients = [

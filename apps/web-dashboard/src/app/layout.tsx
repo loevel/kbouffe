@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ToastProvider } from "@/components/ui/Toast";
-
-import { ThemeProvider } from "@kbouffe/module-core/ui";
-import { LocaleProvider } from "@/contexts/locale-context";
+import { ThemeProvider, LocaleProvider, ToastProvider } from "@kbouffe/module-core/ui";
 import { CartProvider } from "@/contexts/cart-context";
 import "./globals.css";
 

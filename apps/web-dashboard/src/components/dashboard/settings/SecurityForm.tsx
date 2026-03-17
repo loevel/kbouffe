@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Save, Shield, Smartphone, Monitor, AlertTriangle, Trash2 } from "lucide-react";
-import { Card, Button, Input, Toggle } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
-import { useDashboard } from "@/contexts/dashboard-context";
+import { Card, Button, Input, Toggle } from "@kbouffe/module-core/ui";
+import { toast } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
 
 export function SecurityForm() {
     const { t } = useLocale();

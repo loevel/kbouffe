@@ -2,7 +2,7 @@
 
 import { SettingsNav } from "@/components/dashboard/settings/SettingsNav";
 import { RestaurantInfoForm } from "@/components/dashboard/settings/RestaurantInfoForm";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function SettingsPage() {
     const { t } = useLocale();

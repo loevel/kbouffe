@@ -1,7 +1,7 @@
 "use client";
 
 import { CustomersTable, CustomersStats } from "@kbouffe/module-crm/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function CustomersPage() {
     const { t } = useLocale();

@@ -2,7 +2,7 @@
 
 import { SettingsNav } from "@/components/dashboard/settings/SettingsNav";
 import { SecurityForm } from "@/components/dashboard/settings/SecurityForm";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function SecurityPage() {
     const { t } = useLocale();

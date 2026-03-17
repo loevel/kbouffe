@@ -1,10 +1,10 @@
 "use client";
 
 import { TrendingUp, Truck, Wallet } from "lucide-react";
-import { Card } from "@/components/ui";
-import { formatCFA } from "@/lib/format";
+import { Card } from "@kbouffe/module-core/ui";
+import { formatCFA } from "@kbouffe/module-core/ui";
 import { useOrders } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function FinanceSummaryCards() {
     const { t } = useLocale();

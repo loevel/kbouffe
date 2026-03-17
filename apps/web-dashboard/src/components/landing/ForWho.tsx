@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ShoppingBag, Store, Bike, Check, ArrowRight } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function ForWho() {
     const { t } = useLocale();

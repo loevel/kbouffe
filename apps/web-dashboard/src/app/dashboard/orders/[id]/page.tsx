@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, MapPin, Phone, User, Truck, Store, StickyNote } from "lucide-react";
-import { Card, Badge, Button } from "@/components/ui";
+import { Card, Badge, Button } from "@kbouffe/module-core/ui";
 import { ordersUi } from "@kbouffe/module-orders";
 const { OrderStatusBadge, OrderTimeline, OrderActions } = ordersUi;
 import { useOrder } from "@/hooks/use-data";
 import { OrderChat } from "@/components/dashboard/orders/OrderChat";
 import { AssignDriver } from "@/components/dashboard/orders/AssignDriver";
-import { formatCFA, formatDateTime, formatOrderId, formatPhone, getPaymentLabel, getPaymentStatusLabel } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
+import { formatCFA, formatDateTime, formatOrderId, formatPhone, getPaymentLabel, getPaymentStatusLabel } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import type { OrderStatus, OrderItemData } from "@/lib/supabase/types";
 
 export default function OrderDetailPage() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { TeamList } from "@kbouffe/module-hr/ui";
 
 export default function TeamPage() {

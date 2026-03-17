@@ -134,6 +134,7 @@ api.route("/orders", ordersRoutes);
 api.route("/categories", categoriesRoutes);
 api.route("/products", productsRoutes);
 api.route("/reservations", reservationsRoutes);
+api.route("/tables", tablesRoutes);
 api.route("/dashboard", dashboardRoutes);
 api.route("/restaurant", restaurantRoutes);
 api.route("/account", usersRoutes);

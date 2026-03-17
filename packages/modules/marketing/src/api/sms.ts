@@ -20,6 +20,11 @@ smsRoutes.post("/send", async (c) => {
             return c.json({ error: "recipientMsisdn est requis" }, 400);
         }
 
+        const msisdnRegex = /^[0-9]{8,15}$/;
+        if (!msisdnRegex.test(body.recipientMsisdn.trim())) {
+            return c.json({ error: "Format du numéro de téléphone invalide (8-15 chiffres attendus)" }, 400);
+        }
+
         if (!body.message?.trim()) {
             return c.json({ error: "message est requis" }, 400);
         }

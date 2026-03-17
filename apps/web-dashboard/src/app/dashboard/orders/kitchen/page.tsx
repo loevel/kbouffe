@@ -2,7 +2,7 @@
 
 import { ordersUi } from "@kbouffe/module-orders";
 const { KitchenBoard } = ordersUi;
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { Flame } from "lucide-react";
 
 export default function KitchenPage() {

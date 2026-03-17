@@ -8,7 +8,7 @@ import {
     ChevronRight,
     Store,
 } from "lucide-react";
-import { Badge } from "@/components/ui";
+import { Badge } from "@kbouffe/module-core/ui";
 
 interface TransactionRow {
     id: string;

@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
-import { Modal, ModalFooter, Button, Input, Toggle, toast } from "@/components/ui";
-import { useCampaigns } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
-import { formatCFA } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import type { AdCampaignPackage } from "@/lib/supabase/types";
+import { Modal, ModalFooter, Button, Input, Toggle, toast, formatCFA, cn, useLocale } from "@kbouffe/module-core/ui";
+import { useCampaigns } from "../hooks/use-marketing";
+import type { AdCampaignPackage } from "../lib/types";
 
 interface Props {
     isOpen: boolean;

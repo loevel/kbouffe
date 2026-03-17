@@ -19,7 +19,7 @@ import {
     Users,
     CheckCircle2,
 } from "lucide-react";
-import { formatCFA } from "@/lib/format";
+import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/store/CartDrawer";
 

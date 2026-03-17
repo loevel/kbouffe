@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Quote, Star } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 const testimonials = [
     {

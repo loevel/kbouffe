@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Save } from "lucide-react";
-import { Modal, Button, Input, Textarea, Select, toast } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Modal, Button, Input, Textarea, Select, toast } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 interface EditStoreProfileModalProps {
     isOpen: boolean;

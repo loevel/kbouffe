@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { localeLabels, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Globe, ChevronDown } from "lucide-react";

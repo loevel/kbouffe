@@ -6,11 +6,11 @@ import {
     Card,
     Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
     Badge, Button, EmptyState, toast,
-} from "@/components/ui";
-import { useCampaigns } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
-import { formatCFA, formatDate } from "@/lib/format";
-import type { AdCampaign, AdCampaignStatus } from "@/lib/supabase/types";
+    formatCFA, formatDate,
+    useLocale,
+} from "@kbouffe/module-core/ui";
+import { useCampaigns } from "../hooks/use-marketing";
+import type { AdCampaign, AdCampaignStatus } from "../lib/types";
 import { CampaignFormModal } from "./CampaignFormModal";
 
 function statusVariant(status: AdCampaignStatus): "success" | "warning" | "default" | "info" {

@@ -12,6 +12,15 @@ import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core
 
 export const productsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+function normalizeAllergens(allergens: any): string[] | null {
+    if (!allergens) return null;
+    if (Array.isArray(allergens)) return allergens.filter(a => !!a).map(a => a.trim());
+    if (typeof allergens === "string") {
+        return allergens.split(",").map(a => a.trim()).filter(a => !!a);
+    }
+    return null;
+}
+
 /** GET /products */
 productsRoutes.get("/", async (c) => {
     const categoryId = c.req.query("category_id");
@@ -69,7 +78,7 @@ productsRoutes.post("/", async (c) => {
             is_halal: body.is_halal ?? false,
             is_vegan: body.is_vegan ?? false,
             is_gluten_free: body.is_gluten_free ?? false,
-            allergens: body.allergens || null,
+            allergens: normalizeAllergens(body.allergens),
             is_dine_in_only: body.is_dine_in_only ?? false,
             is_no_delivery: body.is_no_delivery ?? false,
             dine_in_price: body.dine_in_price || null,
@@ -143,7 +152,13 @@ productsRoutes.patch("/:id", async (c) => {
     ];
     const updateData: Record<string, unknown> = {};
     for (const field of allowedFields) {
-        if (body[field] !== undefined) updateData[field] = body[field];
+        if (body[field] !== undefined) {
+            if (field === "allergens") {
+                updateData[field] = normalizeAllergens(body[field]);
+            } else {
+                updateData[field] = body[field];
+            }
+        }
     }
     updateData.updated_at = new Date().toISOString();
 

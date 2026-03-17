@@ -14,7 +14,7 @@ import {
     X,
 } from "lucide-react";
 import { useRecentOrders, type RecentOrder } from "@/store/client-store";
-import { formatCFA } from "@/lib/format";
+import { formatCFA } from "@kbouffe/module-core/ui";
 import toast from "react-hot-toast";
 
 // ── Status display ────────────────────────────────────────────────────────────

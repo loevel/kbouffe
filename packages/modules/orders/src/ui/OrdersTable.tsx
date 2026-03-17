@@ -3,11 +3,9 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, Eye, ArrowUpDown, Download } from "lucide-react";
-import { Card, Button, Input, Select, Tabs, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, EmptyState, toast } from "@/components/ui";
+import { Badge, Button, Card, Dropdown, EmptyState, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Tabs, toast, useLocale, formatDate, formatCFA, formatDateTime, formatOrderId } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "./OrderStatusBadge";
-import { useLocale } from "@/contexts/locale-context";
 import { useOrders } from "@/hooks/use-data";
-import { formatCFA, formatDateTime, formatOrderId } from "@/lib/format";
 
 const ITEMS_PER_PAGE = 10;
 

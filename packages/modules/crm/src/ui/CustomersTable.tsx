@@ -3,9 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpDown, Download, Search, Users } from "lucide-react";
-import { Button, Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, EmptyState, toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
-import { formatCFA, formatDate, formatPhone } from "@/lib/format";
+import { Button, Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, EmptyState, toast, useLocale, formatCFA, formatDate, formatPhone } from "@kbouffe/module-core/ui";
 import { useCustomers } from "./hooks";
 
 const ITEMS_PER_PAGE = 10;

@@ -23,22 +23,30 @@ uploadRoutes.post("/", async (c) => {
         return c.json({ error: "Fichier trop volumineux (max 5 Mo)" }, 400);
     }
 
-    const ext = file.name.split(".").pop() || "jpg";
-    const key = `dishes/${c.var.userId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-
     const bucket = c.env.IMAGES_BUCKET;
+    if (!bucket) return c.json({ error: "Bucket non configuré" }, 500);
 
-    await bucket.put(key, await file.arrayBuffer(), {
+    // Feature 28: Deduplication via content hash
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    
+    const ext = file.name.split(".").pop() || "jpg";
+    const hashedKey = `assets/${hashHex}.${ext}`;
+
+    await bucket.put(hashedKey, arrayBuffer, {
         httpMetadata: {
             contentType: file.type,
         },
         customMetadata: {
-            uploadedBy: c.var.userId,
+            uploadedBy: c.var.userId || "anonymous",
+            originalName: file.name,
             ...(fingerprint ? { fingerprint } : {}),
         },
     });
 
-    const publicUrl = `https://images.kbouffe.com/${key}`;
+    const publicUrl = `https://images.kbouffe.com/${hashedKey}`;
 
-    return c.json({ url: publicUrl, key });
+    return c.json({ url: publicUrl, key: hashedKey });
 });

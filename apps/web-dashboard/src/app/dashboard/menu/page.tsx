@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { Plus, FolderOpen } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button } from "@kbouffe/module-core/ui";
 import { catalogUi } from "@kbouffe/module-catalog";
 const { ProductsTable, MenuStats } = catalogUi;
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useProducts } from "@/hooks/use-data";
 
 export default function MenuPage() {

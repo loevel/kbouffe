@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Modal, ModalFooter, Button, Input, Select, toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Modal, ModalFooter, Button, Input, Select, toast } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useCallback } from "react";
 

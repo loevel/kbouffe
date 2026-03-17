@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { ExternalLink, ChefHat, Pencil } from "lucide-react";
-import { Card, Badge, Button } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Badge, Button } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { EditStoreProfileModal } from "./EditStoreProfileModal";
 
 export function StorePreview() {

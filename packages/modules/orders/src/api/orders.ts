@@ -133,6 +133,15 @@ ordersRoutes.get("/:id", async (c) => {
     return c.json({ order: data });
 });
 
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+    pending: ["accepted", "cancelled"],
+    accepted: ["preparing", "cancelled"],
+    preparing: ["ready", "cancelled"],
+    ready: ["delivered", "cancelled"],
+    delivered: [],
+    cancelled: [],
+};
+
 /** PATCH /orders/:id — Update order status / notes */
 ordersRoutes.patch("/:id", async (c) => {
     const supabase = c.var.supabase;
@@ -140,8 +149,29 @@ ordersRoutes.patch("/:id", async (c) => {
     const id = c.req.param("id");
     const body = await c.req.json();
 
+    // 1. Fetch current order to check state
+    const { data: currentOrder, error: fetchError } = await supabase
+        .from("orders")
+        .select("status")
+        .eq("id", id)
+        .eq("restaurant_id", restaurantId)
+        .single();
+
+    if (fetchError || !currentOrder) return c.json({ error: "Commande introuvable" }, 404);
+
     const updateData: Record<string, unknown> = {};
-    if (body.status !== undefined) updateData.status = body.status;
+    if (body.status !== undefined) {
+        const currentStatus = currentOrder.status as string;
+        const nextStatus = body.status as string;
+        
+        if (currentStatus !== nextStatus) {
+            const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
+            if (!allowed.includes(nextStatus)) {
+                return c.json({ error: `Transition de statut invalide: ${currentStatus} -> ${nextStatus}` }, 400);
+            }
+            updateData.status = nextStatus;
+        }
+    }
     if (body.payment_status !== undefined) updateData.payment_status = body.payment_status;
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.driver_id !== undefined) updateData.driver_id = body.driver_id;
@@ -224,7 +254,9 @@ ordersRoutes.post("/:id/refund", async (c) => {
             payment_status: "refunded",
             status: "cancelled", // Automatically cancel order if refunded
             updated_at: new Date().toISOString(),
-            internal_note: `Remboursement effectué le ${new Date().toLocaleString('fr-FR')}`
+            notes: (order as any).notes 
+                ? `${(order as any).notes}\n[Refund] Remboursement effectué le ${new Date().toLocaleString()}`
+                : `[Refund] Remboursement effectué le ${new Date().toLocaleString()}`
         } as any)
         .eq("id", id)
         .eq("restaurant_id", restaurantId)

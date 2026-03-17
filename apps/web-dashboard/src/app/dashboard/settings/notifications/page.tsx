@@ -2,7 +2,7 @@
 
 import { SettingsNav } from "@/components/dashboard/settings/SettingsNav";
 import { NotificationsForm } from "@/components/dashboard/settings/NotificationsForm";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function NotificationsPage() {
     const { t } = useLocale();

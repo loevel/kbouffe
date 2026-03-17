@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 import { Plus, Edit, Trash2, FolderOpen } from "lucide-react";
-import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState, toast, useLocale, useDashboard } from "@kbouffe/module-core/ui";
 import { useCategories, useProducts, createCategory as apiCreateCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory, importCategoryPack } from "@/hooks/use-data";
-import { useDashboard } from "@/contexts/dashboard-context";
-import type { Category } from "@/lib/supabase/types";
+import type { Category } from "@kbouffe/module-core/ui";
 
 export function CategoryList() {
     const { t } = useLocale();

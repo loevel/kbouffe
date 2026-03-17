@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Card, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardHeader, CardTitle } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "@kbouffe/module-orders/ui";
-import { formatCFA, formatDateTime, formatOrderId } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
+import { formatCFA, formatDateTime, formatOrderId } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useOrders } from "@/hooks/use-data";
 
 export function RecentOrders() {

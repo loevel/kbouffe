@@ -1,8 +1,7 @@
 "use client";
 
-import { marketingUi } from "@kbouffe/module-marketing";
-const { MarketingStats, CouponsTable, CampaignsTable } = marketingUi;
-import { useLocale } from "@/contexts/locale-context";
+import { MarketingStats, CouponsTable, CampaignsTable } from "@kbouffe/module-marketing";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function MarketingPage() {
     const { t } = useLocale();

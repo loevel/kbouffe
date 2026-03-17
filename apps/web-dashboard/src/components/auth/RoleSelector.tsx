@@ -1,7 +1,7 @@
 "use client";
 
 import { Store, User } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 
 export type UserRole = "merchant" | "client";

@@ -17,11 +17,11 @@ import {
     Zap,
     LayoutDashboard,
 } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button } from "@kbouffe/module-core/ui";
 
 interface PlatformStats {
     restaurants: { total: number; active: number; pending: number };

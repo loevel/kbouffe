@@ -1,4 +1,4 @@
-import * as marketingApi from "./api";
-import * as marketingUi from "./ui";
-
-export { marketingApi, marketingUi };
+export * from "./ui";
+export * from "./hooks/use-marketing";
+export * from "./lib/types";
+export * as api from "./api";

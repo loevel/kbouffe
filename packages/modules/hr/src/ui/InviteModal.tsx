@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Mail } from "lucide-react";
-import { Modal, ModalFooter, Button, Input, Select, toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Modal, ModalFooter, Button, Input, Select, toast, useLocale } from "@kbouffe/module-core/ui";
 import { ASSIGNABLE_ROLES, type TeamRole, canManageRole } from "../api/permissions";
 import { ROLE_LABELS } from "./constants";
 
@@ -43,7 +42,7 @@ export function InviteModal({ isOpen, onClose, onInvited, callerRole, allowedRol
             const data = await res.json();
 
             if (!res.ok) {
-                toast.error(data.error ?? t.common.error);
+                toast.error((data as any).error ?? t.common.error);
                 return;
             }
 

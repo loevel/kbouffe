@@ -39,12 +39,25 @@ zonesRoutes.post("/", async (c) => {
             return c.json({ error: "Le nom de la zone est requis" }, 400);
         }
 
+        // Calculate next sort_order if not provided
+        let sortOrder = body.sort_order;
+        if (sortOrder === undefined) {
+            const { data: maxZone } = await c.var.supabase
+                .from("table_zones")
+                .select("sort_order")
+                .eq("restaurant_id", c.var.restaurantId)
+                .order("sort_order", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            sortOrder = maxZone ? maxZone.sort_order + 1 : 0;
+        }
+
         const zoneData = {
             restaurant_id: c.var.restaurantId,
             name: body.name,
             type: body.type ?? "indoor",
             description: body.description ?? null,
-            sort_order: body.sort_order ?? 0,
+            sort_order: sortOrder,
             is_active: true,
         };
 

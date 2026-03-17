@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { catalogUi } from "@kbouffe/module-catalog";
 const { ProductForm } = catalogUi;
 import { useProducts } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function EditProductPage() {
     const params = useParams();

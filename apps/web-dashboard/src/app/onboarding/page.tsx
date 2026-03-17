@@ -18,7 +18,7 @@ import {
     ShieldCheck,
     AlertTriangle,
 } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 const CUISINE_TYPES = [
     { value: "african", labelKey: "cuisineAfrican" },

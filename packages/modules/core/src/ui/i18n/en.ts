@@ -44,6 +44,7 @@ export const en: TranslationKeys = {
         download: "Download",
         error: "Error",
         success: "Success",
+        deleteConfirm: "Are you sure you want to delete this item?",
     },
 
     theme: {
@@ -216,6 +217,13 @@ export const en: TranslationKeys = {
         choicePlaceholder: "Choice (e.g.: Normal)",
         addChoice: "+ Add a choice",
         allStatuses: "All statuses",
+        dietaryHealth: "Health & Dietary",
+        allergens: "Allergens",
+        isHalal: "Halal",
+        isVegan: "Vegan",
+        isGlutenFree: "Gluten Free",
+        healthResponsibility: "Health Responsibility",
+        healthResponsibilityNotice: "I certify that the allergen and dietary information is accurate.",
     },
 
     orders: {
@@ -274,6 +282,10 @@ export const en: TranslationKeys = {
         confirmCancel: "Confirm cancellation",
         orderCancelled: "Order cancelled",
         orderCancelledDesc: "This order has been cancelled",
+        refundOrder: "Refund",
+        refundOrderTitle: "Refund Order",
+        refundIrreversible: "This action is irreversible. The customer will receive their refund shortly.",
+        confirmRefund: "Confirm Refund",
         orderRefunded: "Order refunded",
         orderRefundedDesc: "This order has been refunded",
         orderAccepted: "Order accepted",

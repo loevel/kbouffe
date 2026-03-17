@@ -341,6 +341,11 @@ paymentWebhookRoutes.post("/webhook", async (c) => {
 
 // ── POST /disbursement-webhook ───────────────────────────────────
 paymentWebhookRoutes.post("/disbursement-webhook", async (c) => {
+    const secret = c.req.header("x-webhook-secret");
+    if (c.env.MTN_WEBHOOK_SECRET && secret !== c.env.MTN_WEBHOOK_SECRET) {
+        return c.json({ error: "Webhook non autorisé" }, 401);
+    }
+
     const body = await c.req.json<{ referenceId?: string; externalId?: string }>().catch(() => ({} as any));
     const referenceId = body.referenceId || c.req.query("referenceId") || c.req.header("x-reference-id");
     if (!referenceId) return c.json({ error: "referenceId manquant" }, 400);

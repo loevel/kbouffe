@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
 import { useUserSession } from "@/store/client-store";
 import { motion } from "framer-motion";
