@@ -1,8 +1,6 @@
 "use client";
 
-import { Card, Badge } from "@/components/ui";
-import { formatCFA, formatDate, getPayoutStatusLabel } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Badge, useLocale, formatCFA, formatDate } from "@kbouffe/module-core/ui";
 import { usePayouts } from "./hooks";
 
 export function PayoutsList() {
@@ -37,7 +35,7 @@ export function PayoutsList() {
                         </div>
                         <div className="text-right">
                             <Badge variant={payout.status === "paid" ? "success" : payout.status === "pending" ? "warning" : "danger"}>
-                                {getPayoutStatusLabel(payout.status)}
+                                {payout.status === "paid" ? t.finances.paid : payout.status === "pending" ? t.finances.pending : payout.status}
                             </Badge>
                             {payout.paid_at && (
                                 <p className="text-xs text-surface-500 mt-1">{t.finances.paidOn}{formatDate(payout.paid_at)}</p>

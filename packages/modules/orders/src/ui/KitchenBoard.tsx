@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 import { Clock, Utensils, Package, Bike, RefreshCw, CheckCircle2, CalendarClock, Truck } from "lucide-react";
-import { Badge, Button, EmptyState, Input, Modal, ModalFooter, Spinner, toast } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, Modal, ModalFooter, Spinner, toast, cn, formatOrderId, useLocale } from "@kbouffe/module-core/ui";
 import { useOrders, updateOrderStatus } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
-import { formatOrderId } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import type { Order, OrderItemData } from "@/lib/supabase/types";
+import type { Order, OrderItemData } from "@kbouffe/module-core/ui";
 
 // ── Column definitions ────────────────────────────────────────────────────
 

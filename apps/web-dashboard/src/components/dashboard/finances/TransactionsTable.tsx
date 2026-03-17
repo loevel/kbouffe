@@ -1,10 +1,10 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { Card, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, toast } from "@/components/ui";
+import { Card, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, toast } from "@kbouffe/module-core/ui";
 import { useOrders } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
-import { formatCFA, formatDateTime, formatOrderId, getPaymentLabel, getPaymentStatusLabel, formatDate } from "@/lib/format";
+import { useLocale } from "@kbouffe/module-core/ui";
+import { formatCFA, formatDateTime, formatOrderId, getPaymentLabel, getPaymentStatusLabel, formatDate } from "@kbouffe/module-core/ui";
 
 export function TransactionsTable() {
     const { t } = useLocale();

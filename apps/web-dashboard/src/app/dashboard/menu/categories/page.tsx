@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { catalogUi } from "@kbouffe/module-catalog";
 const { CategoryList } = catalogUi;
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function CategoriesPage() {
     const { t } = useLocale();

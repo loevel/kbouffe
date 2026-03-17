@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Send } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
-import { Turnstile } from "@/components/ui/Turnstile";
+import { useLocale, Turnstile } from "@kbouffe/module-core/ui";
 
 export function ContactForm() {
     const { t } = useLocale();

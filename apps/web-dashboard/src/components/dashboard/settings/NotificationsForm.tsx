@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Save, Bell, Mail, Volume2, MessageSquare, Smartphone } from "lucide-react";
-import { Card, Button, Toggle } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
-import { useDashboard } from "@/contexts/dashboard-context";
+import { Card, Button, Toggle } from "@kbouffe/module-core/ui";
+import { toast } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
 
 interface NotificationSetting {
     id: string;

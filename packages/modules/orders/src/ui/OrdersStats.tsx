@@ -1,10 +1,8 @@
 "use client";
 
 import { ClipboardList, CircleDashed, Wallet, CheckCircle2 } from "lucide-react";
-import { Card } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, useLocale, formatCFA } from "@kbouffe/module-core/ui";
 import { useDashboardStats } from "@/hooks/use-data";
-import { formatCFA } from "@/lib/format";
 
 export function OrdersStats() {
     const { t } = useLocale();

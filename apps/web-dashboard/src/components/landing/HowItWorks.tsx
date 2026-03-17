@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ClipboardEdit, Share2, UtensilsCrossed, ArrowRight } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function HowItWorks() {
     const { t } = useLocale();

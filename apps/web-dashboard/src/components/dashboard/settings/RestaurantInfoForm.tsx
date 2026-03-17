@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Save } from "lucide-react";
-import { Card, Button, Input, Textarea, Select } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button, Input, Textarea, Select } from "@kbouffe/module-core/ui";
+import { toast } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function RestaurantInfoForm() {
     const { restaurant, updateRestaurant, loading: dashboardLoading } = useDashboard();

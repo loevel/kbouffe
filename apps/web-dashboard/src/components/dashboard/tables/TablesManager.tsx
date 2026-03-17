@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Loader2, MapPin, QrCode } from "lucide-react";
-import { Card, Button, Badge, Modal, ModalFooter, Input, Select, EmptyState, toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button, Badge, Modal, ModalFooter, Input, Select, EmptyState, toast } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
-import { useDashboard } from "@/contexts/dashboard-context";
+import { useDashboard } from "@kbouffe/module-core/ui";
 import { TableCard } from "./TableCard";
 import { ZoneManager } from "./ZoneManager";
 

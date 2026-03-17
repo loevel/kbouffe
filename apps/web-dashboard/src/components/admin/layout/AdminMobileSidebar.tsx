@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { adminNavItemsDef } from "./AdminSidebar";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
 
 interface AdminMobileSidebarProps {

@@ -3,7 +3,7 @@
 import { FinanceSummaryCards } from "@/components/dashboard/finances/FinanceSummaryCards";
 import { TransactionsTable } from "@/components/dashboard/finances/TransactionsTable";
 import { PayoutsList } from "@kbouffe/module-hr/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function FinancesPage() {
     const { t } = useLocale();

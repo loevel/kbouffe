@@ -44,7 +44,7 @@ async function getOrCreateOrderConversation(supabase: any, orderId: string) {
  * Récupérer l'historique d'une conversation par ID de commande
  */
 chat.get("/orders/:orderId/messages", async (c) => {
-    const supabase = c.get("supabase");
+    const supabase = c.var.supabase;
     if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
     
     const orderId = c.req.param("orderId");
@@ -75,7 +75,7 @@ chat.get("/orders/:orderId/messages", async (c) => {
  * Récupérer l'historique d'une conversation (par ID direct de conversation)
  */
 chat.get("/conversations/:id/messages", async (c) => {
-    const supabase = c.get("supabase");
+    const supabase = c.var.supabase;
     if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
     
     const conversationId = c.req.param("id");
@@ -99,13 +99,13 @@ chat.get("/conversations/:id/messages", async (c) => {
  * Envoi d'un message lié à une commande
  */
 chat.post("/orders/:orderId/messages", async (c) => {
-    const supabase = c.get("supabase");
+    const supabase = c.var.supabase;
     if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
 
     const orderId = c.req.param("orderId");
     const body = await c.req.json();
     
-    const userId = c.get("userId");
+    const userId = c.var.userId;
     if (!userId) return c.json({ error: "Utilisateur non identifié" }, 401);
 
     try {
@@ -115,16 +115,17 @@ chat.post("/orders/:orderId/messages", async (c) => {
         // --- Autorisation ---
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("customer_id")
+            .select("customer_id, restaurant_id")
             .eq("id", orderId)
             .single();
 
         if (orderError || !order) return c.json({ error: "Commande non trouvée" }, 404);
 
-        const restaurantId = c.get("restaurantId");
+        const restaurantId = c.var.restaurantId;
         const isCustomer = userId === order.customer_id;
+        const isMerchantForThisOrder = restaurantId && restaurantId === order.restaurant_id;
         
-        if (!isCustomer && !restaurantId) {
+        if (!isCustomer && !isMerchantForThisOrder) {
             return c.json({ error: "Vous n'êtes pas autorisé à envoyer un message pour cette commande" }, 403);
         }
         // --------------------
@@ -170,13 +171,13 @@ chat.post("/orders/:orderId/messages", async (c) => {
  * Envoi d'un message direct par ID de conversation
  */
 chat.post("/conversations/:id/messages", async (c) => {
-    const supabase = c.get("supabase");
+    const supabase = c.var.supabase;
     if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
 
     const conversationId = c.req.param("id");
     const body = await c.req.json();
     
-    const userId = c.get("userId");
+    const userId = c.var.userId;
     if (!userId) return c.json({ error: "Utilisateur non identifié" }, 401);
 
     const newMessageId = crypto.randomUUID();
@@ -226,6 +227,12 @@ chat.post("/orders/:orderId/upload", async (c) => {
 
     if (!file) return c.json({ error: "Aucun fichier fourni" }, 400);
 
+    // Issue 11: MIME type validation
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+        return c.json({ error: "Type de fichier non supporté (JPG, PNG, WEBP, PDF uniquement)" }, 400);
+    }
+
     const key = `chat/orders/${c.req.param("orderId")}/${crypto.randomUUID()}-${file.name}`;
     await bucket.put(key, file);
 
@@ -246,6 +253,12 @@ chat.post("/conversations/:id/upload", async (c) => {
 
     if (!file) return c.json({ error: "Aucun fichier fourni" }, 400);
 
+    // Issue 11: MIME type validation
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+        return c.json({ error: "Type de fichier non supporté (JPG, PNG, WEBP, PDF uniquement)" }, 400);
+    }
+
     const key = `chat/${crypto.randomUUID()}-${file.name}`;
     await bucket.put(key, file);
 
@@ -258,7 +271,7 @@ chat.post("/conversations/:id/upload", async (c) => {
  * Marquer une conversation comme lue
  */
 chat.post("/conversations/:id/read", async (c) => {
-    const supabase = c.get("supabase");
+    const supabase = c.var.supabase;
     if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
     
     const conversationId = c.req.param("id");

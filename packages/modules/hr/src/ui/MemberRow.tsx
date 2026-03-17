@@ -1,8 +1,7 @@
 "use client";
 
 import { MoreVertical, ShieldCheck, UserX } from "lucide-react";
-import { Badge, Dropdown } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Badge, Dropdown, useLocale } from "@kbouffe/module-core/ui";
 import { type TeamRole } from "../api/permissions";
 import { ROLE_LABELS } from "./constants";
 
@@ -61,7 +60,7 @@ export function MemberRow({
                 .filter((r) => r !== member.role)
                 .map((r) => ({
                     label: `${t.team.changeRoleTo} ${ROLE_LABELS[r][lang]}`,
-                    icon: <ShieldCheck size={14} />,
+                    icon: ShieldCheck,
                     onClick: () => onRoleChange(member.id, r),
                 }))
             : []),
@@ -69,7 +68,7 @@ export function MemberRow({
             ? [
                 {
                     label: isPending ? t.team.cancelInvite : t.team.revokeMember,
-                    icon: <UserX size={14} />,
+                    icon: UserX,
                     onClick: () => onRevoke(member.id),
                     variant: "danger" as const,
                 },

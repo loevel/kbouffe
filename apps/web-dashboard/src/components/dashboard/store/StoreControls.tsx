@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { Link as LinkIcon, Save, Globe, Loader2 } from "lucide-react";
-import { Card, Button, Input, Toggle, toast } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button, Input, Toggle, toast } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { EditStoreProfileModal } from "./EditStoreProfileModal";
 
 function slugify(value: string): string {

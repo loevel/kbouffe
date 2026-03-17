@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Copy, Check, MessageCircle, Share2 } from "lucide-react";
-import { Card, Button } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button } from "@kbouffe/module-core/ui";
+import { toast } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function ShareLinks() {
     const { restaurant } = useDashboard();

@@ -4,7 +4,7 @@ import { StorePreview } from "@/components/dashboard/store/StorePreview";
 import { ShareLinks } from "@/components/dashboard/store/ShareLinks";
 import { StoreControls } from "@/components/dashboard/store/StoreControls";
 import { StoreReadiness } from "@/components/dashboard/store/StoreReadiness";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function StorePage() {
     const { t } = useLocale();

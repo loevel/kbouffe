@@ -32,10 +32,9 @@ import {
     Trash2,
     AlertTriangle,
 } from "lucide-react";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, toast } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { toast } from "@/components/ui/Toast";
 import { useRouter } from "next/navigation";
 
 interface RestaurantDetail {

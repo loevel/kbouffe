@@ -4,7 +4,7 @@ import { useState } from "react";
 import { compressImageForUpload } from "@/lib/wasm/squoosh";
 import { fileFingerprintHex } from "@/lib/wasm/sodium";
 
-import { authFetch } from "@/lib/api/auth-fetch";
+import { authFetch } from "@kbouffe/module-core/ui";
 
 interface UploadResult {
     url: string;

@@ -3,7 +3,7 @@
 import { Check, Clock, ChefHat, Package, CircleCheck, XCircle, Truck } from "lucide-react";
 import type { OrderStatus } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 const steps: { status: OrderStatus; icon: React.ReactNode; color: string }[] = [
     { status: "pending", icon: <Clock size={16} />, color: "text-amber-500 bg-amber-100 dark:bg-amber-900/30" },

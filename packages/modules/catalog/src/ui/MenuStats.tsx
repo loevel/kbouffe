@@ -2,11 +2,9 @@
 
 import { useMemo } from "react";
 import { Package, CheckCircle, XCircle, Tag } from "lucide-react";
-import { Card } from "@/components/ui";
-import { formatCFA } from "@/lib/format";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, formatCFA, useLocale } from "@kbouffe/module-core/ui";
 import { useCategories } from "@/hooks/use-data";
-import type { Product } from "@/lib/supabase/types";
+import type { Product } from "@kbouffe/module-core/ui";
 
 interface StatCardProps {
     icon: React.ReactNode;

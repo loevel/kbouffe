@@ -1,8 +1,7 @@
 "use client";
 
-import { Badge } from "@/components/ui";
-import type { OrderStatus } from "@/lib/supabase/types";
-import { useLocale } from "@/contexts/locale-context";
+import { Badge, useLocale, type OrderStatus } from "@kbouffe/module-core/ui";
+
 
 const statusConfig: Record<OrderStatus, { variant: "warning" | "info" | "brand" | "success" | "danger"; dot?: boolean }> = {
     pending: { variant: "warning", dot: true },

@@ -47,6 +47,7 @@ menuRoutes.get("/:slug", async (c) => {
             .from("categories")
             .select("id, name, description, sort_order")
             .eq("restaurant_id", restaurant.id)
+            .eq("is_active", true)
             .order("sort_order"),
         supabase
             .from("products")

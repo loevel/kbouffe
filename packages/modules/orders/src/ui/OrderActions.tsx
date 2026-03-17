@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { Check, ChefHat, Package, CircleCheck, XCircle } from "lucide-react";
-import { Button, Input, Modal, ModalFooter, Textarea } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
-import { updateOrderStatus, refundOrder } from "@/hooks/use-data";
-import type { OrderStatus } from "@/lib/supabase/types";
+import { Button, Input, Modal, ModalFooter, Textarea, toast, useLocale, type OrderStatus } from "@kbouffe/module-core/ui";
 
 interface OrderActionsProps {
     orderId: string;

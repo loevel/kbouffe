@@ -21,12 +21,10 @@ import {
     Trash2,
     AlertTriangle,
 } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, useLocale, toast } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { toast } from "@/components/ui/Toast";
 
 interface Restaurant {
     id: string;

@@ -1,9 +1,8 @@
 "use client";
 
 import { Tag, Megaphone, TrendingUp, Eye } from "lucide-react";
-import { Card } from "@/components/ui";
-import { useCoupons, useCampaigns } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, useLocale } from "@kbouffe/module-core/ui";
+import { useCoupons, useCampaigns } from "../hooks/use-marketing";
 
 export function MarketingStats() {
     const { t } = useLocale();

@@ -14,7 +14,7 @@ import {
     X,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
-import { formatCFA } from "@/lib/format";
+import { formatCFA } from "@kbouffe/module-core/ui";
 import { useSearchStore } from "@/store/client-store";
 
 // ── Types ────────────────────────────────────────────────────────────────────

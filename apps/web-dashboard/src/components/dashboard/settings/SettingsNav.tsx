@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, Clock, Truck, ImageIcon, Bell, CreditCard, Shield, Armchair } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function SettingsNav() {
     const pathname = usePathname();

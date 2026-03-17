@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Sun, Moon, Laptop, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function ThemeSelector({ className }: { className?: string }) {
     const { theme, setTheme, resolvedTheme } = useTheme();

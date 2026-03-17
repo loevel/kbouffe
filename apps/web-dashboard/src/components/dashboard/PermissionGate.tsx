@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useDashboard } from "@/contexts/dashboard-context";
+import { useDashboard } from "@kbouffe/module-core/ui";
 import type { Permission } from "@/lib/permissions";
 
 interface PermissionGateProps {

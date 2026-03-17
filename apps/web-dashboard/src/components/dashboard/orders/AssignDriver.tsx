@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Truck, Check, Loader2 } from "lucide-react";
-import { Button, Select, toast } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Button, Select, toast } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 interface AssignDriverProps {
     orderId: string;

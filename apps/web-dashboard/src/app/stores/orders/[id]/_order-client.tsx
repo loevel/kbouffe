@@ -16,7 +16,7 @@ import {
     Utensils,
     X,
 } from "lucide-react";
-import { formatCFA } from "@/lib/format";
+import { formatCFA } from "@kbouffe/module-core/ui";
 import { useRecentOrders } from "@/store/client-store";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

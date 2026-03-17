@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Modal, ModalFooter, Button, Input, Select, Toggle } from "@/components/ui";
-import { useCoupons } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
-import { toast } from "@/components/ui";
-import type { Coupon, CouponAppliesTo, CouponType } from "@/lib/supabase/types";
+import { Modal, ModalFooter, Button, Input, Select, Toggle, toast, useLocale } from "@kbouffe/module-core/ui";
+import { useCoupons } from "../hooks/use-marketing";
+import type { Coupon, CouponAppliesTo, CouponType } from "../lib/types";
 
 interface Props {
     isOpen: boolean;

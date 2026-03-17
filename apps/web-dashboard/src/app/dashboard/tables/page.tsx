@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { TablesManager } from "@/components/dashboard/tables/TablesManager";
 
 export default function TablesPage() {

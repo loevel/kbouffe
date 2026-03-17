@@ -2,7 +2,7 @@
 
 import { SettingsNav } from "@/components/dashboard/settings/SettingsNav";
 import { PaymentSettingsForm } from "@/components/dashboard/settings/PaymentSettingsForm";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function PaymentsPage() {
     const { t } = useLocale();

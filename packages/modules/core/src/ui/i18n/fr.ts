@@ -42,6 +42,7 @@ export const fr = {
         download: "Telecharger",
         error: "Erreur",
         success: "Succes",
+        deleteConfirm: "Êtes-vous sûr de vouloir supprimer cet élément ?",
     },
 
     theme: {
@@ -214,6 +215,13 @@ export const fr = {
         choicePlaceholder: "Choix (ex: Normal)",
         addChoice: "+ Ajouter un choix",
         allStatuses: "Tous les statuts",
+        dietaryHealth: "Sante et regime",
+        allergens: "Allergenes",
+        isHalal: "Halal",
+        isVegan: "Vegetalien",
+        isGlutenFree: "Sans gluten",
+        healthResponsibility: "Responsabilite sante",
+        healthResponsibilityNotice: "Je certifie que les informations sur les allergenes et le regime alimentaire sont exactes.",
     },
 
     orders: {
@@ -272,6 +280,10 @@ export const fr = {
         confirmCancel: "Confirmer l'annulation",
         orderCancelled: "Commande annulee",
         orderCancelledDesc: "Cette commande a ete annulee",
+        refundOrder: "Rembourser",
+        refundOrderTitle: "Rembourser la commande",
+        refundIrreversible: "Cette action est irreversible. Le client recevra son remboursement sous peu.",
+        confirmRefund: "Confirmer le remboursement",
         orderRefunded: "Commande remboursee",
         orderRefundedDesc: "Cette commande a ete remboursee",
         orderAccepted: "Commande acceptee",

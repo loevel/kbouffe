@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Armchair } from "lucide-react";
-import { Card, Button, Input, Toggle, Select, toast } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button, Input, Toggle, Select, toast } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function DineInSettingsForm() {
     const { restaurant, updateRestaurant } = useDashboard();

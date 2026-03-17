@@ -1,9 +1,8 @@
 "use client";
 
 import { Plus, Trash2, GripVertical } from "lucide-react";
-import { Button, Input, Toggle } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
-import type { ProductOption } from "@/lib/supabase/types";
+import { Button, Input, Toggle, useLocale } from "@kbouffe/module-core/ui";
+import type { ProductOption } from "@kbouffe/module-core/ui";
 
 interface ProductOptionEditorProps {
     options: ProductOption[];

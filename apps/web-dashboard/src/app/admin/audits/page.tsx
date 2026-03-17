@@ -18,7 +18,7 @@ import {
     Terminal,
     History,
 } from "lucide-react";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 

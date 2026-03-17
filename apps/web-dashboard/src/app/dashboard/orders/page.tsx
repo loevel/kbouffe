@@ -2,7 +2,7 @@
 
 import { ordersUi } from "@kbouffe/module-orders";
 const { OrdersTable, OrdersStats } = ordersUi;
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function OrdersPage() {
     const { t } = useLocale();

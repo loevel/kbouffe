@@ -6,8 +6,7 @@ import { Mail, Lock, User, Phone, Eye, EyeOff, Store, Loader2 } from "lucide-rea
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { useState, type FormEvent } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { useLocale } from "@/contexts/locale-context";
-import { Turnstile } from "@/components/ui/Turnstile";
+import { useLocale, Turnstile } from "@kbouffe/module-core/ui";
 import { RoleSelector, type UserRole } from "./RoleSelector";
 
 interface FormData {

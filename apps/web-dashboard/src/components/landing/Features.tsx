@@ -1,7 +1,7 @@
 "use client";
 
 import { Store, Smartphone, Banknote, ShieldCheck, BarChart3, Globe, CalendarClock, MessageSquare, ClipboardCheck } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function Features() {
     const { t } = useLocale();

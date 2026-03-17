@@ -122,6 +122,17 @@ reservationsRoutes.post("/", async (c) => {
         return c.json({ error: "Nom du client, date, heure et nombre de personnes requis" }, 400);
     }
 
+    // Verify restaurant allows reservations (private route check)
+    const { data: restaurant } = await c.var.supabase
+        .from("restaurants")
+        .select("has_reservations")
+        .eq("id", c.var.restaurantId)
+        .single();
+
+    if (restaurant && !restaurant.has_reservations) {
+        return c.json({ error: "Les réservations sont désactivées pour ce restaurant" }, 403);
+    }
+
     // If table_id is provided, verify capacity
     if (body.table_id) {
         const { data: table } = await c.var.supabase
@@ -186,8 +197,7 @@ reservationsRoutes.patch("/:id", async (c) => {
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.table_id !== undefined) updateData.table_id = body.table_id;
+    // 1. Metadata updates
     if (body.date !== undefined) updateData.date = body.date;
     if (body.time !== undefined) updateData.time = body.time;
     if (body.duration !== undefined) updateData.duration = body.duration;
@@ -200,65 +210,72 @@ reservationsRoutes.patch("/:id", async (c) => {
     if (body.status === "confirmed") updateData.confirmed_at = new Date().toISOString();
     if (body.status === "seated") updateData.seated_at = new Date().toISOString();
 
-    // Manage table status transitions
-    const tableTriggerStatuses = ["confirmed", "seated", "completed", "no_show", "cancelled"];
-    
-    // If table_id is being updated, verify capacity
-    if (body.table_id) {
-        const { data: table } = await c.var.supabase
-            .from("restaurant_tables")
-            .select("capacity")
-            .eq("id", body.table_id)
-            .single();
-        
-        const { data: reservation } = await c.var.supabase
+    // 2. Capacity check if table or party_size changes
+    if (body.table_id || body.party_size) {
+        const { data: current } = await c.var.supabase
             .from("reservations")
-            .select("party_size")
+            .select("table_id, party_size")
             .eq("id", id)
             .single();
 
-        if (table && reservation && table.capacity < (body.party_size ?? reservation.party_size)) {
-            return c.json({ error: `La table n'a pas assez de places (${table.capacity})` }, 400);
+        const tid = body.table_id || current?.table_id;
+        const size = body.party_size || current?.party_size;
+
+        if (tid && size) {
+            const { data: table } = await c.var.supabase
+                .from("restaurant_tables")
+                .select("capacity")
+                .eq("id", tid)
+                .single();
+            if (table && table.capacity < size) {
+                return c.json({ error: `La table n'a pas assez de places (${table.capacity})` }, 400);
+            }
         }
     }
 
-    if (body.status && tableTriggerStatuses.includes(body.status)) {
-        const { data: res } = await c.var.supabase
+    // 3. Atomic status / table update via RPC
+    const statusChanged = body.status !== undefined;
+    const tableChanged = body.table_id !== undefined;
+
+    if (statusChanged || tableChanged) {
+        // We get the target status (either new or current)
+        let targetStatus = body.status;
+        if (!targetStatus) {
+            const { data: res } = await c.var.supabase.from("reservations").select("status").eq("id", id).single();
+            targetStatus = res?.status;
+        }
+
+        const { error: rpcError } = await c.var.supabase.rpc("update_reservation_atomic", {
+            p_res_id: id,
+            p_status: targetStatus,
+            p_table_id: body.table_id ?? null,
+            p_update_table_id: tableChanged,
+        });
+
+        if (rpcError) {
+            console.error("Atomic update RPC error:", rpcError);
+            return c.json({ error: "Erreur lors de la mise à jour atomique" }, 500);
+        }
+    }
+
+    // 4. Update other metadata
+    if (Object.keys(updateData).length > 1) { // updated_at is always there
+        const { data, error } = await c.var.supabase
             .from("reservations")
-            .select("table_id")
+            .update(updateData as any)
             .eq("id", id)
             .eq("restaurant_id", c.var.restaurantId)
+            .select()
             .single();
-        
-        const tableId = (res as { table_id?: string } | null)?.table_id;
-        if (tableId) {
-            let newTableStatus: "available" | "occupied" | "reserved" = "available";
-            if (body.status === "confirmed") newTableStatus = "reserved";
-            else if (body.status === "seated") newTableStatus = "occupied";
-            // completed, no_show, cancelled -> available
 
-            await c.var.supabase
-                .from("restaurant_tables")
-                .update({ status: newTableStatus, updated_at: new Date().toISOString() } as any)
-                .eq("id", tableId)
-                .eq("restaurant_id", c.var.restaurantId);
+        if (error) {
+            console.error("Update reservation error:", error);
+            return c.json({ error: "Erreur lors de la mise à jour" }, 500);
         }
+        return c.json({ success: true, reservation: data });
     }
 
-    const { data, error } = await c.var.supabase
-        .from("reservations")
-        .update(updateData as any)
-        .eq("id", id)
-        .eq("restaurant_id", c.var.restaurantId)
-        .select()
-        .single();
-
-    if (error) {
-        console.error("Update reservation error:", error);
-        return c.json({ error: "Erreur lors de la mise à jour" }, 500);
-    }
-
-    return c.json({ success: true, reservation: data });
+    return c.json({ success: true });
 });
 
 /** DELETE /reservations/:id */

@@ -22,7 +22,8 @@ export type OrderStatus =
     | "delivering"
     | "delivered"
     | "completed"
-    | "cancelled";
+    | "cancelled"
+    | "refunded";
 
 export type UserRole = "merchant" | "customer";
 
@@ -247,7 +248,13 @@ export interface Tables {
             options: Json | null;
             is_dine_in_only: boolean;
             is_no_delivery: boolean;
-            dine_in_price: number | null;
+            prep_time: number | null;
+            allergens: Json | null;
+            calories: number | null;
+            is_halal: boolean | null;
+            is_vegan: boolean | null;
+            is_gluten_free: boolean | null;
+            tags: Json | null;
             created_at: string;
             updated_at: string;
         };
@@ -319,13 +326,13 @@ export interface Tables {
             payment_status: PaymentStatus;
             preparation_time_minutes: number | null;
             notes: string | null;
-            service_fee: number;
-            corkage_fee: number;
-            tip_amount: number;
-            table_number: number | null;
+            service_fee: number | null;
+            corkage_fee: number | null;
+            tip_amount: number | null;
+            table_number: string | null;
             table_id: string | null;
             covers: number | null;
-            external_drinks_count: number;
+            external_drinks_count: number | null;
             scheduled_for: string | null;
             delivered_at: string | null;
             delivery_note: string | null;

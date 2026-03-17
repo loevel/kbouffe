@@ -12,7 +12,7 @@ import {
     RotateCcw,
     Sparkles,
 } from "lucide-react";
-import { formatCFA } from "@/lib/format";
+import { formatCFA } from "@kbouffe/module-core/ui";
 
 // ── Animations ────────────────────────────────────────────────────────────────
 // Simple CSS-based confetti / pulse handled via Tailwind animations.

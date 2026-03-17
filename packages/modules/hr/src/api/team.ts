@@ -1,36 +1,43 @@
 import { Hono } from "hono";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
-import { hasPermission, canManageRole, ASSIGNABLE_ROLES, type TeamRole } from "./permissions";
+import { hasPermission, canManageRole, ASSIGNABLE_ROLES, type TeamRole, type Permission } from "./permissions";
 
 export const teamRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+async function getCallerRole(c: any, permission?: Permission): Promise<{ role: TeamRole; userId: string; restaurantId: string } | Response> {
+    const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    const restaurantId = c.var.restaurantId;
+
+    if (!userId || !restaurantId) return c.json({ error: "Non authentifié ou restaurant non spécifié" }, 401);
+
+    const { data: membership, error } = await supabase
+        .from("restaurant_members")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "active")
+        .maybeSingle();
+
+    if (error || !membership) return c.json({ error: "Accès refusé" }, 403);
+    
+    const role = membership.role as TeamRole;
+    if (permission && !hasPermission(role, permission)) {
+        return c.json({ error: `Permission manquante: ${permission}` }, 403);
+    }
+
+    return { role, userId, restaurantId };
+}
 
 /**
  * GET /team
  */
 teamRoutes.get("/", async (c) => {
     try {
-        const user = await c.var.supabase.auth.getUser();
-        if (user.error || !user.data.user) {
-            return c.json({ error: "Non authentifié" }, 401);
-        }
-
+        const auth = await getCallerRole(c, "team:read");
+        if (auth instanceof Response) return auth;
+        const { restaurantId } = auth;
         const supabase = c.var.supabase;
-
-        // Find the caller's membership
-        const { data: callerMembership, error: callerError } = await supabase
-            .from("restaurant_members")
-            .select("*")
-            .eq("user_id", user.data.user.id)
-            .eq("status", "active")
-            .maybeSingle();
-
-        if (callerError || !callerMembership) {
-            return c.json({ error: "Aucune appartenance à un restaurant" }, 403);
-        }
-
-        if (!hasPermission(callerMembership.role as TeamRole, "team:read")) {
-            return c.json({ error: "Permission refusée" }, 403);
-        }
 
         // Get all members for this restaurant from Supabase
         const { data: membersRaw, error: membersError } = await supabase
@@ -44,7 +51,7 @@ teamRoutes.get("/", async (c) => {
                 accepted_at,
                 invited_by
             `)
-            .eq("restaurant_id", callerMembership.restaurant_id);
+            .eq("restaurant_id", restaurantId);
 
         if (membersError) {
             return c.json({ error: membersError.message }, 500);
@@ -93,7 +100,7 @@ teamRoutes.get("/", async (c) => {
             }
         }
 
-        return c.json({ members: membersWithUserInfo, callerRole: callerMembership.role });
+        return c.json({ members: membersWithUserInfo, callerRole: auth.role });
     } catch (error) {
         console.error("GET /team error:", error);
         return c.json({ error: "Erreur interne" }, 500);
@@ -105,11 +112,6 @@ teamRoutes.get("/", async (c) => {
  */
 teamRoutes.post("/invite", async (c) => {
     try {
-        const user = await c.var.supabase.auth.getUser();
-        if (user.error || !user.data.user) {
-            return c.json({ error: "Non authentifié" }, 401);
-        }
-
         const body = await c.req.json().catch(() => ({})) as { email?: string; role?: string };
         const { email, role } = body;
 
@@ -121,26 +123,13 @@ teamRoutes.post("/invite", async (c) => {
             return c.json({ error: "Rôle invalide" }, 400);
         }
 
+        const auth = await getCallerRole(c, "team:invite");
+        if (auth instanceof Response) return auth;
+        const { role: callerRole, userId: callerUserId, restaurantId } = auth;
         const supabase = c.var.supabase;
 
-        // Verify caller membership + permission
-        const { data: callerMembership, error: callerError } = await supabase
-            .from("restaurant_members")
-            .select("*")
-            .eq("user_id", user.data.user.id)
-            .eq("status", "active")
-            .maybeSingle();
-
-        if (callerError || !callerMembership) {
-            return c.json({ error: "Aucune appartenance" }, 403);
-        }
-
-        if (!hasPermission(callerMembership.role as TeamRole, "team:invite")) {
-            return c.json({ error: "Permission refusée" }, 403);
-        }
-
         // Cannot invite someone to a higher or equal role than yours (unless owner)
-        if (!canManageRole(callerMembership.role as TeamRole, role as TeamRole)) {
+        if (!canManageRole(callerRole, role as TeamRole)) {
             return c.json({ error: "Vous ne pouvez pas attribuer ce rôle" }, 403);
         }
 
@@ -162,7 +151,7 @@ teamRoutes.post("/invite", async (c) => {
         const { data: existing, error: existingError } = await supabase
             .from("restaurant_members")
             .select("*")
-            .eq("restaurant_id", callerMembership.restaurant_id)
+            .eq("restaurant_id", restaurantId)
             .eq("user_id", targetUser.id)
             .maybeSingle();
 
@@ -179,7 +168,7 @@ teamRoutes.post("/invite", async (c) => {
                 .update({ 
                     role, 
                     status: "pending", 
-                    invited_by: user.data.user.id, 
+                    invited_by: callerUserId, 
                     created_at: new Date().toISOString(), 
                     accepted_at: null 
                 })
@@ -195,10 +184,10 @@ teamRoutes.post("/invite", async (c) => {
             .from("restaurant_members")
             .insert({
                 id: memberId,
-                restaurant_id: callerMembership.restaurant_id,
+                restaurant_id: restaurantId,
                 user_id: targetUser.id,
                 role,
-                invited_by: user.data.user.id,
+                invited_by: callerUserId,
                 status: "pending",
                 created_at: new Date().toISOString(),
             });
@@ -219,10 +208,8 @@ teamRoutes.post("/invite", async (c) => {
  */
 teamRoutes.post("/accept", async (c) => {
     try {
-        const user = await c.var.supabase.auth.getUser();
-        if (user.error || !user.data.user) {
-            return c.json({ error: "Non authentifié" }, 401);
-        }
+        const userId = c.var.userId;
+        if (!userId) return c.json({ error: "Non authentifié" }, 401);
 
         const body = await c.req.json().catch(() => ({})) as { memberId?: string };
         const { memberId } = body;
@@ -238,7 +225,7 @@ teamRoutes.post("/accept", async (c) => {
             .from("restaurant_members")
             .select("*")
             .eq("id", memberId)
-            .eq("user_id", user.data.user.id)
+            .eq("user_id", userId)
             .eq("status", "pending")
             .maybeSingle();
 
@@ -257,7 +244,7 @@ teamRoutes.post("/accept", async (c) => {
             await supabase
                 .from("drivers")
                 .update({ restaurant_id: membership.restaurant_id })
-                .eq("user_id", user.data.user.id);
+                .eq("user_id", userId);
         }
 
         return c.json({ success: true });
@@ -273,11 +260,6 @@ teamRoutes.post("/accept", async (c) => {
 teamRoutes.patch("/:memberId", async (c) => {
     try {
         const memberId = c.req.param("memberId");
-        const user = await c.var.supabase.auth.getUser();
-        if (user.error || !user.data.user) {
-            return c.json({ error: "Non authentifié" }, 401);
-        }
-
         const body = await c.req.json().catch(() => ({})) as { role?: string };
         const { role } = body;
 
@@ -285,30 +267,17 @@ teamRoutes.patch("/:memberId", async (c) => {
             return c.json({ error: "Rôle invalide" }, 400);
         }
 
+        const auth = await getCallerRole(c, "team:manage_roles");
+        if (auth instanceof Response) return auth;
+        const { role: callerRole, restaurantId } = auth;
         const supabase = c.var.supabase;
-
-        // Caller's membership
-        const { data: callerMembership, error: callerError } = await supabase
-            .from("restaurant_members")
-            .select("*")
-            .eq("user_id", user.data.user.id)
-            .eq("status", "active")
-            .maybeSingle();
-
-        if (callerError || !callerMembership) {
-            return c.json({ error: "Aucune appartenance" }, 403);
-        }
-
-        if (!hasPermission(callerMembership.role as TeamRole, "team:manage_roles")) {
-            return c.json({ error: "Permission refusée. Seul le propriétaire peut changer les rôles." }, 403);
-        }
 
         // Target membership
         const { data: target, error: targetError } = await supabase
             .from("restaurant_members")
             .select("*")
             .eq("id", memberId)
-            .eq("restaurant_id", callerMembership.restaurant_id)
+            .eq("restaurant_id", restaurantId)
             .maybeSingle();
 
         if (targetError || !target) {
@@ -319,7 +288,7 @@ teamRoutes.patch("/:memberId", async (c) => {
             return c.json({ error: "Impossible de modifier le rôle du propriétaire" }, 403);
         }
 
-        if (!canManageRole(callerMembership.role as TeamRole, role as TeamRole)) {
+        if (!canManageRole(callerRole, role as TeamRole)) {
             return c.json({ error: "Vous ne pouvez pas attribuer ce rôle" }, 403);
         }
 
@@ -333,7 +302,7 @@ teamRoutes.patch("/:memberId", async (c) => {
         if (role === "driver") {
             await supabase
                 .from("drivers")
-                .update({ restaurant_id: callerMembership.restaurant_id })
+                .update({ restaurant_id: restaurantId })
                 .eq("user_id", target.user_id);
         } else if (oldRole === "driver") {
             // If they were a driver and now something else, unlink from restaurant
@@ -356,35 +325,18 @@ teamRoutes.patch("/:memberId", async (c) => {
 teamRoutes.delete("/:memberId", async (c) => {
     try {
         const memberId = c.req.param("memberId");
-        const user = await c.var.supabase.auth.getUser();
-        if (user.error || !user.data.user) {
-            return c.json({ error: "Non authentifié" }, 401);
-        }
-
+        
+        const auth = await getCallerRole(c, "team:invite");
+        if (auth instanceof Response) return auth;
+        const { role: callerRole, restaurantId } = auth;
         const supabase = c.var.supabase;
-
-        // Caller's membership
-        const { data: callerMembership, error: callerError } = await supabase
-            .from("restaurant_members")
-            .select("*")
-            .eq("user_id", user.data.user.id)
-            .eq("status", "active")
-            .maybeSingle();
-
-        if (callerError || !callerMembership) {
-            return c.json({ error: "Aucune appartenance" }, 403);
-        }
-
-        if (!hasPermission(callerMembership.role as TeamRole, "team:invite")) {
-            return c.json({ error: "Permission refusée" }, 403);
-        }
 
         // Target membership
         const { data: target, error: targetError } = await supabase
             .from("restaurant_members")
             .select("*")
             .eq("id", memberId)
-            .eq("restaurant_id", callerMembership.restaurant_id)
+            .eq("restaurant_id", restaurantId)
             .maybeSingle();
 
         if (targetError || !target) {
@@ -395,7 +347,7 @@ teamRoutes.delete("/:memberId", async (c) => {
             return c.json({ error: "Impossible de révoquer le propriétaire" }, 403);
         }
 
-        if (!canManageRole(callerMembership.role as TeamRole, target.role as TeamRole)) {
+        if (!canManageRole(callerRole, target.role as TeamRole)) {
             return c.json({ error: "Vous ne pouvez pas révoquer ce membre" }, 403);
         }
 
@@ -418,4 +370,3 @@ teamRoutes.delete("/:memberId", async (c) => {
         return c.json({ error: "Erreur interne" }, 500);
     }
 });
-

@@ -43,6 +43,7 @@ customersRoutes.get("/", async (c) => {
     if (ordersError) throw new Error(ordersError.message);
 
     const orders = (ordersRaw ?? []) as unknown as OrderRow[];
+    const isDataTruncated = orders.length >= 5000;
 
     // 2) Aggregate by customer_id (or fallback phone)
     const customerMap = new Map<string, CustomerAggregate>();
@@ -51,7 +52,7 @@ customersRoutes.get("/", async (c) => {
         const customerId = order.customer_id ?? null;
         const fallbackKey = order.customer_phone || order.customer_name || "anonymous";
         const key = customerId || `anon:${fallbackKey}`;
-        const createdAt = order.created_at || new Date().toISOString();
+        const createdAt = order.created_at; // Issue 12: remove new Date() fallback
 
         const existing = customerMap.get(key);
         if (!existing) {
@@ -68,8 +69,11 @@ customersRoutes.get("/", async (c) => {
         } else {
             existing.totalOrders += 1;
             existing.totalSpent += order.total || 0;
-            if (new Date(createdAt) > new Date(existing.lastOrderAt)) {
+            if (createdAt && (!existing.lastOrderAt || new Date(createdAt) > new Date(existing.lastOrderAt))) {
                 existing.lastOrderAt = createdAt;
+            }
+            if (createdAt && (!existing.createdAt || new Date(createdAt) < new Date(existing.createdAt))) {
+                existing.createdAt = createdAt;
             }
         }
     }
@@ -127,5 +131,9 @@ customersRoutes.get("/", async (c) => {
             total,
             totalPages: Math.max(1, Math.ceil(total / limit)),
         },
+        _internal: {
+            isDataTruncated,
+            _note: isDataTruncated ? "Données tronquées à 5000 commandes pour performance" : null,
+        }
     });
 });

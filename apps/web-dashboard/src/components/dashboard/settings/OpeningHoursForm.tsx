@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
-import { Card, Button, Input, Toggle } from "@/components/ui";
-import { toast } from "@/components/ui";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, Button, Input, Toggle } from "@kbouffe/module-core/ui";
+import { toast } from "@kbouffe/module-core/ui";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import type { OpeningHours, DayHours, Json } from "@/lib/supabase/types";
 
 const dayKeys: (keyof OpeningHours)[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];

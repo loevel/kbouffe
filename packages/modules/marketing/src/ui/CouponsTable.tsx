@@ -6,11 +6,11 @@ import {
     Card,
     Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
     Badge, Button, EmptyState, toast,
-} from "@/components/ui";
-import { useCoupons } from "@/hooks/use-data";
-import { useLocale } from "@/contexts/locale-context";
-import { formatCFA, formatDate } from "@/lib/format";
-import type { Coupon } from "@/lib/supabase/types";
+    formatCFA, formatDate,
+    useLocale,
+} from "@kbouffe/module-core/ui";
+import { useCoupons } from "../hooks/use-marketing";
+import type { Coupon } from "../lib/types";
 import { CouponFormModal } from "./CouponFormModal";
 
 export function CouponsTable() {

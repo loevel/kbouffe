@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 import { Users, UserCheck, Phone, CalendarDays } from "lucide-react";
-import { Card } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
+import { Card, useLocale } from "@kbouffe/module-core/ui";
 import { useCustomers } from "./hooks";
 
 export function CustomersStats() {

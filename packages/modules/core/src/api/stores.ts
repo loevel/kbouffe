@@ -66,7 +66,14 @@ storesRoutes.get("/", async (c) => {
 
     // Cache publicly: 1 min browser, 5 mins edge limit
     c.header("Cache-Control", "public, s-maxage=300, stale-while-revalidate=60");
-    return c.json({ restaurants: results, total: results.length });
+
+    const mappedResults = results.map(r => ({
+        ...r,
+        logo_url: r.logo_url || "https://images.kbouffe.com/defaults/restaurant-logo.png",
+        banner_url: r.banner_url || "https://images.kbouffe.com/defaults/restaurant-banner.png",
+    }));
+
+    return c.json({ restaurants: mappedResults, total: results.length });
 });
 
 /**
@@ -88,7 +95,13 @@ storesRoutes.get("/:slug", async (c) => {
         return c.json({ error: "Restaurant non trouvé" }, 404);
     }
 
-    return c.json({ restaurant });
+    const res = {
+        ...restaurant,
+        logo_url: restaurant.logo_url || "https://images.kbouffe.com/defaults/restaurant-logo.png",
+        banner_url: restaurant.banner_url || "https://images.kbouffe.com/defaults/restaurant-banner.png",
+    };
+
+    return c.json({ restaurant: res });
 });
 
 /**

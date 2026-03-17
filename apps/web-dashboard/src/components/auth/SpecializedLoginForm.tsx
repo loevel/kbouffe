@@ -6,7 +6,7 @@ import { KbouffeLogo } from "@/components/brand/Logo";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { motion } from "framer-motion";
 import Image from "next/image";
 

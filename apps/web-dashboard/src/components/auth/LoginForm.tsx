@@ -6,7 +6,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { useState, type FormEvent } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 type UserRole = "merchant" | "client" | "livreur" | "admin";
 

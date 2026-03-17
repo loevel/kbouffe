@@ -1,10 +1,10 @@
 "use client";
 
 import { Menu, Bell, Sun, Moon, Monitor, Globe, Shield } from "lucide-react";
-import { Dropdown } from "@/components/ui";
+import { Dropdown } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
-import { useTheme, type Theme } from "@/contexts/theme-context";
-import { useLocale } from "@/contexts/locale-context";
+import { useTheme, type Theme } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { useUserSession } from "@/store/client-store";
 import type { Locale } from "@/lib/i18n";
 

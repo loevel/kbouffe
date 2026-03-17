@@ -17,7 +17,7 @@ import {
     Cloud,
     AlertCircle,
 } from "lucide-react";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 
 interface SettingField {

@@ -18,7 +18,7 @@ import {
     AlertCircle,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
-import { formatCFA } from "@/lib/format";
+import { formatCFA } from "@kbouffe/module-core/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type DeliveryType = "delivery" | "pickup" | "dine_in";

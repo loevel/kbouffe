@@ -4,8 +4,8 @@ import { KpiCards } from "@/components/dashboard/overview/KpiCards";
 import { RevenueChart } from "@/components/dashboard/overview/RevenueChart";
 import { RecentOrders } from "@/components/dashboard/overview/RecentOrders";
 import { PopularProducts } from "@/components/dashboard/overview/PopularProducts";
-import { useDashboard } from "@/contexts/dashboard-context";
-import { useLocale } from "@/contexts/locale-context";
+import { useDashboard } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function DashboardPage() {
     const { user, loading } = useDashboard();

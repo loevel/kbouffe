@@ -3,13 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, ImagePlus, Upload } from "lucide-react";
-import { Card, Button, Input, Textarea, Select, Toggle } from "@/components/ui";
-import { toast } from "@/components/ui";
+import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale } from "@kbouffe/module-core/ui";
+
 import { ProductOptionEditor } from "./ProductOptionEditor";
-import { useLocale } from "@/contexts/locale-context";
 import { useCategories, createProduct, updateProduct as apiUpdateProduct } from "@/hooks/use-data";
 import { useUploadImage } from "@/hooks/use-upload-image";
-import type { Product, ProductOption } from "@/lib/supabase/types";
+import type { Product, ProductOption } from "@kbouffe/module-core/ui";
 
 interface ProductFormProps {
     product?: Product;

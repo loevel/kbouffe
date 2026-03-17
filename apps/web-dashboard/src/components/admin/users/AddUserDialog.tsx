@@ -1,11 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Modal, ModalFooter } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { toast } from "@/components/ui/Toast";
+import { Modal, ModalFooter, Button, Input, Select, toast } from "@kbouffe/module-core/ui";
 import { UserPlus, Mail, Lock, User, Phone } from "lucide-react";
 
 interface AddUserDialogProps {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Heart, ArrowRight } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export function Footer() {
     const { t } = useLocale();

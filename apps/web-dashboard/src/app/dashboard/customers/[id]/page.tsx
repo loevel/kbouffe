@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Phone, Mail, ShoppingBag, TrendingUp, Calendar, ExternalLink } from "lucide-react";
-import { Card, Button, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Spinner, EmptyState } from "@/components/ui";
-import { useLocale } from "@/contexts/locale-context";
-import { formatCFA, formatDate, formatPhone, formatOrderId } from "@/lib/format";
+import { Card, Button, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Spinner, EmptyState } from "@kbouffe/module-core/ui";
+import { useLocale } from "@kbouffe/module-core/ui";
+import { formatCFA, formatDate, formatPhone, formatOrderId } from "@kbouffe/module-core/ui";
 import type { DashboardCustomer } from "@kbouffe/module-crm/ui";
 import type { Order } from "@/lib/supabase/types";
 

@@ -24,8 +24,7 @@ import {
     X,
     Edit2,
 } from "lucide-react";
-import { Badge, Button } from "@/components/ui";
-import { toast } from "@/components/ui/Toast";
+import { Badge, Button, toast } from "@kbouffe/module-core/ui";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";

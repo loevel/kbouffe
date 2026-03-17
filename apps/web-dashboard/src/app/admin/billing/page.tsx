@@ -14,9 +14,9 @@ import {
     Search,
     Filter,
 } from "lucide-react";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 
 interface BillingStats {

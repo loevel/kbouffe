@@ -2,7 +2,7 @@
 
 import { SettingsNav } from "@/components/dashboard/settings/SettingsNav";
 import { DeliverySettingsForm } from "@/components/dashboard/settings/DeliverySettingsForm";
-import { useLocale } from "@/contexts/locale-context";
+import { useLocale } from "@kbouffe/module-core/ui";
 
 export default function DeliveryPage() {
     const { t } = useLocale();
