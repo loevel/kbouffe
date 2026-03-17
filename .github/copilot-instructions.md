@@ -2,65 +2,112 @@
 
 ## Overview
 
-KBouffe is a food ordering platform for Cameroon. Monorepo (npm workspaces) with 3 apps + 2 shared packages deployed on Cloudflare + Supabase Auth.
-
-Architecture doc: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
+KBouffe is a food ordering & restaurant management platform for Cameroon. Monorepo (npm workspaces) with 2 apps + 8 feature modules + 1 shared types package, deployed on Cloudflare Workers + Supabase.
 
 ## Monorepo Structure
 
 | Path | Stack | Purpose |
 |------|-------|---------|
-| `apps/api` | Hono on Cloudflare Workers | REST API (public + merchant + admin) |
-| `apps/web-dashboard` | Next.js 16 + React 19 + Tailwind 4 | Merchant dashboard + public storefront |
+| `apps/api` | Hono on Cloudflare Workers | REST API — orchestrates all modules, handles auth/CORS/middleware |
+| `apps/web-dashboard` | Next.js 16 + React 19 + Tailwind 4 | Merchant dashboard + admin panel + public storefront |
 | `apps/mobile-client` | Expo 54 + React Native 0.81 | Customer mobile app |
-| `packages/db` | Drizzle ORM + D1 | Shared schemas, migrations, DB clients |
+| `packages/modules/core` | Hono routes + React components | Auth, stores, users, upload, shared UI components, i18n, utilities |
+| `packages/modules/catalog` | Hono routes + React components | Categories, products, menu |
+| `packages/modules/orders` | Hono routes + React components | Orders, payments (MTN MoMo), delivery zones |
+| `packages/modules/reservations` | Hono routes + React components | Reservations, tables, zones |
+| `packages/modules/crm` | Hono routes + React components | Customer aggregation & analytics |
+| `packages/modules/hr` | Hono routes + React components | Team management (RBAC), payouts |
+| `packages/modules/marketing` | Hono routes + React components | Campaigns, coupons, ads (MTN), SMS |
+| `packages/modules/chat` | Hono routes | Order-linked messaging, real-time via Supabase |
 | `packages/shared-types` | TypeScript | Shared interfaces & enums |
 | `tools/mcp-cloudflare` | Node.js MCP server | Cloudflare management tooling |
 
+### Module Architecture
+
+Each module under `packages/modules/` follows a consistent structure:
+
+```
+packages/modules/<name>/
+├── src/
+│   ├── api/          # Hono route handlers (business logic)
+│   ├── ui/           # React components (dashboard UI)
+│   │   └── components/  # Sub-components
+│   ├── hooks/        # React hooks (data fetching with authFetch)
+│   └── lib/          # Types, utilities
+├── package.json      # Exports as @kbouffe/module-<name>
+└── index.ts          # Public API barrel
+```
+
+- **`api/`**: Exports Hono route instances. Mounted by `apps/api/src/index.ts`.
+- **`ui/`**: Exports React components. Consumed by `apps/web-dashboard`.
+- **Core module** also exports shared UI primitives (`Button`, `Card`, `Modal`, `Table`, `Input`, etc.), `authFetch`, `format` utilities, i18n strings, and Supabase types.
+
 ## Tech Stack
 
-- **Runtime**: Cloudflare Workers (D1, R2, Queues)
+- **Runtime**: Cloudflare Workers (R2, Queues)
+- **Database**: Supabase PostgreSQL (sole database — all data)
 - **API framework**: Hono (apps/api)
 - **Web framework**: Next.js 16 with OpenNext for Cloudflare
 - **Mobile**: Expo Router (file-based routing)
-- **ORM**: Drizzle ORM with SQLite/D1
 - **Auth**: Supabase Auth (JWT tokens, phone + password)
 - **State**: Zustand (web), React Context + AsyncStorage (mobile)
 - **Styling**: Tailwind CSS 4 (web), React Native StyleSheet (mobile)
 - **Payments**: MTN Mobile Money (Collection + Disbursement APIs)
+- **Image storage**: Cloudflare R2 (`kbouffe-images` bucket)
+- **SMS**: Cloudflare Queues → MTN SMS API
+- **Real-time**: Supabase Realtime (chat, notifications)
 
 ## Language & Locale
 
 - All UI text, error messages, and API responses are in **French**.
 - Code (variables, functions, comments) is in **English**.
-- Currency is **FCFA** (integer, no decimals).
+- Currency is **FCFA / XAF** (integer, no decimals).
+- i18n strings in `packages/modules/core/src/ui/i18n/{fr,en}.ts`.
 
 ## Code Style
 
 - TypeScript strict mode across all apps.
-- ESM (`"type": "module"`) in api and db packages.
+- ESM (`"type": "module"`) in api and module packages.
 - Functional components only (React). No class components.
 - Named exports preferred over default exports (except Next.js pages).
 - Use `interface` over `type` for object shapes when possible.
+- Shared UI components live in `@kbouffe/module-core` (not in `apps/web-dashboard`).
+- Data fetching in hooks uses `authFetch` from `@kbouffe/module-core`.
 
 ## Database Architecture
 
-Two-tier D1 database design:
-- **Global Index** (`packages/db/src/schemas/global-index/`): Platform-wide data — restaurants, users, drivers, reviews, payouts, audit logs, support tickets, platform settings.
-- **Restaurant Tenant** (`packages/db/src/schemas/restaurant/`): Per-restaurant data — categories, products, orders, tables, reservations, coupons (currently in Supabase, migrating to D1).
+**Single database: Supabase PostgreSQL.** All data resides in Supabase:
 
-All schemas use Drizzle `sqliteTable`. IDs are UUIDs (`crypto.randomUUID()`). Timestamps use `integer` with `mode: "timestamp"`.
+- `restaurants` — Restaurant profiles, settings, config
+- `users` — User accounts, wallet, preferences
+- `categories`, `products` — Menu catalog
+- `orders`, `order_items`, `order_item_options` — Order management
+- `payment_transactions` — MTN MoMo payment tracking
+- `reservations`, `restaurant_tables`, `table_zones` — Reservation system
+- `restaurant_members` — Team RBAC
+- `coupons`, `coupon_uses`, `ad_campaigns` — Marketing
+- `conversations`, `messages` — Chat system
+- `reviews`, `support_tickets`, `payouts` — CRM & operations
+- `wallet_movements`, `restaurant_favorites`, `product_favorites` — User engagement
+- `addresses` — Delivery addresses
+- `store_modules` — Feature toggles per restaurant
+- `drivers` — Delivery drivers
+
+IDs are UUIDs (`crypto.randomUUID()`). Timestamps are ISO strings.
 
 ## API Conventions (apps/api)
 
 - All business routes under `/api/*` prefix.
+- `apps/api` is the **orchestrator** — it imports route handlers from modules and applies middleware.
+- Module `api/` directories contain **business logic only** (no auth, no CORS).
 - Public routes: no auth middleware.
 - Merchant routes: `authMiddleware` — resolves `userId`, `restaurantId`, `supabase` from JWT.
+- Module-gated routes: `requireModule(moduleName)` — checks `store_modules` table.
 - Admin routes: `adminMiddleware` — checks `role === "admin"`, exposes `adminRole` for RBAC.
 - Admin RBAC: `requireDomain(c, domain)` from `lib/admin-rbac.ts`. Sub-roles: `super_admin`, `support`, `sales`, `moderator`.
-- Restaurant team RBAC: `hasPermission(role, permission)` from `lib/permissions.ts`. Roles: `owner > manager > cashier | cook | viewer`.
-- Audit logging for admin write operations via `logAdminAction()`.
+- Restaurant team RBAC: `hasPermission(role, permission)` from module-hr `permissions.ts`. Roles: `owner > manager > cashier | cook | driver | viewer`.
 - Error responses: `{ error: "message in French" }` with appropriate HTTP status.
+- Success responses: `{ success: true, ...data }`.
 
 ## User Roles
 
@@ -70,6 +117,17 @@ All schemas use Drizzle `sqliteTable`. IDs are UUIDs (`crypto.randomUUID()`). Ti
 | Merchant | `merchant` | Restaurant owner/staff managing their establishment |
 | Driver | `livreur` | Delivery driver |
 | Admin | `admin` | Platform administrator (sub-roles: super_admin, support, sales, moderator) |
+
+## Restaurant Team Roles
+
+| Role | Permissions |
+|------|-------------|
+| `owner` | Full access |
+| `manager` | Orders, menu, team invites, reservations, marketing |
+| `cashier` | Orders (view/update), payments |
+| `cook` | Orders (view only, kitchen board) |
+| `driver` | Deliveries assigned to them |
+| `viewer` | Read-only access |
 
 ## Build & Dev Commands
 
@@ -86,17 +144,25 @@ cd apps/web-dashboard && npm run deploy
 
 # Mobile Client (Expo)
 cd apps/mobile-client && npm start
-
-# Database (Drizzle)
-cd packages/db && npm run generate        # Generate migrations
-cd packages/db && npm run migrate:local   # Apply to local D1
-cd packages/db && npm run migrate:global  # Apply to remote D1
 ```
 
-## Conventions
+## Key Conventions
 
-- Supabase used **only for auth** (JWT tokens) and **tenant data storage** (orders, products, categories — migrating to D1). Never for platform-wide data.
-- D1 Global Index is the source of truth for users, restaurants, reviews, and platform analytics.
-- R2 for image storage (dishes, logos). Max 5MB, JPEG/PNG/WebP/AVIF only.
-- Cloudflare Queues for async SMS processing.
-- MTN MoMo secrets set via `wrangler secret put`, never hardcoded.
+- **Supabase** is the sole database. All data lives in Supabase PostgreSQL.
+- **R2** for image storage (dishes, logos, chat). Max 5MB, JPEG/PNG/WebP/AVIF only. Deduplication via SHA-256.
+- **Cloudflare Queues** for async SMS processing (`kbouffe-sms-queue`).
+- **MTN MoMo** secrets set via `wrangler secret put`, never hardcoded.
+- **Supabase keys** (URL, anon key, service role key) set as Cloudflare Worker secrets.
+- **Module gating**: Restaurants can enable/disable modules (reservations, marketing, hr) via `store_modules` table.
+- **Shared UI**: All reusable components (`Button`, `Modal`, `Table`, etc.) live in `@kbouffe/module-core`, not duplicated across apps.
+- **authFetch**: Centralized authenticated fetch utility in `@kbouffe/module-core/ui/lib/auth-fetch.ts`.
+
+## Deployment
+
+| Service | Platform | URL |
+|---------|----------|-----|
+| API | Cloudflare Workers | `https://kbouffe-api.davechendjou.workers.dev` |
+| Dashboard | Cloudflare (OpenNext) | `https://kbouffe.com` |
+| Images | Cloudflare R2 | `https://images.kbouffe.com` |
+| Database | Supabase | PostgreSQL |
+| Auth | Supabase | JWT-based |

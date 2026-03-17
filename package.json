@@ -5,5 +5,15 @@
     "apps/*",
     "packages/*",
     "packages/modules/*"
-  ]
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test"
+  },
+  "packageManager": "npm@10.9.0",
+  "devDependencies": {
+    "turbo": "^2.2.3"
+  }
 }

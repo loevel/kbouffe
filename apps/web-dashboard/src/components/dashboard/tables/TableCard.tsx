@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Users, MoreVertical, QrCode, X, Download, ExternalLink } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Users, MoreVertical, QrCode, X, Download, ExternalLink, Clock3 } from "lucide-react";
 import { Card, Badge, Dropdown, Button } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
@@ -41,6 +41,16 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
 
     const statusLabel = t.tables[table.status as keyof typeof t.tables] ?? table.status;
     const statusKey = (table.status ?? "available") as string;
+
+    const statusChip = useMemo(() => {
+        const map: Record<string, { color: string; text: string }> = {
+            available: { color: "bg-emerald-500/10 text-emerald-600 border-emerald-200", text: t.tables.available },
+            occupied: { color: "bg-rose-500/10 text-rose-600 border-rose-200", text: t.tables.occupied },
+            reserved: { color: "bg-amber-500/10 text-amber-600 border-amber-200", text: t.tables.reserved },
+            cleaning: { color: "bg-blue-500/10 text-blue-600 border-blue-200", text: t.tables.cleaning },
+        };
+        return map[statusKey] ?? map.available;
+    }, [statusKey, t.tables.available, t.tables.occupied, t.tables.reserved, t.tables.cleaning]);
 
     const menuUrl = restaurant?.slug
         ? `https://kbouffe.com/r/${restaurant.slug}/table/${table.number}`
@@ -103,10 +113,20 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
                     <div className="flex items-center gap-1.5 text-sm text-surface-500">
                         <Users size={14} />
                         <span>{table.capacity} {t.tables.seats}</span>
+                        {table.table_zones && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-surface-100 text-surface-500 border border-surface-200">
+                                {table.table_zones.name}
+                            </span>
+                        )}
                     </div>
-                    <Badge variant={STATUS_BADGE[statusKey] ?? "default"}>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${statusChip.color}`}>
                         {statusLabel}
-                    </Badge>
+                    </span>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 text-xs text-surface-400">
+                    <Clock3 size={12} />
+                    <span>{t.tables.statusSince ?? "Statut actuel"}</span>
                 </div>
 
                 {/* QR hint button */}
@@ -179,4 +199,3 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
         </>
     );
 }
-

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Edit, Trash2, Copy, UtensilsCrossed, Eye, EyeOff, Beer, GlassWater, CupSoda, Zap, Image as ImageIcon, ExternalLink } from "lucide-react";
+import { Search, Edit, Trash2, Copy, UtensilsCrossed, Eye, EyeOff, Beer, GlassWater, CupSoda, Zap, Image as ImageIcon, ExternalLink, ArrowUp10, ArrowDown10, ArrowUpAZ } from "lucide-react";
 import { Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Toggle, Badge, EmptyState, Dropdown, toast, useLocale, formatCFA } from "@kbouffe/module-core/ui";
 
 import { useProducts, useCategories, updateProduct, deleteProduct as apiDeleteProduct, createProduct } from "@/hooks/use-data";
 
 const ITEMS_PER_PAGE = 10;
+type SortBy = "name" | "priceAsc" | "priceDesc" | "availability";
 
 type AvailabilityFilter = "all" | "available" | "unavailable";
 
@@ -49,6 +50,7 @@ export function ProductsTable() {
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [sortBy, setSortBy] = useState<SortBy>("name");
 
     const categoryOptions = [
         { value: "", label: t.menu.allCategories },
@@ -78,8 +80,16 @@ export function ProductsTable() {
                 p.description?.toLowerCase().includes(q)
             );
         }
+        // Sorting
+        prods = [...prods].sort((a, b) => {
+            if (sortBy === "name") return a.name.localeCompare(b.name);
+            if (sortBy === "priceAsc") return (a.price ?? 0) - (b.price ?? 0);
+            if (sortBy === "priceDesc") return (b.price ?? 0) - (a.price ?? 0);
+            if (sortBy === "availability") return Number(b.is_available) - Number(a.is_available);
+            return 0;
+        });
         return prods;
-    }, [products, categoryFilter, availabilityFilter, search]);
+    }, [products, categoryFilter, availabilityFilter, search, sortBy]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
     const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -186,6 +196,18 @@ export function ProductsTable() {
                             onChange={(e) => { setAvailabilityFilter(e.target.value as AvailabilityFilter); setPage(1); }}
                         />
                     </div>
+                    <div className="w-full sm:w-52">
+                        <Select
+                            value={sortBy}
+                            onChange={(e) => { setSortBy(e.target.value as SortBy); setPage(1); }}
+                            options={[
+                                { value: "name", label: t.menu.sortName ?? "Trier par nom", leftIcon: <ArrowUpAZ size={14} /> },
+                                { value: "priceAsc", label: t.menu.sortPriceAsc ?? "Prix croissant", leftIcon: <ArrowUp10 size={14} /> },
+                                { value: "priceDesc", label: t.menu.sortPriceDesc ?? "Prix décroissant", leftIcon: <ArrowDown10 size={14} /> },
+                                { value: "availability", label: t.menu.sortAvailability ?? "Disponibilité", leftIcon: <Eye size={14} /> },
+                            ]}
+                        />
+                    </div>
                 </div>
 
                 {/* Quick category pills */}
@@ -249,6 +271,15 @@ export function ProductsTable() {
                     icon={<UtensilsCrossed size={32} />}
                     title={t.menu.noProducts}
                     description={search ? t.menu.noProductsSearch : t.menu.noProductsFirst}
+                    action={
+                        <button
+                            onClick={() => window.location.assign("/dashboard/menu/new")}
+                            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg shadow hover:bg-brand-600 transition"
+                        >
+                            <Edit size={14} />
+                            {t.menu.addProduct}
+                        </button>
+                    }
                 />
             ) : (
                 <>
@@ -286,13 +317,15 @@ export function ProductsTable() {
                                         <div className="flex items-center gap-3">
                                             {product.image_url ? (
                                                 <div className="w-10 h-10 rounded-xl overflow-hidden bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
-                                                    <img
-                                                        src={product.image_url}
-                                                        alt={product.name}
-                                                        className="w-full h-full object-contain"
-                                                        onError={(e) => {
-                                                            const target = e.target as HTMLImageElement;
-                                                            target.style.display = "none";
+                                                <img
+                                                    src={product.image_url}
+                                                    alt={product.name}
+                                                    className="w-full h-full object-contain"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = "none";
                                                             target.parentElement!.innerHTML = `<div class="flex items-center justify-center w-full h-full text-surface-400"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
                                                         }}
                                                     />

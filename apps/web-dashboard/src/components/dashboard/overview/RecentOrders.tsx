@@ -1,17 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCircle2, Ban } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "@kbouffe/module-orders/ui";
 import { formatCFA, formatDateTime, formatOrderId } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
-import { useOrders } from "@/hooks/use-data";
+import { useOrders, updateOrderStatus } from "@/hooks/use-data";
+import { useState } from "react";
 
 export function RecentOrders() {
     const { t } = useLocale();
     const { orders, isLoading } = useOrders({ limit: 5, sort: "newest" });
     const recent = orders.slice(0, 5);
+    const [processingId, setProcessingId] = useState<string | null>(null);
+
+    const quickUpdate = async (id: string, status: "ready" | "cancelled") => {
+        setProcessingId(id);
+        const { success, error } = await updateOrderStatus(id, status as any);
+        if (!success) {
+            console.error(error);
+        }
+        setProcessingId(null);
+    };
 
     if (isLoading) {
         return (
@@ -59,9 +70,29 @@ export function RecentOrders() {
                                 {order.customer_name} — {formatDateTime(order.created_at)}
                             </p>
                         </div>
-                        <span className="text-sm font-semibold text-surface-900 dark:text-white ml-4">
-                            {formatCFA(order.total)}
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-surface-900 dark:text-white">
+                                {formatCFA(order.total)}
+                            </span>
+                            {order.status === "pending" && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); quickUpdate(order.id, "ready"); }}
+                                        disabled={processingId === order.id}
+                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                                    >
+                                        <CheckCircle2 size={14} /> {t.dashboard.markReady ?? "Prêt"}
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); quickUpdate(order.id, "cancelled"); }}
+                                        disabled={processingId === order.id}
+                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                                    >
+                                        <Ban size={14} /> {t.common.cancel}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </Link>
                 ))}
             </div>

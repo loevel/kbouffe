@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Save } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Save, AlertCircle } from "lucide-react";
 import { Card, Button, Input, Textarea, Select } from "@kbouffe/module-core/ui";
 import { toast } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
@@ -23,6 +23,7 @@ export function RestaurantInfoForm() {
         priceRange: "1",
     });
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Synchroniser le formulaire avec les données du restaurant
     useEffect(() => {
@@ -46,9 +47,22 @@ export function RestaurantInfoForm() {
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.name.trim()) { toast.error(t.settings.nameRequired); return; }
+    const validate = () => {
+        const next: Record<string, string> = {};
+        if (!form.name.trim()) next.name = t.settings.nameRequired;
+        if (form.email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(form.email)) next.email = t.settings.invalidEmail ?? "Email invalide";
+        if (form.phone && form.phone.length < 6) next.phone = t.settings.invalidPhone ?? "Téléphone invalide";
+        return next;
+    };
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        const validation = validate();
+        setErrors(validation);
+        if (Object.keys(validation).length) { 
+            toast.error(t.settings.errorPrefix + Object.values(validation)[0]); 
+            return; 
+        }
         setLoading(true);
 
         const { error } = await updateRestaurant({
@@ -72,6 +86,8 @@ export function RestaurantInfoForm() {
         setLoading(false);
     };
 
+    const hasErrors = useMemo(() => Object.keys(errors).length > 0, [errors]);
+
     if (dashboardLoading) {
         return (
             <Card>
@@ -91,15 +107,34 @@ export function RestaurantInfoForm() {
             <Card>
                 <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.settings.generalInfo}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label={t.settings.restaurantName} value={form.name} onChange={(e) => updateField("name", e.target.value)} />
+                    <Input 
+                        label={t.settings.restaurantName} 
+                        value={form.name} 
+                        onChange={(e) => updateField("name", e.target.value)} 
+                        error={errors.name}
+                        aria-invalid={!!errors.name}
+                    />
                     <div className="md:col-span-2">
                         <Input label={t.settings.address} value={form.address} onChange={(e) => updateField("address", e.target.value)} />
                     </div>
                     <Input label={t.settings.city} value={form.city} onChange={(e) => updateField("city", e.target.value)} />
                     <Input label={t.settings.postalCode} value={form.postalCode} onChange={(e) => updateField("postalCode", e.target.value)} />
                     <Input label={t.settings.country} value={form.country} onChange={(e) => updateField("country", e.target.value)} />
-                    <Input label={t.settings.phone} value={form.phone} onChange={(e) => updateField("phone", e.target.value)} />
-                    <Input label={t.settings.email} type="email" value={form.email} onChange={(e) => updateField("email", e.target.value)} />
+                    <Input 
+                        label={t.settings.phone} 
+                        value={form.phone} 
+                        onChange={(e) => updateField("phone", e.target.value)} 
+                        error={errors.phone}
+                        aria-invalid={!!errors.phone}
+                    />
+                    <Input 
+                        label={t.settings.email} 
+                        type="email" 
+                        value={form.email} 
+                        onChange={(e) => updateField("email", e.target.value)} 
+                        error={errors.email}
+                        aria-invalid={!!errors.email}
+                    />
                     <Input label={t.settings.cuisineType} value={form.cuisineType} onChange={(e) => updateField("cuisineType", e.target.value)} />
                     <Select 
                         label={t.settings.priceRange} 
@@ -113,8 +148,42 @@ export function RestaurantInfoForm() {
                         ]}
                     />
                 </div>
-                <div className="mt-6 flex justify-end">
-                    <Button type="submit" leftIcon={<Save size={18} />} isLoading={loading}>{t.common.save}</Button>
+                <div className="mt-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    {hasErrors && (
+                        <div className="flex items-center gap-2 text-sm text-rose-600 dark:text-rose-300 font-semibold">
+                            <AlertCircle size={16} />
+                            {t.settings.errorPrefix}{Object.values(errors)[0]}
+                        </div>
+                    )}
+                    <div className="flex gap-3 w-full md:w-auto">
+                        <Button 
+                            type="button" 
+                            variant="secondary" 
+                            onClick={() => {
+                                // reset to restaurant values
+                                if (restaurant) {
+                                    setForm({
+                                        name: restaurant.name ?? "",
+                                        description: restaurant.description ?? "",
+                                        address: restaurant.address ?? "",
+                                        city: restaurant.city ?? "",
+                                        postalCode: restaurant.postal_code ?? "",
+                                        country: restaurant.country ?? "Cameroun",
+                                        phone: restaurant.phone ?? "",
+                                        email: restaurant.email ?? "",
+                                        cuisineType: restaurant.cuisine_type ?? "",
+                                        priceRange: restaurant.price_range?.toString() ?? "1",
+                                    });
+                                    setErrors({});
+                                }
+                            }}
+                        >
+                            {t.common.cancel}
+                        </Button>
+                        <Button type="submit" leftIcon={<Save size={18} />} isLoading={loading} disabled={hasErrors}>
+                            {t.common.save}
+                        </Button>
+                    </div>
                 </div>
             </Card>
         </form>

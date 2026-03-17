@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Added ignores to avoid linting build artifacts and caches
+    ".open-next/**",
+    "dist/**",
+    "node_modules/**"
   ]),
 ]);
 

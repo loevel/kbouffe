@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Plus, XCircle } from "lucide-react";
+import { Search, Plus, XCircle, Filter } from "lucide-react";
 import { Tabs, Input, Button, useLocale, useDashboard } from "@kbouffe/module-core/ui";
 
 interface ReservationsFiltersProps {
@@ -14,6 +14,10 @@ interface ReservationsFiltersProps {
     pendingCount: number;
     confirmedCount: number;
     seatedCount: number;
+    sort: "time" | "party" | "status";
+    onSortChange: (val: "time" | "party" | "status") => void;
+    minParty: number | null;
+    onMinPartyChange: (val: number | null) => void;
 }
 
 export function ReservationsFilters({
@@ -27,6 +31,10 @@ export function ReservationsFilters({
     pendingCount,
     confirmedCount,
     seatedCount,
+    sort,
+    onSortChange,
+    minParty,
+    onMinPartyChange,
 }: ReservationsFiltersProps) {
     const { t } = useLocale();
     const { can } = useDashboard();
@@ -67,12 +75,33 @@ export function ReservationsFilters({
                         )}
                     />
                 </div>
-                <div className="lg:col-span-4">
+                <div className="lg:col-span-3">
                     <Input
                         type="date"
                         value={dateFilter}
                         onChange={(e) => onDateFilterChange(e.target.value)}
                     />
+                </div>
+                <div className="lg:col-span-2">
+                    <Input
+                        type="number"
+                        min={1}
+                        placeholder={t.reservations.minParty ?? "Taille min"}
+                        value={minParty ?? ""}
+                        onChange={(e) => onMinPartyChange(e.target.value ? parseInt(e.target.value, 10) : null)}
+                        leftIcon={<Filter size={14} />}
+                    />
+                </div>
+                <div className="lg:col-span-2">
+                    <select
+                        value={sort}
+                        onChange={(e) => onSortChange(e.target.value as any)}
+                        className="w-full h-10 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm px-3"
+                    >
+                        <option value="time">{t.reservations.sortTime ?? "Trier par heure"}</option>
+                        <option value="party">{t.reservations.sortParty ?? "Trier par groupe"}</option>
+                        <option value="status">{t.reservations.sortStatus ?? "Trier par statut"}</option>
+                    </select>
                 </div>
                 <div className="lg:col-span-3 flex justify-end">
                     {can("reservations:manage") && (

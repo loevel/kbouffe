@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Loader2, MapPin, QrCode } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Plus, Loader2, MapPin, QrCode, Search, Shuffle } from "lucide-react";
 import { Card, Button, Badge, Modal, ModalFooter, Input, Select, EmptyState, toast } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -39,6 +39,8 @@ export function TablesManager() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showZones, setShowZones] = useState(false);
     const [filterZone, setFilterZone] = useState("all");
+    const [query, setQuery] = useState("");
+    const [sort, setSort] = useState<"status" | "capacity" | "number">("status");
 
     const authFetch = useCallback(async (url: string, options: RequestInit = {}) => {
         const supabase = createClient();
@@ -96,9 +98,29 @@ export function TablesManager() {
         fetchData();
     };
 
-    const filteredTables = filterZone === "all"
-        ? tables
-        : tables.filter((t) => t.zone_id === filterZone);
+    const filteredTables = useMemo(() => {
+        let list = filterZone === "all"
+            ? tables
+            : tables.filter((t) => t.zone_id === filterZone);
+
+        if (query.trim()) {
+            const q = query.trim().toLowerCase();
+            list = list.filter((t) =>
+                t.number.toLowerCase().includes(q) ||
+                (t.table_zones?.name?.toLowerCase().includes(q))
+            );
+        }
+
+        list = [...list].sort((a, b) => {
+            if (sort === "capacity") return b.capacity - a.capacity;
+            if (sort === "number") return a.number.localeCompare(b.number);
+            // status sort: available > reserved > occupied > cleaning
+            const order: Record<string, number> = { available: 0, reserved: 1, occupied: 2, cleaning: 3 };
+            return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+        });
+
+        return list;
+    }, [filterZone, tables, query, sort]);
 
     const statusCounts = {
         available: tables.filter((t) => t.status === "available").length,
@@ -118,7 +140,7 @@ export function TablesManager() {
     return (
         <>
             {/* Stats bar */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" aria-live="polite">
                 <Card className="p-4 text-center">
                     <p className="text-2xl font-bold text-green-500">{statusCounts.available}</p>
                     <p className="text-sm text-surface-500">{t.tables.available}</p>
@@ -139,12 +161,30 @@ export function TablesManager() {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
+                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700 w-full md:w-auto">
+                    <Search size={16} className="text-surface-400" />
+                    <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder={t.tables.searchPlaceholder ?? "Rechercher une table ou zone"}
+                        className="bg-transparent w-full outline-none text-sm"
+                    />
+                </div>
                 <Select
                     value={filterZone}
                     onChange={(e) => setFilterZone(e.target.value)}
                     options={[
                         { value: "all", label: t.tables.allZones },
-                        ...zones.map((z) => ({ value: z.id, label: z.name })),
+                        ...zones.map((z) => ({ value: z.id, label: `${z.name} (${tables.filter(t => t.zone_id === z.id).length})` })),
+                    ]}
+                />
+                <Select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as any)}
+                    options={[
+                        { value: "status", label: t.tables.sortStatus ?? "Trier par statut" },
+                        { value: "capacity", label: t.tables.sortCapacity ?? "Capacité" },
+                        { value: "number", label: t.tables.sortNumber ?? "Numéro" },
                     ]}
                 />
                 {can("tables:manage") && (
@@ -212,10 +252,33 @@ function AddTableModal({
     const [capacity, setCapacity] = useState("4");
     const [zoneId, setZoneId] = useState("");
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // auto-suggest next number
+    useEffect(() => {
+        if (!isOpen) return;
+        if (number) return;
+        // Suggest based on zone selection
+        const list = zones
+            .filter((z) => !zoneId || z.id === zoneId)
+            .map((z) => z.id);
+        if (list.length === 0) return;
+        // will be computed outside with fetchData normally; fallback T{count+1}
+        setNumber((prev) => prev || `T${Math.floor(Math.random() * 900 + 100)}`);
+    }, [isOpen, zoneId, zones, number]);
 
     const handleSubmit = async () => {
+        setError(null);
         if (!number.trim()) {
-            toast.error(t.tables.numberRequired);
+            const msg = t.tables.numberRequired;
+            setError(msg);
+            toast.error(msg);
+            return;
+        }
+        if (parseInt(capacity, 10) < 1) {
+            const msg = t.tables.capacityMin ?? "Capacité minimum 1";
+            setError(msg);
+            toast.error(msg);
             return;
         }
 
@@ -243,6 +306,7 @@ function AddTableModal({
             const data = await res.json();
             if (!res.ok) {
                 toast.error(data.error ?? t.common.error);
+                setError(data.error ?? t.common.error);
                 return;
             }
 
@@ -254,6 +318,7 @@ function AddTableModal({
             onCreated();
         } catch {
             toast.error(t.common.error);
+            setError(t.common.error);
         } finally {
             setLoading(false);
         }
@@ -268,6 +333,7 @@ function AddTableModal({
                     value={number}
                     onChange={(e) => setNumber(e.target.value)}
                     leftIcon={<QrCode size={16} />}
+                    error={error ?? undefined}
                 />
                 <Input
                     label={t.tables.capacity}
@@ -277,6 +343,13 @@ function AddTableModal({
                     value={capacity}
                     onChange={(e) => setCapacity(e.target.value)}
                 />
+                <div className="flex gap-2">
+                    {[2, 4, 6, 8].map((c) => (
+                        <Button key={c} size="xs" variant={capacity === c.toString() ? "primary" : "outline"} onClick={() => setCapacity(c.toString())}>
+                            {c} {t.tables.seats}
+                        </Button>
+                    ))}
+                </div>
                 {zones.length > 0 && (
                     <Select
                         label={t.tables.zone}
