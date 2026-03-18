@@ -18,7 +18,7 @@ import {
     MoreHorizontal,
     ThumbsUp,
 } from "lucide-react";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 
 interface ReviewRow {
@@ -79,7 +79,7 @@ export default function AdminModerationPage() {
                 ...(ratingFilter !== "all" && { rating: ratingFilter }),
                 ...(visibleFilter !== "all" && { visible: visibleFilter }),
             });
-            const res = await fetch(`/api/admin/moderation/reviews?${params}`);
+            const res = await adminFetch(`/api/admin/moderation/reviews?${params}`);
             const json = await res.json();
             setReviews(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -97,7 +97,7 @@ export default function AdminModerationPage() {
     const toggleVisibility = async (id: string, isVisible: boolean) => {
         setToggling(id);
         try {
-            const res = await fetch("/api/admin/moderation/reviews", {
+            const res = await adminFetch("/api/admin/moderation/reviews", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, isVisible }),

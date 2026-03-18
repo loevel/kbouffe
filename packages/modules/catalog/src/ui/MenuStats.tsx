@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { Package, CheckCircle, XCircle, Tag } from "lucide-react";
 import { Card, formatCFA, useLocale } from "@kbouffe/module-core/ui";
-import { useCategories } from "@/hooks/use-data";
-import type { Product } from "@kbouffe/module-core/ui";
+import { useCategories } from "../hooks/use-catalog";
+import type { Product, Category } from "../lib/types";
 
 interface StatCardProps {
     icon: React.ReactNode;
@@ -33,20 +33,22 @@ interface MenuStatsProps {
     products: Product[];
 }
 
-export function MenuStats({ products }: MenuStatsProps) {
+export function MenuStats({ products, restaurantId, isAdmin = false }: MenuStatsProps & { restaurantId?: string; isAdmin?: boolean }) {
     const { t } = useLocale();
-    const { categories } = useCategories();
+    const { categories } = useCategories(restaurantId, isAdmin);
     const stats = useMemo(() => {
         const total = products.length;
-        const available = products.filter(p => p.is_available).length;
+        const available = products.filter((p: Product) => p.is_available).length;
         const unavailable = total - available;
-        const activeCategories = categories.filter(c => c.is_active).length;
+        const activeCategories = categories.filter((c: Category) => c.is_active).length;
         const avgPrice = total > 0
-            ? Math.round(products.reduce((sum, p) => sum + p.price, 0) / total)
+            ? Math.round(products.reduce((sum: number, p: Product) => sum + p.price, 0) / total)
             : 0;
 
         return { total, available, unavailable, categories: activeCategories, avgPrice };
     }, [products, categories]);
+
+
 
     return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

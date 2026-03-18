@@ -18,7 +18,7 @@ import {
     FileText,
     UserCheck,
 } from "lucide-react";
-import { Badge } from "@kbouffe/module-core/ui";
+import { Badge, adminFetch } from "@kbouffe/module-core/ui";
 
 interface TicketDetail {
     id: string;
@@ -63,7 +63,7 @@ export default function AdminSupportDetailPage() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch(`/api/admin/support/${id}`);
+                const res = await adminFetch(`/api/admin/support/${id}`);
                 if (res.ok) setTicket(await res.json());
             } finally {
                 setLoading(false);
@@ -75,7 +75,7 @@ export default function AdminSupportDetailPage() {
         if (!ticket) return;
         setSaving(true);
         try {
-            const res = await fetch("/api/admin/support", {
+            const res = await adminFetch("/api/admin/support", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: ticket.id, ...updates }),

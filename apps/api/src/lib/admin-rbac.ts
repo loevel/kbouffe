@@ -5,7 +5,6 @@ import type { AdminRole, Env, Variables } from "../types";
 export type AdminDomain =
     | "stats"
     | "users:read"
-    | "users:read"
     | "users:write"
     | "restaurants:read"
     | "restaurants:write"
@@ -15,6 +14,10 @@ export type AdminDomain =
     | "billing:write"
     | "moderation"
     | "marketing"
+    | "orders:read"
+    | "orders:write"
+    | "catalog:read"
+    | "catalog:write"
     | "system";
 
 // ── Domain → allowed roles ─────────────────────────────────────────
@@ -30,6 +33,10 @@ const DOMAIN_ACCESS: Record<AdminDomain, readonly AdminRole[]> = {
     "billing:write":      ["super_admin"],
     "moderation":         ["super_admin", "moderator"],
     "marketing":          ["super_admin", "sales"],
+    "orders:read":        ["super_admin", "support", "sales", "moderator"],
+    "orders:write":       ["super_admin", "support"],
+    "catalog:read":       ["super_admin", "support", "sales", "moderator"],
+    "catalog:write":      ["super_admin", "sales"],
     "system":             ["super_admin"],
 };
 

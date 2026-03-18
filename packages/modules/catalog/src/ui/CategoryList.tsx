@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { Plus, Edit, Trash2, FolderOpen } from "lucide-react";
 import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState, toast, useLocale, useDashboard } from "@kbouffe/module-core/ui";
-import { useCategories, useProducts, createCategory as apiCreateCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory, importCategoryPack } from "@/hooks/use-data";
-import type { Category } from "@kbouffe/module-core/ui";
+import { useCategories, useProducts, createCategory as apiCreateCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory, importCategoryPack } from "../hooks/use-catalog";
+import type { Category, Product } from "../lib/types";
 
-export function CategoryList() {
+export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?: string; isAdmin?: boolean }) {
     const { t } = useLocale();
-    const { restaurant } = useDashboard();
-    const { categories, mutate: mutateCategories } = useCategories();
-    const { products } = useProducts();
+    const { restaurant: merchantRestaurant } = useDashboard();
+    const effectiveRestaurantId = restaurantId || merchantRestaurant?.id;
+    
+    const { categories, mutate: mutateCategories } = useCategories(effectiveRestaurantId, isAdmin);
+    const { products } = useProducts(effectiveRestaurantId, isAdmin);
     const [showModal, setShowModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [selectedPack, setSelectedPack] = useState("boissons");
@@ -45,16 +47,17 @@ export function CategoryList() {
                 name: form.name,
                 description: form.description || null,
                 is_active: form.isActive,
-            });
+            }, isAdmin);
             if (error) { toast.error(error); setSaving(false); return; }
             mutateCategories();
             toast.success(t.menu.categoryUpdated);
         } else {
             const { error } = await apiCreateCategory({
+                restaurant_id: effectiveRestaurantId,
                 name: form.name,
                 description: form.description || null,
                 is_active: form.isActive,
-            });
+            }, isAdmin);
             if (error) { toast.error(error); setSaving(false); return; }
             mutateCategories();
             toast.success(t.menu.categoryCreated);
@@ -64,20 +67,20 @@ export function CategoryList() {
     };
 
     const handleDelete = async (id: string) => {
-        const { error } = await apiDeleteCategory(id);
+        const { error } = await apiDeleteCategory(id, isAdmin);
         if (error) { toast.error(error); return; }
         mutateCategories();
         toast.success(t.menu.categoryDeleted);
     };
 
     const getProductCount = (categoryId: string) => {
-        return products.filter(p => p.category_id === categoryId).length;
+        return products.filter((p: Product) => p.category_id === categoryId).length;
     };
 
     const handleImport = async () => {
-        if (!restaurant) return;
+        if (!effectiveRestaurantId) return;
         setImporting(true);
-        const { error } = await importCategoryPack(selectedPack, restaurant.id);
+        const { error } = await importCategoryPack(selectedPack, effectiveRestaurantId, isAdmin);
         
         if (error) {
             toast.error(error);
@@ -112,7 +115,7 @@ export function CategoryList() {
                     />
                 ) : (
                     <div className="divide-y divide-surface-100 dark:divide-surface-800">
-                        {categories.map((cat) => (
+                        {categories.map((cat: Category) => (
                             <div key={cat.id} className="px-4 py-3 flex items-center justify-between hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className={`w-2 h-2 rounded-full ${cat.is_active ? "bg-green-500" : "bg-surface-300"}`} />

@@ -2,7 +2,7 @@
 
 import { Plus, Trash2, GripVertical } from "lucide-react";
 import { Button, Input, Toggle, useLocale } from "@kbouffe/module-core/ui";
-import type { ProductOption } from "@kbouffe/module-core/ui";
+import type { ProductOption } from "@kbouffe/module-core/ui"; // This one is fine as it's from core
 
 interface ProductOptionEditorProps {
     options: ProductOption[];

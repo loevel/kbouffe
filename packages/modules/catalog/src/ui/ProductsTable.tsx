@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Edit, Trash2, Copy, UtensilsCrossed, Eye, EyeOff, Beer, GlassWater, CupSoda, Zap, Image as ImageIcon, ExternalLink, ArrowUp10, ArrowDown10, ArrowUpAZ } from "lucide-react";
-import { Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Toggle, Badge, EmptyState, Dropdown, toast, useLocale, formatCFA } from "@kbouffe/module-core/ui";
+import { Search, Edit, Trash2, Copy, UtensilsCrossed, Eye, EyeOff, Beer, GlassWater, CupSoda, Zap, Image as ImageIcon, ExternalLink, ArrowUp10, ArrowDown10, ArrowUpAZ, MoreHorizontal } from "lucide-react";
+import { Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Toggle, Badge, EmptyState, Dropdown, Button, toast, useLocale, formatCFA } from "@kbouffe/module-core/ui";
 
-import { useProducts, useCategories, updateProduct, deleteProduct as apiDeleteProduct, createProduct } from "@/hooks/use-data";
+import { useProducts, useCategories, updateProduct, deleteProduct as apiDeleteProduct, createProduct } from "../hooks/use-catalog";
+import type { Product, Category } from "../lib/types";
 
 const ITEMS_PER_PAGE = 10;
 type SortBy = "name" | "priceAsc" | "priceDesc" | "availability";
@@ -41,10 +42,10 @@ function getSourceBadge(description: string | null) {
     return badges.length > 0 ? <span className="flex gap-1">{badges}</span> : null;
 }
 
-export function ProductsTable() {
+export function ProductsTable({ restaurantId, isAdmin = false }: { restaurantId?: string; isAdmin?: boolean }) {
     const { t } = useLocale();
-    const { products, isLoading: productsLoading, mutate: mutateProducts } = useProducts();
-    const { categories } = useCategories();
+    const { products, isLoading: productsLoading, mutate: mutateProducts } = useProducts(restaurantId, isAdmin);
+    const { categories } = useCategories(restaurantId, isAdmin);
     const [categoryFilter, setCategoryFilter] = useState("");
     const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>("all");
     const [search, setSearch] = useState("");
@@ -54,7 +55,7 @@ export function ProductsTable() {
 
     const categoryOptions = [
         { value: "", label: t.menu.allCategories },
-        ...categories.map(c => ({ value: c.id, label: `${c.name} (${products.filter(p => p.category_id === c.id).length})` })),
+        ...categories.map((c: Category) => ({ value: c.id, label: `${c.name} (${products.filter((p: Product) => p.category_id === c.id).length})` })),
     ];
 
     const availabilityOptions = [
@@ -66,16 +67,16 @@ export function ProductsTable() {
     const filtered = useMemo(() => {
         let prods = products;
         if (categoryFilter) {
-            prods = prods.filter(p => p.category_id === categoryFilter);
+            prods = prods.filter((p: Product) => p.category_id === categoryFilter);
         }
         if (availabilityFilter === "available") {
-            prods = prods.filter(p => p.is_available);
+            prods = prods.filter((p: Product) => p.is_available);
         } else if (availabilityFilter === "unavailable") {
-            prods = prods.filter(p => !p.is_available);
+            prods = prods.filter((p: Product) => !p.is_available);
         }
         if (search.trim()) {
             const q = search.toLowerCase();
-            prods = prods.filter(p =>
+            prods = prods.filter((p: Product) =>
                 p.name.toLowerCase().includes(q) ||
                 p.description?.toLowerCase().includes(q)
             );
@@ -96,18 +97,18 @@ export function ProductsTable() {
 
     const getCategoryName = (categoryId: string | null) => {
         if (!categoryId) return "\u2014";
-        return categories.find(c => c.id === categoryId)?.name ?? "\u2014";
+        return categories.find((c: Category) => c.id === categoryId)?.name ?? "\u2014";
     };
 
     const getCategoryDescription = (categoryId: string | null) => {
         if (!categoryId) return null;
-        return categories.find(c => c.id === categoryId)?.description ?? null;
+        return categories.find((c: Category) => c.id === categoryId)?.description ?? null;
     };
 
     const toggleAvailability = async (productId: string) => {
-        const product = products.find(p => p.id === productId);
+        const product = products.find((p: Product) => p.id === productId);
         if (!product) return;
-        const { error } = await updateProduct(productId, { is_available: !product.is_available });
+        const { error } = await updateProduct(productId, { is_available: !product.is_available }, isAdmin);
         if (error) { toast.error(error); return; }
         mutateProducts();
         toast.success(t.menu.availabilityUpdated);
@@ -126,12 +127,12 @@ export function ProductsTable() {
         if (selectedIds.size === paginated.length) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(paginated.map(p => p.id)));
+            setSelectedIds(new Set(paginated.map((p: Product) => p.id)));
         }
     };
 
     const bulkToggleAvailability = async (available: boolean) => {
-        const promises = Array.from(selectedIds).map(id => updateProduct(id, { is_available: available }));
+        const promises = Array.from(selectedIds).map(id => updateProduct(id, { is_available: available }, isAdmin));
         await Promise.all(promises);
         mutateProducts();
         toast.success(`${selectedIds.size} ${available ? t.menu.productsActivated : t.menu.productsDeactivated}`);
@@ -139,7 +140,7 @@ export function ProductsTable() {
     };
 
     const bulkDelete = async () => {
-        const promises = Array.from(selectedIds).map(id => apiDeleteProduct(id));
+        const promises = Array.from(selectedIds).map(id => apiDeleteProduct(id, isAdmin));
         await Promise.all(promises);
         mutateProducts();
         toast.success(`${selectedIds.size} ${t.menu.productsDeleted}`);
@@ -148,6 +149,7 @@ export function ProductsTable() {
 
     const duplicateProduct = async (product: typeof products[0]) => {
         const { error } = await createProduct({
+            restaurant_id: product.restaurant_id,
             name: `${product.name} (copie)`,
             description: product.description,
             price: product.price,
@@ -156,18 +158,19 @@ export function ProductsTable() {
             image_url: product.image_url,
             is_available: product.is_available,
             options: product.options,
-        });
+        }, isAdmin);
         if (error) { toast.error(error); return; }
         mutateProducts();
         toast.success(t.menu.productDuplicated);
     };
 
     const handleDeleteProduct = async (productId: string) => {
-        const { error } = await apiDeleteProduct(productId);
+        const { error } = await apiDeleteProduct(productId, isAdmin);
         if (error) { toast.error(error); return; }
         mutateProducts();
         toast.success(t.menu.productDeleted);
     };
+
 
     return (
         <Card padding="none">
@@ -201,10 +204,10 @@ export function ProductsTable() {
                             value={sortBy}
                             onChange={(e) => { setSortBy(e.target.value as SortBy); setPage(1); }}
                             options={[
-                                { value: "name", label: t.menu.sortName ?? "Trier par nom", leftIcon: <ArrowUpAZ size={14} /> },
-                                { value: "priceAsc", label: t.menu.sortPriceAsc ?? "Prix croissant", leftIcon: <ArrowUp10 size={14} /> },
-                                { value: "priceDesc", label: t.menu.sortPriceDesc ?? "Prix décroissant", leftIcon: <ArrowDown10 size={14} /> },
-                                { value: "availability", label: t.menu.sortAvailability ?? "Disponibilité", leftIcon: <Eye size={14} /> },
+                                { value: "name", label: t.menu.sortName },
+                                { value: "priceAsc", label: t.menu.sortPriceAsc },
+                                { value: "priceDesc", label: t.menu.sortPriceDesc },
+                                { value: "availability", label: t.menu.sortAvailability },
                             ]}
                         />
                     </div>
@@ -218,8 +221,8 @@ export function ProductsTable() {
                     >
                         Tous ({products.length})
                     </button>
-                    {categories.filter(c => c.is_active).map(cat => {
-                        const count = products.filter(p => p.category_id === cat.id).length;
+                    {categories.filter((c: Category) => c.is_active).map((cat: Category) => {
+                        const count = products.filter((p: Product) => p.category_id === cat.id).length;
                         return (
                             <button
                                 key={cat.id}
@@ -303,7 +306,7 @@ export function ProductsTable() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {paginated.map((product) => (
+                            {paginated.map((product: Product) => (
                                 <TableRow key={product.id} className={selectedIds.has(product.id) ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}>
                                     <TableCell>
                                         <input
@@ -374,10 +377,15 @@ export function ProductsTable() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Dropdown
+                                            trigger={
+                                                <Button variant="ghost" size="sm" className="h-8 w-8">
+                                                    <MoreHorizontal size={16} />
+                                                </Button>
+                                            }
                                             items={[
-                                                { label: "Modifier", icon: <Edit size={14} />, onClick: () => { window.location.href = `/dashboard/menu/${product.id}`; } },
-                                                { label: "Dupliquer", icon: <Copy size={14} />, onClick: () => duplicateProduct(product) },
-                                                { label: "Supprimer", icon: <Trash2 size={14} />, onClick: () => handleDeleteProduct(product.id), variant: "danger" as const },
+                                                { label: t.common.edit, icon: Edit, onClick: () => { window.location.href = `/dashboard/menu/${product.id}`; } },
+                                                { label: t.common.duplicate, icon: Copy, onClick: () => duplicateProduct(product) },
+                                                { label: t.common.delete, icon: Trash2, onClick: () => { if (confirm(t.menu.confirmDeleteProduct)) handleDeleteProduct(product.id); }, variant: "danger" as const },
                                             ]}
                                         />
                                     </TableCell>

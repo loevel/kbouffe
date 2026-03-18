@@ -46,9 +46,8 @@ export function AdminSidebar() {
     // Filter based on admin permissions
     const navItems = adminNavItemsDef.filter((item) => {
         if (!item.permission) return true;
-        // Default to showing all items if the admin role isn't loaded yet
-        // This prevents a flash of an empty sidebar during hydration
-        if (!adminRole) return true;
+        // Hide navigation items that require permissions until the admin role is loaded
+        if (!adminRole) return false;
         return can(item.permission);
     });
 

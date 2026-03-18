@@ -3,7 +3,7 @@
 import { TrendingUp, Truck, Wallet } from "lucide-react";
 import { Card } from "@kbouffe/module-core/ui";
 import { formatCFA } from "@kbouffe/module-core/ui";
-import { useOrders } from "@/hooks/use-data";
+import { useOrders } from "@kbouffe/module-orders/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 
 export function FinanceSummaryCards() {

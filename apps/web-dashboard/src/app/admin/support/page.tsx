@@ -22,7 +22,7 @@ import {
     Smile,
     HeartPulse,
 } from "lucide-react";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -91,7 +91,7 @@ export default function AdminSupportPage() {
                 ...(statusFilter !== "all" && { status: statusFilter }),
                 ...(priorityFilter !== "all" && { priority: priorityFilter }),
             });
-            const res = await fetch(`/api/admin/support?${params}`);
+            const res = await adminFetch(`/api/admin/support?${params}`);
             const json = await res.json();
             setTickets(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });

@@ -8,7 +8,7 @@ import {
     ChevronRight,
     Store,
 } from "lucide-react";
-import { Badge } from "@kbouffe/module-core/ui";
+import { Badge, adminFetch } from "@kbouffe/module-core/ui";
 
 interface TransactionRow {
     id: string;
@@ -58,7 +58,7 @@ export default function AdminTransactionsPage() {
                 ...(typeFilter !== "all" && { type: typeFilter }),
                 ...(directionFilter !== "all" && { direction: directionFilter }),
             });
-            const res = await fetch(`/api/admin/billing/transactions?${params}`);
+            const res = await adminFetch(`/api/admin/billing/transactions?${params}`);
             const json = await res.json();
             setTxs(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });

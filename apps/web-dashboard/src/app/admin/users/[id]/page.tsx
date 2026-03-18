@@ -24,7 +24,7 @@ import {
     X,
     Edit2,
 } from "lucide-react";
-import { Badge, Button, toast } from "@kbouffe/module-core/ui";
+import { Badge, Button, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -62,9 +62,9 @@ interface UserDetail {
 }
 
 const roleBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info" | "brand" }> = {
-    client: { label: "Client", variant: "info" },
+    customer: { label: "Client", variant: "info" },
     merchant: { label: "Marchand", variant: "success" },
-    livreur: { label: "Livreur", variant: "warning" },
+    driver: { label: "Livreur", variant: "warning" },
     admin: { label: "Admin", variant: "danger" },
 };
 
@@ -80,7 +80,7 @@ export default function AdminUserDetailPage() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch(`/api/admin/users/${id}`);
+                const res = await adminFetch(`/api/admin/users/${id}`);
                 if (res.ok) {
                     const data = await res.json();
                     setUser(data);
@@ -99,9 +99,8 @@ export default function AdminUserDetailPage() {
         if (!user) return;
         setSaving(true);
         try {
-            const res = await fetch(`/api/admin/users/${id}`, {
+            const res = await adminFetch(`/api/admin/users/${id}`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ role: newRole }),
             });
             if (res.ok) {
@@ -116,9 +115,8 @@ export default function AdminUserDetailPage() {
         if (!user) return;
         setSaving(true);
         try {
-            const res = await fetch(`/api/admin/users/${id}`, {
+            const res = await adminFetch(`/api/admin/users/${id}`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(editData),
             });
             if (res.ok) {
@@ -140,7 +138,7 @@ export default function AdminUserDetailPage() {
         
         setSaving(true);
         try {
-            const res = await fetch(`/api/admin/users/${id}/reset-password`, {
+            const res = await adminFetch(`/api/admin/users/${id}/reset-password`, {
                 method: "POST",
             });
             if (res.ok) {
@@ -163,7 +161,7 @@ export default function AdminUserDetailPage() {
 
         setSaving(true);
         try {
-            const res = await fetch(`/api/admin/users/${id}`, {
+            const res = await adminFetch(`/api/admin/users/${id}`, {
                 method: "DELETE",
             });
             if (res.ok) {
@@ -425,9 +423,9 @@ export default function AdminUserDetailPage() {
                         <h3 className="text-xl font-black text-surface-900 dark:text-white uppercase tracking-tight mb-8">Changer le rôle</h3>
                         <div className="grid grid-cols-1 gap-4">
                             {[
-                                { id: "client", icon: UserCircle, desc: "Utilisateur standard de la plateforme" },
+                                { id: "customer", icon: UserCircle, desc: "Utilisateur standard de la plateforme" },
                                 { id: "merchant", icon: Store, desc: "Gestionnaire d'un ou plusieurs restaurants" },
-                                { id: "livreur", icon: Truck, desc: "Partenaire de livraison kbouffe" },
+                                { id: "driver", icon: Truck, desc: "Partenaire de livraison kbouffe" },
                                 { id: "admin", icon: ShieldCheck, desc: "Accès total au panneau d'administration" },
                             ].map((role) => {
                                 const active = u.role === role.id;

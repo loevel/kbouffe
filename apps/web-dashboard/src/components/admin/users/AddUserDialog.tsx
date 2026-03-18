@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Modal, ModalFooter, Button, Input, Select, toast } from "@kbouffe/module-core/ui";
+import { Modal, ModalFooter, Button, Input, Select, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { UserPlus, Mail, Lock, User, Phone } from "lucide-react";
 
 interface AddUserDialogProps {
@@ -17,14 +17,14 @@ export function AddUserDialog({ isOpen, onClose, onSuccess }: AddUserDialogProps
         password: "",
         fullName: "",
         phone: "",
-        role: "client",
+        role: "customer",
         adminRole: "support",
     });
 
     const roles = [
-        { value: "client", label: "Client" },
+        { value: "customer", label: "Client" },
         { value: "merchant", label: "Marchand" },
-        { value: "livreur", label: "Livreur" },
+        { value: "driver", label: "Livreur" },
         { value: "admin", label: "Administrateur" },
     ];
 
@@ -40,7 +40,7 @@ export function AddUserDialog({ isOpen, onClose, onSuccess }: AddUserDialogProps
         setIsLoading(true);
 
         try {
-            const response = await fetch("/api/admin/users", {
+            const response = await adminFetch("/api/admin/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData),
@@ -59,7 +59,7 @@ export function AddUserDialog({ isOpen, onClose, onSuccess }: AddUserDialogProps
                 password: "",
                 fullName: "",
                 phone: "",
-                role: "client",
+                role: "customer",
                 adminRole: "support",
             });
         } catch (error: any) {

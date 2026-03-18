@@ -19,7 +19,7 @@ import {
     Mail,
     Trash,
 } from "lucide-react";
-import { Badge, Button, toast } from "@kbouffe/module-core/ui";
+import { Badge, Button, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { AddUserDialog } from "@/components/admin/users/AddUserDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -45,9 +45,9 @@ interface Pagination {
 }
 
 const roleBadgeConfig: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info" | "brand"; color: string }> = {
-    client: { label: "Client", variant: "info", color: "text-blue-500 bg-blue-500/10" },
+    customer: { label: "Client", variant: "info", color: "text-blue-500 bg-blue-500/10" },
     merchant: { label: "Marchand", variant: "success", color: "text-emerald-500 bg-emerald-500/10" },
-    livreur: { label: "Livreur", variant: "warning", color: "text-amber-500 bg-amber-500/10" },
+    driver: { label: "Livreur", variant: "warning", color: "text-amber-500 bg-amber-500/10" },
     admin: { label: "Admin", variant: "danger", color: "text-rose-500 bg-rose-500/10" },
 };
 
@@ -64,7 +64,7 @@ const itemVariants = {
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<UserRow[]>([]);
     const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
-    const [stats, setStats] = useState<{ total: number; clients: number; merchants: number; livreurs: number } | null>(null);
+    const [stats, setStats] = useState<{ total: number; customers: number; merchants: number; drivers: number } | null>(null);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
@@ -82,12 +82,12 @@ export default function AdminUsersPage() {
                 ...(query && { q: query }),
                 ...(roleFilter !== "all" && { role: roleFilter }),
             });
-            const res = await fetch(`/api/admin/users?${params}`);
+            const res = await adminFetch(`/api/admin/users?${params}`);
             const json = await res.json();
             setUsers(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
             
-            const statsRes = await fetch("/api/admin/stats");
+            const statsRes = await adminFetch("/api/admin/stats");
             const statsJson = await statsRes.json();
             setStats(statsJson.users);
         } catch {
@@ -101,7 +101,7 @@ export default function AdminUsersPage() {
         if (!userToDelete) return;
 
         try {
-            const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+            const res = await adminFetch(`/api/admin/users/${id}`, { method: "DELETE" });
             if (res.ok) {
                 toast.success("Utilisateur supprimé");
                 fetchUsers(pagination.page);
@@ -128,7 +128,7 @@ export default function AdminUsersPage() {
 
     const getRoleIcon = (role: string) => {
         if (role === "merchant") return <Store size={14} />;
-        if (role === "livreur") return <Truck size={14} />;
+        if (role === "driver") return <Truck size={14} />;
         if (role === "admin") return <ShieldCheck size={14} />;
         return <UserCircle size={14} />;
     };
@@ -168,9 +168,9 @@ export default function AdminUsersPage() {
             {/* Premium Stat Grid */}
             <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard label="Total Plateforme" value={stats?.total ?? 0} color="surface" icon={Users} trend="+12% ce mois" />
-                <StatCard label="Base Clients" value={stats?.clients ?? 0} color="brand" icon={UserCircle} active={roleFilter === "client"} />
+                <StatCard label="Base Clients" value={stats?.customers ?? 0} color="brand" icon={UserCircle} active={roleFilter === "customer"} />
                 <StatCard label="Marchands Actifs" value={stats?.merchants ?? 0} color="emerald" icon={Store} active={roleFilter === "merchant"} />
-                <StatCard label="Flotte Livreurs" value={stats?.livreurs ?? 0} color="amber" icon={Truck} active={roleFilter === "livreur"} />
+                <StatCard label="Flotte Livreurs" value={stats?.drivers ?? 0} color="amber" icon={Truck} active={roleFilter === "driver"} />
             </motion.div>
 
             {/* Smart Toolbar */}
@@ -190,7 +190,7 @@ export default function AdminUsersPage() {
                 </div>
                 
                 <div className="flex items-center gap-2 p-1 bg-surface-50 dark:bg-surface-800/50 rounded-2xl">
-                    {["all", "client", "merchant", "livreur", "admin"].map((role) => (
+                    {["all", "customer", "merchant", "driver", "admin"].map((role) => (
                         <button
                             key={role}
                             onClick={() => setRoleFilter(role)}
@@ -249,7 +249,7 @@ export default function AdminUsersPage() {
                                     </motion.tr>
                                 ) : (
                                     users.map((u, idx) => {
-                                        const rc = roleBadgeConfig[u.role] ?? roleBadgeConfig.client;
+                                        const rc = roleBadgeConfig[u.role] ?? roleBadgeConfig.customer;
                                         return (
                                             <motion.tr 
                                                 key={u.id} 

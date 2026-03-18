@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AlertTriangle, Timer, CalendarClock, ArrowRight } from "lucide-react";
 import { Card } from "@kbouffe/module-core/ui";
-import { useDashboardStats, useOrders } from "@/hooks/use-data";
+import { useDashboardStats, useOrders } from "@kbouffe/module-orders/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 
 export function QuickActions() {

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "@kbouffe/module-orders/ui";
 import { formatCFA, formatDateTime, formatOrderId } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
-import { useOrders, updateOrderStatus } from "@/hooks/use-data";
+import { useOrders, updateOrderStatus } from "@kbouffe/module-orders/ui";
 import { useState } from "react";
 
 export function RecentOrders() {

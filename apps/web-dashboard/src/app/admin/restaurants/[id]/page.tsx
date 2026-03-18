@@ -32,10 +32,10 @@ import {
     Trash2,
     AlertTriangle,
 } from "lucide-react";
-import { Badge, Button, toast } from "@kbouffe/module-core/ui";
+import { Badge, Button, toast, adminFetch, Modal, ModalFooter } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { ProductsTable, CategoryList, MenuStats, useProducts } from "@kbouffe/module-catalog";
 
 interface RestaurantDetail {
     id: string;
@@ -43,7 +43,7 @@ interface RestaurantDetail {
     slug: string;
     description: string;
     logoUrl: string | null;
-    coverUrl: string | null;
+    bannerUrl: string | null;
     lat: number;
     lng: number;
     address: string;
@@ -109,7 +109,7 @@ export default function AdminRestaurantDetailPage() {
     const [toggling, setToggling] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
     const [showRejectionInput, setShowRejectionInput] = useState(false);
-    const [activeTab, setActiveTab] = useState<"overview" | "team">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "team" | "catalog">("overview");
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
     
@@ -126,16 +126,7 @@ export default function AdminRestaurantDetailPage() {
     useEffect(() => {
         (async () => {
             try {
-                const supabase = createClient();
-                if (!supabase) throw new Error("Supabase client not initialized");
-                const { data: { session } } = await supabase.auth.getSession();
-                const token = session?.access_token;
-
-                const res = await fetch(`/api/admin/restaurants/${id}`, {
-                    headers: {
-                        ...(token && { "Authorization": `Bearer ${token}` }),
-                    }
-                });
+                const res = await adminFetch(`/api/admin/restaurants/${id}`);
                 if (res.ok) {
                     const data = await res.json();
                     setRestaurant(data);
@@ -144,15 +135,14 @@ export default function AdminRestaurantDetailPage() {
                 
                 // Fetch members
                 setLoadingMembers(true);
-                const memRes = await fetch(`/api/admin/restaurants/${id}/members`, {
-                    headers: {
-                        ...(token && { "Authorization": `Bearer ${token}` }),
-                    }
-                });
+                const memRes = await adminFetch(`/api/admin/restaurants/${id}/members`);
                 if (memRes.ok) {
                     const data = await memRes.json();
                     setMembers(data.members || []);
                 }
+            } catch (err) {
+                console.error("Failed to fetch restaurant details:", err);
+                toast.error("Échec du chargement du restaurant");
             } finally {
                 setLoading(false);
                 setLoadingMembers(false);
@@ -164,16 +154,10 @@ export default function AdminRestaurantDetailPage() {
         if (!restaurant) return;
         setToggling(true);
         try {
-            const supabase = createClient();
-            if (!supabase) throw new Error("Supabase client not initialized");
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const res = await fetch(`/api/admin/restaurants/${id}`, {
+            const res = await adminFetch(`/api/admin/restaurants/${id}`, {
                 method: "PATCH",
                 headers: { 
                     "Content-Type": "application/json",
-                    ...(token && { "Authorization": `Bearer ${token}` }),
                 },
                 body: JSON.stringify(updates),
             });
@@ -198,16 +182,10 @@ export default function AdminRestaurantDetailPage() {
         if (!restaurant) return;
         setIsSaving(true);
         try {
-            const supabase = createClient();
-            if (!supabase) throw new Error("Supabase client not initialized");
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const res = await fetch(`/api/admin/restaurants/${id}`, {
+            const res = await adminFetch(`/api/admin/restaurants/${id}`, {
                 method: "PATCH",
                 headers: { 
                     "Content-Type": "application/json",
-                    ...(token && { "Authorization": `Bearer ${token}` }),
                 },
                 body: JSON.stringify(editForm),
             });
@@ -230,16 +208,8 @@ export default function AdminRestaurantDetailPage() {
         if (!restaurant) return;
         setIsDeleting(true);
         try {
-            const supabase = createClient();
-            if (!supabase) throw new Error("Supabase client not initialized");
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const res = await fetch(`/api/admin/restaurants/${id}`, {
-                method: "DELETE",
-                headers: {
-                    ...(token && { "Authorization": `Bearer ${token}` }),
-                }
+            const res = await adminFetch(`/api/admin/restaurants/${id}`, {
+                method: "DELETE"
             });
 
             if (res.ok) {
@@ -275,16 +245,10 @@ export default function AdminRestaurantDetailPage() {
     const updateMember = async (memberId: string, updates: Partial<TeamMember>) => {
         setToggling(true);
         try {
-            const supabase = createClient();
-            if (!supabase) return;
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const res = await fetch(`/api/admin/restaurants/${id}/members/${memberId}`, {
+            const res = await adminFetch(`/api/admin/restaurants/${id}/members/${memberId}`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(token && { "Authorization": `Bearer ${token}` }),
                 },
                 body: JSON.stringify(updates),
             });
@@ -300,16 +264,8 @@ export default function AdminRestaurantDetailPage() {
         if (!confirm("Êtes-vous sûr de vouloir révoquer l'accès de ce membre ?")) return;
         setToggling(true);
         try {
-            const supabase = createClient();
-            if (!supabase) return;
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const res = await fetch(`/api/admin/restaurants/${id}/members/${memberId}`, {
-                method: "DELETE",
-                headers: {
-                    ...(token && { "Authorization": `Bearer ${token}` }),
-                }
+            const res = await adminFetch(`/api/admin/restaurants/${id}/members/${memberId}`, {
+                method: "DELETE"
             });
             if (res.ok) {
                 setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status: "revoked" } : m));
@@ -512,6 +468,17 @@ export default function AdminRestaurantDetailPage() {
                     )}
                 >
                     Équipe ({members.filter(m => m.status === "active").length})
+                </button>
+                <button
+                    onClick={() => setActiveTab("catalog")}
+                    className={cn(
+                        "px-6 py-2 rounded-xl text-sm font-bold transition-all",
+                        activeTab === "catalog" 
+                            ? "bg-white dark:bg-surface-700 text-brand-500 shadow-sm" 
+                            : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                    )}
+                >
+                    Catalogue
                 </button>
             </div>
 
@@ -926,7 +893,7 @@ export default function AdminRestaurantDetailPage() {
                     </motion.div>
                 </div>
             </motion.div>
-        ) : (
+                ) : activeTab === "team" ? (
                     <motion.div 
                         key="team"
                         initial={{ opacity: 0, x: 20 }}
@@ -940,7 +907,7 @@ export default function AdminRestaurantDetailPage() {
                                 <p className="text-xs text-surface-500">Liste des membres et accès au Dashboard</p>
                             </div>
                             <Badge variant="outline" className="text-brand-500 border-brand-500/20">
-                                {members.filter(m => m.status === "active").length} membres actifs
+                                {members.filter((m: any) => m.status === "active").length} membres actifs
                             </Badge>
                         </div>
                         
@@ -964,7 +931,7 @@ export default function AdminRestaurantDetailPage() {
                                         <tr>
                                             <td colSpan={5} className="px-6 py-12 text-center text-surface-400 italic">Aucun membre trouvé.</td>
                                         </tr>
-                                    ) : members.map((member) => (
+                                    ) : members.map((member: any) => (
                                         <tr key={member.id} className="group hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
@@ -1028,65 +995,120 @@ export default function AdminRestaurantDetailPage() {
                             </table>
                         </div>
                     </motion.div>
-                )}
+                ) : activeTab === "catalog" ? (
+                    <motion.div
+                        key="catalog"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        className="space-y-6"
+                    >
+                        <AdminCatalogContent restaurantId={id} />
+                    </motion.div>
+                ) : null}
             </AnimatePresence>
 
-            {/* Deletion Confirmation Modal */}
-            <AnimatePresence>
-                {isConfirmDeleteOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-surface-950/50 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white dark:bg-surface-900 rounded-3xl p-8 max-w-md w-full border border-surface-200 dark:border-surface-800 shadow-2xl"
-                        >
-                            <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 mb-6 mx-auto">
-                                <AlertTriangle size={32} />
-                            </div>
-                            
-                            <h3 className="text-xl font-bold text-surface-900 dark:text-white text-center mb-2">Supprimer le restaurant ?</h3>
-                            <p className="text-surface-500 text-center text-sm mb-8 leading-relaxed">
-                                Cette action est définitive. Pour confirmer, veuillez saisir le nom du restaurant : <br/>
-                                <strong className="text-surface-900 dark:text-white mt-1 block select-none">"{restaurant?.name}"</strong>
-                            </p>
-
-                            <input
-                                type="text"
-                                value={deleteConfirmationName}
-                                onChange={(e) => setDeleteConfirmationName(e.target.value)}
-                                placeholder="Saisir le nom exactement..."
-                                className="w-full px-4 py-3 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-sm focus:ring-2 focus:ring-red-500 outline-none transition-all mb-6 text-center font-bold"
-                            />
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <Button 
-                                    variant="outline" 
-                                    onClick={() => {
-                                        setIsConfirmDeleteOpen(false);
-                                        setDeleteConfirmationName("");
-                                    }}
-                                    disabled={isDeleting}
-                                    className="rounded-xl border-surface-200 dark:border-surface-700 h-11"
-                                >
-                                    Annuler
-                                </Button>
-                                <Button 
-                                    onClick={deleteRestaurant}
-                                    disabled={isDeleting || deleteConfirmationName !== restaurant?.name}
-                                    className="bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 shadow-lg shadow-red-500/20"
-                                >
-                                    {isDeleting ? (
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        "Supprimer définitivement"
-                                    )}
-                                </Button>
-                            </div>
-                        </motion.div>
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={isConfirmDeleteOpen}
+                onClose={() => {
+                    setIsConfirmDeleteOpen(false);
+                    setDeleteConfirmationName("");
+                }}
+                title="Supprimer le restaurant"
+            >
+                <div className="space-y-4">
+                    <div className="p-4 bg-danger-50 dark:bg-danger-900/10 rounded-2xl flex items-start gap-3">
+                        <AlertTriangle className="text-danger-500 shrink-0 mt-0.5" size={18} />
+                        <div className="text-sm text-danger-600 dark:text-danger-400">
+                            <p className="font-bold mb-1">Action irréversible</p>
+                            <p>Toutes les données associées (menu, commandes, réservations, équipe) seront définitivement supprimées.</p>
+                        </div>
                     </div>
-                )}
-            </AnimatePresence>
+
+                    <div className="space-y-2">
+                        <p className="text-sm text-surface-600 dark:text-surface-400">
+                            Veuillez saisir <strong className="text-surface-900 dark:text-white">{restaurant.name}</strong> pour confirmer :
+                        </p>
+                        <input
+                            type="text"
+                            value={deleteConfirmationName}
+                            onChange={(e) => setDeleteConfirmationName(e.target.value)}
+                            className="w-full bg-surface-50 dark:bg-surface-800 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-danger-500 outline-none"
+                            placeholder="Nom du restaurant"
+                        />
+                    </div>
+                    <ModalFooter>
+                        <Button 
+                            variant="ghost" 
+                            onClick={() => {
+                                setIsConfirmDeleteOpen(false);
+                                setDeleteConfirmationName("");
+                            }}
+                        >
+                            Annuler
+                        </Button>
+                        <Button 
+                            variant="danger" 
+                            onClick={deleteRestaurant}
+                            disabled={deleteConfirmationName !== restaurant.name || isDeleting}
+                            className="gap-2"
+                        >
+                            {isDeleting ? (
+                                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <Trash2 size={16} />
+                            )}
+                            Supprimer définitivement
+                        </Button>
+                    </ModalFooter>
+                </div>
+            </Modal>
         </motion.div>
     );
 }
+
+function AdminCatalogContent({ restaurantId }: { restaurantId: string }) {
+    const { products } = useProducts(restaurantId, true);
+    const [view, setView] = useState<"products" | "categories">("products");
+
+    return (
+        <div className="space-y-6">
+            <MenuStats products={products || []} restaurantId={restaurantId} isAdmin={true} />
+            
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-1 p-1 bg-surface-100 dark:bg-surface-800 rounded-xl w-fit">
+                    <button
+                        onClick={() => setView("products")}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                            view === "products" 
+                                ? "bg-white dark:bg-surface-700 text-brand-500 shadow-sm" 
+                                : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                        )}
+                    >
+                        Produits
+                    </button>
+                    <button
+                        onClick={() => setView("categories")}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                            view === "categories" 
+                                ? "bg-white dark:bg-surface-700 text-brand-500 shadow-sm" 
+                                : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                        )}
+                    >
+                        Catégories
+                    </button>
+                </div>
+            </div>
+
+            {view === "products" ? (
+                <ProductsTable restaurantId={restaurantId} isAdmin={true} />
+            ) : (
+                <CategoryList restaurantId={restaurantId} isAdmin={true} />
+            )}
+        </div>
+    );
+}
+

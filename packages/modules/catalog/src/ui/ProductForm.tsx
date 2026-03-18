@@ -6,9 +6,9 @@ import { Save, ImagePlus, Upload } from "lucide-react";
 import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale } from "@kbouffe/module-core/ui";
 
 import { ProductOptionEditor } from "./ProductOptionEditor";
-import { useCategories, createProduct, updateProduct as apiUpdateProduct } from "@/hooks/use-data";
-import { useUploadImage } from "@/hooks/use-upload-image";
-import type { Product, ProductOption } from "@kbouffe/module-core/ui";
+import { useCategories, createProduct, updateProduct as apiUpdateProduct } from "../hooks/use-catalog";
+import { useUploadImage } from "../hooks/use-upload-image";
+import type { Product, ProductOption } from "../lib/types";
 
 interface ProductFormProps {
     product?: Product;

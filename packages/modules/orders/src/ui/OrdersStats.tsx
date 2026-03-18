@@ -2,7 +2,7 @@
 
 import { ClipboardList, CircleDashed, Wallet, CheckCircle2 } from "lucide-react";
 import { Card, useLocale, formatCFA } from "@kbouffe/module-core/ui";
-import { useDashboardStats } from "@/hooks/use-data";
+import { useDashboardStats } from "../hooks/use-orders";
 
 export function OrdersStats() {
     const { t } = useLocale();

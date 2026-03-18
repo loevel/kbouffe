@@ -17,7 +17,7 @@ import { requireModule } from "./middleware/module";
 
 // ── Public routes ────────────────────────────────────────────────────
 import { coreApi } from "@kbouffe/module-core";
-const { storesRoutes, uploadRoutes, authRoutes, usersRoutes } = coreApi;
+const { storesRoutes, uploadRoutes, authRoutes, usersRoutes, securityRoutes } = coreApi;
 import { catalogApi } from "@kbouffe/module-catalog";
 const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute: productsRoutes } = catalogApi;
 import { storePublicRoutes } from "./modules/store/store-public";
@@ -27,8 +27,9 @@ import { restaurantRoutes } from "./modules/store/restaurant";
 // ── Authenticated routes ─────────────────────────────────────────────
 import { ordersApi } from "@kbouffe/module-orders";
 const { ordersRoutes, paymentRoutes, paymentWebhookRoutes } = ordersApi;
+import { zonesRoutes as deliveryZonesRoutes } from "@kbouffe/module-orders";
 import { reservationsApi } from "@kbouffe/module-reservations";
-const { reservationsRoutes, publicReservationsRoutes, tablesRoutes } = reservationsApi;
+const { reservationsRoutes, publicReservationsRoutes, tablesRoutes, zonesRoutes: tableZonesRoutes } = reservationsApi;
 import { crmApi } from "@kbouffe/module-crm";
 const { customersRoutes } = crmApi;
 import { marketingApi } from "@kbouffe/module-marketing";
@@ -44,7 +45,6 @@ const { teamRoutes, payoutsRoutes } = hrApi;
 import { chatApi } from "@kbouffe/module-chat";
 const { chatRoutes } = chatApi;
 import { notificationsRoutes } from "./modules/core/notifications";
-import { zonesRoutes } from "@kbouffe/module-orders";
 
 // ── Admin routes ─────────────────────────────────────────────────────
 import { adminRoutes } from "./modules/admin";
@@ -113,6 +113,8 @@ for (const path of merchantPaths) {
 const moduleRequirements: Record<string, string> = {
     "/reservations": "reservations",
     "/tables": "reservations",
+    "/zones": "reservations",
+    "/orders/zones": "orders",
     "/marketing": "marketing",
     "/coupons": "marketing",
     "/ads": "marketing",
@@ -135,10 +137,12 @@ api.route("/categories", categoriesRoutes);
 api.route("/products", productsRoutes);
 api.route("/reservations", reservationsRoutes);
 api.route("/tables", tablesRoutes);
+api.route("/zones", tableZonesRoutes);            // zones de salle
+api.route("/orders/zones", deliveryZonesRoutes);  // zones de livraison
 api.route("/dashboard", dashboardRoutes);
 api.route("/restaurant", restaurantRoutes);
 api.route("/account", usersRoutes);
-api.route("/security", usersRoutes);
+api.route("/security", securityRoutes);
 api.route("/register-restaurant", authRoutes);
 api.route("/kyc", authRoutes);
 api.route("/upload", uploadRoutes);
@@ -148,7 +152,6 @@ api.route("/payouts", payoutsRoutes);
 api.route("/payments/mtn", paymentRoutes);
 api.route("/ads", adsRoutes);
 api.route("/team", teamRoutes);
-api.route("/zones", zonesRoutes);
 api.route("/upload", uploadRoutes);
 api.route("/chat", chatRoutes);
 

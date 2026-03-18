@@ -21,7 +21,7 @@ import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 
 interface PlatformStats {
     restaurants: { total: number; active: number; pending: number };
@@ -93,7 +93,7 @@ export default function AdminDashboardPage() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch("/api/admin/stats");
+                const res = await adminFetch("/api/admin/stats");
                 if (res.ok) setStats(await res.json());
             } catch (err) {
                 console.error("Failed to fetch admin stats:", err);

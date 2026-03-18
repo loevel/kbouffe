@@ -15,7 +15,8 @@
         "react": "19.2.3",
         "react-dom": "19.2.3",
         "lucide-react": "^0.575.0",
-        "@kbouffe/shared-types": "^1.0.0"
+        "@kbouffe/shared-types": "^1.0.0",
+        "swr": "^2.2.4"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20250621.0",

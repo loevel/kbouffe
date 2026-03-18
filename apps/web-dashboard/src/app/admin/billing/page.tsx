@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 
 interface BillingStats {
@@ -102,7 +102,7 @@ export default function AdminBillingPage() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch("/api/admin/billing/stats");
+                const res = await adminFetch("/api/admin/billing/stats");
                 if (res.ok) setStats(await res.json());
             } catch (err) {
                 console.error("Failed to load billing stats:", err);
@@ -143,7 +143,7 @@ export default function AdminBillingPage() {
                             className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 p-1 rounded-2xl flex items-center gap-1 shadow-sm"
                         >
                             <Button variant="ghost" size="sm" className="rounded-xl h-10 px-4 font-bold text-surface-500 hover:text-brand-500">Hebdomadaire</Button>
-                            <Button variant="default" size="sm" className="rounded-xl h-10 px-4 font-black shadow-lg shadow-brand-500/20">Mensuel</Button>
+                            <Button variant="primary" size="sm" className="rounded-xl h-10 px-4 font-black shadow-lg shadow-brand-500/20">Mensuel</Button>
                         </motion.div>
                     )}
                 </AnimatePresence>

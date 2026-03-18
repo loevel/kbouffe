@@ -12,7 +12,7 @@ import {
     Loader2,
     Store,
 } from "lucide-react";
-import { Badge } from "@kbouffe/module-core/ui";
+import { Badge, adminFetch } from "@kbouffe/module-core/ui";
 
 interface PayoutRow {
     id: string;
@@ -64,7 +64,7 @@ export default function AdminPayoutsPage() {
                 limit: "20",
                 ...(statusFilter !== "all" && { status: statusFilter }),
             });
-            const res = await fetch(`/api/admin/billing/payouts?${params}`);
+            const res = await adminFetch(`/api/admin/billing/payouts?${params}`);
             const json = await res.json();
             setPayouts(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -82,7 +82,7 @@ export default function AdminPayoutsPage() {
     const updateStatus = async (id: string, newStatus: string) => {
         setUpdating(id);
         try {
-            const res = await fetch("/api/admin/billing/payouts", {
+            const res = await adminFetch("/api/admin/billing/payouts", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, status: newStatus }),

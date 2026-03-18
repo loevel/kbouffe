@@ -18,7 +18,7 @@ import {
     Terminal,
     History,
 } from "lucide-react";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -80,7 +80,7 @@ export default function AdminAuditLogsPage() {
                 ...(actionFilter !== "all" && { action: actionFilter }),
                 ...(targetFilter !== "all" && { target: targetFilter }),
             });
-            const res = await fetch(`/api/admin/system/audit?${params}`);
+            const res = await adminFetch(`/api/admin/system/audit?${params}`);
             const json = await res.json();
             setLogs(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
