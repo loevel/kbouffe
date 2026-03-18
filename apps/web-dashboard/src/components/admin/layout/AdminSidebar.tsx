@@ -18,7 +18,6 @@ import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
-import { useUserSession } from "@/store/client-store";
 import { motion } from "framer-motion";
 import { type AdminPermission } from "@/lib/admin-permissions";
 
@@ -41,7 +40,7 @@ export function AdminSidebar() {
     const pathname = usePathname();
     const { t } = useLocale();
     const { can, adminRole } = useAdmin();
-    const session = useUserSession((s) => s.session);
+    const adminNavLabels = t.adminNav as Partial<Record<AdminNavKey | "backToSite", string>> | undefined;
 
     // Filter based on admin permissions
     const navItems = adminNavItemsDef.filter((item) => {
@@ -71,8 +70,7 @@ export function AdminSidebar() {
             <nav className="flex-1 px-3 space-y-1.5 py-4 overflow-y-auto custom-scrollbar">
                 {navItems.map((item) => {
                     const active = isActive(item.href);
-                    // Handle fallback translation if adminNav is missing
-                    const label = (t.adminNav as any)?.[item.labelKey] || item.labelKey;
+                    const label = adminNavLabels?.[item.labelKey] || item.labelKey;
 
                     return (
                         <Link
@@ -121,7 +119,7 @@ export function AdminSidebar() {
                     className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-surface-500 hover:text-white hover:bg-surface-900 rounded-lg transition-all active:scale-95 group"
                 >
                     <span className="group-hover:-translate-x-1 transition-transform">←</span>
-                    {t.adminNav ? t.adminNav.backToSite : "Retour au site"}
+                    {adminNavLabels?.backToSite || "Retour au site"}
                 </Link>
             </div>
         </aside>

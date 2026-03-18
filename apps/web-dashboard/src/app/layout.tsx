@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider, LocaleProvider, ToastProvider } from "@kbouffe/module-core/ui";
 import { CartProvider } from "@/contexts/cart-context";
+import { ClientAppProvider } from "@/components/providers/ClientAppProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -74,10 +75,12 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <LocaleProvider>
-            <CartProvider>
-              {children}
-              <ToastProvider />
-            </CartProvider>
+            <ClientAppProvider>
+              <CartProvider>
+                {children}
+                <ToastProvider />
+              </CartProvider>
+            </ClientAppProvider>
           </LocaleProvider>
         </ThemeProvider>
       </body>
