@@ -37,7 +37,7 @@ export function useOrdersRealtime() {
                     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                     Alert.alert(
                         'Mise à jour de commande',
-                        `${order.restaurantName} · ${getOrderStatusLabel(newStatus)}`,
+                        `${order.restaurantName || 'Restaurant'} · ${getOrderStatusLabel(newStatus)}`,
                     );
                 }),
             );

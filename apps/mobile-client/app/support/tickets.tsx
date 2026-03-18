@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radii, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSupport, type SupportTicketStatus } from '@/contexts/support-context';
-import { useLoyalty } from '@/contexts/loyalty-context';
 
 const typeLabel = {
     question: 'Question',
@@ -34,8 +33,7 @@ export default function SupportTicketsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
-    const { tickets, updateTicketStatus } = useSupport();
-    const { } = useLoyalty();
+    const { tickets } = useSupport();
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + Spacing.md }]}> 
@@ -53,13 +51,13 @@ export default function SupportTicketsScreen() {
                 renderItem={({ item }) => (
                     <View style={[styles.card, { borderColor: theme.border }]}> 
                         <View style={styles.row}>
-                            <Text style={[styles.ticketTitle, { color: theme.text }]} numberOfLines={1}>{item.title}</Text>
+                            <Text style={[styles.ticketTitle, { color: theme.text }]} numberOfLines={1}>{item.subject}</Text>
                             <View style={[styles.badge, { backgroundColor: statusColor[item.status] + '20' }]}> 
                                 <Text style={[styles.badgeText, { color: statusColor[item.status] }]}>{statusLabel[item.status]}</Text>
                             </View>
                         </View>
                         <Text style={[styles.ticketMeta, { color: theme.icon }]}>#{item.id.slice(-6)} · {typeLabel[item.type]}{item.orderId ? ` · cmd #${item.orderId.slice(-4)}` : ''}</Text>
-                        <Text style={[styles.ticketMessage, { color: theme.icon }]} numberOfLines={2}>{item.message}</Text>
+                        <Text style={[styles.ticketMessage, { color: theme.icon }]} numberOfLines={2}>{item.description}</Text>
                     </View>
                 )}
                 ListEmptyComponent={

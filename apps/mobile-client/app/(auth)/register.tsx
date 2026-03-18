@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
@@ -21,9 +21,14 @@ export default function RegisterScreen() {
     const handleRegister = async () => {
         if (!fullName || !phone || !password) return;
         setLoading(true);
-        await register(fullName, phone, password);
-        setLoading(false);
-        router.replace('/(tabs)');
+        try {
+            await register(fullName, phone, password);
+            router.replace('/onboarding');
+        } catch (error) {
+            Alert.alert('Inscription impossible', error instanceof Error ? error.message : 'Veuillez réessayer.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

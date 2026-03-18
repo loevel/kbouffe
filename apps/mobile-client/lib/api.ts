@@ -5,8 +5,25 @@
  */
 
 import { supabase } from './supabase';
+import { Platform } from 'react-native';
 
-const BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+function phoneToAuthEmail(phone: string) {
+    const digits = phone.replace(/\D/g, '');
+    return `mobile-${digits}@auth.kbouffe.app`;
+}
+
+function resolveBaseUrl() {
+    const rawBase = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
+    // Android emulators cannot reach the host machine via localhost.
+    if (Platform.OS === 'android') {
+        return rawBase.replace('://localhost', '://10.0.2.2').replace('://127.0.0.1', '://10.0.2.2');
+    }
+
+    return rawBase;
+}
+
+const BASE = resolveBaseUrl();
 
 // ── Error type ────────────────────────────────────────────────────────────────
 export class ApiError extends Error {
@@ -116,11 +133,11 @@ export interface MobileProduct {
     is_vegan?: boolean;
     is_gluten_free?: boolean;
     // compat fields for existing mobile components
-    options?: Array<{
+    options?: {
         name: string;
         required?: boolean;
-        choices: Array<{ label: string; extraPrice: number }>;
-    }>;
+        choices: { label: string; extraPrice: number }[];
+    }[];
 }
 
 export interface MobileReview {
@@ -140,7 +157,7 @@ interface StoresParams {
 }
 
 interface StoresResponse {
-    restaurants: Array<{
+    restaurants: {
         id: string;
         name: string;
         slug: string;
@@ -164,7 +181,7 @@ interface StoresResponse {
         delivery_base_fee: number | null;
         delivery_per_km_fee: number | null;
         max_delivery_radius_km: number | null;
-    }>;
+    }[];
 }
 
 function mapRestaurant(r: StoresResponse['restaurants'][0]): MobileRestaurant {
@@ -227,7 +244,7 @@ interface StoreResponse {
         max_delivery_radius_km?: number | null;
     };
     categories: MobileCategory[];
-    products: Array<{
+    products: {
         id: string;
         name: string;
         description: string | null;
@@ -244,7 +261,7 @@ interface StoreResponse {
         delivery_base_fee?: number | null;
         delivery_per_km_fee?: number | null;
         max_delivery_radius_km?: number | null;
-    }>;
+    }[];
     reviews: MobileReview[];
 }
 
@@ -287,19 +304,19 @@ export async function getStore(slug: string): Promise<StoreDetail> {
 // ── /api/store/order ──────────────────────────────────────────────────────────
 export interface PlaceOrderParams {
     restaurantId: string;
-    items: Array<{
+    items: {
         productId: string;
         name: string;
         price: number;
         quantity: number;
-        options?: Array<{
+        options?: {
             optionId?: string;
             valueId?: string;
             name: string;
             value: string;
             priceAdjustment: number;
-        }>;
-    }>;
+        }[];
+    }[];
     deliveryType: 'delivery' | 'pickup' | 'dine_in';
     deliveryAddress?: string;
     tableNumber?: string;
@@ -331,11 +348,13 @@ export interface OrderTracking {
     id: string;
     status: string;
     payment_status: string;
+    restaurant_id?: string | null;
+    restaurant_name?: string | null;
     delivery_type: string;
     delivery_address: string | null;
     customer_name: string;
     customer_phone: string;
-    items: Array<{ productId: string; name: string; price: number; quantity: number }>;
+    items: { productId: string; name: string; price: number; quantity: number }[];
     subtotal: number;
     delivery_fee: number;
     service_fee: number;
@@ -459,6 +478,17 @@ export async function updateProfile(params: any): Promise<{ success: boolean }> 
     });
 }
 
+export async function registerCustomer(params: {
+    fullName: string;
+    phone: string;
+    password: string;
+}): Promise<{ success: boolean; userId: string; email: string }> {
+    return apiFetch<{ success: boolean; userId: string; email: string }>('/api/auth/customer-register', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+
 // ── Support ──────────────────────────────────────────────────────────────────
 
 export async function getSupportTickets(): Promise<SupportTicket[]> {
@@ -488,3 +518,5 @@ export async function getAccountOrders(): Promise<OrderTracking[]> {
     const data = await apiFetch<{ orders: OrderTracking[] }>('/api/account/orders');
     return data.orders || [];
 }
+
+export { phoneToAuthEmail };

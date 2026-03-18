@@ -42,6 +42,14 @@ const pages: OnboardingPage[] = [
     },
     {
         id: '2',
+        image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80',
+        icon: 'calendar-outline',
+        title: 'Reservez votre\ntable en avance',
+        subtitle: 'Choisissez votre restaurant, votre horaire et votre nombre de couverts pour arriver sereinement.',
+        accent: '#ec4899',
+    },
+    {
+        id: '3',
         image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
         icon: 'phone-portrait-outline',
         title: 'Commandez en\nquelques taps',
@@ -49,7 +57,7 @@ const pages: OnboardingPage[] = [
         accent: '#10b981',
     },
     {
-        id: '3',
+        id: '4',
         image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80',
         icon: 'wallet-outline',
         title: 'Payez avec\nMobile Money',
@@ -57,7 +65,15 @@ const pages: OnboardingPage[] = [
         accent: '#3b82f6',
     },
     {
-        id: '4',
+        id: '5',
+        image: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=800&q=80',
+        icon: 'time-outline',
+        title: 'Suivez votre\ncommande en direct',
+        subtitle: 'Voyez chaque etape en temps reel, de la preparation jusqu\'a l\'arrivee de votre repas.',
+        accent: '#14b8a6',
+    },
+    {
+        id: '6',
         image: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=800&q=80',
         icon: 'bicycle-outline',
         title: 'Livraison rapide\na votre porte',
@@ -74,6 +90,7 @@ export default function OnboardingScreen() {
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList<OnboardingPage>>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [completing, setCompleting] = useState(false);
 
     const isLastPage = currentIndex === pages.length - 1;
 
@@ -88,16 +105,17 @@ export default function OnboardingScreen() {
     const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
     const completeOnboarding = async () => {
+        if (completing) return;
+        setCompleting(true);
         await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
         if (isAuthenticated) {
-            try {
-                await updateProfile({ onboardingCompleted: true });
-                await refreshUser();
-            } catch (error) {
-                console.error('Error syncing onboarding status:', error);
-            }
+            updateProfile({ onboardingCompleted: true })
+                .then(() => refreshUser())
+                .catch((error) => {
+                    console.error('Error syncing onboarding status:', error);
+                });
         }
-        router.replace('/(tabs)');
+        router.replace('/');
     };
 
     const handleNext = () => {
@@ -149,10 +167,19 @@ export default function OnboardingScreen() {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {/* Skip button */}
             <Pressable
-                style={[styles.skipButton, { top: insets.top + Spacing.sm }]}
+                style={[
+                    styles.skipButton,
+                    {
+                        top: insets.top + Spacing.sm,
+                        backgroundColor: colorScheme === 'dark' ? 'rgba(15, 23, 42, 0.82)' : 'rgba(255, 255, 255, 0.92)',
+                        borderColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.08)',
+                    },
+                ]}
                 onPress={handleSkip}
+                disabled={completing}
             >
-                <Text style={[styles.skipText, { color: theme.icon }]}>Passer</Text>
+                <Text style={[styles.skipText, { color: theme.text }]}>Passer</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.text} />
             </Pressable>
 
             {/* Pages */}
@@ -198,9 +225,10 @@ export default function OnboardingScreen() {
                         },
                     ]}
                     onPress={handleNext}
+                    disabled={completing}
                 >
                     {isLastPage ? (
-                        <Text style={styles.startButtonText}>Commencer</Text>
+                        <Text style={styles.startButtonText}>{completing ? 'Ouverture...' : 'Commencer'}</Text>
                     ) : (
                         <Ionicons name="arrow-forward" size={22} color="#fff" />
                     )}
@@ -220,10 +248,20 @@ const styles = StyleSheet.create({
         zIndex: 10,
         paddingHorizontal: Spacing.md,
         paddingVertical: Spacing.sm,
+        borderRadius: 999,
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+        elevation: 6,
     },
     skipText: {
         ...Typography.body,
-        fontWeight: '500',
+        fontWeight: '700',
     },
     page: {
         flex: 1,

@@ -15,6 +15,7 @@ import {
     postReferralReward,
     validateCoupon as apiValidateCoupon,
 } from '@/lib/api';
+import { useAuth } from './auth-context';
 
 export interface PromotionRule {
     code: string;
@@ -43,8 +44,6 @@ interface LoyaltyContextType extends LoyaltyState {
     registerReferralReward: (amount: number) => void;
 }
 
-const STORAGE_KEY = '@kbouffe:loyalty';
-
 const INITIAL_STATE: LoyaltyState = {
     favoriteRestaurantIds: [],
     favoriteProductIds: [],
@@ -56,10 +55,17 @@ const INITIAL_STATE: LoyaltyState = {
 const LoyaltyContext = createContext<LoyaltyContextType | null>(null);
 
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
+    const { isAuthenticated } = useAuth();
     const [state, setState] = useState<LoyaltyState>(INITIAL_STATE);
     const hydrated = useRef(false);
 
     useEffect(() => {
+        if (!isAuthenticated) {
+            setState(INITIAL_STATE);
+            hydrated.current = true;
+            return;
+        }
+
         getLoyalty()
             .then((data) => {
                 setState((prev) => ({
@@ -77,7 +83,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
             .finally(() => {
                 hydrated.current = true;
             });
-    }, []);
+    }, [isAuthenticated]);
 
     const toggleRestaurantFavorite = useCallback(async (id: string) => {
         try {

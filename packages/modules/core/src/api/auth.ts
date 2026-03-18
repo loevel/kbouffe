@@ -43,6 +43,22 @@ function encodeGeohash(lat: number, lng: number, precision = 6): string {
     return hash;
 }
 
+function normalizeAuthPhone(phone: string): string {
+    const trimmed = phone.trim();
+    if (!trimmed) return trimmed;
+
+    if (trimmed.startsWith("+")) {
+        return `+${trimmed.slice(1).replace(/\D/g, "")}`;
+    }
+
+    return `+${trimmed.replace(/\D/g, "")}`;
+}
+
+function phoneToAuthEmail(phone: string): string {
+    const digits = phone.replace(/\D/g, "");
+    return `mobile-${digits}@auth.kbouffe.app`;
+}
+
 // ── KYC Helpers ──────────────────────────────────────────────
 
 async function checkMsisdnActive(env: CoreEnv, phone: string): Promise<{ active: boolean }> {
@@ -151,6 +167,69 @@ authRoutes.post("/", async (c) => {
     } catch (error: any) {
         console.error("Register restaurant error:", error);
         return c.json({ error: error.message || "Erreur lors de la création" }, 500);
+    }
+});
+
+authRoutes.post("/customer-register", async (c) => {
+    try {
+        if (!c.env.SUPABASE_SERVICE_ROLE_KEY) {
+            return c.json({ error: "Configuration d'inscription manquante" }, 500);
+        }
+
+        const body = await c.req.json();
+        const fullName = String(body.fullName ?? "").trim();
+        const normalizedPhone = normalizeAuthPhone(String(body.phone ?? ""));
+        const password = String(body.password ?? "");
+
+        if (!fullName) return c.json({ error: "Nom complet requis" }, 400);
+        if (!normalizedPhone || normalizedPhone.length < 8) return c.json({ error: "Numero de telephone invalide" }, 400);
+        if (password.length < 6) return c.json({ error: "Mot de passe trop court" }, 400);
+
+        const email = phoneToAuthEmail(normalizedPhone);
+        const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: {
+                full_name: fullName,
+                phone: normalizedPhone,
+                role: "customer",
+                auth_method: "phone_alias",
+            },
+        });
+
+        if (authError) {
+            const status = /already|exists|registered/i.test(authError.message) ? 409 : 400;
+            return c.json({ error: authError.message }, status);
+        }
+
+        const newUser = {
+            id: authUser.user.id,
+            email,
+            full_name: fullName,
+            phone: normalizedPhone,
+            role: "customer",
+            preferred_lang: "fr",
+            notifications_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error: dbError } = await supabaseAdmin
+            .from("users")
+            .upsert(newUser, { onConflict: "id" });
+
+        if (dbError) {
+            await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+            return c.json({ error: dbError.message || "Erreur lors de la creation du profil" }, 500);
+        }
+
+        return c.json({ success: true, userId: authUser.user.id, email });
+    } catch (error: any) {
+        console.error("Customer register error:", error);
+        return c.json({ error: error.message || "Erreur lors de l'inscription" }, 500);
     }
 });
 
@@ -327,4 +406,3 @@ authRoutes.post("/verify-turnstile", async (c) => {
         return c.json({ success: false }, 500);
     }
 });
-

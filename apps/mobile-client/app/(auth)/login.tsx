@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
@@ -13,17 +13,22 @@ export default function LoginScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
-    const [phone, setPhone] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const handleLogin = async () => {
-        if (!phone || !password) return;
+        if (!identifier || !password) return;
         setLoading(true);
-        await login(phone, password);
-        setLoading(false);
-        router.replace('/(tabs)');
+        try {
+            await login(identifier, password);
+            router.replace('/');
+        } catch (error) {
+            Alert.alert('Connexion impossible', error instanceof Error ? error.message : 'Vérifiez vos identifiants.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -47,12 +52,15 @@ export default function LoginScreen() {
                     <View style={[styles.inputContainer, { borderColor: theme.border, backgroundColor: theme.background }]}>
                         <Ionicons name="call-outline" size={20} color={theme.icon} style={styles.inputIcon} />
                         <TextInput
-                            placeholder="Numero de telephone"
+                            placeholder="Numero de telephone ou email"
                             placeholderTextColor={theme.icon}
                             style={[styles.input, { color: theme.text }]}
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
+                            value={identifier}
+                            onChangeText={setIdentifier}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            keyboardType="default"
+                            textContentType="username"
                         />
                     </View>
 

@@ -1,29 +1,48 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, ScrollView, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_USER } from '@/data/mocks';
-import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
+import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function EditProfileScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const { user, updateProfile } = useAuth();
 
-    const [fullName, setFullName] = useState(MOCK_USER.fullName);
-    const [email, setEmail] = useState(MOCK_USER.email ?? '');
-    const [phone, setPhone] = useState(MOCK_USER.phone ?? '');
+    const [fullName, setFullName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const handleSave = () => {
+    useEffect(() => {
+        setFullName(user?.fullName ?? '');
+        setEmail(user?.email ?? '');
+        setPhone(user?.phone ?? '');
+    }, [user]);
+
+    const handleSave = async () => {
+        if (!fullName.trim()) {
+            Alert.alert('Profil', 'Le nom complet est requis.');
+            return;
+        }
+
         setSaving(true);
-        setTimeout(() => {
+        try {
+            await updateProfile({
+                fullName: fullName.trim(),
+                phone: phone.trim() || null,
+            });
+            Alert.alert('Succès', 'Profil mis à jour.', [{ text: 'OK', onPress: () => router.back() }]);
+        } catch (error) {
+            Alert.alert('Erreur', error instanceof Error ? error.message : 'Impossible de mettre à jour le profil.');
+        } finally {
             setSaving(false);
-            Alert.alert('Succes', 'Profil mis a jour.', [{ text: 'OK', onPress: () => router.back() }]);
-        }, 1000);
+        }
     };
 
     return (
@@ -67,6 +86,7 @@ export default function EditProfileScreen() {
                         placeholderTextColor={theme.icon}
                         keyboardType="email-address"
                         autoCapitalize="none"
+                        editable={false}
                     />
                 </View>
 

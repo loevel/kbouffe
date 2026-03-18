@@ -92,6 +92,7 @@ api.route("/store", publicReservationsRoutes);             // public reservation
 api.route("/coupons/validate", couponValidateRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
 api.route("/sms", smsRoutes);
+api.route("/auth", authRoutes);
 api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
 api.route("/sync-user", authRoutes);       // Combined in authRoutes
 

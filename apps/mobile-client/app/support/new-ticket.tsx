@@ -19,21 +19,25 @@ export default function NewSupportTicketScreen() {
     const [title, setTitle] = useState(orderId ? `Commande #${orderId.slice(-4)} - Incident` : '');
     const [message, setMessage] = useState('');
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         if (!title.trim() || !message.trim()) {
             Alert.alert('Informations manquantes', 'Ajoutez un titre et une description.');
             return;
         }
 
-        createTicket({
-            type,
-            title: title.trim(),
-            message: message.trim(),
-            orderId,
-        });
-        Alert.alert('Ticket créé', 'Votre demande est maintenant traçable.', [
-            { text: 'Voir mes tickets', onPress: () => router.replace('/support/tickets') },
-        ]);
+        try {
+            await createTicket({
+                type,
+                subject: title.trim(),
+                description: message.trim(),
+                orderId,
+            });
+            Alert.alert('Ticket créé', 'Votre demande est maintenant traçable.', [
+                { text: 'Voir mes tickets', onPress: () => router.replace('/support/tickets') },
+            ]);
+        } catch (error) {
+            Alert.alert('Erreur', error instanceof Error ? error.message : 'Impossible de créer le ticket.');
+        }
     };
 
     return (

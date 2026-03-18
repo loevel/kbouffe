@@ -1,22 +1,13 @@
-/**
- * contexts/orders-context.tsx
- * Stores the user's recent orders persistently in AsyncStorage.
- * Replaces MOCK_ORDERS for the orders tab and tracking screen.
- */
 import React, {
     createContext,
     useCallback,
     useContext,
     useEffect,
     useMemo,
-    useRef,
     useState,
     type ReactNode,
 } from 'react';
-import {
-    getAccountOrders,
-    OrderTracking as ApiOrder
-} from '@/lib/api';
+import { getAccountOrders } from '@/lib/api';
 import { useAuth } from './auth-context';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -34,9 +25,10 @@ export type MobileOrderStatus =
 export interface StoredOrder {
     id: string;
     restaurantId: string;
+    restaurantName: string;
     status: MobileOrderStatus;
     deliveryType: 'delivery' | 'pickup' | 'dine_in';
-    items: Array<{ productId: string; name: string; price: number; quantity: number }>;
+    items: { productId: string; name: string; price: number; quantity: number }[];
     subtotal: number;
     deliveryFee: number;
     total: number;
@@ -50,7 +42,9 @@ export interface StoredOrder {
 interface OrdersContextType {
     orders: StoredOrder[];
     loading: boolean;
+    activeOrderCount: number;
     refreshOrders: () => Promise<void>;
+    updateOrderStatus: (id: string, status: MobileOrderStatus) => void;
     getOrderById: (id: string) => StoredOrder | undefined;
 }
 
@@ -62,16 +56,41 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     const [orders, setOrders] = useState<StoredOrder[]>([]);
     const [loading, setLoading] = useState(false);
 
+    const mapDeliveryType = (value: string | null | undefined): StoredOrder['deliveryType'] => {
+        if (value === 'pickup' || value === 'dine_in') return value;
+        return 'delivery';
+    };
+
+    const mapOrderStatus = (value: string | null | undefined): MobileOrderStatus => {
+        switch (value) {
+            case 'confirmed':
+            case 'accepted':
+            case 'preparing':
+            case 'ready':
+            case 'delivering':
+            case 'delivered':
+            case 'completed':
+            case 'cancelled':
+                return value;
+            default:
+                return 'pending';
+        }
+    };
+
     const refreshOrders = useCallback(async () => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated) {
+            setOrders([]);
+            return;
+        }
         setLoading(true);
         try {
             const data = await getAccountOrders();
             const mapped: StoredOrder[] = data.map(o => ({
                 id: o.id,
-                restaurantId: '', // Would need populating or separate fetch if needed
-                status: o.status as MobileOrderStatus,
-                deliveryType: o.delivery_type as any,
+                restaurantId: o.restaurant_id ?? '',
+                restaurantName: o.restaurant_name ?? 'Restaurant',
+                status: mapOrderStatus(o.status),
+                deliveryType: mapDeliveryType(o.delivery_type),
                 items: o.items,
                 subtotal: o.subtotal,
                 deliveryFee: o.delivery_fee,
@@ -90,8 +109,14 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         }
     }, [isAuthenticated]);
 
+    const updateOrderStatus = useCallback((id: string, status: MobileOrderStatus) => {
+        setOrders((current) => current.map((order) => (
+            order.id === id ? { ...order, status } : order
+        )));
+    }, []);
+
     useEffect(() => {
-        refreshOrders();
+        void refreshOrders();
     }, [refreshOrders]);
 
     const getOrderById = useCallback(
@@ -99,9 +124,14 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         [orders],
     );
 
+    const activeOrderCount = useMemo(
+        () => orders.filter((order) => !['completed', 'delivered', 'cancelled'].includes(order.status)).length,
+        [orders],
+    );
+
     const value = useMemo(
-        () => ({ orders, loading, refreshOrders, getOrderById }),
-        [orders, loading, refreshOrders, getOrderById],
+        () => ({ orders, loading, activeOrderCount, refreshOrders, updateOrderStatus, getOrderById }),
+        [orders, loading, activeOrderCount, refreshOrders, updateOrderStatus, getOrderById],
     );
 
     return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;
