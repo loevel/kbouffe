@@ -32,3 +32,23 @@ export function formatPhone(phone: string): string {
     }
     return phone;
 }
+
+export function getPaymentLabel(method: string): string {
+    const labels: Record<string, string> = {
+        orange_money: "Orange Money",
+        mtn_mobile_money: "MTN MoMo",
+        cash: "Espèces",
+        card: "Carte bancaire",
+    };
+    return labels[method] || method;
+}
+
+export function getPaymentStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+        pending: "En attente",
+        paid: "Payé",
+        failed: "Échoué",
+        refunded: "Remboursé",
+    };
+    return labels[status] || status;
+}

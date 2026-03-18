@@ -64,6 +64,52 @@ adminSystemRoutes.get("/settings", async (c) => {
     return c.json(data);
 });
 
+adminSystemRoutes.put("/settings", async (c) => {
+    const denied = requireDomain(c, "system");
+    if (denied) return denied;
+
+    const body = await c.req.json();
+    if (typeof body !== "object" || body === null) {
+        return c.json({ error: "Format invalide" }, 400);
+    }
+
+    const updates = Object.entries(body).map(([key, value]) => ({
+        key,
+        value,
+        updated_by: c.var.userId,
+        updated_at: new Date().toISOString()
+    }));
+
+    if (updates.length === 0) {
+        return c.json({ message: "Aucun changement" });
+    }
+
+    const { data: updated, error } = await c.var.supabase
+        .from("platform_settings")
+        .upsert(updates)
+        .select();
+
+    if (error) {
+        console.error("Settings bulk update error:", error);
+        return c.json({ error: "Erreur lors de la mise à jour des réglages" }, 500);
+    }
+
+    await logAdminAction(c, {
+        action: "bulk_update_settings",
+        targetType: "platform_settings",
+        targetId: "global",
+        details: { keys: Object.keys(body) }
+    });
+
+    // Return as a key-value object to match frontend expectation
+    const response = (updated as any[]).reduce((acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+    }, {} as Record<string, any>);
+
+    return c.json(response);
+});
+
 adminSystemRoutes.patch("/settings", async (c) => {
     const denied = requireDomain(c, "system");
     if (denied) return denied;

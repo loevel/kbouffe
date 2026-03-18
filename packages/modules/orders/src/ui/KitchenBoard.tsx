@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Clock, Utensils, Package, Bike, RefreshCw, CheckCircle2, CalendarClock, Truck } from "lucide-react";
 import { Badge, Button, EmptyState, Input, Modal, ModalFooter, Spinner, toast, cn, formatOrderId, useLocale } from "@kbouffe/module-core/ui";
-import { useOrders, updateOrderStatus } from "@/hooks/use-data";
+import { useOrders, updateOrderStatus } from "../hooks/use-orders";
 import type { Order, OrderItemData } from "@kbouffe/module-core/ui";
 
 // ── Column definitions ────────────────────────────────────────────────────

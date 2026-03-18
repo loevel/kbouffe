@@ -19,7 +19,7 @@ import {
     User,
     Info,
 } from "lucide-react";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,28 +37,33 @@ interface OrderRow {
 
 const statusConfig: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info" | "brand"; icon: any; color: string }> = {
     pending: { label: "En attente", variant: "warning", icon: Clock, color: "text-amber-500 bg-amber-500/10" },
-    confirmed: { label: "Confirmée", variant: "info", icon: CheckCircle, color: "text-blue-500 bg-blue-500/10" },
+    accepted: { label: "Acceptée", variant: "info", icon: CheckCircle, color: "text-blue-500 bg-blue-500/10" },
     preparing: { label: "En préparation", variant: "info", icon: Utensils, color: "text-indigo-500 bg-indigo-500/10" },
     ready: { label: "Prête", variant: "success", icon: CheckCircle, color: "text-emerald-500 bg-emerald-500/10" },
-    delivering: { label: "En livraison", variant: "brand", icon: Truck, color: "text-brand-500 bg-brand-500/10" },
-    delivered: { label: "Livrée", variant: "success", icon: CheckCircle, color: "text-green-500 bg-green-500/10" },
+    completed: { label: "Finalisée", variant: "success", icon: CheckCircle, color: "text-green-500 bg-green-500/10" },
     cancelled: { label: "Annulée", variant: "danger", icon: XCircle, color: "text-red-500 bg-red-500/10" },
-    disputed: { label: "Litige", variant: "danger", icon: AlertTriangle, color: "text-rose-500 bg-rose-500/10" },
 };
 
 // Placeholder data (matches the existing mock but extended for better feel)
 const mockOrders: OrderRow[] = [
-    { id: "ORD-001", restaurantName: "Le Tchop Gourmet", customerName: "Jean Kamga", total: 8500, status: "delivered", createdAt: "2026-03-04T14:30:00Z" },
+    { id: "ORD-001", restaurantName: "Le Tchop Gourmet", customerName: "Jean Kamga", total: 8500, status: "completed", createdAt: "2026-03-04T14:30:00Z" },
     { id: "ORD-002", restaurantName: "Chez Mama", customerName: "Marie Ngo", total: 12000, status: "preparing", createdAt: "2026-03-04T15:12:00Z" },
     { id: "ORD-003", restaurantName: "Pizza Express", customerName: "Paul Mbarga", total: 6500, status: "pending", createdAt: "2026-03-04T15:45:00Z" },
-    { id: "ORD-004", restaurantName: "Le Tchop Gourmet", customerName: "Aline Fotso", total: 15200, status: "delivering", createdAt: "2026-03-04T16:00:00Z" },
+    { id: "ORD-004", restaurantName: "Le Tchop Gourmet", customerName: "Aline Fotso", total: 15200, status: "accepted", createdAt: "2026-03-04T16:00:00Z" },
     { id: "ORD-005", restaurantName: "Saveurs du Cameroun", customerName: "Eric Njoh", total: 9800, status: "cancelled", createdAt: "2026-03-04T12:20:00Z" },
-    { id: "ORD-006", restaurantName: "Burger Lab", customerName: "Sandra Etoudi", total: 7400, status: "disputed", createdAt: "2026-03-04T10:15:00Z" },
+    { id: "ORD-006", restaurantName: "Burger Lab", customerName: "Sandra Etoudi", total: 7400, status: "preparing", createdAt: "2026-03-04T10:15:00Z" },
     { id: "ORD-007", restaurantName: "Pasta House", customerName: "Kevin Talla", total: 11000, status: "ready", createdAt: "2026-03-04T11:45:00Z" },
 ];
 
 function formatFCFA(value: number) {
     return new Intl.NumberFormat("fr-FR").format(value) + " FCFA";
+}
+
+interface Pagination {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
 }
 
 const containerVariants = {
@@ -77,14 +82,45 @@ const itemVariants = {
 };
 
 export default function AdminOrdersPage() {
+    const [orders, setOrders] = useState<OrderRow[]>([]);
+    const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
+    const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [error, setError] = useState<string | null>(null);
 
-    const filteredOrders = mockOrders.filter((o) => {
-        const matchesQuery = !query || o.restaurantName.toLowerCase().includes(query.toLowerCase()) || o.customerName.toLowerCase().includes(query.toLowerCase()) || o.id.toLowerCase().includes(query.toLowerCase());
-        const matchesStatus = statusFilter === "all" || o.status === statusFilter;
-        return matchesQuery && matchesStatus;
-    });
+    const fetchOrders = useCallback(async (page = 1) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: "20",
+                ...(query && { q: query }),
+                ...(statusFilter !== "all" && { status: statusFilter }),
+            });
+            
+            const res = await adminFetch(`/api/admin/orders?${params}`);
+            const json = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(json.error || `Erreur ${res.status}`);
+            }
+
+            setOrders(json.data ?? []);
+            setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
+        } catch (err: any) {
+            console.error("Failed to fetch orders:", err);
+            setError(err.message || "Échec du chargement des commandes");
+        } finally {
+            setLoading(false);
+        }
+    }, [query, statusFilter]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => fetchOrders(1), 300);
+        return () => clearTimeout(timer);
+    }, [fetchOrders]);
 
     return (
         <motion.div 
@@ -157,15 +193,13 @@ export default function AdminOrdersPage() {
                             <option value="all">Tous les statuts</option>
                             <optgroup label="Actives">
                                 <option value="pending">En attente</option>
-                                <option value="confirmed">Confirmée</option>
+                                <option value="accepted">Acceptée</option>
                                 <option value="preparing">En préparation</option>
                                 <option value="ready">Prête</option>
-                                <option value="delivering">En livraison</option>
                             </optgroup>
                             <optgroup label="Finalisées">
-                                <option value="delivered">Livrée</option>
+                                <option value="completed">Finalisée</option>
                                 <option value="cancelled">Annulée</option>
-                                <option value="disputed">Litiges</option>
                             </optgroup>
                         </select>
                     </div>
@@ -195,7 +229,15 @@ export default function AdminOrdersPage() {
                         </thead>
                         <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
                             <AnimatePresence mode="popLayout">
-                                {filteredOrders.length === 0 ? (
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, idx) => (
+                                        <tr key={idx} className="animate-pulse">
+                                            <td colSpan={7} className="px-6 py-4">
+                                                <div className="h-10 bg-surface-100 dark:bg-surface-800 rounded-lg w-full" />
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : orders.length === 0 ? (
                                     <motion.tr 
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
@@ -219,7 +261,7 @@ export default function AdminOrdersPage() {
                                         </td>
                                     </motion.tr>
                                 ) : (
-                                    filteredOrders.map((o, idx) => {
+                                    orders.map((o, idx) => {
                                         const sc = statusConfig[o.status] ?? statusConfig.pending;
                                         const StatusIcon = sc.icon;
                                         return (
@@ -294,20 +336,38 @@ export default function AdminOrdersPage() {
                 </div>
 
                 {/* Pagination Placeholder */}
-                <div className="p-4 border-t border-surface-100 dark:border-surface-800 bg-surface-50/30 dark:bg-surface-800/10 flex items-center justify-between">
-                    <p className="text-xs text-surface-500 font-medium">Affichage de {filteredOrders.length} résultats</p>
-                    <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled>
-                            <ChevronLeft size={16} />
-                        </Button>
-                        <div className="flex items-center gap-1 px-2">
-                            <span className="w-8 h-8 rounded-lg bg-brand-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shadow-brand-500/20">1</span>
+                {pagination.totalPages > 1 && (
+                    <div className="p-4 border-t border-surface-100 dark:border-surface-800 bg-surface-50/30 dark:bg-surface-800/10 flex items-center justify-between">
+                        <p className="text-xs text-surface-500 font-medium tracking-tight">
+                            Affichage de {orders.length} sur {pagination.total} commandes
+                        </p>
+                        <div className="flex items-center gap-1">
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 w-8 p-0 rounded-lg" 
+                                onClick={() => fetchOrders(pagination.page - 1)}
+                                disabled={pagination.page <= 1}
+                            >
+                                <ChevronLeft size={16} />
+                            </Button>
+                            <div className="flex items-center gap-1 px-2">
+                                <span className="w-8 h-8 rounded-lg bg-brand-500 text-white flex items-center justify-center text-xs font-bold shadow-sm shadow-brand-500/20">
+                                    {pagination.page}
+                                </span>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 w-8 p-0 rounded-lg" 
+                                onClick={() => fetchOrders(pagination.page + 1)}
+                                disabled={pagination.page >= pagination.totalPages}
+                            >
+                                <ChevronRight size={16} />
+                            </Button>
                         </div>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled>
-                            <ChevronRight size={16} />
-                        </Button>
                     </div>
-                </div>
+                )}
             </motion.div>
         </motion.div>
     );

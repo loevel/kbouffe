@@ -1,18 +1,38 @@
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 
 export const adminUsersRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+const createUserSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
+    fullName: z.string().optional(),
+    phone: z.string().optional(),
+    role: z.enum(["admin", "support", "merchant", "customer", "driver"]).default("customer"),
+    adminRole: z.enum(["super_admin", "support", "sales", "moderator"]).optional(),
+}).refine(data => {
+    if (data.role === "admin" && !data.adminRole) return false;
+    return true;
+}, {
+    message: "adminRole est requis quand le rôle est 'admin'",
+    path: ["adminRole"]
+});
 
 adminUsersRoutes.post("/", async (c) => {
     const denied = requireDomain(c, "users:write");
     if (denied) return denied;
 
     const body = await c.req.json();
-    const { email, password, fullName, phone, role, adminRole } = body;
+    const result = createUserSchema.safeParse(body);
 
-    if (!email || !password) return c.json({ error: "Email et mot de passe requis" }, 400);
+    if (!result.success) {
+        return c.json({ error: result.error.issues[0].message }, 400);
+    }
+
+    const { email, password, fullName, phone, role, adminRole } = result.data;
 
     // 1. Create in Supabase Auth via Admin API
     if (!c.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -28,7 +48,7 @@ adminUsersRoutes.post("/", async (c) => {
         user_metadata: { 
             full_name: fullName, 
             phone, 
-            role: role || "client" 
+            role: role || "customer" 
         }
     });
 
@@ -40,8 +60,8 @@ adminUsersRoutes.post("/", async (c) => {
         email,
         full_name: fullName || null,
         phone: phone || null,
-        role: role || "client",
-        // admin_role is not standard in public.users but might be needed
+        role: role,
+        admin_role: adminRole || null,
         preferred_lang: "fr",
         notifications_enabled: true,
         created_at: new Date().toISOString(),

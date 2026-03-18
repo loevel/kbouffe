@@ -21,10 +21,9 @@ import {
     Trash2,
     AlertTriangle,
 } from "lucide-react";
-import { Badge, Button, useLocale, toast } from "@kbouffe/module-core/ui";
+import { Badge, Button, useLocale, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 
 interface Restaurant {
     id: string;
@@ -80,11 +79,6 @@ export default function AdminRestaurantsPage() {
         setLoading(true);
         setError(null);
         try {
-            const supabase = createClient();
-            if (!supabase) throw new Error("Supabase client not initialized");
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
             const params = new URLSearchParams({
                 page: String(page),
                 limit: "20",
@@ -93,12 +87,7 @@ export default function AdminRestaurantsPage() {
                 ...(verifiedFilter !== "all" && { verified: verifiedFilter }),
             });
             
-            const res = await fetch(`/api/admin/restaurants?${params}`, {
-                headers: {
-                    ...(token && { "Authorization": `Bearer ${token}` }),
-                }
-            });
-
+            const res = await adminFetch(`/api/admin/restaurants?${params}`);
             const json = await res.json();
             
             if (!res.ok) {
@@ -123,17 +112,8 @@ export default function AdminRestaurantsPage() {
     const toggleField = async (id: string, field: string, value: boolean) => {
         setToggling(id);
         try {
-            const supabase = createClient();
-            if (!supabase) throw new Error("Supabase client not initialized");
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const res = await fetch(`/api/admin/restaurants/${id}`, {
+            const res = await adminFetch(`/api/admin/restaurants/${id}`, {
                 method: "PATCH",
-                headers: { 
-                    "Content-Type": "application/json",
-                    ...(token && { "Authorization": `Bearer ${token}` }),
-                },
                 body: JSON.stringify({ [field]: value }),
             });
 
@@ -155,16 +135,8 @@ export default function AdminRestaurantsPage() {
         if (!restaurantToDelete) return;
         setIsDeleting(true);
         try {
-            const supabase = createClient();
-            if (!supabase) throw new Error("Supabase client not initialized");
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            const res = await fetch(`/api/admin/restaurants/${restaurantToDelete.id}`, {
+            const res = await adminFetch(`/api/admin/restaurants/${restaurantToDelete.id}`, {
                 method: "DELETE",
-                headers: {
-                    ...(token && { "Authorization": `Bearer ${token}` }),
-                }
             });
 
             if (!res.ok) {

@@ -14,11 +14,9 @@ const AdminContext = createContext<AdminContextValue | undefined>(undefined);
 export function AdminProvider({ children }: { children: ReactNode }) {
     const session = useUserSession(state => state.session);
 
-    // Get the adminRole from the session. 
-    // Defaults to "super_admin" if the user has the "admin" role but no specific adminRole is set.
     const adminRole = useMemo(() => {
         if (!session || session.role !== "admin") return null;
-        return (session.adminRole || "super_admin") as AdminRole;
+        return (session.adminRole || null) as AdminRole | null;
     }, [session]);
 
     const can = useMemo(() => {

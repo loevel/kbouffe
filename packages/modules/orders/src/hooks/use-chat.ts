@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import useSWR from "swr";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@kbouffe/module-core/ui";
 
 export interface Message {
     id: string;

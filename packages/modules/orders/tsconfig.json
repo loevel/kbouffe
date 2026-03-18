@@ -21,12 +21,7 @@
         "types": [
             "@cloudflare/workers-types"
         ],
-        "baseUrl": ".",
-        "paths": {
-            "@/*": [
-                "../../../apps/web-dashboard/src/*"
-            ]
-        }
+        "baseUrl": "."
     },
     "include": [
         "src"

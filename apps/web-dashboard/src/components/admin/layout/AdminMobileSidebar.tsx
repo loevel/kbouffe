@@ -22,8 +22,8 @@ export function AdminMobileSidebar({ isOpen, onClose }: AdminMobileSidebarProps)
 
     const navItems = adminNavItemsDef.filter((item) => {
         if (!item.permission) return true;
-        // Default to showing all items if the admin role isn't loaded yet
-        if (!adminRole) return true;
+        // Hide navigation items that require permissions until the admin role is loaded
+        if (!adminRole) return false;
         return can(item.permission);
     });
 

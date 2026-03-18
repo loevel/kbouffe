@@ -11,6 +11,10 @@ export const tablesRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /** GET /tables */
 tablesRoutes.get("/", async (c) => {
+    const zoneFilter = c.req.query("zone");
+    const search = c.req.query("q")?.trim().toLowerCase();
+    const sort = c.req.query("sort") ?? "sort_order"; // sort_order | capacity | status | number
+
     const { data: zones, error: zonesError } = await c.var.supabase
         .from("table_zones")
         .select("*")
@@ -22,11 +26,22 @@ tablesRoutes.get("/", async (c) => {
         return c.json({ error: "Erreur lors de la récupération des zones" }, 500);
     }
 
-    const { data: tables, error: tablesError } = await c.var.supabase
+    let query = c.var.supabase
         .from("restaurant_tables")
         .select("*, table_zones(name, type)")
-        .eq("restaurant_id", c.var.restaurantId)
-        .order("sort_order", { ascending: true });
+        .eq("restaurant_id", c.var.restaurantId);
+
+    if (zoneFilter && zoneFilter !== "all") {
+        query = query.eq("zone_id", zoneFilter);
+    }
+
+    if (search) {
+        query = query.or(`number.ilike.%${search}%,table_zones.name.ilike.%${search}%`);
+    }
+
+    const sortColumn = ["capacity", "status", "number"].includes(sort) ? sort : "sort_order";
+
+    const { data: tables, error: tablesError } = await query.order(sortColumn as any, { ascending: true });
 
     if (tablesError) {
         console.error("Tables query error:", tablesError);
@@ -41,6 +56,19 @@ tablesRoutes.post("/", async (c) => {
     const body = await c.req.json();
 
     if (!body.number) return c.json({ error: "Le numéro de table est requis" }, 400);
+    if (body.capacity !== undefined && Number(body.capacity) < 1) {
+        return c.json({ error: "La capacité doit être positive" }, 400);
+    }
+
+    // Check duplicates within the restaurant
+    const { data: existing } = await c.var.supabase
+        .from("restaurant_tables")
+        .select("id")
+        .eq("restaurant_id", c.var.restaurantId)
+        .eq("number", body.number)
+        .maybeSingle();
+
+    if (existing) return c.json({ error: "Ce numéro de table existe déjà" }, 409);
 
     const { data, error } = await c.var.supabase
         .from("restaurant_tables")
@@ -80,6 +108,18 @@ tablesRoutes.patch("/:id", async (c) => {
     if (body.is_active !== undefined) updateData.is_active = body.is_active;
     if (body.sort_order !== undefined) updateData.sort_order = body.sort_order;
     if (body.qr_code !== undefined) updateData.qr_code = body.qr_code;
+
+    // Prevent duplicate table numbers inside the same restaurant
+    if (body.number) {
+        const { data: duplicate } = await c.var.supabase
+            .from("restaurant_tables")
+            .select("id")
+            .eq("restaurant_id", c.var.restaurantId)
+            .eq("number", body.number)
+            .neq("id", id)
+            .maybeSingle();
+        if (duplicate) return c.json({ error: "Ce numéro de table existe déjà" }, 409);
+    }
 
     const { data, error } = await c.var.supabase
         .from("restaurant_tables")

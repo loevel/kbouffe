@@ -17,7 +17,7 @@ import {
     Cloud,
     AlertCircle,
 } from "lucide-react";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
 
 interface SettingField {
@@ -68,8 +68,16 @@ export default function AdminSettingsPage() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch("/api/admin/settings");
-                if (res.ok) setSettings(await res.json());
+                const res = await adminFetch("/api/admin/system/settings");
+                if (res.ok) {
+                    const data = await res.json();
+                    // Transform array [{key, value}] to record {key: value}
+                    const record = (data as any[]).reduce((acc, curr) => {
+                        acc[curr.key] = curr.value;
+                        return acc;
+                    }, {} as Record<string, string>);
+                    setSettings(record);
+                }
             } catch (err) {
                 console.error("Failed to load settings:", err);
             } finally {
@@ -87,7 +95,7 @@ export default function AdminSettingsPage() {
     const saveSettings = async () => {
         setSaving(true);
         try {
-            const res = await fetch("/api/admin/settings", {
+            const res = await adminFetch("/api/admin/system/settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(settings),

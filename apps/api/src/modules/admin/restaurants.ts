@@ -58,7 +58,7 @@ adminRestaurantsRoutes.get("/", async (c) => {
         phone: r.phone,
         email: r.email,
         logoUrl: r.logo_url,
-        coverUrl: r.cover_url,
+        bannerUrl: r.banner_url,
         isActive: !!r.is_published,
         isVerified: !!r.is_verified,
         isPremium: !!r.is_premium,
@@ -108,7 +108,7 @@ adminRestaurantsRoutes.get("/:id", async (c) => {
         phone: restaurant.phone,
         email: restaurant.email,
         logoUrl: restaurant.logo_url,
-        coverUrl: restaurant.cover_url,
+        bannerUrl: restaurant.banner_url,
         isActive: restaurant.is_published,
         isVerified: restaurant.is_verified,
         isPremium: restaurant.is_premium,
@@ -161,7 +161,7 @@ adminRestaurantsRoutes.patch("/:id", async (c) => {
     if ("phone" in body) updates.phone = body.phone;
     if ("email" in body) updates.email = body.email;
     if ("logoUrl" in body) updates.logo_url = body.logoUrl;
-    if ("coverUrl" in body) updates.cover_url = body.coverUrl;
+    if ("bannerUrl" in body) updates.banner_url = body.bannerUrl;
     if ("kycNiu" in body) updates.kyc_niu = body.kycNiu;
     if ("kycRccm" in body) updates.kyc_rccm = body.kycRccm;
 
@@ -198,7 +198,7 @@ adminRestaurantsRoutes.patch("/:id", async (c) => {
         phone: updated.phone,
         email: updated.email,
         logoUrl: updated.logo_url,
-        coverUrl: updated.cover_url,
+        bannerUrl: updated.banner_url,
         isActive: updated.is_published,
         isVerified: updated.is_verified,
         isPremium: updated.is_premium,

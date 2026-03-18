@@ -19,7 +19,7 @@ import {
     BarChart3,
     ArrowUpRight,
 } from "lucide-react";
-import { Badge, Button } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -85,7 +85,7 @@ export default function AdminMarketingPage() {
                 limit: "20",
                 ...(statusFilter !== "all" && { status: statusFilter }),
             });
-            const res = await fetch(`/api/admin/marketing/campaigns?${params}`);
+            const res = await adminFetch(`/api/admin/marketing/campaigns?${params}`);
             const json = await res.json();
             setCampaigns(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -103,7 +103,7 @@ export default function AdminMarketingPage() {
     const updateStatus = async (id: string, newStatus: string) => {
         setUpdating(id);
         try {
-            const res = await fetch("/api/admin/marketing/campaigns", {
+            const res = await adminFetch("/api/admin/marketing/campaigns", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, status: newStatus }),
@@ -291,7 +291,7 @@ export default function AdminMarketingPage() {
                                                     <div className="flex items-center justify-end gap-2">
                                                         {c.status === "pending" ? (
                                                             <Button
-                                                                variant="brand"
+                                                                variant="primary"
                                                                 size="sm"
                                                                 onClick={() => updateStatus(c.id, "active")}
                                                                 disabled={updating === c.id}
@@ -361,7 +361,7 @@ export default function AdminMarketingPage() {
                             Le ciblage intelligent a permis de réduire le coût d'acquisition client de 15% pour les partenaires Elite.
                         </p>
                         <div className="pt-4">
-                            <Button variant="brand" className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-brand-500/20 active:scale-95">
+                            <Button variant="primary" className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-brand-500/20 active:scale-95">
                                 Analyser les segments
                             </Button>
                         </div>

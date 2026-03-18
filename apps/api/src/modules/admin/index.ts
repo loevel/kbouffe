@@ -9,6 +9,8 @@ import { adminBillingRoutes } from "./billing";
 import { adminModerationRoutes } from "./moderation";
 import { adminMarketingRoutes } from "./marketing";
 import { adminSystemRoutes } from "./system";
+import { adminOrdersRoutes } from "./orders";
+import { adminCatalogRoutes } from "./catalog";
 import { createClient } from "@supabase/supabase-js";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -35,9 +37,9 @@ adminRoutes.get("/stats", async (c) => {
         supabase.from("restaurants").select("*", { count: "exact", head: true }).eq("is_published", false).eq("is_verified", false),
 
         supabase.from("users").select("*", { count: "exact", head: true }),
-        supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "client"),
+        supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "customer"),
         supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "merchant"),
-        supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "livreur"),
+        supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "driver"),
 
         supabase.from("restaurants")
             .select("id, name, is_published, created_at")
@@ -60,9 +62,9 @@ adminRoutes.get("/stats", async (c) => {
         },
         users: { 
             total: totalUsers || 0, 
-            clients: countClients || 0,
+            customers: countClients || 0,
             merchants: countMerchants || 0,
-            livreurs: countLivreurs || 0
+            drivers: countLivreurs || 0
         },
         recentActivity: { newRestaurants }
     });
@@ -77,5 +79,7 @@ adminRoutes.route("/billing", adminBillingRoutes);
 adminRoutes.route("/moderation", adminModerationRoutes);
 adminRoutes.route("/marketing", adminMarketingRoutes);
 adminRoutes.route("/system", adminSystemRoutes);
+adminRoutes.route("/orders", adminOrdersRoutes);
+adminRoutes.route("/catalog", adminCatalogRoutes);
 // For backward compatibility on /admin/audit
 adminRoutes.route("/audit", adminSystemRoutes);

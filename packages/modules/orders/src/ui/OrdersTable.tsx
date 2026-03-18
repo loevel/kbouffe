@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Search, Eye, ArrowUpDown, Download } from "lucide-react";
 import { Badge, Button, Card, Dropdown, EmptyState, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Tabs, toast, useLocale, formatDate, formatCFA, formatDateTime, formatOrderId } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "./OrderStatusBadge";
-import { useOrders } from "@/hooks/use-data";
+import { useOrders } from "../hooks/use-orders";
 
 const ITEMS_PER_PAGE = 10;
 

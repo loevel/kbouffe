@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { requireDomain } from "../../lib/admin-rbac";
+import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 
 export const adminMarketingRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -56,3 +56,42 @@ adminMarketingRoutes.get("/campaigns", async (c) => {
         }
     });
 });
+
+    // Allow updating campaign status from admin UI
+    adminMarketingRoutes.patch("/campaigns", async (c) => {
+        const denied = requireDomain(c, "marketing");
+        if (denied) return denied;
+
+        const body = await c.req.json().catch(() => ({}));
+        const { id, status } = body as { id?: string; status?: string };
+
+        if (!id || !status) {
+            return c.json({ error: "Paramètres invalides" }, 400);
+        }
+
+        try {
+            const { data: updated, error } = await c.var.supabase
+                .from("ad_campaigns")
+                .update({ status, updated_at: new Date().toISOString() })
+                .eq("id", id)
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Failed to update campaign status:", error);
+                return c.json({ error: "Impossible de mettre à jour la campagne" }, 500);
+            }
+
+            await logAdminAction(c, {
+                action: "update_campaign_status",
+                targetType: "campaign",
+                targetId: id,
+                details: { status }
+            });
+
+            return c.json({ success: true, status: updated.status });
+        } catch (err) {
+            console.error("Unexpected error updating campaign status:", err);
+            return c.json({ error: "Erreur serveur" }, 500);
+        }
+    });
