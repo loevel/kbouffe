@@ -1,8 +1,7 @@
 import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_USER } from '@/data/mocks';
-import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
+import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -28,13 +27,15 @@ const menuItems: MenuItem[] = [
 
 export default function ProfileScreen() {
     const router = useRouter();
-    const { user, logout, updateProfile } = useAuth();
+    const { user, isAuthenticated, logout, updateProfile } = useAuth();
     const [uploading, setUploading] = useState(false);
     const { orders } = useOrders();
     const { favoriteRestaurantIds, favoriteProductIds } = useLoyalty();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const displayName = user?.fullName ?? 'Utilisateur Kbouffe';
+    const displayPhone = user?.phone ?? 'Ajoutez votre numéro';
 
     const totalOrders = orders.filter(o => ['completed', 'delivered'].includes(o.status)).length;
     const totalSpent = orders.filter(o => ['completed', 'delivered'].includes(o.status)).reduce((s, o) => s + o.total, 0);
@@ -67,7 +68,7 @@ export default function ProfileScreen() {
                 type: `image/${fileExt}`
             } as any);
 
-            const { data, error: uploadError } = await supabase.storage
+            const { error: uploadError } = await supabase.storage
                 .from('avatars')
                 .upload(fileName, formData, { upsert: true });
 
@@ -88,6 +89,34 @@ export default function ProfileScreen() {
         }
     };
 
+    if (!isAuthenticated) {
+        return (
+            <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: Spacing.xxl }}>
+                <View style={[styles.emptyGuest, { paddingTop: Spacing.xxl }]}>
+                    <View style={[styles.avatar, { backgroundColor: theme.primary + '18' }]}>
+                        <Ionicons name="person-outline" size={36} color={theme.primary} />
+                    </View>
+                    <Text style={[styles.name, { color: theme.text }]}>Connectez-vous pour personnaliser votre experience</Text>
+                    <Text style={[styles.phone, { color: theme.icon, textAlign: 'center', maxWidth: 280 }]}>
+                        Accedez a votre profil, vos favoris, vos adresses et vos commandes en quelques secondes.
+                    </Text>
+                    <Pressable
+                        style={[styles.authButton, { backgroundColor: theme.primary }]}
+                        onPress={() => router.push('/(auth)/login')}
+                    >
+                        <Text style={styles.authButtonText}>Se connecter</Text>
+                    </Pressable>
+                    <Pressable
+                        style={[styles.authGhostButton, { borderColor: theme.border }]}
+                        onPress={() => router.push('/(auth)/register')}
+                    >
+                        <Text style={[styles.authGhostButtonText, { color: theme.text }]}>Creer un compte</Text>
+                    </Pressable>
+                </View>
+            </ScrollView>
+        );
+    }
+
     return (
         <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: Spacing.xxl }}>
             <View style={styles.header}>
@@ -98,15 +127,15 @@ export default function ProfileScreen() {
                         <Image source={{ uri: user.avatarUrl }} style={{ width: '100%', height: '100%' }} />
                     ) : (
                         <Text style={styles.avatarText}>
-                            {(user?.fullName ?? MOCK_USER.fullName).split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                            {displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                         </Text>
                     )}
                     <View style={styles.cameraBadge}>
                         <Ionicons name="camera" size={14} color="#fff" />
                     </View>
                 </Pressable>
-                <Text style={[styles.name, { color: theme.text }]}>{user?.fullName ?? MOCK_USER.fullName}</Text>
-                <Text style={[styles.phone, { color: theme.icon }]}>{user?.phone ?? MOCK_USER.phone}</Text>
+                <Text style={[styles.name, { color: theme.text }]}>{displayName}</Text>
+                <Text style={[styles.phone, { color: theme.icon }]}>{displayPhone}</Text>
             </View>
 
             <View style={[styles.statsRow, { borderColor: theme.border }]}>
@@ -167,9 +196,13 @@ export default function ProfileScreen() {
                         { backgroundColor: theme.background, borderColor: theme.border },
                         pressed && { opacity: 0.8 },
                     ]}
-                    onPress={() => {
-                        logout();
-                        router.replace('/(auth)/login');
+                    onPress={async () => {
+                        try {
+                            await logout();
+                            router.replace('/(auth)/login');
+                        } catch {
+                            Alert.alert('Erreur', 'Impossible de vous déconnecter pour le moment.');
+                        }
                     }}
                 >
                     <View style={[styles.menuIcon, { backgroundColor: '#ef444415' }]}>
@@ -187,6 +220,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    emptyGuest: { alignItems: 'center', paddingHorizontal: Spacing.lg, gap: Spacing.md },
     header: { alignItems: 'center', padding: Spacing.lg },
     avatar: {
         width: 80,
@@ -211,6 +245,24 @@ const styles = StyleSheet.create({
         borderColor: '#fff',
     },
     avatarText: { color: '#fff', fontSize: 24, fontWeight: '700' },
+    authButton: {
+        marginTop: Spacing.md,
+        minWidth: 220,
+        height: 52,
+        borderRadius: Radii.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    authButtonText: { color: '#fff', ...Typography.body, fontWeight: '700' },
+    authGhostButton: {
+        minWidth: 220,
+        height: 52,
+        borderRadius: Radii.lg,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    authGhostButtonText: { ...Typography.body, fontWeight: '600' },
     name: { ...Typography.title3, marginBottom: 4 },
     phone: { ...Typography.body },
     statsRow: {

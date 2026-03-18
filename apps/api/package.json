@@ -9,20 +9,21 @@
         "lint": "tsc --noEmit"
     },
     "dependencies": {
-        "@kbouffe/shared-types": "^1.0.0",
         "@kbouffe/module-catalog": "*",
-        "@kbouffe/module-hr": "*",
-        "@kbouffe/module-crm": "*",
+        "@kbouffe/module-chat": "*",
         "@kbouffe/module-core": "*",
+        "@kbouffe/module-crm": "*",
+        "@kbouffe/module-hr": "*",
         "@kbouffe/module-marketing": "*",
         "@kbouffe/module-orders": "*",
         "@kbouffe/module-reservations": "*",
-        "@kbouffe/module-chat": "*",
+        "@kbouffe/shared-types": "^1.0.0",
         "@supabase/supabase-js": "^2.98.0",
         "hono": "^4.7.0"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20250621.0",
+        "@types/node": "^20.19.35",
         "typescript": "^5",
         "wrangler": "^4.69.0"
     }

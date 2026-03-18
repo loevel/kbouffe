@@ -349,13 +349,18 @@ usersRoutes.post("/support/tickets", async (c) => {
 usersRoutes.get("/orders", async (c) => {
     const { data, error } = await c.var.supabase
         .from("orders")
-        .select("*")
+        .select("*, restaurant:restaurants(name)")
         .eq("customer_id", c.var.userId)
         .order("created_at", { ascending: false })
         .limit(100);
 
     if (error) return c.json({ error: error.message }, 500);
-    return c.json({ orders: data || [] });
+    return c.json({
+        orders: (data || []).map((order: Record<string, unknown> & { restaurant?: { name?: string | null } | null }) => ({
+            ...order,
+            restaurant_name: order.restaurant?.name ?? null,
+        })),
+    });
 });
 
 // ── Security ─────────────────────────────────────────────────────────

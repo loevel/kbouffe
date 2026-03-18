@@ -4,14 +4,12 @@ import React, {
     useContext,
     useEffect,
     useMemo,
-    useRef,
     useState,
     type ReactNode,
 } from 'react';
 import {
     getSupportTickets,
     createSupportTicket as apiCreateSupportTicket,
-    SupportTicket as ApiSupportTicket
 } from '@/lib/api';
 import { useAuth } from './auth-context';
 
@@ -20,8 +18,8 @@ export type SupportTicketStatus = 'open' | 'in_review' | 'waiting_customer' | 'r
 
 export interface SupportTicket {
     id: string;
-    type: string;
-    status: string;
+    type: SupportTicketType;
+    status: SupportTicketStatus;
     subject: string;
     description: string;
     orderId?: string;
@@ -39,7 +37,7 @@ interface SupportContextType {
     tickets: SupportTicket[];
     faq: FaqItem[];
     loading: boolean;
-    createTicket: (params: { subject: string; description: string; orderId?: string; reporterType?: string }) => Promise<void>;
+    createTicket: (params: { type?: SupportTicketType; subject: string; description: string; orderId?: string; reporterType?: string }) => Promise<void>;
     getTicketById: (id: string) => SupportTicket | undefined;
     getTicketsByOrderId: (orderId: string) => SupportTicket[];
     refreshTickets: () => Promise<void>;
@@ -86,8 +84,8 @@ export function SupportProvider({ children }: { children: ReactNode }) {
             const data = await getSupportTickets();
             const mapped: SupportTicket[] = data.map(t => ({
                 id: t.id,
-                type: 'question', // Map as needed
-                status: t.status,
+                type: 'question',
+                status: (t.status as SupportTicketStatus) || 'open',
                 subject: t.subject,
                 description: t.description,
                 orderId: t.order_id,
@@ -105,7 +103,7 @@ export function SupportProvider({ children }: { children: ReactNode }) {
         refreshTickets();
     }, [refreshTickets]);
 
-    const createTicket = useCallback(async (params: { subject: string; description: string; orderId?: string; reporterType?: string }) => {
+    const createTicket = useCallback(async (params: { type?: SupportTicketType; subject: string; description: string; orderId?: string; reporterType?: string }) => {
         setLoading(true);
         try {
             await apiCreateSupportTicket(params);

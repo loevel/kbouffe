@@ -1,4 +1,4 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
@@ -6,17 +6,11 @@ import { HapticTab } from '@/components/haptic-tab';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { MOCK_ORDERS } from '@/data/mocks';
-import { useAuth } from '@/contexts/auth-context';
+import { useOrders } from '@/contexts/orders-context';
 
 export default function TabLayout() {
     const colorScheme = useColorScheme();
-    const { isAuthenticated } = useAuth();
-    const activeOrderCount = MOCK_ORDERS.filter(o => !['completed', 'cancelled'].includes(o.status)).length;
-
-    if (!isAuthenticated) {
-        return <Redirect href="/(auth)/login" />;
-    }
+    const { activeOrderCount } = useOrders();
 
     return (
         <Tabs

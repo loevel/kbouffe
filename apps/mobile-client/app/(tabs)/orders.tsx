@@ -7,6 +7,7 @@ import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '@/contexts/cart-context';
+import { useAuth } from '@/contexts/auth-context';
 
 const statusLabels: Record<MobileOrderStatus, string> = {
     pending: 'En attente',
@@ -37,6 +38,7 @@ export default function OrdersScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const { isAuthenticated } = useAuth();
     const { orders } = useOrders();
     const { addItem, clearCart } = useCart();
 
@@ -123,38 +125,55 @@ export default function OrdersScreen() {
                 <Text style={[styles.title, { color: theme.text }]}>Mes commandes</Text>
             </View>
 
-            <FlatList
-                data={[...activeOrders, ...pastOrders]}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.listContainer}
-                showsVerticalScrollIndicator={false}
-                renderItem={({ item, index }) => (
-                    <View>
-                        {index === 0 && activeOrders.length > 0 && (
-                            <Text style={[styles.sectionTitle, { color: theme.text }]}>En cours</Text>
-                        )}
-                        {index === activeOrders.length && pastOrders.length > 0 && (
-                            <Text style={[styles.sectionTitle, { color: theme.text, marginTop: Spacing.lg }]}>Historique</Text>
-                        )}
-                        {renderOrderCard(item)}
-                    </View>
-                )}
-                ListEmptyComponent={() => (
-                    <View style={styles.empty}>
-                        <Ionicons name="receipt-outline" size={48} color={theme.icon} />
-                        <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune commande</Text>
-                        <Text style={[styles.emptyText, { color: theme.icon }]}>
-                            Vos commandes apparaitront ici.
-                        </Text>
-                        <Pressable
-                            style={[styles.exploreButton, { backgroundColor: theme.primary }]}
-                            onPress={() => router.push('/(tabs)/explore')}
-                        >
-                            <Text style={styles.exploreButtonText}>Decouvrir les restaurants</Text>
-                        </Pressable>
-                    </View>
-                )}
-            />
+            {!isAuthenticated ? (
+                <View style={styles.empty}>
+                    <Ionicons name="lock-closed-outline" size={48} color={theme.icon} />
+                    <Text style={[styles.emptyTitle, { color: theme.text }]}>Connectez-vous pour suivre vos commandes</Text>
+                    <Text style={[styles.emptyText, { color: theme.icon }]}>
+                        Retrouvez votre historique, l&apos;etat des commandes et vos recommandations.
+                    </Text>
+                    <Pressable
+                        style={[styles.exploreButton, { backgroundColor: theme.primary }]}
+                        onPress={() => router.push('/(auth)/login')}
+                    >
+                        <Text style={styles.exploreButtonText}>Se connecter</Text>
+                    </Pressable>
+                </View>
+            ) : (
+
+                <FlatList
+                    data={[...activeOrders, ...pastOrders]}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.listContainer}
+                    showsVerticalScrollIndicator={false}
+                    renderItem={({ item, index }) => (
+                        <View>
+                            {index === 0 && activeOrders.length > 0 && (
+                                <Text style={[styles.sectionTitle, { color: theme.text }]}>En cours</Text>
+                            )}
+                            {index === activeOrders.length && pastOrders.length > 0 && (
+                                <Text style={[styles.sectionTitle, { color: theme.text, marginTop: Spacing.lg }]}>Historique</Text>
+                            )}
+                            {renderOrderCard(item)}
+                        </View>
+                    )}
+                    ListEmptyComponent={() => (
+                        <View style={styles.empty}>
+                            <Ionicons name="receipt-outline" size={48} color={theme.icon} />
+                            <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune commande</Text>
+                            <Text style={[styles.emptyText, { color: theme.icon }]}>
+                                Vos commandes apparaitront ici.
+                            </Text>
+                            <Pressable
+                                style={[styles.exploreButton, { backgroundColor: theme.primary }]}
+                                onPress={() => router.push('/(tabs)/explore')}
+                            >
+                                <Text style={styles.exploreButtonText}>Decouvrir les restaurants</Text>
+                            </Pressable>
+                        </View>
+                    )}
+                />
+            )}
         </View>
     );
 }
