@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useUserSession, useCartStore } from "@/store/client-store";
-import { initializeAnalytics, createInternalProvider } from "@/lib/analytics";
+import { useUserSession, useCartStore, type UserSession } from "@/store/client-store";
+import { initializeAnalytics, createInternalProvider, type AnalyticsEvent } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 
 interface ClientAppProviderProps {
@@ -10,7 +10,7 @@ interface ClientAppProviderProps {
 }
 
 export function ClientAppProvider({ children }: ClientAppProviderProps) {
-    const { setSession, isAuthenticated } = useUserSession();
+    const { setSession } = useUserSession();
     const { calculateTotals } = useCartStore();
 
     useEffect(() => {
@@ -23,6 +23,13 @@ export function ClientAppProvider({ children }: ClientAppProviderProps) {
         // Initialiser la session Supabase
         const supabase = createClient();
 
+        const toSessionRole = (role: unknown): UserSession["role"] => {
+            if (role === "admin" || role === "merchant" || role === "livreur" || role === "customer" || role === "client") {
+                return role;
+            }
+            return "client";
+        };
+
         const initializeAuth = async () => {
             if (!supabase) return;
 
@@ -33,7 +40,7 @@ export function ClientAppProvider({ children }: ClientAppProviderProps) {
                     setSession({
                         id: session.user.id,
                         email: session.user.email || "",
-                        role: (session.user.user_metadata?.role || "client") as any,
+                        role: toSessionRole(session.user.user_metadata?.role),
                         adminRole: session.user.user_metadata?.admin_role,
                         name: session.user.user_metadata?.name,
                         phone: session.user.user_metadata?.phone,
@@ -67,7 +74,7 @@ export function ClientAppProvider({ children }: ClientAppProviderProps) {
                 setSession({
                     id: session.user.id,
                     email: session.user.email || "",
-                    role: (session.user.user_metadata?.role || "client") as any,
+                    role: toSessionRole(session.user.user_metadata?.role),
                     adminRole: session.user.user_metadata?.admin_role,
                     name: session.user.user_metadata?.name,
                     phone: session.user.user_metadata?.phone,
@@ -116,7 +123,7 @@ export function useClientTracking() {
     const isAuthenticated = useUserSession((state) => state.isAuthenticated);
 
     return {
-        trackEvent: (event: any) => {
+        trackEvent: (event: AnalyticsEvent) => {
             const analytics = initializeAnalytics();
             analytics?.track({
                 ...event,
@@ -124,7 +131,7 @@ export function useClientTracking() {
                 userRole: session?.role,
             });
         },
-        identify: (traits?: Record<string, any>) => {
+        identify: (traits?: Record<string, unknown>) => {
             if (session) {
                 const analytics = initializeAnalytics();
                 analytics?.identify(session.id, {

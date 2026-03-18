@@ -18,7 +18,7 @@ export function AdminMobileSidebar({ isOpen, onClose }: AdminMobileSidebarProps)
     const pathname = usePathname();
     const { t } = useLocale();
     const { can, adminRole } = useAdmin();
-    // No need for session here as we just check if adminRole is null
+    const adminNavLabels = t.adminNav as Partial<Record<(typeof adminNavItemsDef)[number]["labelKey"] | "backToSite", string>> | undefined;
 
     const navItems = adminNavItemsDef.filter((item) => {
         if (!item.permission) return true;
@@ -56,7 +56,7 @@ export function AdminMobileSidebar({ isOpen, onClose }: AdminMobileSidebarProps)
                 <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
                     {navItems.map((item) => {
                         const active = isActive(item.href);
-                        const label = (t.adminNav as any)?.[item.labelKey] || item.labelKey;
+                        const label = adminNavLabels?.[item.labelKey] || item.labelKey;
                         return (
                             <Link
                                 key={item.href}
@@ -82,7 +82,7 @@ export function AdminMobileSidebar({ isOpen, onClose }: AdminMobileSidebarProps)
                         onClick={onClose}
                         className="flex items-center gap-2 px-4 py-2 text-sm text-surface-500 hover:text-surface-300"
                     >
-                        {t.adminNav ? t.adminNav.backToSite : "Back to site"}
+                        {adminNavLabels?.backToSite || "Back to site"}
                     </Link>
                 </div>
             </div>

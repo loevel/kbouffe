@@ -15,6 +15,13 @@ import { createClient } from "@supabase/supabase-js";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+adminRoutes.get("/profile", async (c) => {
+    return c.json({
+        userId: c.get("userId"),
+        adminRole: c.get("adminRole"),
+    });
+});
+
 // Provide the general /admin/stats overview that was at the top-level of original admin.ts
 adminRoutes.get("/stats", async (c) => {
     const denied = requireDomain(c, "stats");
