@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, ImagePlus, Upload } from "lucide-react";
-import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale } from "@kbouffe/module-core/ui";
+import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale, useDashboard } from "@kbouffe/module-core/ui";
 
 import { ProductOptionEditor } from "./ProductOptionEditor";
 import { useCategories, createProduct, updateProduct as apiUpdateProduct } from "../hooks/use-catalog";
@@ -17,7 +17,9 @@ interface ProductFormProps {
 export function ProductForm({ product }: ProductFormProps) {
     const router = useRouter();
     const { t } = useLocale();
-    const { categories } = useCategories();
+    const dashboard = useDashboard();
+    const effectiveRestaurantId = dashboard?.restaurant?.id;
+    const { categories } = useCategories(effectiveRestaurantId);
     const isEditing = !!product;
 
     const [form, setForm] = useState({
@@ -44,7 +46,7 @@ export function ProductForm({ product }: ProductFormProps) {
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
-    const categoryOptions = categories.filter(c => c.is_active).map(c => ({
+    const categoryOptions = categories.filter((c: any) => c.is_active).map((c: any) => ({
         value: c.id,
         label: c.name,
     }));
