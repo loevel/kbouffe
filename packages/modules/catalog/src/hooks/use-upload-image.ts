@@ -1,30 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@kbouffe/module-core/ui";
 
 export function useUploadImage() {
   const [uploading, setUploading] = useState(false);
-  const supabase = createClient();
 
   const upload = async (file: File) => {
     setUploading(true);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `products/${fileName}`;
+      const formData = new FormData();
+      formData.append("file", file);
 
-      const { error: uploadError } = await supabase!.storage
-        .from("images")
-        .upload(filePath, file);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-      if (uploadError) {
-        throw uploadError;
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Erreur lors de l'upload");
       }
 
-      const { data } = supabase!.storage.from("images").getPublicUrl(filePath);
-
-      return { url: data.publicUrl };
+      const data = await response.json();
+      return { url: data.url };
     } catch (error) {
       console.error("Erreur upload:", error);
       return null;
