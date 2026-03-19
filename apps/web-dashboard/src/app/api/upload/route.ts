@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         console.log("[Upload API] Upload R2 réussi");
 
         // URL publique du bucket R2
-        const publicUrl = `https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/${key}`;
+        const publicUrl = `https://pub-1729b536b57c42c9a54d530432764964.r2.dev/${key}`;
 
         console.log("[Upload API] Succès:", { url: publicUrl });
         return NextResponse.json({

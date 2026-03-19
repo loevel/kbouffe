@@ -43,7 +43,7 @@ uploadRoutes.post("/", async (c) => {
     });
 
     // Public URL logic. Uses R2 bucket public domain
-    const publicUrl = `https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/${key}`;
+    const publicUrl = `https://pub-1729b536b57c42c9a54d530432764964.r2.dev/${key}`;
 
     return c.json({ url: publicUrl, key });
 });

@@ -69,8 +69,8 @@ storesRoutes.get("/", async (c) => {
 
     const mappedResults = results.map(r => ({
         ...r,
-        logoUrl: r.logo_url || "https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/defaults/restaurant-logo.png",
-        coverUrl: r.banner_url || "https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/defaults/restaurant-banner.png",
+        logoUrl: r.logo_url || "https://pub-1729b536b57c42c9a54d530432764964.r2.dev/defaults/restaurant-logo.png",
+        coverUrl: r.banner_url || "https://pub-1729b536b57c42c9a54d530432764964.r2.dev/defaults/restaurant-banner.png",
         cuisineType: r.cuisine_type,
         priceRange: r.price_range,
         reviewCount: r.review_count,
@@ -108,8 +108,8 @@ storesRoutes.get("/:slug", async (c) => {
 
     const res = {
         ...restaurant,
-        logoUrl: restaurant.logo_url || "https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/defaults/restaurant-logo.png",
-        coverUrl: restaurant.banner_url || "https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/defaults/restaurant-banner.png",
+        logoUrl: restaurant.logo_url || "https://pub-1729b536b57c42c9a54d530432764964.r2.dev/defaults/restaurant-logo.png",
+        coverUrl: restaurant.banner_url || "https://pub-1729b536b57c42c9a54d530432764964.r2.dev/defaults/restaurant-banner.png",
         cuisineType: restaurant.cuisine_type,
         priceRange: restaurant.price_range,
         reviewCount: restaurant.review_count,
