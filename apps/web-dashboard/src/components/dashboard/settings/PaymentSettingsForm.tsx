@@ -27,8 +27,8 @@ export function PaymentSettingsForm() {
     useEffect(() => {
         if (!restaurant) return;
         
-        if (restaurant.payment_methods) {
-            const pm = restaurant.payment_methods as any;
+        if ((restaurant as any).payment_methods) {
+            const pm = (restaurant as any).payment_methods;
             setMethods({
                 mobileMoney: !!pm.mobileMoney,
                 cashOnDelivery: !!pm.cashOnDelivery,
@@ -36,8 +36,8 @@ export function PaymentSettingsForm() {
             });
         }
         
-        if (restaurant.payment_credentials) {
-            const pc = restaurant.payment_credentials as any;
+        if ((restaurant as any).payment_credentials) {
+            const pc = (restaurant as any).payment_credentials;
             setCredentials({
                 orangeMoneyNumber: pc.orangeMoneyNumber || "",
                 mtnMomoNumber: pc.mtnMomoNumber || "",
@@ -49,10 +49,11 @@ export function PaymentSettingsForm() {
         e.preventDefault();
         setLoading(true);
 
-        const { error } = await updateRestaurant({
-            payment_methods: methods as unknown as Json,
-            payment_credentials: credentials as unknown as Json,
-        });
+        const payload: any = {
+            payment_methods: methods,
+            payment_credentials: credentials,
+        };
+        const { error } = await updateRestaurant(payload);
 
         if (error) {
             toast.error(`${t.settings.errorPrefix}${error}`);

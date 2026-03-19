@@ -112,8 +112,28 @@ categoriesRoutes.delete("/:id", async (c) => {
     return c.json({ success: true });
 });
 
-/** POST /categories/import-pack — Import boilerplate catalog packs */
-const PACKS = {
+/** GET /categories/available-packs — Get all available catalog packs */
+categoriesRoutes.get("/available-packs", async (c) => {
+    try {
+        const { data, error } = await c.var.supabase
+            .from("catalog_packs")
+            .select("id, slug, name, description, is_active")
+            .eq("is_active", true);
+
+        if (error) {
+            console.error("[Available Packs] Error:", error);
+            return c.json({ error: "Erreur lors de la récupération des packs" }, 500);
+        }
+
+        return c.json({ packs: data ?? [] });
+    } catch (error) {
+        console.error("[Available Packs] Exception:", error);
+        return c.json({ error: "Erreur serveur" }, 500);
+    }
+});
+
+/** POST /categories/import-pack — Import boilerplate catalog packs from database */
+const LEGACY_PACKS = {
     boissons: {
         categories: [
             { id: "cat_bieres", name: "Bières", description: "Bières locales et importées", sort_order: 1, is_active: true },
@@ -140,6 +160,59 @@ const PACKS = {
             { category_id: "cat_jus", name: "Jus d'Ananas Naturel", description: "Jus d'ananas frais de Penja", price: 1000, is_available: false },
             { category_id: "cat_jus", name: "Foléré", description: "Bissap rouge traditionnel", price: 500, is_available: false },
         ]
+    },
+    braiserie: {
+        categories: [
+            { id: "cat_poissons", name: "Poissons Braisés", description: "Le meilleur du poisson frais", sort_order: 1, is_active: true },
+            { id: "cat_viandes", name: "Viandes & Volaille", description: "Braisés et grillades", sort_order: 2, is_active: true },
+            { id: "cat_accompagnements", name: "Accompagnements", description: "Compléments pour vos plats", sort_order: 3, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_poissons", name: "Bar Braisé (Moyen)", description: "Poisson bar frais mariné aux épices", price: 4500, is_available: false },
+            { category_id: "cat_poissons", name: "Carpe Braisée", description: "Carpe d'eau douce braisée au charbon", price: 3500, is_available: false },
+            { category_id: "cat_viandes", name: "Demi-Poulet Braisé", description: "Poulet bicyclette tendre et parfumé", price: 4500, is_available: false },
+            { category_id: "cat_viandes", name: "Soya (Boeuf)", description: "Brochettes de boeuf épicées", price: 2000, is_available: false },
+            { category_id: "cat_accompagnements", name: "Miondo (3 bâtons)", description: "Bâtons de manioc fins", price: 500, is_available: false },
+            { category_id: "cat_accompagnements", name: "Frites de Plantain", description: "Plantains mûrs frits", price: 1000, is_available: false },
+        ]
+    },
+    traditionnel: {
+        categories: [
+            { id: "cat_sauces", name: "Plats Traditionnels", description: "Recettes ancestrales", sort_order: 1, is_active: true },
+            { id: "cat_fufu", name: "Couscous & Fufu", description: "Les bases de nos plats", sort_order: 2, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_sauces", name: "Ndole Complet", description: "Viande, crevettes et morue", price: 3500, is_available: false },
+            { category_id: "cat_sauces", name: "Eru & Waterleaf", description: "Mélange de légumes verts", price: 3000, is_available: false },
+            { category_id: "cat_sauces", name: "Sauce Jaune (Achu)", description: "Spécialité du Nord-Ouest", price: 4000, is_available: false },
+            { category_id: "cat_sauces", name: "Okok Sucré/Salé", description: "Feuilles d'okok et arachide", price: 2500, is_available: false },
+            { category_id: "cat_fufu", name: "Couscous Maïs", description: "Boule de maïs jaune", price: 500, is_available: false },
+            { category_id: "cat_fufu", name: "Waterfufu", description: "Fufu de manioc fermenté", price: 500, is_available: false },
+        ]
+    },
+    streetfood: {
+        categories: [
+            { id: "cat_beignets", name: "Beignets & Snacks", description: "Sur le pouce", sort_order: 1, is_active: true },
+            { id: "cat_sandwichs", name: "Sandwichs & Burgers", description: "Le goût de la rue", sort_order: 2, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_beignets", name: "Beignets Haricots", description: "Le classique indémodable", price: 500, is_available: false },
+            { category_id: "cat_beignets", name: "Accras de Morue", description: "Petits beignets de poisson", price: 1000, is_available: false },
+            { category_id: "cat_sandwichs", name: "Pain Chargé", description: "Omelette, spaghetti, avocat", price: 800, is_available: false },
+            { category_id: "cat_sandwichs", name: "Burger Maison", description: "Boeuf frais et sauce secrète", price: 2500, is_available: false },
+        ]
+    },
+    petitdej: {
+        categories: [
+            { id: "cat_chaud", name: "Boissons Chaudes", description: "Café, Thé et Chocolat", sort_order: 1, is_active: true },
+            { id: "cat_pains", name: "Viennoiseries & Pains", description: "Fraîchement cuits", sort_order: 2, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_chaud", name: "Café de l'Ouest", description: "100% Arabica local", price: 1000, is_available: false },
+            { category_id: "cat_chaud", name: "Chocolat Chaud", description: "Cacao du pays", price: 1200, is_available: false },
+            { category_id: "cat_pains", name: "Pain au Chocolat", description: "Beurre pur", price: 600, is_available: false },
+            { category_id: "cat_pains", name: "Omelette Garnie", description: "3 oeufs, oignons, piment", price: 1500, is_available: false },
+        ]
     }
 };
 
@@ -148,18 +221,39 @@ categoriesRoutes.post("/import-pack", async (c) => {
         const body = await c.req.json();
         const { packId, restaurantId } = body;
 
+        console.log("[Import Pack] Request:", { packId, restaurantId, authRestaurantId: c.var.restaurantId });
+
         // Security: ensure merchant is importing for their OWN restaurant
         const targetRestaurantId = restaurantId || c.var.restaurantId;
+        if (!targetRestaurantId) {
+            console.error("[Import Pack] No restaurant ID found");
+            return c.json({ error: "Restaurant non identifié" }, 400);
+        }
         if (targetRestaurantId !== c.var.restaurantId) {
-             return c.json({ error: "Non autorisé" }, 403);
+            console.error("[Import Pack] Authorization failed", { targetRestaurantId, authRestaurantId: c.var.restaurantId });
+            return c.json({ error: "Non autorisé" }, 403);
         }
 
         if (!packId) return c.json({ error: "packId est requis" }, 400);
 
-        const pack = PACKS[packId as keyof typeof PACKS];
-        if (!pack) return c.json({ error: "Pack non trouvé" }, 404);
-
         const supabase = c.var.supabase;
+
+        // 1. Get the pack from the database
+        const { data: packData, error: packError } = await supabase
+            .from("catalog_packs")
+            .select("*")
+            .eq("slug", packId)
+            .single();
+
+        if (packError || !packData) {
+            console.error("[Import Pack] Pack not found in database:", packId);
+            return c.json({ error: `Pack "${packId}" non trouvé en base de données` }, 404);
+        }
+
+        const pack = {
+            categories: packData.categories || [],
+            products: packData.products || []
+        };
 
         // 1. Insert Categories
         const categoriesToInsert = pack.categories.map(cat => ({
@@ -176,27 +270,34 @@ categoriesRoutes.post("/import-pack", async (c) => {
             .select();
 
         if (catError || !insertedCategories) {
-            console.error("Error inserting categories:", catError);
-            return c.json({ error: "Échec de l'importation des catégories" }, 500);
+            console.error("[Import Pack] Error inserting categories:", catError);
+            return c.json({ error: `Erreur lors de l'importation des catégories: ${catError?.message || "Inconnue"}` }, 500);
         }
 
-        const categoryIdMap: Record<string, string> = {};
-        pack.categories.forEach((catTemplate: any) => {
-            const inserted = insertedCategories.find(c => c.name === catTemplate.name);
-            if (inserted) {
-                categoryIdMap[catTemplate.id] = inserted.id;
-            }
+        console.log("[Import Pack] Inserted categories:", insertedCategories.length);
+
+        // Create a map: category_name -> category_id for product insertion
+        const categoryNameMap: Record<string, string> = {};
+        insertedCategories.forEach((cat: any) => {
+            categoryNameMap[cat.name] = cat.id;
         });
 
         // 2. Insert Products
-        const productsToInsert = pack.products.map(prod => ({
-            restaurant_id: targetRestaurantId,
-            category_id: categoryIdMap[prod.category_id],
-            name: prod.name,
-            description: prod.description,
-            price: prod.price,
-            is_available: prod.is_available,
-        })).filter(p => p.category_id);
+        const productsToInsert = pack.products.map((prod: any) => {
+            const categoryId = categoryNameMap[prod.category_name];
+            if (!categoryId) {
+                console.warn(`[Import Pack] Category not found for product: ${prod.name} (${prod.category_name})`);
+                return null;
+            }
+            return {
+                restaurant_id: targetRestaurantId,
+                category_id: categoryId,
+                name: prod.name,
+                description: prod.description,
+                price: prod.price,
+                is_available: prod.is_available,
+            };
+        }).filter(p => p !== null);
 
         if (productsToInsert.length > 0) {
             const { error: prodError } = await supabase
@@ -204,11 +305,13 @@ categoriesRoutes.post("/import-pack", async (c) => {
                 .insert(productsToInsert as any);
 
             if (prodError) {
-                console.error("Error inserting products:", prodError);
-                return c.json({ error: "Échec de l'importation des produits" }, 500);
+                console.error("[Import Pack] Error inserting products:", prodError);
+                return c.json({ error: `Erreur lors de l'importation des produits: ${prodError?.message || "Inconnue"}` }, 500);
             }
+            console.log("[Import Pack] Inserted products:", productsToInsert.length);
         }
 
+        console.log("[Import Pack] Success! Pack imported:", packId);
         return c.json({ success: true, message: "Pack importé avec succès" });
     } catch (error) {
         console.error("Import Pack API Error:", error);

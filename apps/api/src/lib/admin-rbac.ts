@@ -18,6 +18,8 @@ export type AdminDomain =
     | "orders:write"
     | "catalog:read"
     | "catalog:write"
+    | "marketplace:read"
+    | "marketplace:write"
     | "system";
 
 // ── Domain → allowed roles ─────────────────────────────────────────
@@ -37,6 +39,8 @@ const DOMAIN_ACCESS: Record<AdminDomain, readonly AdminRole[]> = {
     "orders:write":       ["super_admin", "support"],
     "catalog:read":       ["super_admin", "support", "sales", "moderator"],
     "catalog:write":      ["super_admin", "sales"],
+    "marketplace:read":   ["super_admin", "sales"],
+    "marketplace:write":  ["super_admin"],
     "system":             ["super_admin"],
 };
 

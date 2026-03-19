@@ -46,7 +46,7 @@ uploadRoutes.post("/", async (c) => {
         },
     });
 
-    const publicUrl = `https://images.kbouffe.com/${hashedKey}`;
+    const publicUrl = `https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/${hashedKey}`;
 
     return c.json({ url: publicUrl, key: hashedKey });
 });

@@ -149,7 +149,7 @@ export function StoreControls() {
                         leftIcon={<Save size={14} />} 
                         onClick={() => setIsEditModalOpen(true)}
                     >
-                        {t.store.editProfileTitle}
+                        Modifier le profil
                     </Button>
                 </div>
             </div>

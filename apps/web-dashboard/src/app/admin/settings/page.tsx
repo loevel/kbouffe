@@ -30,8 +30,7 @@ interface SettingField {
 }
 
 const SETTING_FIELDS: SettingField[] = [
-    // Commissions
-    { key: "commission_rate", label: "Taux de commission (%)", description: "Pourcentage prélevé sur chaque commande traitée par la plateforme.", type: "number", icon: DollarSign, group: "Commissions & Payouts" },
+    // Commissions & Payouts
     { key: "min_payout_amount", label: "Seuil minimum de versement (FCFA)", description: "Montant cumulé nécessaire pour déclencher un virement automatique.", type: "number", icon: Database, group: "Commissions & Payouts" },
     { key: "payout_frequency_days", label: "Cycle de facturation (jours)", description: "Intervalle de temps entre deux règlements marchands générés.", type: "number", icon: Clock, group: "Commissions & Payouts" },
     // Plateforme

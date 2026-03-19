@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
     // Commission rates mapping
     const commissionRates: Record<string, number> = {
       starter: 0,
-      pro: 5,
-      business: 3,
+      pro: 0,
+      business: 0,
     };
     const commissionRate = saasPlanId ? (commissionRates[saasPlanId] ?? 0) : 0;
 

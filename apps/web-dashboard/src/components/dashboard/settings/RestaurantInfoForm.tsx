@@ -44,14 +44,14 @@ export function RestaurantInfoForm() {
                 description: restaurant.description ?? "",
                 address: restaurant.address ?? "",
                 city: restaurant.city ?? "",
-                postalCode: restaurant.postalCode ?? "",
-                country: restaurant.country ?? "Cameroun",
+                postalCode: (restaurant as any).postalCode ?? "",
+                country: (restaurant as any).country ?? "Cameroun",
                 phone: restaurant.phone ?? "",
                 email: restaurant.email ?? "",
-                cuisineTypes: restaurant.cuisineTypes ?? [],
-                priceRange: restaurant.priceRange?.toString() ?? "2",
-                welcomeMessage: restaurant.welcomeMessage ?? "",
-                socialLinks: restaurant.socialLinks ?? { facebook: "", instagram: "", twitter: "", website: "" },
+                cuisineTypes: (restaurant as any).cuisineTypes ?? [],
+                priceRange: (restaurant as any).priceRange?.toString() ?? "2",
+                welcomeMessage: (restaurant as any).welcomeMessage ?? "",
+                socialLinks: (restaurant as any).socialLinks ?? { facebook: "", instagram: "", twitter: "", website: "" },
             });
         }
     }, [restaurant]);
@@ -92,7 +92,7 @@ export function RestaurantInfoForm() {
         }
         setLoading(true);
 
-        const { error } = await updateRestaurant({
+        const payload: any = {
             name: form.name,
             description: form.description || null,
             address: form.address || null,
@@ -105,7 +105,9 @@ export function RestaurantInfoForm() {
             priceRange: parseInt(form.priceRange) || null,
             welcomeMessage: form.welcomeMessage || null,
             socialLinks: form.socialLinks,
-        });
+        };
+
+        const { error } = await updateRestaurant(payload);
 
         if (error) {
             toast.error(`${t.settings.errorPrefix}${error}`);
@@ -117,7 +119,7 @@ export function RestaurantInfoForm() {
 
     const hasErrors = useMemo(() => Object.keys(errors).length > 0, [errors]);
 
-    if (dashboardLoading) return <Card className="animate-pulse h-96 bg-surface-50 dark:bg-surface-800/20" />;
+    if (dashboardLoading) return <div className="animate-pulse h-96 bg-surface-50 dark:bg-surface-800/20 rounded-2xl" />;
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -131,7 +133,7 @@ export function RestaurantInfoForm() {
                         error={errors.name}
                     />
                     <Select 
-                        label={t.settings.priceRange} 
+                        label="Gamme de prix" 
                         value={form.priceRange} 
                         onChange={(e) => updateField("priceRange", e.target.value)}
                         options={[

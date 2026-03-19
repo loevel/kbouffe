@@ -6,8 +6,23 @@ import { Card, Button, Input, Toggle } from "@kbouffe/module-core/ui";
 import { toast } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
-import type { OpeningHours, DayHours, Json } from "@/lib/supabase/types";
+import type { Json } from "@/lib/supabase/types";
 
+export type DayHours = {
+    isOpen: boolean;
+    open: string;
+    close: string;
+};
+
+export type OpeningHours = {
+    monday: DayHours;
+    tuesday: DayHours;
+    wednesday: DayHours;
+    thursday: DayHours;
+    friday: DayHours;
+    saturday: DayHours;
+    sunday: DayHours;
+};
 const dayKeys: (keyof OpeningHours)[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
 export function OpeningHoursForm() {

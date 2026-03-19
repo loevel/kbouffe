@@ -55,9 +55,8 @@ export async function POST(request: NextRequest) {
             }
         });
 
-        // URL publique (configurée dans le dashboard Cloudflare R2 ou via un domaine personnalisé)
-        // Note: On retourne la clé pour que le client puisse construire l'URL ou stocker la référence
-        const publicUrl = `${process.env.NEXT_PUBLIC_IMAGES_BASE_URL ?? "https://images.kbouffe.com"}/${key}`;
+        // URL publique du bucket R2
+        const publicUrl = `${process.env.NEXT_PUBLIC_IMAGES_BASE_URL ?? "https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com"}/${key}`;
 
         return NextResponse.json({ 
             success: true, 

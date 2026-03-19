@@ -81,7 +81,7 @@ export async function processActivePushCampaigns(): Promise<AdDeliveryResult[]> 
   const now = new Date().toISOString();
 
   // Find active campaigns with push enabled but not yet sent
-  const { data: campaigns, error } = await supabase
+  const { data: campaigns, error } = await (supabase as any)
     .from("ad_campaigns")
     .select("*")
     .eq("status", "active")
@@ -156,7 +156,7 @@ async function deliverCampaignPush(
     if (uniquePhones.size === 0) {
       result.errors.push("No customer phones found for this restaurant");
       // Mark as sent anyway to avoid retrying
-      await supabase
+      await (supabase as any)
         .from("ad_campaigns")
         .update({ push_sent: true } as never)
         .eq("id", campaign.id);
@@ -183,7 +183,7 @@ async function deliverCampaignPush(
     }
 
     // Mark campaign as push_sent
-    await supabase
+    await (supabase as any)
       .from("ad_campaigns")
       .update({ push_sent: true } as never)
       .eq("id", campaign.id);

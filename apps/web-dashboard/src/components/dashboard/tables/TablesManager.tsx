@@ -165,8 +165,7 @@ export function TablesManager() {
                     <Search size={16} className="text-surface-400" />
                     <input
                         value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder={t.tables.searchPlaceholder ?? "Rechercher une table ou zone"}
+                        placeholder="Rechercher une table ou zone"
                         className="bg-transparent w-full outline-none text-sm"
                     />
                 </div>
@@ -182,9 +181,9 @@ export function TablesManager() {
                     value={sort}
                     onChange={(e) => setSort(e.target.value as any)}
                     options={[
-                        { value: "status", label: t.tables.sortStatus ?? "Trier par statut" },
-                        { value: "capacity", label: t.tables.sortCapacity ?? "Capacité" },
-                        { value: "number", label: t.tables.sortNumber ?? "Numéro" },
+                        { value: "status", label: "Trier par statut" },
+                        { value: "capacity", label: "Capacité" },
+                        { value: "number", label: "Numéro" },
                     ]}
                 />
                 {can("tables:manage") && (
@@ -276,7 +275,7 @@ function AddTableModal({
             return;
         }
         if (parseInt(capacity, 10) < 1) {
-            const msg = t.tables.capacityMin ?? "Capacité minimum 1";
+            const msg = "Capacité minimum 1";
             setError(msg);
             toast.error(msg);
             return;
@@ -345,7 +344,7 @@ function AddTableModal({
                 />
                 <div className="flex gap-2">
                     {[2, 4, 6, 8].map((c) => (
-                        <Button key={c} size="xs" variant={capacity === c.toString() ? "primary" : "outline"} onClick={() => setCapacity(c.toString())}>
+                        <Button key={c} size="sm" variant={capacity === c.toString() ? "primary" : "outline"} onClick={() => setCapacity(c.toString())}>
                             {c} {t.tables.seats}
                         </Button>
                     ))}

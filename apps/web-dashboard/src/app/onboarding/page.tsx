@@ -635,8 +635,8 @@ export default function OnboardingPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         {[
                                             { id: "starter", name: t.onboarding.planStarter, price: t.pricing.freePrice, commission: "0%", features: [t.pricing.feature1restaurant, t.pricing.featureUpTo15] },
-                                            { id: "pro", name: t.onboarding.planPro, price: t.pricing.proPrice, commission: "5%", features: [t.pricing.featureUnlimitedProducts, t.pricing.featurePrioritySupport], popular: true },
-                                            { id: "business", name: t.onboarding.planBusiness, price: t.pricing.businessPrice, commission: "3%", features: [t.pricing.featureMultiRestaurant, t.pricing.featureDedicatedManager] },
+                                            { id: "pro", name: t.onboarding.planPro, price: t.pricing.proPrice, commission: "0%", features: [t.pricing.featureUnlimitedProducts, t.pricing.featurePrioritySupport], popular: true },
+                                            { id: "business", name: t.onboarding.planBusiness, price: t.pricing.businessPrice, commission: "0%", features: [t.pricing.featureMultiRestaurant, t.pricing.featureDedicatedManager] },
                                         ].map((plan) => (
                                             <div
                                                 key={plan.id}
@@ -703,7 +703,6 @@ export default function OnboardingPage() {
                                                 <li>Kbouffe agit en tant que facilitateur technologique.</li>
                                                 <li>Vous êtes responsable de la conformité légale et fiscale de votre restaurant.</li>
                                                 <li>Les fonds sont prélevés via votre propre passerelle de paiement (Stripe/Mobile Money).</li>
-                                                <li>Kbouffe prélève une commission automatique sur chaque transaction réussie selon votre plan.</li>
                                             </ul>
                                         </div>
 

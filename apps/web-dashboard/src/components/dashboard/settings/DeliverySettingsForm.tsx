@@ -12,15 +12,15 @@ export function DeliverySettingsForm() {
     const { restaurant, updateRestaurant } = useDashboard();
     const { t } = useLocale();
     const [form, setForm] = useState({
-        deliveryBaseFee: restaurant?.delivery_base_fee?.toString() ?? "0",
-        deliveryPerKmFee: restaurant?.delivery_per_km_fee?.toString() ?? "0",
-        maxDeliveryRadiusKm: restaurant?.max_delivery_radius_km?.toString() ?? "10",
-        minOrderAmount: restaurant?.min_order_amount?.toString() ?? "0",
+        deliveryBaseFee: (restaurant as any)?.delivery_base_fee?.toString() ?? "0",
+        deliveryPerKmFee: (restaurant as any)?.delivery_per_km_fee?.toString() ?? "0",
+        maxDeliveryRadiusKm: (restaurant as any)?.max_delivery_radius_km?.toString() ?? "10",
+        minOrderAmount: (restaurant as any)?.min_order_amount?.toString() ?? "0",
         freeDeliveryThreshold: (restaurant as any)?.freeDeliveryThreshold?.toString() ?? "",
         estimatedDeliveryTime: (restaurant as any)?.estimatedDeliveryTime?.toString() ?? "30",
     });
     const [zones, setZones] = useState<string[]>(
-        (restaurant?.delivery_zones as unknown as string[]) ?? []
+        ((restaurant as any)?.delivery_zones as unknown as string[]) ?? []
     );
     const [newZone, setNewZone] = useState("");
     const [loading, setLoading] = useState(false);
@@ -28,14 +28,14 @@ export function DeliverySettingsForm() {
     useEffect(() => {
         if (!restaurant) return;
         setForm({
-            deliveryBaseFee: restaurant.delivery_base_fee?.toString() ?? "0",
-            deliveryPerKmFee: restaurant.delivery_per_km_fee?.toString() ?? "0",
-            maxDeliveryRadiusKm: restaurant.max_delivery_radius_km?.toString() ?? "10",
-            minOrderAmount: restaurant.min_order_amount?.toString() ?? "0",
+            deliveryBaseFee: (restaurant as any).delivery_base_fee?.toString() ?? "0",
+            deliveryPerKmFee: (restaurant as any).delivery_per_km_fee?.toString() ?? "0",
+            maxDeliveryRadiusKm: (restaurant as any).max_delivery_radius_km?.toString() ?? "10",
+            minOrderAmount: (restaurant as any).min_order_amount?.toString() ?? "0",
             freeDeliveryThreshold: (restaurant as any).freeDeliveryThreshold?.toString() ?? "",
             estimatedDeliveryTime: (restaurant as any).estimatedDeliveryTime?.toString() ?? "30",
         });
-        setZones((restaurant.delivery_zones as unknown as string[]) ?? []);
+        setZones(((restaurant as any).delivery_zones as unknown as string[]) ?? []);
     }, [restaurant]);
 
     const addZone = () => {
@@ -60,7 +60,7 @@ export function DeliverySettingsForm() {
             freeDeliveryThreshold: form.freeDeliveryThreshold ? Number(form.freeDeliveryThreshold) : null,
             estimatedDeliveryTime: Number(form.estimatedDeliveryTime) || 30,
             delivery_zones: zones as unknown as Json,
-        });
+        } as any);
         if (error) {
             toast.error(`${t.settings.errorPrefix}${error}`);
         } else {
@@ -75,13 +75,13 @@ export function DeliverySettingsForm() {
                 <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.settings.pricing}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
-                        label={t.settings.deliveryBaseFee}
+                        label="Frais de livraison de base (FCFA)"
                         type="number"
                         value={form.deliveryBaseFee}
                         onChange={(e) => setForm(prev => ({ ...prev, deliveryBaseFee: e.target.value }))}
                     />
                     <Input
-                        label={t.settings.deliveryPerKmFee}
+                        label="Frais supplémentaire par Km (FCFA)"
                         type="number"
                         value={form.deliveryPerKmFee}
                         onChange={(e) => setForm(prev => ({ ...prev, deliveryPerKmFee: e.target.value }))}
@@ -138,9 +138,9 @@ export function DeliverySettingsForm() {
             </Card>
 
             <Card className="border-brand-500/30 bg-brand-500/5">
-                <h3 className="font-semibold text-brand-600 dark:text-brand-400 mb-2">{t.settings.deliveryResponsibility}</h3>
+                <h3 className="font-semibold text-brand-600 dark:text-brand-400 mb-2">Responsabilité des livraisons</h3>
                 <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                    {t.settings.deliveryResponsibilityNotice}
+                    Kbouffe ne fournit pas de livreurs. Vous êtes responsable d'organiser l'acheminement de vos commandes via vos propres moyens ou services externes.
                 </p>
             </Card>
 

@@ -13,6 +13,7 @@ import {
     LifeBuoy,
     ShoppingBag,
     ShieldCheck,
+    Store as StoreIcon, // Use alias to avoid conflict
 } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -21,16 +22,17 @@ import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion } from "framer-motion";
 import { type AdminPermission } from "@/lib/admin-permissions";
 
-export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "support" | "orders" | "moderation";
+export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation";
 
-export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: typeof LayoutDashboard; permission?: AdminPermission }[] = [
+export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any; permission?: AdminPermission }[] = [
     { href: "/admin", labelKey: "dashboard", icon: LayoutDashboard },
-    { href: "/admin/restaurants", labelKey: "restaurants", icon: Store, permission: "admin:restaurants:read" },
+    { href: "/admin/restaurants", labelKey: "restaurants", icon: Store },
     { href: "/admin/users", labelKey: "users", icon: Users, permission: "admin:users:read" },
     { href: "/admin/orders", labelKey: "orders", icon: ShoppingBag, permission: "admin:orders:read" },
     { href: "/admin/moderation", labelKey: "moderation", icon: ShieldCheck, permission: "admin:reviews:manage" },
     { href: "/admin/billing", labelKey: "billing", icon: Wallet, permission: "admin:billing:read" },
     { href: "/admin/marketing", labelKey: "marketing", icon: Megaphone, permission: "admin:marketing:read" },
+    { href: "/admin/marketplace", labelKey: "marketplace", icon: StoreIcon, permission: "admin:marketplace:manage" },
     { href: "/admin/support", labelKey: "support", icon: LifeBuoy, permission: "admin:support:manage" },
     { href: "/admin/audits", labelKey: "audits", icon: ShieldAlert, permission: "admin:settings:manage" },
     { href: "/admin/settings", labelKey: "settings", icon: Settings, permission: "admin:settings:manage" },
