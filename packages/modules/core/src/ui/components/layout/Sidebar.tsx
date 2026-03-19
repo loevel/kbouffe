@@ -15,6 +15,7 @@ import {
     CalendarDays,
     Flame,
     Megaphone,
+    BarChart3,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "../brand/Logo";
 import { cn } from "../../lib/utils";
@@ -22,7 +23,7 @@ import { useLocale } from "../../contexts/LocaleContext";
 import { useDashboard } from "../../contexts/DashboardContext";
 import { NAV_PERMISSIONS } from "../../lib/permissions";
 
-export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing";
+export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports";
 
 export interface NavItem {
     href: string;
@@ -40,6 +41,7 @@ export const navItemsDef: NavItem[] = [
     { href: "/dashboard/reservations", labelKey: "reservations", icon: CalendarDays },
     { href: "/dashboard/customers", labelKey: "customers", icon: Users },
     { href: "/dashboard/finances", labelKey: "finances", icon: Wallet },
+    { href: "/dashboard/reports", labelKey: "reports", icon: BarChart3 },
     { href: "/dashboard/store", labelKey: "myStore", icon: Store },
     { href: "/dashboard/team", labelKey: "team", icon: Users2 },
     { href: "/dashboard/settings", labelKey: "settings", icon: Settings },

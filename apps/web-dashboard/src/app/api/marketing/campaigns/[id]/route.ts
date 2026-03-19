@@ -22,7 +22,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
 
         // Ensure the campaign belongs to this restaurant
-        const { data: existingRaw } = await ctx.supabase
+        const { data: existingRaw } = await (ctx.supabase as any)
             .from("ad_campaigns")
             .select("id, status")
             .eq("id", id)
@@ -35,7 +35,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         if (existing.status === "completed") return apiError("Impossible d'annuler une campagne terminée", 400);
         if (existing.status === "cancelled") return apiError("Campagne déjà annulée", 400);
 
-        const { data, error } = await (ctx.supabase.from("ad_campaigns") as any)
+        const { data, error } = await (ctx.supabase as any)
+            .from("ad_campaigns")
             .update({ status: "cancelled", updated_at: new Date().toISOString() })
             .eq("id", id)
             .select()

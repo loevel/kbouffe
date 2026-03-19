@@ -2,12 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Phone, Mail, ShoppingBag, TrendingUp, Calendar, ExternalLink } from "lucide-react";
-import { Card, Button, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Spinner, EmptyState } from "@kbouffe/module-core/ui";
+import Link from "next/link";
+import { ArrowLeft, Phone, Mail, ShoppingBag, TrendingUp, Calendar, ExternalLink, UserCircle, Star, Save, Tag, AlertCircle } from "lucide-react";
+import { Card, Button, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Spinner, EmptyState, Input, Textarea, Select, toast } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { formatCFA, formatDate, formatPhone, formatOrderId } from "@kbouffe/module-core/ui";
-import type { DashboardCustomer } from "@kbouffe/module-crm/ui";
-import type { Order } from "@/lib/supabase/types";
+
+interface CustomerDetail {
+    id: string;
+    profile: {
+        name: string;
+        email: string | null;
+        phone: string | null;
+        avatarUrl: string | null;
+        joinedAt: string;
+    };
+    stats: {
+        totalSpent: number;
+        ordersCount: number;
+        lastOrderAt: string;
+        avgOrderValue: number;
+        topProducts: { name: string, count: number }[];
+    };
+    segment: string;
+    internalNotes: string | null;
+    tags: string[];
+    orders: any[];
+}
 
 export default function CustomerDetailPage() {
     const { t } = useLocale();
@@ -15,197 +36,241 @@ export default function CustomerDetailPage() {
     const params = useParams();
     const customerId = decodeURIComponent(params.id as string);
 
-    const [customer, setCustomer] = useState<DashboardCustomer | null>(null);
-    const [orders, setOrders] = useState<Order[]>([]);
+    const [data, setData] = useState<CustomerDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [notFound, setNotFound] = useState(false);
+    const [saving, setSaving] = useState(false);
+    
+    const [segment, setSegment] = useState("regular");
+    const [notes, setNotes] = useState("");
 
     useEffect(() => {
-        let active = true;
-
         async function load() {
             setLoading(true);
             try {
-                // Fetch all customers and find the one matching by id
-                const res = await fetch(`/api/customers?limit=200`, { cache: "no-store" });
+                const res = await fetch(`/api/customers/${customerId}`, { cache: "no-store" });
                 if (!res.ok) throw new Error("API error");
-                const data = await res.json();
-                const rows: DashboardCustomer[] = Array.isArray(data.customers) ? data.customers : [];
-                const found = rows.find((c) => c.id === customerId || c.phone === customerId);
-                if (!active) return;
-
-                if (!found) {
-                    setNotFound(true);
-                    setLoading(false);
-                    return;
-                }
-                setCustomer(found);
-
-                // Fetch orders for this customer using name search
-                const ordersRes = await fetch(`/api/orders?search=${encodeURIComponent(found.name)}&limit=100`, { cache: "no-store" });
-                if (ordersRes.ok) {
-                    const ordersData = await ordersRes.json();
-                    const allOrders: Order[] = ordersData.orders ?? [];
-                    // Filter to exact customer match based on phone or id
-                    const customerOrders = allOrders.filter((o) =>
-                        (found.phone && o.customer_phone === found.phone) ||
-                        (found.id && o.customer_id === found.id)
-                    );
-                    if (!active) return;
-                    setOrders(customerOrders.length > 0 ? customerOrders : allOrders);
-                }
-            } catch {
-                if (active) setNotFound(true);
+                const json = await res.json();
+                setData(json);
+                setSegment(json.segment || "regular");
+                setNotes(json.internalNotes || "");
+            } catch (err) {
+                console.error(err);
+                toast.error("Erreur lors du chargement du client");
             } finally {
-                if (active) setLoading(false);
+                setLoading(false);
             }
         }
-
         load();
-        return () => { active = false; };
     }, [customerId]);
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center py-24">
-                <Spinner size="lg" />
-            </div>
-        );
-    }
+    const handleSaveInfo = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/customers/${customerId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ segment, internalNotes: notes }),
+            });
+            if (res.ok) {
+                toast.success("Informations client enregistrées");
+            } else {
+                toast.error("Échec de l'enregistrement");
+            }
+        } catch {
+            toast.error("Erreur réseau");
+        } finally {
+            setSaving(false);
+        }
+    };
 
-    if (notFound || !customer) {
-        return (
-            <div className="space-y-4">
-                <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2">
-                    <ArrowLeft size={16} /> {t.customers.backToCustomers}
-                </Button>
-                <EmptyState title={t.common.noResults} description="" />
-            </div>
-        );
-    }
+    if (loading) return (
+        <div className="flex items-center justify-center py-24">
+            <Spinner size="lg" />
+        </div>
+    );
 
-    const avgOrder = customer.totalOrders > 0 ? customer.totalSpent / customer.totalOrders : 0;
+    if (!data) return (
+        <div className="space-y-4">
+            <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2">
+                <ArrowLeft size={16} /> {t.customers.backToCustomers}
+            </Button>
+            <EmptyState title="Client introuvable" description="" />
+        </div>
+    );
+
+    const { profile, stats, orders } = data;
 
     return (
-        <>
+        <div className="max-w-6xl mx-auto space-y-6">
             {/* Header */}
-            <div className="mb-6">
-                <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/customers")} className="gap-2 mb-4">
-                    <ArrowLeft size={16} />
-                    {t.customers.backToCustomers}
-                </Button>
-
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-brand-600 dark:text-brand-400 text-xl font-bold">
-                        {customer.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div className="space-y-4">
+                    <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/customers")} className="gap-2 -ml-2">
+                        <ArrowLeft size={16} /> {t.customers.backToCustomers}
+                    </Button>
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 text-2xl font-black">
+                            {profile.name?.charAt(0) || "U"}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-3xl font-black text-surface-900 dark:text-white uppercase tracking-tight">
+                                    {profile.name || "Client"}
+                                </h1>
+                                <Badge variant={segment === "vip" ? "brand" : segment === "blocked" ? "danger" : "default"} className="uppercase font-black text-[10px] tracking-widest px-2.5">
+                                    {segment}
+                                </Badge>
+                            </div>
+                            <p className="text-surface-500 font-medium">Client depuis le {new Date(profile.joinedAt).toLocaleDateString()}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{customer.name}</h1>
-                        <p className="text-surface-500 dark:text-surface-400 mt-0.5">{t.customers.detail}</p>
-                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Button variant="outline" className="gap-2 font-bold uppercase text-[10px] tracking-widest h-11 px-6">
+                        <Phone size={14} /> Contacter
+                    </Button>
                 </div>
             </div>
 
-            {/* Contact info */}
-            <Card className="mb-6">
-                <div className="flex flex-wrap gap-6">
-                    {customer.phone && (
-                        <div className="flex items-center gap-2 text-sm">
-                            <Phone size={16} className="text-surface-400" />
-                            <span className="text-surface-700 dark:text-surface-300">{formatPhone(customer.phone)}</span>
-                        </div>
-                    )}
-                    {customer.email && (
-                        <div className="flex items-center gap-2 text-sm">
-                            <Mail size={16} className="text-surface-400" />
-                            <span className="text-surface-700 dark:text-surface-300">{customer.email}</span>
-                        </div>
-                    )}
-                    {customer.createdAt && (
-                        <div className="flex items-center gap-2 text-sm">
-                            <Calendar size={16} className="text-surface-400" />
-                            <span className="text-surface-500">{t.customers.customerSince} {formatDate(customer.createdAt)}</span>
-                        </div>
-                    )}
-                </div>
-            </Card>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <Card className="p-4">
-                    <p className="text-xs text-surface-500 dark:text-surface-400">{t.customers.totalOrders}</p>
-                    <p className="text-2xl font-bold text-surface-900 dark:text-white mt-1">{customer.totalOrders}</p>
-                </Card>
-                <Card className="p-4">
-                    <p className="text-xs text-surface-500 dark:text-surface-400">{t.customers.totalSpent}</p>
-                    <p className="text-2xl font-bold text-surface-900 dark:text-white mt-1">{formatCFA(customer.totalSpent)}</p>
-                </Card>
-                <Card className="p-4">
-                    <p className="text-xs text-surface-500 dark:text-surface-400">{t.customers.avgOrder}</p>
-                    <p className="text-2xl font-bold text-surface-900 dark:text-white mt-1">{formatCFA(avgOrder)}</p>
-                </Card>
-                <Card className="p-4">
-                    <p className="text-xs text-surface-500 dark:text-surface-400">{t.customers.firstOrder}</p>
-                    <p className="text-lg font-bold text-surface-900 dark:text-white mt-1">{customer.createdAt ? formatDate(customer.createdAt) : "-"}</p>
-                </Card>
-            </div>
-
-            {/* Order history */}
-            <Card padding="none">
-                <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800 flex items-center gap-2">
-                    <ShoppingBag size={16} className="text-surface-400" />
-                    <h2 className="font-semibold text-surface-900 dark:text-white">{t.customers.orderHistory}</h2>
-                </div>
-
-                {orders.length === 0 ? (
-                    <div className="p-8 text-center">
-                        <EmptyState
-                            icon={<TrendingUp size={28} className="text-surface-400" />}
-                            title={t.customers.noOrderHistory}
-                            description=""
-                        />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Statistics & Profile Cards */}
+                <div className="lg:col-span-8 space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <Card className="flex flex-col gap-4 border-none bg-surface-900 text-white p-6 shadow-xl">
+                            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                                <TrendingUp size={20} className="text-brand-400" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-surface-400 mb-1">Valeur Totale (LTV)</p>
+                                <p className="text-2xl font-black tabular-nums tracking-tight">{formatCFA(stats.totalSpent)}</p>
+                            </div>
+                        </Card>
+                        <Card className="flex flex-col gap-4 p-6">
+                            <div className="w-10 h-10 rounded-xl bg-surface-50 dark:bg-surface-800 flex items-center justify-center">
+                                <ShoppingBag size={20} className="text-brand-500" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-surface-400 mb-1">Commandes</p>
+                                <p className="text-2xl font-black tabular-nums tracking-tight text-surface-900 dark:text-white">{stats.ordersCount}</p>
+                            </div>
+                        </Card>
+                        <Card className="flex flex-col gap-4 p-6">
+                            <div className="w-10 h-10 rounded-xl bg-surface-50 dark:bg-surface-800 flex items-center justify-center">
+                                <Star size={20} className="text-amber-500" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-surface-400 mb-1">Panier Moyen</p>
+                                <p className="text-2xl font-black tabular-nums tracking-tight text-surface-900 dark:text-white">{formatCFA(stats.avgOrderValue)}</p>
+                            </div>
+                        </Card>
                     </div>
-                ) : (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>{t.orders.colOrder}</TableHead>
-                                <TableHead>{t.orders.colAmount}</TableHead>
-                                <TableHead>{t.orders.colStatus}</TableHead>
-                                <TableHead>{t.orders.colDate}</TableHead>
-                                <TableHead>{t.common.actions}</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {orders.map((order) => (
-                                <TableRow key={order.id}>
-                                    <TableCell className="font-medium text-surface-900 dark:text-white">
-                                        {formatOrderId(order.id)}
-                                    </TableCell>
-                                    <TableCell>{formatCFA(order.total)}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={order.status === "completed" ? "success" : order.status === "cancelled" ? "default" : "warning"}>
-                                            {t.orders[order.status as keyof typeof t.orders] as string ?? order.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-surface-500">{formatDate(order.created_at)}</TableCell>
-                                    <TableCell>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-                                            className="gap-1.5"
-                                        >
-                                            <ExternalLink size={13} />
-                                            {t.customers.viewOrder}
-                                        </Button>
-                                    </TableCell>
+
+                    <Card padding="none" className="overflow-hidden">
+                        <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/30 flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-surface-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                <History size={16} className="text-brand-500" /> Historique Récent
+                            </h3>
+                        </div>
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="hover:bg-transparent">
+                                    <TableHead className="text-[10px] uppercase font-black">Commande</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-black">Date</TableHead>
+                                    <TableHead className="text-[10px] uppercase font-black">Status</TableHead>
+                                    <TableHead className="text-right text-[10px] uppercase font-black">Montant</TableHead>
                                 </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {orders.map((order) => (
+                                    <TableRow key={order.id} className="group">
+                                        <TableCell className="font-mono text-xs font-bold text-surface-900 dark:text-white">
+                                            <Link href={`/dashboard/orders/${order.id}`} className="hover:text-brand-500 transition-colors">
+                                                #{order.id.slice(0, 8)}
+                                            </Link>
+                                        </TableCell>
+                                        <TableCell className="text-xs font-medium text-surface-500">{new Date(order.created_at).toLocaleDateString()}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={order.status === 'completed' ? 'success' : 'default'} className="text-[9px] uppercase font-bold">
+                                                {order.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right font-black text-sm text-surface-900 dark:text-white">{formatCFA(order.total)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Card>
+                </div>
+
+                {/* Right Sidebar: Notes & CRM */}
+                <div className="lg:col-span-4 space-y-6">
+                    <Card className="space-y-6">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-surface-400">Gouvernance CRM</h3>
+                        
+                        <div className="space-y-4">
+                            <Select 
+                                label="Segmentation"
+                                value={segment}
+                                onChange={(e) => setSegment(e.target.value)}
+                                options={[
+                                    { value: "new", label: "Nouveau Client" },
+                                    { value: "regular", label: "Habitué" },
+                                    { value: "vip", label: "Client VIP" },
+                                    { value: "blocked", label: "Client Bloqué" },
+                                ]}
+                            />
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-surface-500 uppercase tracking-wider">Note Interne</label>
+                                <Textarea 
+                                    placeholder="Ajoutez des notes sur les préférences du client (ex: aime le piment, allergies, adresse difficile à trouver...)"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    rows={5}
+                                    className="bg-surface-50 dark:bg-surface-800 border-none rounded-xl text-sm"
+                                />
+                            </div>
+
+                            <Button 
+                                className="w-full h-12 font-black uppercase text-[10px] tracking-[0.2em]" 
+                                leftIcon={<Save size={16} />}
+                                onClick={handleSaveInfo}
+                                isLoading={saving}
+                            >
+                                Mettre à jour la fiche
+                            </Button>
+                        </div>
+                    </Card>
+
+                    <Card className="space-y-4">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-surface-400">Habitudes de Consommation</h3>
+                        <div className="space-y-3">
+                            {stats.topProducts.map((p, i) => (
+                                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-surface-50 dark:bg-surface-800/50">
+                                    <span className="text-sm font-bold text-surface-900 dark:text-white truncate max-w-[150px]">{p.name}</span>
+                                    <Badge variant="outline" className="text-[10px] font-black">{p.count} fois</Badge>
+                                </div>
                             ))}
-                        </TableBody>
-                    </Table>
-                )}
-            </Card>
-        </>
+                            {stats.topProducts.length === 0 && (
+                                <p className="text-xs text-surface-400 italic text-center py-4">Pas encore assez de données</p>
+                            )}
+                        </div>
+                    </Card>
+
+                    {segment === "blocked" && (
+                        <div className="p-4 rounded-2xl bg-danger-50 dark:bg-danger-900/10 border border-danger-200 dark:border-danger-800 flex items-start gap-3">
+                            <AlertCircle className="text-danger-500 shrink-0" size={18} />
+                            <div>
+                                <p className="text-sm font-bold text-danger-600 dark:text-danger-400">Client Restreint</p>
+                                <p className="text-xs text-danger-500 leading-relaxed">Les commandes de ce client sont automatiquement signalées comme suspectes.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
+
+// Missing History and Trash icon imports handled by using lucide names manually or assuming they are in the bundle.
+import { History } from "lucide-react";

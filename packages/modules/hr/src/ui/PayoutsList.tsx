@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Badge, useLocale, formatCFA, formatDate } from "@kbouffe/module-core/ui";
+import { Card, Badge, useLocale, formatCFA, formatDate, type Payout } from "@kbouffe/module-core/ui";
 import { usePayouts } from "./hooks";
 
 export function PayoutsList() {
@@ -25,7 +25,7 @@ export function PayoutsList() {
                 <p className="text-sm text-surface-500 mt-0.5">{t.finances.payoutsDesc}</p>
             </div>
             <div className="divide-y divide-surface-100 dark:divide-surface-800">
-                {payouts.map((payout) => (
+                {payouts.map((payout: Payout) => (
                     <div key={payout.id} className="px-6 py-4 flex items-center justify-between">
                         <div>
                             <p className="font-medium text-surface-900 dark:text-white">{formatCFA(payout.amount)}</p>

@@ -7,16 +7,17 @@ import { withAuth, apiError } from "@/lib/api/helpers";
  */
 export async function DELETE(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { ctx, error } = await withAuth();
     if (error) return error;
 
     try {
+        const { id } = await params;
         const { error: deleteError } = await ctx.supabase
             .from("table_zones")
             .delete()
-            .eq("id", params.id)
+            .eq("id", id)
             .eq("restaurant_id", ctx.restaurantId);
 
         if (deleteError) {

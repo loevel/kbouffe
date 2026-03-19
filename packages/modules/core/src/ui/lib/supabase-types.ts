@@ -862,6 +862,8 @@ export interface AdCampaign {
 export interface ProductOption {
     name: string;
     required?: boolean;
+    min_selections?: number;
+    max_selections?: number;
     choices: ProductOptionChoice[];
 }
 

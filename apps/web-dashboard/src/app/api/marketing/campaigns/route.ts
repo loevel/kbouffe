@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest) {
         if (auth.error) return auth.error;
         const { ctx } = auth;
 
-        const { data, error } = await ctx.supabase
+        const { data, error } = await (ctx.supabase as any)
             .from("ad_campaigns")
             .select("*")
             .eq("restaurant_id", ctx.restaurantId)
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
             created_at: new Date().toISOString(),
         };
 
-        const { data, error } = await ctx.supabase
+        const { data, error } = await (ctx.supabase as any)
             .from("ad_campaigns")
             .insert(campaignData as any)
             .select()

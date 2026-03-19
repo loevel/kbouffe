@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "hono": "^4.7.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "@kbouffe/shared-types": "^1.0.0"
   },
   "devDependencies": {

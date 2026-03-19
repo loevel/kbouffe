@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Log verification attempt in DB for audit trail
     try {
       const admin = await createAdminClient();
-      await admin
+      await (admin as any)
         .from("kyc_verifications")
         .insert({
           restaurant_id: ctx.restaurantId,

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient();
@@ -16,12 +16,11 @@ export async function PATCH(
             return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
         }
 
-        const id = (await params).id;
+        const { id } = await params;
         const body = await request.json();
         const { label, address: addressLine, city, instructions, is_default } = body;
 
-        // Security check: ensure address belongs to user (Supabase RLS handles this, 
-        // but we can also check existence)
+        // Security check: ensure address belongs to user
         const { data: existing, error: fetchError } = await supabase
             .from("addresses")
             .select("id")
@@ -75,7 +74,7 @@ export async function PATCH(
 
 export async function DELETE(
     _request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient();
@@ -88,7 +87,7 @@ export async function DELETE(
             return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
         }
 
-        const id = (await params).id;
+        const { id } = await params;
 
         const { error: deleteError } = await supabase
             .from("addresses")

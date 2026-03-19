@@ -8,12 +8,13 @@ import { Card, Badge, Button } from "@kbouffe/module-core/ui";
 import { ordersUi } from "@kbouffe/module-orders";
 import { useOrder, type OrderStatus } from "@kbouffe/module-orders/ui";
 const { OrderStatusBadge, OrderTimeline, OrderActions, OrderChat, AssignDriver } = ordersUi;
-import { formatCFA, formatDateTime, formatOrderId, formatPhone, getPaymentLabel, getPaymentStatusLabel, type OrderItemData } from "@kbouffe/module-core/ui";
-import { useLocale } from "@kbouffe/module-core/ui";
+import { formatCFA, formatDateTime, formatOrderId, formatPhone, getPaymentLabel, getPaymentStatusLabel, type OrderItemData, ReceiptPrinter } from "@kbouffe/module-core/ui";
+import { useLocale, useDashboard } from "@kbouffe/module-core/ui";
 
 export default function OrderDetailPage() {
     const params = useParams();
     const { t } = useLocale();
+    const { restaurant } = useDashboard();
     const orderId = params.id as string;
     const { order, isLoading, mutate } = useOrder(orderId);
     const [status, setStatus] = useState<OrderStatus | null>(null);
@@ -62,7 +63,10 @@ export default function OrderDetailPage() {
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{formatOrderId(order.id)}</h1>
                         <OrderStatusBadge status={currentStatus} />
                     </div>
-                    <OrderActions orderId={orderId} status={currentStatus} onStatusChange={handleStatusChange} />
+                    <div className="flex items-center gap-3">
+                        <ReceiptPrinter order={order} restaurant={restaurant} />
+                        <OrderActions orderId={orderId} status={currentStatus} onStatusChange={handleStatusChange} />
+                    </div>
                 </div>
                 <p className="text-surface-500 dark:text-surface-400 mt-1">{formatDateTime(order.created_at)}</p>
             </div>

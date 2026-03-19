@@ -70,6 +70,7 @@ adminRestaurantsRoutes.get("/", async (c) => {
         orderCount: Number(r.order_count || 0),
         createdAt: r.created_at,
         updatedAt: r.updated_at,
+        ownerId: r.owner_id,
     }));
 
     return c.json({ 

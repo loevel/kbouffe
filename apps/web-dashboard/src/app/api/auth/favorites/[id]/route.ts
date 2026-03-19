@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function DELETE(
     _request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient();
@@ -16,7 +16,7 @@ export async function DELETE(
             return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
         }
 
-        const id = (await params).id;
+        const { id } = await params;
 
         const { error: deleteError } = await supabase
             .from("restaurant_favorites")

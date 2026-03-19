@@ -13,4 +13,6 @@ export * from "./Dropdown";
 export * from "./Tabs";
 export * from "./Textarea";
 export * from "./Turnstile";
+export * from "./ReceiptPrinter";
+export * from "./Reports";
 export * from "./layout";

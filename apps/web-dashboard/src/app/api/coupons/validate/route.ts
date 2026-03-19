@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
             .eq("is_active", true)
             .single();
 
-        const coupon = couponRaw as Coupon | null;
+        const coupon = couponRaw as any;
 
         if (error || !coupon) {
             return NextResponse.json({ valid: false, error: "Code promo invalide ou inactif" }, { status: 200 });
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
         // Check per-customer usage
         if (customer_id && coupon.max_uses_per_customer) {
-            const { count } = await supabase
+            const { count } = await (supabase as any)
                 .from("coupon_uses")
                 .select("*", { count: "exact", head: true })
                 .eq("coupon_id", coupon.id)

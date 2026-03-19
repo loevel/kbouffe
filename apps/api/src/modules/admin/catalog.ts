@@ -221,31 +221,71 @@ adminCatalogRoutes.delete("/products/:id", async (c) => {
 
 // ── Import Pack ───────────────────────────────────────────────
 const PACKS = {
+    braiserie: {
+        categories: [
+            { id: "cat_poissons", name: "Poissons Braisés", description: "Le meilleur du poisson frais", sort_order: 1, is_active: true },
+            { id: "cat_viandes", name: "Viandes & Volaille", description: "Braisés et grillades", sort_order: 2, is_active: true },
+            { id: "cat_accompagnements", name: "Accompagnements", description: "Compléments pour vos plats", sort_order: 3, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_poissons", name: "Bar Braisé (Moyen)", description: "Poisson bar frais mariné aux épices", price: 4500, is_available: true },
+            { category_id: "cat_poissons", name: "Carpe Braisée", description: "Carpe d'eau douce braisée au charbon", price: 3500, is_available: true },
+            { category_id: "cat_viandes", name: "Demi-Poulet Braisé", description: "Poulet bicyclette tendre et parfumé", price: 4500, is_available: true },
+            { category_id: "cat_viandes", name: "Soya (Boeuf)", description: "Brochettes de boeuf épicées", price: 2000, is_available: true },
+            { category_id: "cat_accompagnements", name: "Miondo (3 bâtons)", description: "Bâtons de manioc fins", price: 500, is_available: true },
+            { category_id: "cat_accompagnements", name: "Frites de Plantain", description: "Plantains mûrs frits", price: 1000, is_available: true },
+        ]
+    },
+    traditionnel: {
+        categories: [
+            { id: "cat_sauces", name: "Plats Traditionnels", description: "Recettes ancestrales", sort_order: 1, is_active: true },
+            { id: "cat_fufu", name: "Couscous & Fufu", description: "Les bases de nos plats", sort_order: 2, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_sauces", name: "Ndole Complet", description: "Viande, crevettes et morue", price: 3500, is_available: true },
+            { category_id: "cat_sauces", name: "Eru & Waterleaf", description: "Mélange de légumes verts", price: 3000, is_available: true },
+            { category_id: "cat_sauces", name: "Sauce Jaune (Achu)", description: "Spécialité du Nord-Ouest", price: 4000, is_available: true },
+            { category_id: "cat_sauces", name: "Okok Sucré/Salé", description: "Feuilles d'okok et arachide", price: 2500, is_available: true },
+            { category_id: "cat_fufu", name: "Couscous Maïs", description: "Boule de maïs jaune", price: 500, is_available: true },
+            { category_id: "cat_fufu", name: "Waterfufu", description: "Fufu de manioc fermenté", price: 500, is_available: true },
+        ]
+    },
+    streetfood: {
+        categories: [
+            { id: "cat_beignets", name: "Beignets & Snacks", description: "Sur le pouce", sort_order: 1, is_active: true },
+            { id: "cat_sandwichs", name: "Sandwichs & Burgers", description: "Le goût de la rue", sort_order: 2, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_beignets", name: "Beignets Haricots", description: "Le classique indémodable", price: 500, is_available: true },
+            { category_id: "cat_beignets", name: "Accras de Morue", description: "Petits beignets de poisson", price: 1000, is_available: true },
+            { category_id: "cat_sandwichs", name: "Pain Chargé", description: "Omelette, spaghetti, avocat", price: 800, is_available: true },
+            { category_id: "cat_sandwichs", name: "Burger Maison", description: "Boeuf frais et sauce secrète", price: 2500, is_available: true },
+        ]
+    },
+    petitdej: {
+        categories: [
+            { id: "cat_chaud", name: "Boissons Chaudes", description: "Café, Thé et Chocolat", sort_order: 1, is_active: true },
+            { id: "cat_pains", name: "Viennoiseries & Pains", description: "Fraîchement cuits", sort_order: 2, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_chaud", name: "Café de l'Ouest", description: "100% Arabica local", price: 1000, is_available: true },
+            { category_id: "cat_chaud", name: "Chocolat Chaud", description: "Cacao du pays", price: 1200, is_available: true },
+            { category_id: "cat_pains", name: "Pain au Chocolat", description: "Beurre pur", price: 600, is_available: true },
+            { category_id: "cat_pains", name: "Omelette Garnie", description: "3 oeufs, oignons, piment", price: 1500, is_available: true },
+        ]
+    },
     boissons: {
         categories: [
             { id: "cat_bieres", name: "Bières", description: "Bières locales et importées", sort_order: 1, is_active: true },
             { id: "cat_gazeuses", name: "Boissons Gazeuses", description: "Sodas et boissons gazeuses", sort_order: 2, is_active: true },
-            { id: "cat_eaux", name: "Eaux", description: "Eaux minérales et purifiées", sort_order: 3, is_active: true },
-            { id: "cat_jus", name: "Jus Naturels", description: "Jus frais et boissons artisanales", sort_order: 4, is_active: true },
+            { id: "cat_jus", name: "Jus Naturels", description: "Jus frais et boissons artisanales", sort_order: 3, is_active: true },
         ],
         products: [
-            { category_id: "cat_bieres", name: "33 Export", description: "Bière blonde lager", price: 800, is_available: false },
-            { category_id: "cat_bieres", name: "Castel Beer", description: "Bière blonde premium", price: 800, is_available: false },
-            { category_id: "cat_bieres", name: "Mutzig", description: "Bière forte premium", price: 900, is_available: false },
-            { category_id: "cat_bieres", name: "Beaufort Lager", description: "Bière blonde classique", price: 700, is_available: false },
-            { category_id: "cat_bieres", name: "Heineken", description: "Bière internationale premium", price: 1000, is_available: false },
-            { category_id: "cat_gazeuses", name: "Top Ananas", description: "Boisson gazeuse à l'ananas", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "Top Orange", description: "Boisson gazeuse à l'orange", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "Top Grenadine", description: "Boisson gazeuse", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "World Cola", description: "Cola", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "Orangina", description: "Boisson à l'orange", price: 500, is_available: false },
-            { category_id: "cat_eaux", name: "Tangui", description: "Eau minérale naturelle", price: 300, is_available: false },
-            { category_id: "cat_eaux", name: "Supermont", description: "Eau minérale naturelle plate", price: 300, is_available: false },
-            { category_id: "cat_eaux", name: "Vitale", description: "Eau purifiée premium", price: 250, is_available: false },
-            { category_id: "cat_eaux", name: "Aqua Belle", description: "Eau de source", price: 250, is_available: false },
-            { category_id: "cat_jus", name: "Jus d'Orange Frais", description: "100% pur jus pressé", price: 1200, is_available: false },
-            { category_id: "cat_jus", name: "Jus d'Ananas Naturel", description: "Jus d'ananas frais de Penja", price: 1000, is_available: false },
-            { category_id: "cat_jus", name: "Foléré", description: "Bissap rouge traditionnel", price: 500, is_available: false },
+            { category_id: "cat_bieres", name: "33 Export (65cl)", description: "Bière blonde lager", price: 800, is_available: true },
+            { category_id: "cat_bieres", name: "Castel Beer (65cl)", description: "Bière blonde premium", price: 800, is_available: true },
+            { category_id: "cat_gazeuses", name: "Top Ananas", description: "Boisson gazeuse à l'ananas", price: 500, is_available: true },
+            { category_id: "cat_jus", name: "Foléré Maison", description: "Bissap rouge gingembre", price: 500, is_available: true },
+            { category_id: "cat_jus", name: "Jus de Baobab", description: "Onctueux et nutritif", price: 800, is_available: true },
         ]
     }
 };

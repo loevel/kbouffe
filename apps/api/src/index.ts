@@ -10,6 +10,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { createClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "./types";
 import { authMiddleware } from "./middleware/auth";
 import { adminMiddleware } from "./middleware/admin";
@@ -73,6 +74,15 @@ app.use(
         maxAge: 86400,
     }),
 );
+
+// ── Default Supabase Client ──────────────────────────────────────────
+app.use("*", async (c, next) => {
+    if (c.env.SUPABASE_URL && c.env.SUPABASE_ANON_KEY) {
+        const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_ANON_KEY);
+        c.set("supabase", supabase);
+    }
+    await next();
+});
 
 // ── Health check — root ──────────────────────────────────────────────
 app.get("/", (c) =>

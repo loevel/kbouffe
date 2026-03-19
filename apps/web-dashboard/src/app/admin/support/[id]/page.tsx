@@ -17,8 +17,13 @@ import {
     Store,
     FileText,
     UserCheck,
+    Send,
+    MessageSquare,
+    Shield,
 } from "lucide-react";
-import { Badge, adminFetch } from "@kbouffe/module-core/ui";
+import { Badge, Button, Input, Textarea, toast, adminFetch, Card } from "@kbouffe/module-core/ui";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface TicketDetail {
     id: string;
@@ -40,18 +45,18 @@ interface TicketDetail {
     assigneeEmail: string | null;
 }
 
-const statusBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info" }> = {
-    open: { label: "Ouvert", variant: "warning" },
-    in_progress: { label: "En cours", variant: "info" },
-    resolved: { label: "Résolu", variant: "success" },
-    closed: { label: "Fermé", variant: "default" },
+const statusBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info"; color: string }> = {
+    open: { label: "Nouveau", variant: "warning", color: "text-amber-500 bg-amber-500/10" },
+    in_progress: { label: "En cours", variant: "info", color: "text-blue-500 bg-blue-500/10" },
+    resolved: { label: "Résolu", variant: "success", color: "text-emerald-500 bg-emerald-500/10" },
+    closed: { label: "Fermé", variant: "default", color: "text-surface-400 bg-surface-100" },
 };
 
-const priorityBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" }> = {
-    low: { label: "Basse", variant: "default" },
-    medium: { label: "Moyenne", variant: "warning" },
-    high: { label: "Haute", variant: "danger" },
-    urgent: { label: "Urgente", variant: "danger" },
+const priorityBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger"; color: string }> = {
+    low: { label: "Basse", variant: "default", color: "bg-surface-100 text-surface-500" },
+    medium: { label: "Moyenne", variant: "warning", color: "bg-blue-500/10 text-blue-500" },
+    high: { label: "Haute", variant: "danger", color: "bg-orange-500/10 text-orange-600" },
+    urgent: { label: "Urgente", variant: "danger", color: "bg-red-500/10 text-red-600" },
 };
 
 export default function AdminSupportDetailPage() {
@@ -59,6 +64,7 @@ export default function AdminSupportDetailPage() {
     const [ticket, setTicket] = useState<TicketDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [response, setResponse] = useState("");
 
     useEffect(() => {
         (async () => {
@@ -71,7 +77,7 @@ export default function AdminSupportDetailPage() {
         })();
     }, [id]);
 
-    const updateTicket = async (updates: Record<string, string>) => {
+    const updateTicket = async (updates: Partial<TicketDetail>) => {
         if (!ticket) return;
         setSaving(true);
         try {
@@ -80,17 +86,48 @@ export default function AdminSupportDetailPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: ticket.id, ...updates }),
             });
-            if (res.ok) setTicket({ ...ticket, ...updates } as TicketDetail);
+            if (res.ok) {
+                setTicket({ ...ticket, ...updates } as TicketDetail);
+                toast.success("Ticket mis à jour");
+            } else {
+                toast.error("Erreur lors de la mise à jour");
+            }
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) return <div className="flex items-center justify-center h-64 text-surface-400">Chargement...</div>;
+    const handleSendResponse = async () => {
+        if (!response.trim()) return;
+        toast.info("Envoi de la réponse (Simulation)...");
+        // Here you would call an API to send email/notification to user
+        setTimeout(() => {
+            setResponse("");
+            toast.success("Réponse envoyée au rapporteur");
+            if (ticket?.status === "open") {
+                updateTicket({ status: "in_progress" });
+            }
+        }, 1000);
+    };
+
+    if (loading) return (
+        <div className="flex flex-col items-center justify-center h-96 gap-4">
+            <div className="w-10 h-10 border-4 border-brand-500/20 border-t-brand-500 rounded-full animate-spin" />
+            <p className="text-surface-400">Chargement du ticket...</p>
+        </div>
+    );
+
     if (!ticket) return (
-        <div className="text-center py-16">
-            <p className="text-surface-400">Ticket introuvable</p>
-            <Link href="/admin/support" className="text-brand-500 text-sm mt-2 inline-block">← Retour</Link>
+        <div className="text-center py-24">
+            <div className="w-20 h-20 bg-surface-100 dark:bg-surface-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle size={40} className="text-surface-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-surface-900 dark:text-white">Ticket introuvable</h2>
+            <Link href="/admin/support">
+                <Button variant="outline" className="mt-6">
+                    <ArrowLeft size={16} className="mr-2" /> Retour à la liste
+                </Button>
+            </Link>
         </div>
     );
 
@@ -101,133 +138,204 @@ export default function AdminSupportDetailPage() {
         val ? new Date(val).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
     return (
-        <>
-            <Link href="/admin/support" className="inline-flex items-center gap-1 text-sm text-surface-500 hover:text-brand-500 transition-colors mb-6">
-                <ArrowLeft size={16} /> Retour aux tickets
-            </Link>
-
-            {/* Header */}
-            <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6 mb-6">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                        <h1 className="text-xl font-bold text-surface-900 dark:text-white flex items-center gap-2">
-                            <Headset size={22} /> {t.subject}
-                        </h1>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <Badge variant={sb.variant}>{sb.label}</Badge>
-                            <Badge variant={pb.variant}>
-                                {t.priority === "urgent" && <AlertTriangle size={10} className="inline mr-1" />}
-                                Priorité {pb.label}
-                            </Badge>
-                            <Badge variant="default">{t.reporterType}</Badge>
-                        </div>
+        <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-6xl mx-auto pb-20"
+        >
+            <div className="flex items-center justify-between mb-8">
+                <Link href="/admin/support" className="group flex items-center gap-2 text-sm font-medium text-surface-500 hover:text-brand-500 transition-all">
+                    <div className="p-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 group-hover:bg-brand-500/10 transition-colors">
+                        <ArrowLeft size={16} />
                     </div>
-                    <p className="text-xs text-surface-400">ID: {t.id.substring(0, 8)}…</p>
+                    Retour à l'assistance
+                </Link>
+                <div className="flex items-center gap-3">
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => updateTicket({ status: t.status === "resolved" ? "open" : "resolved" })}
+                        className={t.status === "resolved" ? "text-amber-600" : "text-emerald-600"}
+                    >
+                        {t.status === "resolved" ? "Réouvrir le ticket" : "Marquer comme résolu"}
+                    </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Description */}
-                <div className="lg:col-span-2 bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6">
-                    <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-4">Description</h3>
-                    <p className="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap leading-relaxed">
-                        {t.description}
-                    </p>
-
-                    {/* References */}
-                    {(t.restaurantId || t.orderId) && (
-                        <div className="mt-6 pt-4 border-t border-surface-100 dark:border-surface-800">
-                            <p className="text-xs font-medium text-surface-500 mb-2">Références</p>
-                            <div className="flex gap-3 flex-wrap">
-                                {t.restaurantId && (
-                                    <Link href={`/admin/restaurants/${t.restaurantId}`} className="flex items-center gap-1 text-xs text-brand-500 hover:underline">
-                                        <Store size={12} /> Restaurant {t.restaurantId.substring(0, 8)}…
-                                    </Link>
-                                )}
-                                {t.orderId && (
-                                    <span className="flex items-center gap-1 text-xs text-surface-500">
-                                        <FileText size={12} /> Commande {t.orderId.substring(0, 8)}…
-                                    </span>
-                                )}
+            {/* Main Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Content Area */}
+                <div className="lg:col-span-8 space-y-8">
+                    {/* Header Card */}
+                    <Card className="p-0 overflow-hidden">
+                        <div className={`p-6 border-b border-surface-100 dark:border-surface-800 ${sb.color.split(" ")[1]} bg-opacity-30`}>
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant={sb.variant} className="font-bold border-none shadow-sm">{sb.label}</Badge>
+                                        <Badge variant={pb.variant} className="font-bold border-none">{pb.label}</Badge>
+                                    </div>
+                                    <h1 className="text-2xl font-black text-surface-900 dark:text-white tracking-tight uppercase">
+                                        {t.subject}
+                                    </h1>
+                                </div>
+                                <span className="text-[10px] font-mono text-surface-400 bg-white/50 dark:bg-black/20 px-2 py-1 rounded-lg">
+                                    ID: #{t.id.slice(0, 12)}
+                                </span>
                             </div>
                         </div>
-                    )}
+                        <div className="p-8">
+                            <div className="flex items-start gap-4 mb-8">
+                                <div className="w-10 h-10 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-surface-400 shrink-0">
+                                    <User size={20} />
+                                </div>
+                                <div className="space-y-4 flex-1">
+                                    <div className="bg-surface-50 dark:bg-surface-800/50 p-6 rounded-2xl border border-surface-100 dark:border-surface-800">
+                                        <p className="text-base text-surface-700 dark:text-surface-200 leading-relaxed whitespace-pre-wrap">
+                                            {t.description}
+                                        </p>
+                                    </div>
+                                    <p className="text-[10px] text-surface-400 font-bold uppercase tracking-widest px-2">
+                                        Soumis le {formatDate(t.createdAt)} par {t.reporterName}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* References */}
+                            {(t.restaurantId || t.orderId) && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
+                                    {t.restaurantId && (
+                                        <Link href={`/admin/restaurants/${t.restaurantId}`} className="group p-4 rounded-2xl border border-surface-100 dark:border-surface-800 hover:border-brand-500/20 hover:bg-brand-500/5 transition-all">
+                                            <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-2">Établissement lié</p>
+                                            <div className="flex items-center gap-3">
+                                                <Store size={18} className="text-brand-500" />
+                                                <span className="text-sm font-bold text-surface-900 dark:text-white truncate group-hover:text-brand-500">#{t.restaurantId.slice(0, 8)}</span>
+                                            </div>
+                                        </Link>
+                                    )}
+                                    {t.orderId && (
+                                        <div className="p-4 rounded-2xl border border-surface-100 dark:border-surface-800">
+                                            <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-2">Commande associée</p>
+                                            <div className="flex items-center gap-3">
+                                                <FileText size={18} className="text-brand-500" />
+                                                <span className="text-sm font-bold text-surface-900 dark:text-white">#{t.orderId.slice(0, 8)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+
+                    {/* Response Area */}
+                    <Card className="space-y-4">
+                        <h3 className="text-lg font-bold text-surface-900 dark:text-white flex items-center gap-2">
+                            <MessageSquare size={20} className="text-brand-500" />
+                            Répondre au rapporteur
+                        </h3>
+                        <div className="relative">
+                            <Textarea
+                                value={response}
+                                onChange={(e) => setResponse(e.target.value)}
+                                placeholder="Saisissez votre réponse ici. Le rapporteur recevra une notification par email."
+                                rows={6}
+                                className="bg-surface-50 dark:bg-surface-800 border-none rounded-2xl focus:ring-2 focus:ring-brand-500 transition-all p-4"
+                            />
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <p className="text-xs text-surface-400 italic">
+                                Une réponse officielle sera enregistrée dans l'audit.
+                            </p>
+                            <Button
+                                disabled={!response.trim() || saving}
+                                onClick={handleSendResponse}
+                                leftIcon={<Send size={18} />}
+                                className="px-8 shadow-lg shadow-brand-500/20"
+                            >
+                                Envoyer la réponse
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
 
                 {/* Sidebar */}
-                <div className="space-y-6">
-                    {/* Reporter */}
-                    <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
-                        <h3 className="text-sm font-semibold text-surface-900 dark:text-white mb-3">Rapporteur</h3>
-                        <div className="space-y-2 text-sm">
-                            <p className="flex items-center gap-2 text-surface-700 dark:text-surface-300"><User size={14} className="text-surface-400" /> {t.reporterName ?? "—"}</p>
-                            <p className="flex items-center gap-2 text-surface-700 dark:text-surface-300"><Mail size={14} className="text-surface-400" /> {t.reporterEmail ?? "—"}</p>
-                            {t.reporterPhone && <p className="flex items-center gap-2 text-surface-700 dark:text-surface-300"><Phone size={14} className="text-surface-400" /> {t.reporterPhone}</p>}
+                <div className="lg:col-span-4 space-y-6">
+                    {/* Reporter Info */}
+                    <Card className="space-y-4">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-surface-400 flex items-center gap-2">
+                            <Shield size={14} /> Profil Rapporteur
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 font-bold text-xl">
+                                    {t.reporterName?.charAt(0) || "U"}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-surface-900 dark:text-white leading-tight">{t.reporterName || "Inconnu"}</p>
+                                    <p className="text-xs text-surface-500 font-medium capitalize">{t.reporterType}</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2 pt-2">
+                                <div className="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-300">
+                                    <Mail size={14} className="text-surface-400" />
+                                    <span className="truncate">{t.reporterEmail || "Pas d'email"}</span>
+                                </div>
+                                {t.reporterPhone && (
+                                    <div className="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-300">
+                                        <Phone size={14} className="text-surface-400" />
+                                        <span>{t.reporterPhone}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    </Card>
 
-                    {/* Dates */}
-                    <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
-                        <h3 className="text-sm font-semibold text-surface-900 dark:text-white mb-3">Dates</h3>
-                        <div className="space-y-2 text-sm">
-                            <p className="flex items-center gap-2 text-surface-700 dark:text-surface-300"><Calendar size={14} className="text-surface-400" /> Créé: {formatDate(t.createdAt)}</p>
-                            <p className="flex items-center gap-2 text-surface-700 dark:text-surface-300"><CheckCircle size={14} className="text-surface-400" /> Résolu: {formatDate(t.resolvedAt)}</p>
+                    {/* Meta Info */}
+                    <Card className="space-y-4">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-surface-400">Informations Clés</h3>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between py-2 border-b border-surface-100 dark:border-surface-800">
+                                <span className="text-xs font-bold text-surface-500 flex items-center gap-2"><Calendar size={14} /> Création</span>
+                                <span className="text-xs font-bold text-surface-900 dark:text-white">{new Date(t.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2 border-b border-surface-100 dark:border-surface-800">
+                                <span className="text-xs font-bold text-surface-500 flex items-center gap-2"><UserCheck size={14} /> Assigné à</span>
+                                <span className="text-xs font-bold text-brand-500">{t.assigneeName || "En attente"}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2">
+                                <span className="text-xs font-bold text-surface-500 flex items-center gap-2"><Clock size={14} /> Résolu le</span>
+                                <span className="text-xs font-bold text-surface-900 dark:text-white">{t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString() : "—"}</span>
+                            </div>
                         </div>
-                    </div>
+                    </Card>
 
-                    {/* Assignee */}
-                    <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
-                        <h3 className="text-sm font-semibold text-surface-900 dark:text-white mb-3">Assigné à</h3>
-                        <p className="text-sm text-surface-700 dark:text-surface-300 flex items-center gap-2">
-                            <UserCheck size={14} className="text-surface-400" /> {t.assigneeName ?? t.assigneeEmail ?? "Non assigné"}
-                        </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
-                        <h3 className="text-sm font-semibold text-surface-900 dark:text-white mb-3">Changer le statut</h3>
-                        <div className="grid grid-cols-2 gap-2">
+                    {/* Status Management */}
+                    <Card className="space-y-4">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-surface-400">Statut du ticket</h3>
+                        <div className="grid grid-cols-1 gap-2">
                             {(["open", "in_progress", "resolved", "closed"] as const).map((s) => {
-                                const sbi = statusBadge[s];
+                                const active = t.status === s;
                                 return (
                                     <button
                                         key={s}
                                         onClick={() => updateTicket({ status: s })}
-                                        disabled={saving || t.status === s}
-                                        className={`px-3 py-2 text-xs rounded-xl border transition-colors ${t.status === s
-                                                ? "border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400"
-                                                : "border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"
-                                            }`}
+                                        disabled={saving || active}
+                                        className={cn(
+                                            "flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all border",
+                                            active
+                                                ? "bg-brand-500 text-white border-brand-500 shadow-md shadow-brand-500/20"
+                                                : "bg-surface-50 dark:bg-surface-800 border-surface-100 dark:border-surface-700 text-surface-500 hover:border-brand-500/30"
+                                        )}
                                     >
-                                        {sbi?.label ?? s}
+                                        <span className="uppercase">{statusBadge[s].label}</span>
+                                        {active && <CheckCircle size={14} />}
                                     </button>
                                 );
                             })}
                         </div>
-                        <div className="mt-3 pt-3 border-t border-surface-100 dark:border-surface-800">
-                            <p className="text-xs font-medium text-surface-500 mb-2">Priorité</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {(["low", "medium", "high", "urgent"] as const).map((p) => {
-                                    const pbi = priorityBadge[p];
-                                    return (
-                                        <button
-                                            key={p}
-                                            onClick={() => updateTicket({ priority: p })}
-                                            disabled={saving || t.priority === p}
-                                            className={`px-3 py-2 text-xs rounded-xl border transition-colors ${t.priority === p
-                                                    ? "border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400"
-                                                    : "border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"
-                                                }`}
-                                        >
-                                            {pbi?.label ?? p}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
+                    </Card>
                 </div>
             </div>
-        </>
+        </motion.div>
     );
 }

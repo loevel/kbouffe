@@ -20,6 +20,7 @@ import {
     Utensils,
     Trash2,
     AlertTriangle,
+    LogIn,
 } from "lucide-react";
 import { Badge, Button, useLocale, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,6 +41,7 @@ interface Restaurant {
     isSponsored: boolean;
     kycStatus: "pending" | "approved" | "rejected";
     createdAt: string;
+    ownerId: string;
 }
 
 interface Pagination {
@@ -153,6 +155,25 @@ export default function AdminRestaurantsPage() {
         } finally {
             setIsDeleting(false);
             setRestaurantToDelete(null);
+        }
+    };
+
+    const handleImpersonate = async (userId: string) => {
+        if (!userId) {
+            toast.error("Propriétaire introuvable pour ce restaurant");
+            return;
+        }
+        try {
+            const res = await adminFetch(`/api/admin/users/${userId}/impersonate`, { method: "POST" });
+            const json = await res.json();
+            if (res.ok && json.magicLink) {
+                toast.success("Redirection vers le compte marchand...");
+                window.open(json.magicLink, "_blank");
+            } else {
+                toast.error(json.error || "Échec de l'impersonation");
+            }
+        } catch {
+            toast.error("Erreur réseau");
         }
     };
 
@@ -403,6 +424,18 @@ export default function AdminRestaurantsPage() {
                                             </td>
                                             <td className="px-10 py-6 text-right">
                                                 <div className="flex items-center justify-end gap-3">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleImpersonate(r.ownerId);
+                                                        }}
+                                                        className="w-10 h-10 p-0 rounded-xl text-brand-500 hover:bg-brand-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Se connecter en tant que"
+                                                    >
+                                                        <LogIn size={18} />
+                                                    </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"

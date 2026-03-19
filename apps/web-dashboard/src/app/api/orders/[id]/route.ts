@@ -98,7 +98,6 @@ export async function PATCH(
 
     const { data, error } = await ctx.supabase
       .from("orders")
-      // @ts-expect-error — Supabase types infer never for ungenerated schema
       .update(updateData as any)
       .eq("id", id)
       .eq("restaurant_id", ctx.restaurantId)

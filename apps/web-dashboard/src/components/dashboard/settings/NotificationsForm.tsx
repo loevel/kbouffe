@@ -26,6 +26,8 @@ export function NotificationsForm() {
     const currentChannels = (restaurant?.notification_channels as string[] | null) ?? ["email", "push"];
     const [smsEnabled, setSmsEnabled] = useState(currentChannels.includes("sms"));
     const [whatsappEnabled, setWhatsappEnabled] = useState(currentChannels.includes("whatsapp"));
+    const [dailyReportEnabled, setDailyReportEnabled] = useState((restaurant as any)?.dailyReportEnabled ?? true);
+    const [waitAlertThreshold, setWaitAlertThreshold] = useState((restaurant as any)?.waitAlertThresholdMinutes?.toString() ?? "15");
 
     const [settings, setSettings] = useState<NotificationSetting[]>([
         {
@@ -57,6 +59,9 @@ export function NotificationsForm() {
     useEffect(() => {
         if (!restaurant) return;
         
+        setDailyReportEnabled((restaurant as any).dailyReportEnabled ?? true);
+        setWaitAlertThreshold((restaurant as any).waitAlertThresholdMinutes?.toString() ?? "15");
+
         if (restaurant.notification_info) {
             const info = restaurant.notification_info as any;
             setSettings(prev => prev.map(s => ({
@@ -94,32 +99,14 @@ export function NotificationsForm() {
                     sms_notifications_enabled: smsEnabled || whatsappEnabled,
                     notification_channels: channels as unknown as import("@/lib/supabase/types").Json,
                     notification_info: detailedSettings as unknown as import("@/lib/supabase/types").Json,
+                    dailyReportEnabled: dailyReportEnabled,
+                    waitAlertThresholdMinutes: parseInt(waitAlertThreshold) || 15,
                 });
-            }
-
-            const response = await fetch("/api/notifications/preferences", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    settings: settings.reduce((acc, s) => ({
-                        ...acc,
-                        [s.id]: { email: s.email, push: s.push },
-                    }), {}),
-                    soundEnabled,
-                    smsEnabled,
-                    whatsappEnabled,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error("Failed to save");
             }
 
             toast.success(t.settings.notificationsUpdated);
         } catch {
-            // Fallback: save locally (mock)
-            await new Promise(r => setTimeout(r, 500));
-            toast.success(t.settings.notificationsUpdated);
+            toast.error("Erreur de sauvegarde");
         } finally {
             setLoading(false);
         }
@@ -131,6 +118,18 @@ export function NotificationsForm() {
                 <h3 className="font-semibold text-surface-900 dark:text-white mb-6">
                     {t.settings.notifications}
                 </h3>
+
+                {/* Daily Report Toggle */}
+                <div className="flex items-center justify-between p-4 rounded-xl bg-brand-50/50 dark:bg-brand-900/10 border border-brand-100 dark:border-brand-900/30 mb-6">
+                    <div className="flex items-start gap-3">
+                        <Mail size={18} className="text-brand-500 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-brand-900 dark:text-brand-100">Rapport journalier par email</p>
+                            <p className="text-xs text-brand-700 dark:text-brand-300">Recevez un résumé de vos ventes chaque matin à 8h00.</p>
+                        </div>
+                    </div>
+                    <Toggle checked={dailyReportEnabled} onChange={setDailyReportEnabled} />
+                </div>
 
                 {/* Header row */}
                 <div className="hidden sm:grid grid-cols-[1fr_80px_80px] gap-4 mb-4 px-4">
@@ -180,76 +179,90 @@ export function NotificationsForm() {
                 </div>
             </Card>
 
-            <Card>
-                <h3 className="font-semibold text-surface-900 dark:text-white mb-4">
-                    {t.settings.soundAlerts}
-                </h3>
-                <div className="flex items-center justify-between p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50">
-                    <div className="flex items-start gap-3">
-                        <Volume2 size={18} className="text-green-500 mt-0.5" />
-                        <div>
-                            <p className="font-medium text-surface-900 dark:text-white">
-                                {t.settings.soundAlerts}
-                            </p>
-                            <p className="text-sm text-surface-500">
-                                {t.settings.soundAlertsDesc}
-                            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                    <h3 className="font-semibold text-surface-900 dark:text-white mb-4">Alertes Opérationnelles</h3>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50">
+                            <div className="flex items-start gap-3">
+                                <Volume2 size={18} className="text-green-500 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-surface-900 dark:text-white">{t.settings.soundAlerts}</p>
+                                    <p className="text-xs text-surface-500">{t.settings.soundAlertsDesc}</p>
+                                </div>
+                            </div>
+                            <Toggle checked={soundEnabled} onChange={setSoundEnabled} />
                         </div>
-                    </div>
-                    <Toggle
-                        checked={soundEnabled}
-                        onChange={setSoundEnabled}
-                    />
-                </div>
-            </Card>
-
-            {/* SMS & WhatsApp Notification Channels */}
-            <Card>
-                <h3 className="font-semibold text-surface-900 dark:text-white mb-2">
-                    {t.smsNotifications.notificationChannels}
-                </h3>
-                <p className="text-sm text-surface-500 mb-6">
-                    {t.smsNotifications.notificationChannelsDesc}
-                </p>
-
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50">
-                        <div className="flex items-start gap-3">
-                            <Smartphone size={18} className="text-emerald-500 mt-0.5" />
-                            <div>
-                                <p className="font-medium text-surface-900 dark:text-white">
-                                    {t.smsNotifications.smsChannel}
-                                </p>
-                                <p className="text-sm text-surface-500">
-                                    {t.smsNotifications.smsEnabledDesc}
-                                </p>
+                        
+                        <div className="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50 space-y-3">
+                            <div className="flex items-start gap-3">
+                                <Clock size={18} className="text-amber-500 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-surface-900 dark:text-white">Seuil d'alerte (Attente)</p>
+                                    <p className="text-xs text-surface-500">Alerte visuelle si une commande attend plus de X minutes.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 pt-2">
+                                <input 
+                                    type="number" 
+                                    value={waitAlertThreshold} 
+                                    onChange={(e) => setWaitAlertThreshold(e.target.value)}
+                                    className="w-20 px-3 py-2 rounded-lg bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 text-sm font-bold"
+                                />
+                                <span className="text-sm font-medium text-surface-500">minutes</span>
                             </div>
                         </div>
-                        <Toggle
-                            checked={smsEnabled}
-                            onChange={setSmsEnabled}
-                        />
                     </div>
+                </Card>
 
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50">
-                        <div className="flex items-start gap-3">
-                            <MessageSquare size={18} className="text-green-500 mt-0.5" />
-                            <div>
-                                <p className="font-medium text-surface-900 dark:text-white">
-                                    {t.smsNotifications.whatsappChannel}
-                                </p>
-                                <p className="text-sm text-surface-500">
-                                    {t.smsNotifications.smsEnabledDesc}
-                                </p>
+                {/* SMS & WhatsApp Notification Channels */}
+                <Card>
+                    <h3 className="font-semibold text-surface-900 dark:text-white mb-2">
+                        {t.smsNotifications.notificationChannels}
+                    </h3>
+                    <p className="text-sm text-surface-500 mb-6">
+                        {t.smsNotifications.notificationChannelsDesc}
+                    </p>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50">
+                            <div className="flex items-start gap-3">
+                                <Smartphone size={18} className="text-emerald-500 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-surface-900 dark:text-white">
+                                        {t.smsNotifications.smsChannel}
+                                    </p>
+                                    <p className="text-sm text-surface-500">
+                                        {t.smsNotifications.smsEnabledDesc}
+                                    </p>
+                                </div>
                             </div>
+                            <Toggle
+                                checked={smsEnabled}
+                                onChange={setSmsEnabled}
+                            />
                         </div>
-                        <Toggle
-                            checked={whatsappEnabled}
-                            onChange={setWhatsappEnabled}
-                        />
+
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50">
+                            <div className="flex items-start gap-3">
+                                <MessageSquare size={18} className="text-green-500 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-surface-900 dark:text-white">
+                                        {t.smsNotifications.whatsappChannel}
+                                    </p>
+                                    <p className="text-sm text-surface-500">
+                                        {t.smsNotifications.smsEnabledDesc}
+                                    </p>
+                                </div>
+                            </div>
+                            <Toggle
+                                checked={whatsappEnabled}
+                                onChange={setWhatsappEnabled}
+                            />
+                        </div>
                     </div>
-                </div>
-            </Card>
+                </Card>
+            </div>
 
             <div className="flex justify-end">
                 <Button type="submit" leftIcon={<Save size={18} />} isLoading={loading}>
