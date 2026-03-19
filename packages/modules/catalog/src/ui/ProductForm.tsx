@@ -54,16 +54,18 @@ export function ProductForm({ product }: ProductFormProps) {
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
         try {
             const data = await upload(file);
             if (data?.url) {
                 setImageUrl(data.url);
-                toast.success((t.menu as Record<string, string>).imageUploaded ?? "Image uploadée");
+                toast.success((t.menu as Record<string, string>).imageUploaded ?? "Image uploadée ✨");
             } else {
-                toast.error("Erreur upload");
+                toast.error("Impossible d'uploader l'image. Vérifiez la console pour plus de détails.");
             }
-        } catch {
-            toast.error("Erreur upload");
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            toast.error(`Erreur upload: ${errorMsg}`);
         }
     };
 
