@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Bell, Mail, Volume2, MessageSquare, Smartphone } from "lucide-react";
+import { Save, Bell, Mail, Volume2, MessageSquare, Smartphone, Clock } from "lucide-react";
 import { Card, Button, Toggle } from "@kbouffe/module-core/ui";
 import { toast } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -62,8 +62,8 @@ export function NotificationsForm() {
         setDailyReportEnabled((restaurant as any).dailyReportEnabled ?? true);
         setWaitAlertThreshold((restaurant as any).waitAlertThresholdMinutes?.toString() ?? "15");
 
-        if (restaurant.notification_info) {
-            const info = restaurant.notification_info as any;
+        if ((restaurant as any).notification_info) {
+            const info = (restaurant as any).notification_info;
             setSettings(prev => prev.map(s => ({
                 ...s,
                 email: info[s.id]?.email ?? s.email,
@@ -95,13 +95,14 @@ export function NotificationsForm() {
                     [s.id]: { email: s.email, push: s.push },
                 }), {});
 
-                await updateRestaurant({
+                const payload: any = {
                     sms_notifications_enabled: smsEnabled || whatsappEnabled,
-                    notification_channels: channels as unknown as import("@/lib/supabase/types").Json,
-                    notification_info: detailedSettings as unknown as import("@/lib/supabase/types").Json,
+                    notification_channels: channels,
+                    notification_info: detailedSettings,
                     dailyReportEnabled: dailyReportEnabled,
                     waitAlertThresholdMinutes: parseInt(waitAlertThreshold) || 15,
-                });
+                };
+                await updateRestaurant(payload);
             }
 
             toast.success(t.settings.notificationsUpdated);

@@ -76,7 +76,18 @@ packages/modules/<name>/
 
 ## Database Architecture
 
+
 **Single database: Supabase PostgreSQL.** All data resides in Supabase:
+
+### Performance Best Practices (Supabase/Postgres)
+
+- **Index all foreign keys**: Every foreign key column must have a dedicated index to ensure optimal query performance, especially on large tables. Review linter/advisor output regularly and add missing indexes as needed.
+	- Example: `CREATE INDEX IF NOT EXISTS idx_addresses_user_id ON public.addresses(user_id);`
+- **Monitor slow queries**: Use Supabase query analysis tools to identify and optimize slow queries.
+- **Review query plans**: For complex queries, always check the execution plan (`EXPLAIN`) to avoid sequential scans on large tables.
+- **Apply Supabase/Postgres best practices**: Follow the [Supabase Postgres Best Practices](https://supabase.com/docs/guides/database/database-linter) for schema design, indexing, and performance.
+
+> **Note:** The project must regularly run the Supabase advisor/linter and apply all recommended performance optimizations, especially regarding foreign key indexes.
 
 - `restaurants` — Restaurant profiles, settings, config
 - `users` — User accounts, wallet, preferences

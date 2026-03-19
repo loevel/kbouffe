@@ -35,12 +35,12 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
                 description: restaurant.description ?? "",
                 address: restaurant.address ?? "",
                 city: restaurant.city ?? "",
-                postalCode: restaurant.postal_code ?? "",
-                country: restaurant.country ?? "Cameroun",
+                postalCode: (restaurant as any).postal_code ?? "",
+                country: (restaurant as any).country ?? "Cameroun",
                 phone: restaurant.phone ?? "",
                 email: restaurant.email ?? "",
-                cuisineType: restaurant.cuisine_type ?? "",
-                priceRange: restaurant.price_range?.toString() ?? "1",
+                cuisineType: (restaurant as any).cuisine_type ?? "",
+                priceRange: (restaurant as any).price_range?.toString() ?? "1",
             });
         }
     }, [restaurant, isOpen]);
@@ -57,7 +57,7 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
         }
         setLoading(true);
 
-        const { error } = await updateRestaurant({
+        const payload: any = {
             name: form.name,
             description: form.description || null,
             address: form.address || null,
@@ -68,7 +68,9 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
             email: form.email || null,
             cuisineType: form.cuisineType || null,
             priceRange: parseInt(form.priceRange) || null,
-        });
+        };
+
+        const { error } = await updateRestaurant(payload);
 
         if (error) {
             toast.error(`${t.settings?.errorPrefix || "Erreur: "}${error}`);
@@ -83,7 +85,7 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
         <Modal 
             isOpen={isOpen} 
             onClose={onClose} 
-            title={t.store?.editProfileTitle || "Modifier le profil"}
+            title="Modifier le profil"
             size="lg"
         >
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,7 +119,7 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
                         onChange={(e) => updateField("city", e.target.value)} 
                     />
                     <Input 
-                        label={t.settings?.postalCode || "Code postal"} 
+                        label="Code postal" 
                         value={form.postalCode} 
                         onChange={(e) => updateField("postalCode", e.target.value)} 
                     />
@@ -133,12 +135,12 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
                         onChange={(e) => updateField("email", e.target.value)} 
                     />
                     <Input 
-                        label={t.settings?.cuisineType || "Type de cuisine"} 
+                        label="Type de cuisine" 
                         value={form.cuisineType} 
                         onChange={(e) => updateField("cuisineType", e.target.value)} 
                     />
                     <Select 
-                        label={t.settings?.priceRange || "Gamme de prix"} 
+                        label="Gamme de prix" 
                         value={form.priceRange} 
                         onChange={(e) => updateField("priceRange", e.target.value)}
                         options={[

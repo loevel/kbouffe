@@ -17,14 +17,16 @@ adminBillingRoutes.get("/stats", async (c) => {
         { count: completedPayCount, data: completedPaySum },
         { count: totalTxCount },
         { data: commRevSum },
-        { data: totalCommSum }
+        { data: totalCommSum },
+        { data: subRevSum }
     ] = await Promise.all([
         supabase.from("payouts").select("*", { count: "exact", head: false }),
         supabase.from("payouts").select("*", { count: "exact", head: false }).eq("status", "pending"),
         supabase.from("payouts").select("*", { count: "exact", head: false }).eq("status", "completed"),
         supabase.from("ledger_entries").select("*", { count: "exact", head: true }),
         supabase.from("ledger_entries").select("amount").eq("entry_type", "order_commission").eq("direction", "in"),
-        supabase.from("payouts").select("commission_amount")
+        supabase.from("payouts").select("commission_amount"),
+        supabase.from("ledger_entries").select("amount").eq("entry_type", "subscription").eq("direction", "in")
     ]);
 
     const sumAmount = (list: any[], key: string = "amount") => list?.reduce((acc, curr) => acc + (curr[key] || 0), 0) || 0;
@@ -41,6 +43,7 @@ adminBillingRoutes.get("/stats", async (c) => {
         transactions: { total: totalTxCount || 0 },
         commissionRevenue: sumAmount(commRevSum || []),
         totalCommission: sumAmount(totalCommSum || [], "commission_amount"),
+        subscriptionRevenue: sumAmount(subRevSum || []),
     });
 });
 

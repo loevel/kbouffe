@@ -11,6 +11,7 @@ import { adminMarketingRoutes } from "./marketing";
 import { adminSystemRoutes } from "./system";
 import { adminOrdersRoutes } from "./orders";
 import { adminCatalogRoutes } from "./catalog";
+import { adminMarketplaceRoutes } from "./marketplace";
 import { createClient } from "@supabase/supabase-js";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -98,5 +99,6 @@ adminRoutes.route("/marketing", adminMarketingRoutes);
 adminRoutes.route("/system", adminSystemRoutes);
 adminRoutes.route("/orders", adminOrdersRoutes);
 adminRoutes.route("/catalog", adminCatalogRoutes);
+adminRoutes.route("/marketplace", adminMarketplaceRoutes);
 // For backward compatibility on /admin/audit
 adminRoutes.route("/audit", adminSystemRoutes);

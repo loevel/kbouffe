@@ -74,7 +74,7 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
         {
             label: t.tables.showQr ?? "Code QR",
             onClick: () => setShowQr(true),
-            icon: <QrCode size={14} />,
+            icon: QrCode,
         },
         {
             label: t.common.delete,
@@ -126,7 +126,7 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
 
                 <div className="mt-3 flex items-center gap-2 text-xs text-surface-400">
                     <Clock3 size={12} />
-                    <span>{t.tables.statusSince ?? "Statut actuel"}</span>
+                    <span>Statut actuel</span>
                 </div>
 
                 {/* QR hint button */}

@@ -236,7 +236,7 @@ chat.post("/orders/:orderId/upload", async (c) => {
     const key = `chat/orders/${c.req.param("orderId")}/${crypto.randomUUID()}-${file.name}`;
     await bucket.put(key, file);
 
-    const url = `https://images.kbouffe.com/${key}`;
+    const url = `https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/${key}`;
 
     return c.json({ url });
 });
@@ -262,7 +262,7 @@ chat.post("/conversations/:id/upload", async (c) => {
     const key = `chat/${crypto.randomUUID()}-${file.name}`;
     await bucket.put(key, file);
 
-    const url = `https://images.kbouffe.com/${key}`;
+    const url = `https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/${key}`;
 
     return c.json({ url });
 });

@@ -7,6 +7,13 @@ if (process.env.NODE_ENV === "development") {
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "boissonsducameroun.com" },
+      { protocol: "https", hostname: "www.sa-ucb.com" },
+    ],
+  },
   async rewrites() {
     return [
       {

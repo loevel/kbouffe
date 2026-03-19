@@ -16,6 +16,7 @@ import {
     Flame,
     Megaphone,
     BarChart3,
+    Store as StoreIcon, // Alias to avoid conflict
 } from "lucide-react";
 import { KbouffeLogoWhite } from "../brand/Logo";
 import { cn } from "../../lib/utils";
@@ -23,7 +24,7 @@ import { useLocale } from "../../contexts/LocaleContext";
 import { useDashboard } from "../../contexts/DashboardContext";
 import { NAV_PERMISSIONS } from "../../lib/permissions";
 
-export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports";
+export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "marketplace";
 
 export interface NavItem {
     href: string;
@@ -42,15 +43,16 @@ export const navItemsDef: NavItem[] = [
     { href: "/dashboard/customers", labelKey: "customers", icon: Users },
     { href: "/dashboard/finances", labelKey: "finances", icon: Wallet },
     { href: "/dashboard/reports", labelKey: "reports", icon: BarChart3 },
+    { href: "/dashboard/marketing", labelKey: "marketing", icon: Megaphone },
+    { href: "/dashboard/marketplace", labelKey: "marketplace", icon: StoreIcon },
     { href: "/dashboard/store", labelKey: "myStore", icon: Store },
     { href: "/dashboard/team", labelKey: "team", icon: Users2 },
     { href: "/dashboard/settings", labelKey: "settings", icon: Settings },
 ];
 
 export const MODULE_REQUIREMENTS: Record<string, string> = {
-    "/dashboard/reservations": "reservations",
-    "/dashboard/marketing": "marketing",
-    "/dashboard/team": "hr",
+    // All navigation items are available for all restaurants by default
+    // Modules can still be managed via store_modules table if needed
 };
 
 interface SidebarProps {
@@ -65,8 +67,7 @@ export function Sidebar({ pendingOrderCount = 0 }: SidebarProps) {
     const allNavItems: NavItem[] = [
         ...navItemsDef.map(item =>
             item.labelKey === "orders" ? { ...item, badge: pendingOrderCount } : item
-        ),
-        { href: "/dashboard/marketing", labelKey: "marketing", icon: Megaphone },
+        )
     ];
 
     const navItems = allNavItems.filter((item) => {

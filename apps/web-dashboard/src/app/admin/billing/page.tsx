@@ -31,6 +31,7 @@ interface BillingStats {
     transactions: { total: number };
     commissionRevenue: number;
     totalCommission: number;
+    subscriptionRevenue: number;
 }
 
 function formatFCFA(val: number) {
@@ -160,8 +161,8 @@ export default function AdminBillingPage() {
                     {/* Main Analytics Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <KpiCard
-                            label="Revenus Net Commission"
-                            value={formatFCFA(s?.commissionRevenue ?? 0)}
+                            label="Revenus Abonnements"
+                            value={formatFCFA(s?.subscriptionRevenue ?? 0)}
                             sub="Propriété Plateforme"
                             icon={BadgeDollarSign}
                             iconColor="bg-brand-500 text-white shadow-xl shadow-brand-500/20"
@@ -218,9 +219,9 @@ export default function AdminBillingPage() {
                             className="grid grid-cols-1 sm:grid-cols-2 gap-6"
                         >
                             <KpiCard
-                                label="Commissions Brutes"
+                                label="Historique Commissions"
                                 value={formatFCFA(s?.totalCommission ?? 0)}
-                                sub="Historique global"
+                                sub="Données archivées"
                                 icon={TrendingUp}
                                 iconColor="bg-blue-600 text-white shadow-xl shadow-blue-600/20"
                                 index={3}
@@ -271,7 +272,7 @@ export default function AdminBillingPage() {
                         <div className="space-y-4">
                             <h3 className="text-3xl font-black text-surface-900 dark:text-white tracking-tight">Registre Ledger</h3>
                             <p className="text-surface-500 text-lg leading-relaxed font-medium">
-                                Audit granulaire de chaque commission prélevée et traçabilité complète des écritures de trésorerie.
+                                Audit granulaire de chaque abonnement et traçabilité complète des écritures de trésorerie.
                             </p>
                         </div>
                         <div className="flex items-center gap-2 text-purple-500 font-black text-sm group-hover:gap-4 transition-all uppercase tracking-widest">

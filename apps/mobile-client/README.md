@@ -1,50 +1,135 @@
-# Welcome to your Expo app 👋
+# Kbouffe Mobile Client
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application mobile cliente pour commander de la nourriture, construite avec **Expo** et **React Native**.
 
-## Get started
+## Stack
 
-1. Install dependencies
+- **Expo 54** — Framework React Native
+- **React Native 0.81** — UI native cross-platform
+- **React 19** — Dernière version de React
+- **Expo Router** — Navigation basée sur les fichiers
+- **Supabase** — Backend + Auth
 
-   ```bash
-   npm install
-   ```
+## Structure
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+app/
+├── (auth)/               # Écrans d'authentification
+│   ├── login.tsx
+│   └── register.tsx
+├── (tabs)/               # Navigation principale
+│   ├── index.tsx         # Accueil / Explorer
+│   ├── orders.tsx        # Mes commandes
+│   └── profile.tsx       # Mon profil
+├── cart.tsx              # Panier
+├── checkout.tsx          # Paiement
+├── onboarding.tsx        # Onboarding
+├── product-modal.tsx     # Détail produit
+├── order/                # Suivi de commande
+├── restaurant/           # Page restaurant
+├── profile/              # Sous-pages profil
+└── _layout.tsx           # Layout racine
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Installation
 
-## Learn more
+```bash
+# Depuis la racine du monorepo
+npm install
 
-To learn more about developing your project with Expo, look at the following resources:
+# Configurer les variables d'environnement
+cp .env.example .env
+# Éditer .env avec vos clés
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Développement
 
-## Join the community
+```bash
+# Lancer Expo
+npm start
 
-Join our community of developers creating universal apps.
+# Ou directement sur une plateforme
+npm run ios      # Simulateur iOS
+npm run android  # Émulateur Android
+npm run web      # Navigateur web
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Variables d'environnement
+
+| Variable | Description |
+|----------|-------------|
+| `EXPO_PUBLIC_API_URL` | URL de l'API backend |
+| `EXPO_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Clé publique Supabase |
+
+## Fonctionnalités
+
+### Client
+- Parcourir les restaurants
+- Consulter les menus
+- Ajouter au panier
+- Commander et payer
+- Suivre les commandes
+- Gérer son profil
+- Avis et évaluations
+
+### Authentification
+- Connexion / Inscription
+- Connexion sociale (Google, Apple)
+- Récupération de mot de passe
+
+## Navigation
+
+L'app utilise **Expo Router** avec une structure de fichiers :
+
+```
+app/
+├── _layout.tsx           # RootLayout avec providers
+├── index.tsx             # Redirection initiale
+├── (auth)/               # Groupe auth (non connecté)
+├── (tabs)/               # Groupe tabs (connecté)
+└── [...rest]             # Routes dynamiques
+```
+
+## Composants Partagés
+
+```
+components/
+├── ui/                   # Composants UI de base
+├── navigation/           # TabBar, Header
+└── features/             # Composants métier
+```
+
+## Build & Déploiement
+
+### Development Build
+```bash
+npx expo run:ios
+npx expo run:android
+```
+
+### Production Build (EAS)
+```bash
+# Configurer EAS
+eas build:configure
+
+# Build iOS
+eas build --platform ios
+
+# Build Android
+eas build --platform android
+
+# Soumettre aux stores
+eas submit --platform ios
+eas submit --platform android
+```
+
+## Dépendances Clés
+
+| Package | Usage |
+|---------|-------|
+| `expo-router` | Navigation |
+| `expo-image` | Images optimisées |
+| `expo-haptics` | Retour haptique |
+| `react-native-reanimated` | Animations fluides |
+| `@supabase/supabase-js` | Client Supabase |

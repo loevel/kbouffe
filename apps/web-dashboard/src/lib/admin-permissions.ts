@@ -34,6 +34,8 @@ export type AdminPermission =
     | "admin:billing:payouts"     // Trigger payouts, adjust commissions
     // Support
     | "admin:support:manage"      // Read, reply, close tickets
+    // Marketplace
+    | "admin:marketplace:manage"  // Manage services and packs
     // Platform Settings
     | "admin:settings:manage"     // Edit global variables, fee structures
     ;
@@ -50,6 +52,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
         "admin:marketing:read", "admin:marketing:write",
         "admin:billing:read", "admin:billing:payouts",
         "admin:support:manage",
+        "admin:marketplace:manage",
         "admin:settings:manage"
     ],
     support: [
@@ -64,6 +67,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
         "admin:dashboard:read",
         "admin:restaurants:read", "admin:restaurants:write",
         "admin:marketing:read",
+        "admin:marketplace:manage",
     ],
     moderator: [
         "admin:dashboard:read",
@@ -114,6 +118,7 @@ export const ADMIN_NAV_PERMISSIONS: Record<string, AdminPermission> = {
     "/admin/billing": "admin:billing:read",
     "/admin/audits": "admin:settings:manage", // Let's restrict audits to super admin via settings:manage
     "/admin/marketing": "admin:marketing:read",
+    "/admin/marketplace": "admin:marketplace:manage",
     "/admin/reviews": "admin:reviews:manage",
     "/admin/support": "admin:support:manage",
     "/admin/settings": "admin:settings:manage",
