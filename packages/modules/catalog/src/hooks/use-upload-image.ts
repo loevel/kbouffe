@@ -13,9 +13,17 @@ export function useUploadImage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/upload", {
+      // Use the API server that has Cloudflare R2 access (with fallback)
+      const uploadUrl = process.env.NEXT_PUBLIC_API_URL
+        ? `${process.env.NEXT_PUBLIC_API_URL}/upload`
+        : "/api/upload";
+
+      console.log("[useUploadImage] Upload URL:", uploadUrl);
+
+      const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData,
+        credentials: "include", // Include cookies for authentication
       });
 
       console.log("[useUploadImage] Réponse API:", { status: response.status, ok: response.ok });

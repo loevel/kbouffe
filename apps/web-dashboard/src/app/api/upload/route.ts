@@ -1,8 +1,28 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "edge";
+
+interface R2Bucket {
+  put(
+    key: string,
+    value: ReadableStream<Uint8Array> | ArrayBuffer | string,
+    options?: { httpMetadata?: { contentType: string }; customMetadata?: Record<string, string> }
+  ): Promise<R2Object>;
+}
+
+interface R2Object {
+  key: string;
+  version: string;
+  size: number;
+  etag: string;
+  httpEtag: string;
+  checksums: Record<string, string>;
+  uploaded: Date;
+  httpMetadata: { contentType: string };
+  customMetadata: Record<string, string>;
+  range?: { offset: number; length: number };
+}
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5 Mo
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
@@ -47,41 +67,38 @@ export async function POST(request: NextRequest) {
         const key = `dishes/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
         console.log("[Upload API] Clé préparée:", key);
 
-        try {
-            // Accès aux bindings Cloudflare via OpenNext
-            const { env } = getCloudflareContext();
-            const bucket = env.IMAGES_BUCKET as R2Bucket;
+        // 5. Upload vers R2
+        console.log("[Upload API] Accès au bucket R2...");
+        const bucket = (request as any).env?.IMAGES_BUCKET as R2Bucket | undefined;
 
-            if (!bucket) {
-                console.error("[Upload API] IMAGES_BUCKET binding non trouvé");
-                throw new Error("Binding IMAGES_BUCKET non trouvé");
-            }
-
-            console.log("[Upload API] Début de l'upload R2...");
-            await bucket.put(key, file.stream(), {
-                httpMetadata: {
-                    contentType: file.type,
-                },
-                customMetadata: {
-                    uploadedBy: user.id,
-                }
-            });
-            console.log("[Upload API] Upload R2 réussi");
-
-            // URL publique du bucket R2
-            const publicUrl = `${process.env.NEXT_PUBLIC_IMAGES_BASE_URL ?? "https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com"}/${key}`;
-
-            console.log("[Upload API] Succès:", { url: publicUrl });
-            return NextResponse.json({
-                success: true,
-                url: publicUrl,
-                key: key
-            });
-
-        } catch (r2Error) {
-            console.error("[Upload API] Erreur R2:", r2Error instanceof Error ? r2Error.message : String(r2Error));
-            throw r2Error;
+        if (!bucket) {
+            console.error("[Upload API] IMAGES_BUCKET binding non trouvé");
+            console.error("[Upload API] env keys:", Object.keys((request as any).env || {}));
+            throw new Error("Binding IMAGES_BUCKET non disponible. Vérifiez que le binding est configuré dans wrangler.toml");
         }
+
+        console.log("[Upload API] Début de l'upload R2...");
+        const arrayBuffer = await file.arrayBuffer();
+
+        await bucket.put(key, arrayBuffer, {
+            httpMetadata: {
+                contentType: file.type,
+            },
+            customMetadata: {
+                uploadedBy: user.id,
+            }
+        });
+        console.log("[Upload API] Upload R2 réussi");
+
+        // URL publique du bucket R2
+        const publicUrl = `https://kbouffe-images.d58014fa11833876c245e4828ab1cc8a.r2.cloudflarecontent.com/${key}`;
+
+        console.log("[Upload API] Succès:", { url: publicUrl });
+        return NextResponse.json({
+            success: true,
+            url: publicUrl,
+            key: key
+        });
 
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
