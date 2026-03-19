@@ -13,7 +13,7 @@ export default function EditProductPage() {
     const { t } = useLocale();
     const { products, isLoading } = useProducts();
     const productId = Array.isArray(params.id) ? params.id[0] : params.id;
-    const product = products.find(p => p.id === productId);
+    const product = products.find((p: any) => p.id === productId);
 
     if (isLoading) {
         return (

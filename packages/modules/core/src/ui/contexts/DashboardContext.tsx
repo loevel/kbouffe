@@ -10,9 +10,21 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "../lib/supabase-client";
-import type { User, Restaurant, Tables } from "../lib/supabase-types";
+import type { Restaurant, Tables } from "../lib/supabase-types";
 import { MOCK_USER, MOCK_RESTAURANT } from "../lib/mock-data";
 import { hasPermission as checkPermission, type TeamRole, type Permission } from "../lib/permissions";
+
+// Re-define User to match API response which may include extra roles
+type User = {
+    id: string;
+    email: string | null;
+    phone: string | null;
+    full_name: string;
+    role: string; // Widened from UserRole to string to allow "admin", "support"
+    avatar_url: string | null;
+    created_at: string;
+    updated_at: string;
+}
 
 type RestaurantUpdate = Tables["restaurants"]["Update"];
 
@@ -121,7 +133,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             // Essayer de récupérer les données depuis Cloudflare D1
             try {
                 const response = await fetch("/api/sync-user");
-                const data = await response.json();
+                const data = await response.json() as any;
 
                 if (response.ok && data.user) {
                     setUser(data.user);
@@ -143,14 +155,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
                     const syncResponse = await fetch("/api/sync-user", {
                         method: "POST",
                     });
-                    const syncData = await syncResponse.json();
+                    const syncData = await syncResponse.json() as any;
 
                     if (syncResponse.ok && syncData.user) {
                         setUser(syncData.user);
                         // Récupérer le restaurant si créé
                         if (syncData.restaurantId) {
                             const restaurantResponse = await fetch("/api/sync-user");
-                            const restaurantData = await restaurantResponse.json();
+                            const restaurantData = await restaurantResponse.json() as any;
                             if (restaurantData.restaurant) {
                                 setRestaurant(restaurantData.restaurant);
                             }
@@ -200,7 +212,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         try {
             // Essayer D1 d'abord
             const response = await fetch("/api/sync-user");
-            const data = await response.json();
+            const data = await response.json() as any;
 
             if (response.ok && data.restaurant) {
                 setRestaurant(data.restaurant);
@@ -242,14 +254,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
                 });
 
                 if (response.ok) {
-                    const result = await response.json();
+                    const result = await response.json() as any;
                     if (result.restaurant) {
                         setRestaurant(result.restaurant);
                     }
                     return { error: null };
                 }
 
-                const errorData = await response.json();
+                const errorData = await response.json() as any;
                 throw new Error(errorData.error || "Erreur de mise à jour");
             } catch (d1Error) {
                 // Fallback Supabase

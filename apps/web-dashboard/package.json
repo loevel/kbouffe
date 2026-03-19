@@ -21,6 +21,7 @@
     "@kbouffe/module-crm": "*",
     "@kbouffe/module-marketing": "*",
     "@kbouffe/module-orders": "*",
+    "@kbouffe/module-reports": "*",
     "@kbouffe/module-reservations": "*",
     "@squoosh/lib": "^0.3.1",
     "@supabase/ssr": "^0.8.0",

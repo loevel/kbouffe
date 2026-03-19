@@ -16,7 +16,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { RestaurantCard } from '@/components/restaurant/RestaurantCard';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { MOCK_PROMOS } from '@/data/mocks';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -148,7 +151,10 @@ export default function HomeScreen() {
                             style={styles.promoCard}
                             imageStyle={{ borderRadius: Radii.xl }}
                         >
-                            <View style={styles.promoOverlay}>
+                            <LinearGradient
+                                colors={['transparent', 'rgba(0,0,0,0.85)']}
+                                style={styles.promoOverlay}
+                            >
                                 <View style={styles.promoContent}>
                                     <View style={styles.promoTextContainer}>
                                         <Text style={styles.promoTitle}>{promo.title}</Text>
@@ -159,21 +165,14 @@ export default function HomeScreen() {
                                         <Ionicons name="arrow-forward" size={14} color="#fff" />
                                     </View>
                                 </View>
-                            </View>
+                            </LinearGradient>
                         </ImageBackground>
                     </Pressable>
                 ))}
             </ScrollView>
             <View style={styles.dotRow}>
                 {MOCK_PROMOS.map((_, i) => (
-                    <View
-                        key={i}
-                        style={[
-                            styles.dotBase,
-                            { backgroundColor: i === activePromo ? theme.primary : theme.border },
-                            i === activePromo && { width: 14 },
-                        ]}
-                    />
+                    <PaginationDot key={i} index={i} currentIndex={activePromo} theme={theme} />
                 ))}
             </View>
 
@@ -226,10 +225,12 @@ export default function HomeScreen() {
     );
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+        <View style={[styles.container, { backgroundColor: theme.background, paddingTop: Math.max(insets.top, 20) + Spacing.sm }]}>
             {loadingRestaurants && restaurants.length === 0 && (
-                <View style={{ padding: Spacing.lg, alignItems: 'center' }}>
-                    <ActivityIndicator color={theme.primary} />
+                <View style={{ paddingHorizontal: Spacing.md, gap: Spacing.lg, marginTop: Spacing.md }}>
+                    <Skeleton height={260} borderRadius={Radii.xl} />
+                    <Skeleton height={260} borderRadius={Radii.xl} />
+                    <Skeleton height={260} borderRadius={Radii.xl} />
                 </View>
             )}
             <FlatList
@@ -324,7 +325,6 @@ const styles = StyleSheet.create({
     },
     promoOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.3)',
         justifyContent: 'flex-end',
         padding: Spacing.md,
     },
@@ -339,36 +339,36 @@ const styles = StyleSheet.create({
     },
     promoTitle: { 
         color: '#fff', 
-        fontSize: 20, 
+        ...Typography.title3,
         fontWeight: '800', 
         marginBottom: 2,
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 10
     },
     promoSubtitle: { 
-        color: '#fff', 
-        fontSize: 14, 
-        fontWeight: '500',
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 10
+        color: 'rgba(255,255,255,0.9)', 
+        ...Typography.caption,
     },
     promoCta: {
         paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs,
+        paddingVertical: Spacing.sm,
         borderRadius: Radii.full,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
     },
     promoCtaText: {
         color: '#fff',
-        fontSize: 12,
+        ...Typography.small,
         fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    dotRow: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: Spacing.sm, marginBottom: Spacing.lg },
-    dotBase: { width: 6, height: 6, borderRadius: 3 },
+    dotRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: Spacing.sm, marginBottom: Spacing.lg },
+    dotBase: { height: 6, borderRadius: 3 },
     sponsoredList: { paddingHorizontal: Spacing.md, gap: Spacing.sm, paddingBottom: Spacing.xs },
     sponsoredCard: {
         width: 200,
@@ -393,3 +393,16 @@ const styles = StyleSheet.create({
     sponsoredMetaTxt: { fontSize: 11 },
     metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#cbd5e1' },
 });
+
+function PaginationDot({ index, currentIndex, theme }: { index: number, currentIndex: number, theme: any }) {
+    const isActive = index === currentIndex;
+    
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            width: withSpring(isActive ? 20 : 8, { damping: 15 }),
+            backgroundColor: withTiming(isActive ? theme.primary : theme.border, { duration: 300 }),
+        };
+    });
+
+    return <Animated.View style={[styles.dotBase, animatedStyle]} />;
+}

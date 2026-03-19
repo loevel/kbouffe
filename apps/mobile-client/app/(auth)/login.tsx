@@ -19,7 +19,10 @@ export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
 
     const handleLogin = async () => {
-        if (!identifier || !password) return;
+        if (!identifier || !password) {
+            Alert.alert('Champs requis', 'Veuillez renseigner votre identifiant et votre mot de passe.');
+            return;
+        }
         setLoading(true);
         try {
             await login(identifier, password);

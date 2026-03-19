@@ -21,7 +21,7 @@ export function PopularProducts() {
 
     // Show top 5 available products by price (as proxy for popularity until order analytics are added)
     const popularProducts = products
-        .filter((p) => p.is_available)
+        .filter((p: any) => p.is_available)
         .slice(0, 5);
 
     if (isLoading) {
@@ -49,8 +49,8 @@ export function PopularProducts() {
                 <CardTitle>{t.dashboard.popularProducts}</CardTitle>
             </CardHeader>
             <div className="divide-y divide-surface-100 dark:divide-surface-800">
-                {popularProducts.map((product, i) => {
-                    const category = categories.find((c) => c.id === product.category_id);
+                {popularProducts.map((product: any, i: number) => {
+                    const category = categories.find((c: any) => c.id === product.category_id);
                     return (
                         <div key={product.id} className="flex items-center gap-4 px-6 py-3">
                             <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradients[i]} flex items-center justify-center text-white font-bold text-sm shrink-0`}>

@@ -1,12 +1,12 @@
 /**
  * RBAC Permission system for restaurant teams.
  *
- * Roles: owner > manager > cashier | cook | viewer
+ * Roles: owner > manager > cashier | cook | driver | viewer
  * Each role grants a fixed set of permissions.
  */
 
 // ── Types ──────────────────────────────────────────────────────────────
-export type TeamRole = "owner" | "manager" | "cashier" | "cook" | "viewer";
+export type TeamRole = "owner" | "manager" | "cashier" | "cook" | "driver" | "viewer";
 
 export type Permission =
     // Dashboard
@@ -15,6 +15,8 @@ export type Permission =
     | "orders:read"
     | "orders:manage"      // accept, reject, cancel
     | "orders:mark_ready"
+    | "orders:kitchen"     // specific KDS access
+    | "orders:delivery"    // specific delivery access
     // Menu
     | "menu:read"
     | "menu:write"
@@ -47,7 +49,7 @@ export type MemberStatus = "pending" | "active" | "revoked";
 const ROLE_PERMISSIONS: Record<TeamRole, readonly Permission[]> = {
     owner: [
         "dashboard:read",
-        "orders:read", "orders:manage", "orders:mark_ready",
+        "orders:read", "orders:manage", "orders:mark_ready", "orders:kitchen", "orders:delivery",
         "menu:read", "menu:write",
         "customers:read",
         "finances:read",
@@ -61,7 +63,7 @@ const ROLE_PERMISSIONS: Record<TeamRole, readonly Permission[]> = {
     ],
     manager: [
         "dashboard:read",
-        "orders:read", "orders:manage", "orders:mark_ready",
+        "orders:read", "orders:manage", "orders:mark_ready", "orders:kitchen", "orders:delivery",
         "menu:read", "menu:write",
         "customers:read",
         "finances:read",
@@ -74,11 +76,14 @@ const ROLE_PERMISSIONS: Record<TeamRole, readonly Permission[]> = {
     ],
     cashier: [
         "orders:read", "orders:manage", "orders:mark_ready",
-        "reservations:read",
+        "tables:manage",
+        "reservations:read", "reservations:manage",
     ],
     cook: [
-        "orders:read", "orders:mark_ready",
-        "menu:read",
+        "orders:kitchen", "orders:mark_ready",
+    ],
+    driver: [
+        "orders:delivery",
     ],
     viewer: [
         "dashboard:read",
@@ -108,6 +113,7 @@ const ROLE_HIERARCHY: Record<TeamRole, number> = {
     manager: 80,
     cashier: 30,
     cook: 20,
+    driver: 20,
     viewer: 10,
 };
 
@@ -116,10 +122,10 @@ export function canManageRole(actorRole: TeamRole, targetRole: TeamRole): boolea
 }
 
 /** All available roles (for dropdowns) */
-export const TEAM_ROLES: TeamRole[] = ["owner", "manager", "cashier", "cook", "viewer"];
+export const TEAM_ROLES: TeamRole[] = ["owner", "manager", "cashier", "cook", "driver", "viewer"];
 
 /** Assignable roles (owner cannot be assigned, it's automatic) */
-export const ASSIGNABLE_ROLES: TeamRole[] = ["manager", "cashier", "cook", "viewer"];
+export const ASSIGNABLE_ROLES: TeamRole[] = ["manager", "cashier", "cook", "driver", "viewer"];
 
 /** Human-readable role labels (used in UI) */
 export const ROLE_LABELS: Record<TeamRole, { fr: string; en: string }> = {
@@ -127,6 +133,7 @@ export const ROLE_LABELS: Record<TeamRole, { fr: string; en: string }> = {
     manager: { fr: "Gérant",      en: "Manager" },
     cashier: { fr: "Caissier",    en: "Cashier" },
     cook:    { fr: "Cuisinier",   en: "Cook" },
+    driver:  { fr: "Livreur",     en: "Driver" },
     viewer:  { fr: "Observateur", en: "Viewer" },
 };
 
@@ -136,6 +143,7 @@ export const ROLE_BADGE_VARIANT: Record<TeamRole, "brand" | "info" | "success" |
     manager: "info",
     cashier: "success",
     cook:    "warning",
+    driver:  "warning",
     viewer:  "default",
 };
 
@@ -143,7 +151,7 @@ export const ROLE_BADGE_VARIANT: Record<TeamRole, "brand" | "info" | "success" |
 export const NAV_PERMISSIONS: Record<string, Permission> = {
     "/dashboard":                   "dashboard:read",
     "/dashboard/orders":            "orders:read",
-    "/dashboard/orders/kitchen":    "orders:read",
+    "/dashboard/orders/kitchen":    "orders:kitchen",
     "/dashboard/menu":              "menu:read",
     "/dashboard/customers":         "customers:read",
     "/dashboard/finances":          "finances:read",

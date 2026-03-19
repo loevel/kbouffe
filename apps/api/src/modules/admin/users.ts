@@ -299,3 +299,49 @@ adminUsersRoutes.post("/:id/reset-password", async (c) => {
 
     return c.json({ success: true, message: "Lien de récupération généré. L'utilisateur recevra un email si configuré, ou vous pouvez gérer les liens manuellement." });
 });
+
+/** POST /admin/users/:id/impersonate — Generate a login link for support */
+adminUsersRoutes.post("/:id/impersonate", async (c) => {
+    const denied = requireDomain(c, "users:write");
+    if (denied) return denied;
+    const id = c.req.param("id");
+
+    const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    // Fetch user to ensure existence
+    const { data: user, error: fetchError } = await supabaseAdmin
+        .from("users")
+        .select("email, role")
+        .eq("id", id)
+        .single();
+
+    if (fetchError || !user) return c.json({ error: "Utilisateur introuvable" }, 404);
+
+    // Super-Admin only can impersonate other Admins
+    if (user.role === 'admin' && c.get("adminRole") !== 'super_admin') {
+        return c.json({ error: "Seuls les Super-Admins peuvent impersonner d'autres Admins" }, 403);
+    }
+
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: user.email,
+        options: {
+            redirectTo: c.env.DASHBOARD_URL || 'http://localhost:3000/dashboard'
+        }
+    });
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    await logAdminAction(c, { 
+        action: "impersonate_user", 
+        targetType: "user", 
+        targetId: id,
+        details: { email: user.email }
+    });
+
+    return c.json({ 
+        success: true, 
+        magicLink: data.properties.action_link,
+        message: "Utilisez ce lien pour accéder au compte de l'utilisateur."
+    });
+});

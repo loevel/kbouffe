@@ -30,18 +30,14 @@ adminRoutes.get("/stats", async (c) => {
     const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
 
     const [
-        { count: totalRestaurants },
-        { count: activeRestaurants },
-        { count: pendingRestaurants },
+        { data: globalMetrics },
         { count: totalUsers },
         { count: countClients },
         { count: countMerchants },
         { count: countLivreurs },
         { data: newSupabaseRestaurants }
     ] = await Promise.all([
-        supabase.from("restaurants").select("*", { count: "exact", head: true }),
-        supabase.from("restaurants").select("*", { count: "exact", head: true }).eq("is_published", true),
-        supabase.from("restaurants").select("*", { count: "exact", head: true }).eq("is_published", false).eq("is_verified", false),
+        supabase.from("platform_global_metrics").select("*").single(),
 
         supabase.from("users").select("*", { count: "exact", head: true }),
         supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "customer"),
@@ -61,17 +57,31 @@ adminRoutes.get("/stats", async (c) => {
         createdAt: r.created_at
     }));
 
+    const metrics = globalMetrics || { 
+        total_restaurants: 0, 
+        active_restaurants: 0, 
+        total_gmv: 0, 
+        total_orders: 0, 
+        total_unique_customers: 0 
+    };
+
     return c.json({
         restaurants: { 
-            total: totalRestaurants || 0, 
-            active: activeRestaurants || 0, 
-            pending: pendingRestaurants || 0 
+            total: metrics.total_restaurants, 
+            active: metrics.active_restaurants, 
+            pending: metrics.total_restaurants - metrics.active_restaurants
         },
         users: { 
             total: totalUsers || 0, 
             customers: countClients || 0,
             merchants: countMerchants || 0,
             drivers: countLivreurs || 0
+        },
+        metrics: {
+            gmv: metrics.total_gmv,
+            totalOrders: metrics.total_orders,
+            totalCustomers: metrics.total_unique_customers,
+            avgOrderValue: metrics.total_orders > 0 ? Math.round(metrics.total_gmv / metrics.total_orders) : 0
         },
         recentActivity: { newRestaurants }
     });

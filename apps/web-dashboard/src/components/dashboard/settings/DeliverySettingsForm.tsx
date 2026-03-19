@@ -16,6 +16,8 @@ export function DeliverySettingsForm() {
         deliveryPerKmFee: restaurant?.delivery_per_km_fee?.toString() ?? "0",
         maxDeliveryRadiusKm: restaurant?.max_delivery_radius_km?.toString() ?? "10",
         minOrderAmount: restaurant?.min_order_amount?.toString() ?? "0",
+        freeDeliveryThreshold: (restaurant as any)?.freeDeliveryThreshold?.toString() ?? "",
+        estimatedDeliveryTime: (restaurant as any)?.estimatedDeliveryTime?.toString() ?? "30",
     });
     const [zones, setZones] = useState<string[]>(
         (restaurant?.delivery_zones as unknown as string[]) ?? []
@@ -30,6 +32,8 @@ export function DeliverySettingsForm() {
             deliveryPerKmFee: restaurant.delivery_per_km_fee?.toString() ?? "0",
             maxDeliveryRadiusKm: restaurant.max_delivery_radius_km?.toString() ?? "10",
             minOrderAmount: restaurant.min_order_amount?.toString() ?? "0",
+            freeDeliveryThreshold: (restaurant as any).freeDeliveryThreshold?.toString() ?? "",
+            estimatedDeliveryTime: (restaurant as any).estimatedDeliveryTime?.toString() ?? "30",
         });
         setZones((restaurant.delivery_zones as unknown as string[]) ?? []);
     }, [restaurant]);
@@ -53,6 +57,8 @@ export function DeliverySettingsForm() {
             delivery_per_km_fee: Number(form.deliveryPerKmFee) || 0,
             max_delivery_radius_km: Number(form.maxDeliveryRadiusKm) || 10,
             min_order_amount: Number(form.minOrderAmount) || 0,
+            freeDeliveryThreshold: form.freeDeliveryThreshold ? Number(form.freeDeliveryThreshold) : null,
+            estimatedDeliveryTime: Number(form.estimatedDeliveryTime) || 30,
             delivery_zones: zones as unknown as Json,
         });
         if (error) {
@@ -81,10 +87,18 @@ export function DeliverySettingsForm() {
                         onChange={(e) => setForm(prev => ({ ...prev, deliveryPerKmFee: e.target.value }))}
                     />
                     <Input
-                        label={t.settings.maxDeliveryRadiusKm}
+                        label="Livraison gratuite au-dessus de (FCFA)"
                         type="number"
-                        value={form.maxDeliveryRadiusKm}
-                        onChange={(e) => setForm(prev => ({ ...prev, maxDeliveryRadiusKm: e.target.value }))}
+                        placeholder="Ex: 15000"
+                        value={form.freeDeliveryThreshold}
+                        onChange={(e) => setForm(prev => ({ ...prev, freeDeliveryThreshold: e.target.value }))}
+                        hint="Laissez vide pour désactiver"
+                    />
+                    <Input
+                        label="Délai de livraison moyen (min)"
+                        type="number"
+                        value={form.estimatedDeliveryTime}
+                        onChange={(e) => setForm(prev => ({ ...prev, estimatedDeliveryTime: e.target.value }))}
                     />
                     <Input
                         label={t.settings.minOrder}

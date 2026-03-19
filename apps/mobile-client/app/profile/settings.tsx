@@ -2,23 +2,30 @@ import { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Pressable, Switch, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
+import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/theme-context';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function SettingsScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
     const { preference, setPreference } = useAppTheme();
+    const { user, updateProfile } = useAuth();
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
 
-    const [notifications, setNotifications] = useState(true);
-    const [orderUpdates, setOrderUpdates] = useState(true);
-    const [promos, setPromos] = useState(false);
-    const darkMode = preference === 'dark';
-    const themeModeLabel = preference === 'system' ? 'Automatique' : darkMode ? 'Sombre' : 'Clair';
+    const [notifications, setNotifications] = useState(user?.profile?.notificationsEnabled ?? true);
+    const [language, setLanguage] = useState<'fr' | 'en'>(user?.profile?.preferredLang === 'en' ? 'en' : 'fr');
+
+    const handleLanguageChange = () => {
+        const newLang = language === 'fr' ? 'en' : 'fr';
+        setLanguage(newLang);
+        if (updateProfile) {
+            updateProfile({ profile: { ...user?.profile, preferredLang: newLang } });
+        }
+    };
 
     const handleDeleteAccount = () => {
         Alert.alert(
@@ -31,148 +38,136 @@ export default function SettingsScreen() {
         );
     };
 
+    const ThemeOption = ({ label, value, icon }: { label: string, value: 'light' | 'dark' | 'system', icon: any }) => {
+        const isActive = preference === value;
+        return (
+            <Pressable
+                style={[
+                    styles.themeOption,
+                    { 
+                        backgroundColor: isActive ? theme.primary : theme.background,
+                        borderColor: isActive ? theme.primary : theme.border,
+                    }
+                ]}
+                onPress={() => setPreference(value)}
+            >
+                <Ionicons name={icon} size={18} color={isActive ? '#fff' : theme.icon} />
+                <Text style={[styles.themeOptionText, { color: isActive ? '#fff' : theme.icon }]}>{label}</Text>
+            </Pressable>
+        );
+    };
+
     return (
         <ScrollView
             style={[styles.container, { backgroundColor: theme.background }]}
             contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xl }}
         >
+            {/* Header */}
+            <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
+                <Pressable onPress={() => router.back()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                </Pressable>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Paramètres</Text>
+                <View style={{ width: 40 }} />
+            </View>
+
             {/* Notifications */}
             <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.icon }]}>Notifications</Text>
-                <View style={[styles.card, { borderColor: theme.border }]}>
-                    <View style={[styles.row, { borderBottomColor: theme.border }]}>
+                <Text style={[styles.sectionTitle, { color: theme.icon }]}>Préférences</Text>
+                <View style={[styles.card, { backgroundColor: theme.surface }]}>
+                    <View style={styles.row}>
                         <View style={styles.rowContent}>
-                            <Ionicons name="notifications-outline" size={20} color={theme.text} />
-                            <Text style={[styles.rowLabel, { color: theme.text }]}>Notifications push</Text>
+                            <View style={[styles.iconBox, { backgroundColor: theme.primary + '15' }]}>
+                                <Ionicons name="notifications" size={20} color={theme.primary} />
+                            </View>
+                            <Text style={[styles.rowLabel, { color: theme.text }]}>Notifications</Text>
                         </View>
                         <Switch
                             value={notifications}
-                            onValueChange={setNotifications}
-                            trackColor={{ false: theme.border, true: theme.primary + '60' }}
+                            onValueChange={(val) => {
+                                setNotifications(val);
+                                if (updateProfile) updateProfile({ profile: { ...user?.profile, notificationsEnabled: val } });
+                            }}
+                            trackColor={{ false: theme.border, true: theme.primary + '80' }}
                             thumbColor={notifications ? theme.primary : '#f4f3f4'}
                         />
                     </View>
-                    <View style={[styles.row, { borderBottomColor: theme.border }]}>
-                        <View style={styles.rowContent}>
-                            <Ionicons name="bicycle-outline" size={20} color={theme.text} />
-                            <Text style={[styles.rowLabel, { color: theme.text }]}>Suivi de commande</Text>
-                        </View>
-                        <Switch
-                            value={orderUpdates}
-                            onValueChange={setOrderUpdates}
-                            trackColor={{ false: theme.border, true: theme.primary + '60' }}
-                            thumbColor={orderUpdates ? theme.primary : '#f4f3f4'}
-                        />
-                    </View>
-                    <View style={styles.row}>
-                        <View style={styles.rowContent}>
-                            <Ionicons name="pricetag-outline" size={20} color={theme.text} />
-                            <Text style={[styles.rowLabel, { color: theme.text }]}>Offres et promotions</Text>
-                        </View>
-                        <Switch
-                            value={promos}
-                            onValueChange={setPromos}
-                            trackColor={{ false: theme.border, true: theme.primary + '60' }}
-                            thumbColor={promos ? theme.primary : '#f4f3f4'}
-                        />
-                    </View>
                 </View>
             </View>
 
-            {/* General */}
+            {/* Apparence & Langue */}
             <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.icon }]}>Général</Text>
-                <View style={[styles.card, { borderColor: theme.border }]}>
-                    <View style={[styles.row, { borderBottomColor: theme.border }]}> 
+                <Text style={[styles.sectionTitle, { color: theme.icon }]}>Application</Text>
+                <View style={[styles.card, { backgroundColor: theme.surface }]}>
+                    {/* Thème Selector */}
+                    <View style={[styles.row, { borderBottomWidth: 1, borderBottomColor: theme.border, flexDirection: 'column', alignItems: 'stretch', gap: Spacing.md }]}> 
                         <View style={styles.rowContent}>
-                            <Ionicons name="moon-outline" size={20} color={theme.text} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={[styles.rowLabel, { color: theme.text }]}>Apparence</Text>
-                                <Text style={[styles.rowValue, { color: theme.icon }]}>Mode {themeModeLabel}</Text>
+                            <View style={[styles.iconBox, { backgroundColor: theme.primary + '15' }]}>
+                                <Ionicons name="color-palette" size={20} color={theme.primary} />
                             </View>
+                            <Text style={[styles.rowLabel, { color: theme.text }]}>Thème</Text>
                         </View>
-                        <View style={styles.themeActions}>
-                            <Pressable
-                                style={[styles.autoChip, { borderColor: preference === 'system' ? theme.primary : theme.border }]}
-                                onPress={() => setPreference('system')}
-                            >
-                                <Text style={[styles.autoChipText, { color: preference === 'system' ? theme.primary : theme.icon }]}>Auto</Text>
-                            </Pressable>
-                            <Switch
-                                value={darkMode}
-                                onValueChange={(value) => setPreference(value ? 'dark' : 'light')}
-                                trackColor={{ false: theme.border, true: theme.primary + '60' }}
-                                thumbColor={darkMode ? theme.primary : '#f4f3f4'}
-                            />
+                        <View style={styles.themeSelector}>
+                            <ThemeOption label="Clair" value="light" icon="sunny" />
+                            <ThemeOption label="Sombre" value="dark" icon="moon" />
+                            <ThemeOption label="Auto" value="system" icon="phone-portrait" />
                         </View>
                     </View>
-                    <Pressable style={({ pressed }) => [styles.row, { borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}>
+                    
+                    {/* Langue Selector */}
+                    <Pressable style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]} onPress={handleLanguageChange}>
                         <View style={styles.rowContent}>
-                            <Ionicons name="language-outline" size={20} color={theme.text} />
+                            <View style={[styles.iconBox, { backgroundColor: theme.primary + '15' }]}>
+                                <Ionicons name="language" size={20} color={theme.primary} />
+                            </View>
                             <Text style={[styles.rowLabel, { color: theme.text }]}>Langue</Text>
                         </View>
                         <View style={styles.rowRight}>
-                            <Text style={[styles.rowValue, { color: theme.icon }]}>Français</Text>
-                            <Ionicons name="chevron-forward" size={18} color={theme.icon} />
-                        </View>
-                    </Pressable>
-                    <Pressable style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
-                        <View style={styles.rowContent}>
-                            <Ionicons name="cash-outline" size={20} color={theme.text} />
-                            <Text style={[styles.rowLabel, { color: theme.text }]}>Devise</Text>
-                        </View>
-                        <View style={styles.rowRight}>
-                            <Text style={[styles.rowValue, { color: theme.icon }]}>FCFA (XAF)</Text>
-                            <Ionicons name="chevron-forward" size={18} color={theme.icon} />
+                            <Text style={[styles.rowValue, { color: theme.text }]}>{language === 'fr' ? 'Français' : 'English'}</Text>
+                            <Ionicons name="chevron-forward" size={20} color={theme.icon} />
                         </View>
                     </Pressable>
                 </View>
             </View>
 
-            {/* Aide */}
+            {/* Aide & Support */}
             <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.icon }]}>Aide</Text>
-                <View style={[styles.card, { borderColor: theme.border }]}>
+                <Text style={[styles.sectionTitle, { color: theme.icon }]}>À propos</Text>
+                <View style={[styles.card, { backgroundColor: theme.surface }]}>
                     <Pressable
-                        style={({ pressed }) => [styles.row, { borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
+                        style={({ pressed }) => [styles.row, { borderBottomWidth: 1, borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
                         onPress={() => router.push('/legal/client')}
                     >
                         <View style={styles.rowContent}>
-                            <Ionicons name="document-text-outline" size={20} color={theme.text} />
                             <Text style={[styles.rowLabel, { color: theme.text }]}>Conditions d'utilisation</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color={theme.icon} />
+                        <Ionicons name="chevron-forward" size={20} color={theme.icon} />
                     </Pressable>
                     <Pressable
-                        style={({ pressed }) => [styles.row, { borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
+                        style={({ pressed }) => [styles.row, { borderBottomWidth: 1, borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
                         onPress={() => router.push('/legal/client')}
                     >
                         <View style={styles.rowContent}>
-                            <Ionicons name="shield-checkmark-outline" size={20} color={theme.text} />
                             <Text style={[styles.rowLabel, { color: theme.text }]}>Politique de confidentialité</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color={theme.icon} />
+                        <Ionicons name="chevron-forward" size={20} color={theme.icon} />
                     </Pressable>
                     <Pressable
                         style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
                         onPress={() => router.push('/support')}
                     >
                         <View style={styles.rowContent}>
-                            <Ionicons name="chatbubble-outline" size={20} color={theme.text} />
-                            <Text style={[styles.rowLabel, { color: theme.text }]}>Contacter le support</Text>
+                            <Text style={[styles.rowLabel, { color: theme.text }]}>Support & Aide</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color={theme.icon} />
+                        <Ionicons name="chevron-forward" size={20} color={theme.icon} />
                     </Pressable>
                 </View>
             </View>
 
             {/* Danger Zone */}
-            <View style={styles.section}>
-                <Pressable
-                    style={[styles.deleteButton, { borderColor: '#ef4444' }]}
-                    onPress={handleDeleteAccount}
-                >
-                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            <View style={[styles.section, { marginTop: Spacing.xl }]}>
+                <Pressable style={styles.deleteButton} onPress={handleDeleteAccount}>
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
                     <Text style={styles.deleteButtonText}>Supprimer mon compte</Text>
                 </Pressable>
             </View>
@@ -184,37 +179,73 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: Spacing.md,
+        paddingBottom: Spacing.md,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        ...Typography.title3,
+    },
     section: { paddingHorizontal: Spacing.md, marginTop: Spacing.lg },
-    sectionTitle: { ...Typography.caption, fontWeight: '600', textTransform: 'uppercase', marginBottom: Spacing.sm, marginLeft: Spacing.xs },
-    card: { borderRadius: Radii.lg, borderWidth: 1, overflow: 'hidden' },
+    sectionTitle: { ...Typography.small, fontWeight: '700', textTransform: 'uppercase', marginBottom: Spacing.sm, marginLeft: Spacing.xs, letterSpacing: 0.5 },
+    card: { 
+        borderRadius: Radii.xl, 
+        overflow: 'hidden',
+        ...Shadows.sm,
+    },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: Spacing.md,
-        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     rowContent: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 },
-    rowRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-    themeActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-    autoChip: {
-        borderWidth: 1,
-        borderRadius: Radii.full,
-        paddingHorizontal: Spacing.sm,
-        paddingVertical: 4,
+    iconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: Radii.md,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    autoChipText: { ...Typography.small, fontWeight: '600' },
-    rowLabel: { ...Typography.body },
-    rowValue: { ...Typography.caption },
+    rowRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+    rowLabel: { ...Typography.bodySemibold },
+    rowValue: { ...Typography.body, fontWeight: '500' },
+    themeSelector: {
+        flexDirection: 'row',
+        gap: Spacing.sm,
+    },
+    themeOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.xs,
+        paddingVertical: Spacing.sm,
+        borderWidth: 1,
+        borderRadius: Radii.lg,
+    },
+    themeOptionText: {
+        ...Typography.small,
+        fontWeight: '600',
+    },
     deleteButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: Spacing.sm,
         padding: Spacing.md,
-        borderRadius: Radii.lg,
-        borderWidth: 1,
+        borderRadius: Radii.xl,
+        backgroundColor: '#ef444415',
     },
-    deleteButtonText: { color: '#ef4444', ...Typography.body, fontWeight: '500' },
-    version: { textAlign: 'center', ...Typography.small, marginTop: Spacing.xl, marginBottom: Spacing.md },
+    deleteButtonText: { color: '#ef4444', ...Typography.bodySemibold },
+    version: { textAlign: 'center', ...Typography.caption, marginTop: Spacing.xl, marginBottom: Spacing.md },
 });

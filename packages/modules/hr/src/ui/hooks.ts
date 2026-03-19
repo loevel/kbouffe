@@ -1,11 +1,11 @@
 import useSWR from "swr";
-import { Payout } from "@/lib/supabase/types";
-import { MOCK_PAYOUTS } from "@/lib/mock-data";
+import { type Payout } from "@kbouffe/module-core/ui";
+import { MOCK_PAYOUTS } from "@kbouffe/module-core/ui";
 
 async function fetcher<T>(url: string): Promise<T> {
     const res = await fetch(url);
     if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
+        const body = await res.json() as any;
         throw new Error(body.error ?? `API error ${res.status}`);
     }
     return res.json();

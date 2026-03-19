@@ -404,3 +404,39 @@ export function useTableZones() {
     mutate,
   };
 }
+
+// ── Restaurant Hook ──────────────────────────────────────────────────────────
+
+interface RestaurantResponse {
+  success: boolean;
+  restaurant: any;
+}
+
+export function useRestaurant() {
+  const { data, error, isLoading, mutate } = useSWR<RestaurantResponse>(
+    "/api/restaurant",
+    fetcher
+  );
+
+  async function updateRestaurant(body: any) {
+    const res = await authFetch("/api/restaurant", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? "Erreur mise à jour restaurant");
+    }
+    await mutate();
+    return res.json();
+  }
+
+  return {
+    restaurant: data?.restaurant ?? null,
+    isLoading,
+    error,
+    updateRestaurant,
+    mutate,
+  };
+}

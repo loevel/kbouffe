@@ -17,7 +17,7 @@ export function useCustomers() {
                 const response = await fetch("/api/customers?limit=200", { cache: "no-store" });
                 if (!response.ok) throw new Error("API customers indisponible");
 
-                const data = await response.json();
+                const data = await response.json() as any;
                 if (!active) return;
 
                 const rows = Array.isArray(data.customers) ? data.customers : [];

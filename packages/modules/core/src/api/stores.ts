@@ -69,8 +69,19 @@ storesRoutes.get("/", async (c) => {
 
     const mappedResults = results.map(r => ({
         ...r,
-        logo_url: r.logo_url || "https://images.kbouffe.com/defaults/restaurant-logo.png",
-        banner_url: r.banner_url || "https://images.kbouffe.com/defaults/restaurant-banner.png",
+        logoUrl: r.logo_url || "https://images.kbouffe.com/defaults/restaurant-logo.png",
+        coverUrl: r.banner_url || "https://images.kbouffe.com/defaults/restaurant-banner.png",
+        cuisineType: r.cuisine_type,
+        priceRange: r.price_range,
+        reviewCount: r.review_count,
+        orderCount: r.order_count,
+        isVerified: r.is_verified,
+        isPremium: r.is_premium,
+        isSponsored: r.is_sponsored,
+        hasDineIn: r.has_dine_in,
+        deliveryBaseFee: r.delivery_base_fee,
+        deliveryPerKmFee: r.delivery_per_km_fee,
+        maxDeliveryRadiusKm: r.max_delivery_radius_km,
     }));
 
     return c.json({ restaurants: mappedResults, total: results.length });
@@ -97,8 +108,19 @@ storesRoutes.get("/:slug", async (c) => {
 
     const res = {
         ...restaurant,
-        logo_url: restaurant.logo_url || "https://images.kbouffe.com/defaults/restaurant-logo.png",
-        banner_url: restaurant.banner_url || "https://images.kbouffe.com/defaults/restaurant-banner.png",
+        logoUrl: restaurant.logo_url || "https://images.kbouffe.com/defaults/restaurant-logo.png",
+        coverUrl: restaurant.banner_url || "https://images.kbouffe.com/defaults/restaurant-banner.png",
+        cuisineType: restaurant.cuisine_type,
+        priceRange: restaurant.price_range,
+        reviewCount: restaurant.review_count,
+        orderCount: restaurant.order_count,
+        isVerified: restaurant.is_verified,
+        isPremium: restaurant.is_premium,
+        isSponsored: restaurant.is_sponsored,
+        hasDineIn: restaurant.has_dine_in,
+        deliveryBaseFee: restaurant.delivery_base_fee,
+        deliveryPerKmFee: restaurant.delivery_per_km_fee,
+        maxDeliveryRadiusKm: restaurant.max_delivery_radius_km,
     };
 
     return c.json({ restaurant: res });

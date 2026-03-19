@@ -9,7 +9,7 @@ import type {
     OpeningHours,
     OrderItemData,
     ProductOption,
-} from "@/lib/supabase/types";
+} from "../lib/supabase-types";
 
 // --- IDs constants ---
 const RESTAURANT_ID = "r1000000-0000-0000-0000-000000000001";
@@ -127,7 +127,9 @@ const dineInDefaults = {
     allergens: null,
     is_halal: false,
     is_vegan: false,
-    is_gluten_free: false
+    is_gluten_free: false,
+    calories: null,
+    prep_time: 15
 } as const;
 
 type ProductWithoutDineIn = Omit<Product, keyof typeof dineInDefaults>;

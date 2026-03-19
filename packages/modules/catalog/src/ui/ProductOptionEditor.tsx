@@ -12,7 +12,7 @@ interface ProductOptionEditorProps {
 export function ProductOptionEditor({ options, onChange }: ProductOptionEditorProps) {
     const { t } = useLocale();
     const addOption = () => {
-        onChange([...options, { name: "", required: false, choices: [{ label: "", extra_price: 0 }] }]);
+        onChange([...options, { name: "", required: false, min_selections: 1, max_selections: 1, choices: [{ label: "", extra_price: 0 }] }]);
     };
 
     const removeOption = (index: number) => {
@@ -21,7 +21,7 @@ export function ProductOptionEditor({ options, onChange }: ProductOptionEditorPr
 
     const updateOption = (index: number, field: keyof ProductOption, value: unknown) => {
         const updated = [...options];
-        (updated[index] as unknown as Record<string, unknown>)[field] = value;
+        (updated[index] as any)[field] = value;
         onChange(updated);
     };
 
@@ -39,7 +39,7 @@ export function ProductOptionEditor({ options, onChange }: ProductOptionEditorPr
 
     const updateChoice = (optionIndex: number, choiceIndex: number, field: string, value: unknown) => {
         const updated = [...options];
-        (updated[optionIndex].choices[choiceIndex] as unknown as Record<string, unknown>)[field] = value;
+        (updated[optionIndex].choices[choiceIndex] as any)[field] = value;
         onChange(updated);
     };
 
@@ -56,20 +56,40 @@ export function ProductOptionEditor({ options, onChange }: ProductOptionEditorPr
             </div>
 
             {options.map((option, optionIndex) => (
-                <div key={optionIndex} className="border border-surface-200 dark:border-surface-700 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center gap-3">
+                <div key={optionIndex} className="border border-surface-200 dark:border-surface-700 rounded-xl p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
                         <GripVertical size={16} className="text-surface-400 shrink-0" />
                         <Input
                             placeholder={t.menu.optionNamePlaceholder}
                             value={option.name}
                             onChange={(e) => updateOption(optionIndex, "name", e.target.value)}
-                            className="flex-1"
+                            className="flex-1 min-w-[200px]"
                         />
-                        <Toggle
-                            checked={option.required ?? false}
-                            onChange={(val) => updateOption(optionIndex, "required", val)}
-                            label={t.common.required}
-                        />
+                        <div className="flex items-center gap-4">
+                            <Toggle
+                                checked={option.required ?? false}
+                                onChange={(val) => updateOption(optionIndex, "required", val)}
+                                label={t.common.required}
+                            />
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-surface-500">Min</span>
+                                <input
+                                    type="number"
+                                    value={option.min_selections ?? 1}
+                                    onChange={(e) => updateOption(optionIndex, "min_selections", parseInt(e.target.value))}
+                                    className="w-12 h-8 text-center text-xs border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-900"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-surface-500">Max</span>
+                                <input
+                                    type="number"
+                                    value={option.max_selections ?? 1}
+                                    onChange={(e) => updateOption(optionIndex, "max_selections", parseInt(e.target.value))}
+                                    className="w-12 h-8 text-center text-xs border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-900"
+                                />
+                            </div>
+                        </div>
                         <button onClick={() => removeOption(optionIndex)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
                             <Trash2 size={16} />
                         </button>

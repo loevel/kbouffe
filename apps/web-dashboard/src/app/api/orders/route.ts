@@ -56,13 +56,13 @@ export async function GET(request: NextRequest) {
       .eq("restaurant_id", ctx.restaurantId);
 
     if (status) {
-      query = query.eq("status", status);
+      query = query.eq("status", status as any);
     }
     if (payment) {
-      query = query.eq("payment_status", payment);
+      query = query.eq("payment_status", payment as any);
     }
     if (delivery) {
-      query = query.eq("delivery_type", delivery);
+      query = query.eq("delivery_type", delivery as any);
     }
     if (search) {
       query = query.or(

@@ -5,6 +5,7 @@ import { RevenueChart } from "@/components/dashboard/overview/RevenueChart";
 import { RecentOrders } from "@/components/dashboard/overview/RecentOrders";
 import { PopularProducts } from "@/components/dashboard/overview/PopularProducts";
 import { QuickActions } from "@/components/dashboard/overview/QuickActions";
+import { OperationalAlerts } from "@/components/dashboard/overview/OperationalAlerts";
 import { useDashboard } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 
@@ -24,6 +25,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-6">
+                <OperationalAlerts />
                 <QuickActions />
                 <KpiCards />
                 <RevenueChart />

@@ -555,7 +555,9 @@ export type Database = {
                     notes: string | null;
                     payment_method: Database["public"]["Enums"]["payment_method"];
                     payment_status: Database["public"]["Enums"]["payment_status"];
+                    preparation_time_minutes: number | null;
                     restaurant_id: string;
+                    scheduled_for: string | null;
                     service_fee: number | null;
                     status: Database["public"]["Enums"]["order_status"];
                     subtotal: number;
@@ -564,6 +566,9 @@ export type Database = {
                     tip_amount: number | null;
                     total: number;
                     updated_at: string;
+                    delivered_at: string | null;
+                    delivery_note: string | null;
+                    delivered_by: string | null;
                 };
                 Insert: {
                     corkage_fee?: number | null;
