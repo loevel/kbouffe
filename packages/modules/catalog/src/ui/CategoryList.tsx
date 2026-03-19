@@ -1,25 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Edit, Trash2, FolderOpen } from "lucide-react";
-import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState, toast, useLocale, useDashboard } from "@kbouffe/module-core/ui";
+import useSWR from "swr";
+import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState, toast, useLocale, useDashboard, authFetch } from "@kbouffe/module-core/ui";
 import { useCategories, useProducts, createCategory as apiCreateCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory, importCategoryPack } from "../hooks/use-catalog";
 import type { Category, Product } from "../lib/types";
 
+interface CatalogPack {
+    id: string;
+    slug: string;
+    name: string;
+    description?: string;
+}
+
+// Fetcher for SWR
+async function fetchAvailablePacks(): Promise<CatalogPack[]> {
+    const res = await authFetch("/api/categories/available-packs");
+    if (!res.ok) {
+        throw new Error("Failed to load packs");
+    }
+    const data = await res.json();
+    return data.packs || [];
+}
+
 export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?: string; isAdmin?: boolean }) {
     const { t } = useLocale();
-    const { restaurant: merchantRestaurant } = useDashboard();
-    const effectiveRestaurantId = restaurantId || merchantRestaurant?.id;
-    
+    const dashboard = useDashboard();
+    const effectiveRestaurantId = restaurantId || dashboard?.restaurant?.id;
+
     const { categories, mutate: mutateCategories } = useCategories(effectiveRestaurantId, isAdmin);
     const { products } = useProducts(effectiveRestaurantId, isAdmin);
+
+    // Use SWR to cache packs (revalidates every 5 minutes)
+    const { data: availablePacks = [], isLoading: packsLoading } = useSWR<CatalogPack[]>(
+        "/api/categories/available-packs",
+        fetchAvailablePacks,
+        {
+            revalidateOnFocus: false,
+            revalidateOnReconnect: false,
+            dedupingInterval: 60000, // 1 minute
+        }
+    );
+
     const [showModal, setShowModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
-    const [selectedPack, setSelectedPack] = useState("boissons");
+    const [selectedPack, setSelectedPack] = useState("");
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [form, setForm] = useState({ name: "", description: "", isActive: true });
     const [saving, setSaving] = useState(false);
     const [importing, setImporting] = useState(false);
+
+    // Update selectedPack when availablePacks load
+    useEffect(() => {
+        if (availablePacks.length > 0 && !selectedPack) {
+            setSelectedPack(availablePacks[0].slug);
+        }
+    }, [availablePacks]);
 
     const openCreate = () => {
         setEditingCategory(null);
@@ -28,7 +65,6 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
     };
 
     const openImport = () => {
-        setSelectedPack("boissons");
         setShowImportModal(true);
     };
 
@@ -78,18 +114,45 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
     };
 
     const handleImport = async () => {
-        if (!effectiveRestaurantId) return;
-        setImporting(true);
-        const { error } = await importCategoryPack(selectedPack, effectiveRestaurantId, isAdmin);
-        
-        if (error) {
-            toast.error(error);
-        } else {
-            toast.success("Pack importé avec succès !");
-            mutateCategories();
-            setShowImportModal(false);
+        console.log("[CategoryList] Import initiated:", {
+            effectiveRestaurantId,
+            selectedPack,
+            isAdmin,
+            dashboardRestaurantId: dashboard?.restaurant?.id,
+        });
+
+        if (!effectiveRestaurantId) {
+            console.error("[CategoryList] No restaurant ID found", {
+                restaurantId,
+                dashboardRestaurant: dashboard?.restaurant,
+            });
+            toast.error("Restaurant non trouvé. Vérifiez que votre restaurant est correctement chargé.");
+            return;
         }
-        setImporting(false);
+
+        if (!selectedPack) {
+            toast.error("Veuillez sélectionner un pack");
+            return;
+        }
+
+        setImporting(true);
+        try {
+            const { error } = await importCategoryPack(selectedPack, effectiveRestaurantId, isAdmin);
+
+            if (error) {
+                console.error("[CategoryList] Import error:", error);
+                toast.error(error);
+            } else {
+                toast.success("Pack importé avec succès ! ✨");
+                await mutateCategories();
+                setShowImportModal(false);
+            }
+        } catch (err) {
+            console.error("[CategoryList] Import exception:", err);
+            toast.error("Erreur lors de l'importation");
+        } finally {
+            setImporting(false);
+        }
     };
 
     return (
@@ -183,26 +246,36 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
             >
                 <div className="space-y-4">
                     <p className="text-sm text-surface-500">
-                        Gagnez du temps en important un pack de catégories et de produits préconfigurés. 
+                        Gagnez du temps en important un pack de catégories et de produits préconfigurés.
                         Les produits seront importés en mode &quot;indisponible&quot; afin que vous puissiez ajuster leurs prix.
                     </p>
                     <div>
                         <label className="block text-sm font-medium mb-1">Sélectionner un pack</label>
-                        <select 
-                            className="w-full h-10 px-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50"
-                            value={selectedPack}
-                            onChange={(e) => setSelectedPack(e.target.value)}
-                        >
-                            <option value="boissons">Pack Boissons (Bières, Eaux, Jus, Sodas)</option>
-                        </select>
+                        {availablePacks.length === 0 ? (
+                            <div className="text-sm text-surface-500 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
+                                ⏳ Chargement des packs disponibles...
+                            </div>
+                        ) : (
+                            <select
+                                className="w-full h-10 px-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50"
+                                value={selectedPack}
+                                onChange={(e) => setSelectedPack(e.target.value)}
+                            >
+                                {availablePacks.map((pack) => (
+                                    <option key={pack.id} value={pack.slug}>
+                                        {pack.name} {pack.description ? `- ${pack.description}` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                 </div>
                 <ModalFooter>
                     <Button variant="outline" onClick={() => setShowImportModal(false)}>Annuler</Button>
-                    <Button 
-                        onClick={handleImport} 
+                    <Button
+                        onClick={handleImport}
                         isLoading={importing}
-                        disabled={importing}
+                        disabled={importing || availablePacks.length === 0 || !selectedPack}
                     >
                         Importer
                     </Button>
