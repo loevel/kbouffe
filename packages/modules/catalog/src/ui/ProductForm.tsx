@@ -202,10 +202,7 @@ export function ProductForm({ product }: ProductFormProps) {
                                     <p className="text-sm text-surface-500">Upload en cours...</p>
                                 </div>
                             ) : (
-                                <div
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="cursor-pointer"
-                                >
+                                <div className="cursor-pointer">
                                     <ImagePlus size={32} className="mx-auto text-surface-400 mb-3" />
                                     <p className="text-sm font-medium text-surface-700 dark:text-surface-300">{t.menu.productImageDrop}</p>
                                     <p className="text-xs text-surface-400 mt-1">{t.menu.productImageHint}</p>
