@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Save, ImagePlus, Upload } from "lucide-react";
 import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale, useDashboard } from "@kbouffe/module-core/ui";
@@ -40,6 +40,8 @@ export function ProductForm({ product }: ProductFormProps) {
     );
     const [imageUrl, setImageUrl] = useState<string | null>(product?.image_url ?? null);
     const [loading, setLoading] = useState(false);
+    const [dragActive, setDragActive] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { upload, uploading } = useUploadImage();
 
     const updateField = (field: string, value: unknown) => {
@@ -51,8 +53,7 @@ export function ProductForm({ product }: ProductFormProps) {
         label: c.name,
     }));
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
+    const handleImageUpload = async (file: File) => {
         if (!file) return;
 
         try {
@@ -66,6 +67,34 @@ export function ProductForm({ product }: ProductFormProps) {
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             toast.error(`Erreur upload: ${errorMsg}`);
+        }
+    };
+
+    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) handleImageUpload(file);
+    };
+
+    const handleDrag = (e: React.DragEvent<HTMLLabelElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        const file = e.dataTransfer.files?.[0];
+        if (file && file.type.startsWith("image/")) {
+            handleImageUpload(file);
+        } else {
+            toast.error("Veuillez déposer une image valide");
         }
     };
 
@@ -135,12 +164,37 @@ export function ProductForm({ product }: ProductFormProps) {
 
                     <Card>
                         <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.menu.productImage}</h3>
-                        <label className="border-2 border-dashed border-surface-200 dark:border-surface-700 rounded-xl p-8 text-center hover:border-brand-300 dark:hover:border-brand-700 transition-colors cursor-pointer block">
-                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        <label
+                            onDragEnter={handleDrag}
+                            onDragLeave={handleDrag}
+                            onDragOver={handleDrag}
+                            onDrop={handleDrop}
+                            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer block ${
+                                dragActive
+                                    ? "border-brand-400 bg-brand-50/50 dark:bg-brand-900/20"
+                                    : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700"
+                            } ${uploading ? "opacity-50 cursor-wait" : ""}`}
+                        >
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileInputChange}
+                                className="hidden"
+                                disabled={uploading}
+                            />
                             {imageUrl ? (
                                 <div className="space-y-2">
                                     <img src={imageUrl} alt="Product" className="w-32 h-32 object-cover rounded-lg mx-auto" />
                                     <p className="text-xs text-surface-500">{t.menu.productImageHint}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={uploading}
+                                        className="text-xs text-brand-600 hover:text-brand-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Changer l'image
+                                    </button>
                                 </div>
                             ) : uploading ? (
                                 <div className="space-y-2">
@@ -148,11 +202,14 @@ export function ProductForm({ product }: ProductFormProps) {
                                     <p className="text-sm text-surface-500">Upload en cours...</p>
                                 </div>
                             ) : (
-                                <>
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="cursor-pointer"
+                                >
                                     <ImagePlus size={32} className="mx-auto text-surface-400 mb-3" />
                                     <p className="text-sm font-medium text-surface-700 dark:text-surface-300">{t.menu.productImageDrop}</p>
                                     <p className="text-xs text-surface-400 mt-1">{t.menu.productImageHint}</p>
-                                </>
+                                </div>
                             )}
                         </label>
                     </Card>
