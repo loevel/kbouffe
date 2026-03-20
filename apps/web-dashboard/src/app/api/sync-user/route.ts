@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
         // Récupérer les modules actifs du restaurant
         const { data: moduleData } = await supabase
-            .from("restaurant_modules")
+            .from("restaurant_modules" as any)
             .select("module_id")
             .eq("restaurant_id", restaurant.id)
             .eq("is_active", true);
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
         // Récupérer les modules actifs
         if (restaurantId) {
             const { data: moduleData } = await supabase
-                .from("restaurant_modules")
+                .from("restaurant_modules" as any)
                 .select("module_id")
                 .eq("restaurant_id", restaurantId)
                 .eq("is_active", true);
