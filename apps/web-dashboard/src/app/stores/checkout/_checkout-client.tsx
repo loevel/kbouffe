@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -10,7 +10,9 @@ import {
     ChefHat,
     CreditCard,
     Loader2,
+    Loader,
     MapPin,
+    Navigation,
     Package,
     ShoppingBag,
     Smartphone,
@@ -19,6 +21,7 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useRecentOrders } from "@/store/client-store";
+import { createClient } from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type DeliveryType    = "delivery" | "pickup" | "dine_in";
@@ -117,6 +120,87 @@ export function CheckoutPageClient() {
     const [paymentMethod, setPaymentMethod]   = useState<PaymentMethod>("cash");
     const [submitting, setSubmitting]         = useState(false);
     const [error, setError]                   = useState<string | null>(null);
+    const [isLocating, setIsLocating]         = useState(false);
+
+    // ── Load user data on mount ────────────────────────────────────────────
+    useEffect(() => {
+        const loadUserData = async () => {
+            try {
+                const supabase = createClient();
+                if (!supabase) return;
+
+                // Get current user
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser) return;
+
+                // Fetch user profile
+                const { data: userProfile } = await supabase
+                    .from("users")
+                    .select("full_name, phone")
+                    .eq("id", authUser.id)
+                    .single();
+
+                if (userProfile) {
+                    if (userProfile.full_name) setCustomerName(userProfile.full_name);
+                    if (userProfile.phone) setCustomerPhone(userProfile.phone);
+                }
+            } catch (err) {
+                console.error("[Checkout] Failed to load user data:", err);
+                // Silently fail - user can still enter data manually
+            }
+        };
+
+        loadUserData();
+    }, []);
+
+    // ── Geolocation handler ────────────────────────────────────────────────
+    const handleUseCurrentLocation = async () => {
+        setIsLocating(true);
+        setError(null);
+
+        try {
+            if (!navigator.geolocation) {
+                setError("La géolocalisation n'est pas disponible sur cet appareil.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    // Format as readable coordinates
+                    const address = `📍 ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                    setDeliveryAddress(address);
+                    setIsLocating(false);
+                },
+                (error) => {
+                    console.error("Geolocation error:", error);
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            setError("Permission refusée. Veuillez autoriser la géolocalisation dans les paramètres.");
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            setError("Position indisponible. Vérifiez votre connexion GPS.");
+                            break;
+                        case error.TIMEOUT:
+                            setError("Délai d'attente dépassé. Réessayez.");
+                            break;
+                        default:
+                            setError("Impossible de récupérer votre position.");
+                    }
+                    setIsLocating(false);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        } catch (err) {
+            console.error("Geolocation handler error:", err);
+            setError("Erreur lors de la géolocalisation.");
+            setIsLocating(false);
+        }
+    };
 
     // ── Empty cart guard ───────────────────────────────────────────────────
     if (items.length === 0) {
@@ -262,9 +346,29 @@ export function CheckoutPageClient() {
                         {/* Mode-specific fields */}
                         {deliveryType === "delivery" && (
                             <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
-                                <h2 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
-                                    <MapPin size={16} className="text-brand-500" /> Adresse de livraison
-                                </h2>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="font-bold text-surface-900 dark:text-white flex items-center gap-2">
+                                        <MapPin size={16} className="text-brand-500" /> Adresse de livraison
+                                    </h2>
+                                    <button
+                                        onClick={handleUseCurrentLocation}
+                                        disabled={isLocating}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Utiliser votre position actuelle"
+                                    >
+                                        {isLocating ? (
+                                            <>
+                                                <Loader size={14} className="animate-spin" />
+                                                Localisation...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Navigation size={14} />
+                                                Utiliser ma position
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                                 <textarea
                                     value={deliveryAddress}
                                     onChange={(e) => setDeliveryAddress(e.target.value)}
