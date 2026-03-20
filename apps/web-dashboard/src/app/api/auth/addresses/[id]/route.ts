@@ -89,6 +89,28 @@ export async function DELETE(
 
         const { id } = await params;
 
+        // Vérifier que l'adresse existe et appartient à l'utilisateur
+        const { data: addressToDelete, error: fetchError } = await supabase
+            .from("addresses")
+            .select("id, is_default")
+            .eq("id", id)
+            .eq("user_id", user.id)
+            .single();
+
+        if (fetchError || !addressToDelete) {
+            return NextResponse.json({ error: "Adresse non trouvée" }, { status: 404 });
+        }
+
+        // Si c'est l'adresse par défaut, d'abord la désactiver
+        if (addressToDelete.is_default) {
+            await supabase
+                .from("addresses")
+                .update({ is_default: false })
+                .eq("id", id)
+                .eq("user_id", user.id);
+        }
+
+        // Maintenant supprimer l'adresse
         const { error: deleteError } = await supabase
             .from("addresses")
             .delete()

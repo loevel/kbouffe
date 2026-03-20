@@ -296,12 +296,14 @@ export function AddressesPanelReal() {
                 if (res.ok) {
                     removeAddress(id);
                     setDeleteConfirm(null);
-                    toast.success("Adresse supprimée");
+                    toast.success("Adresse supprimée avec succès");
                 } else {
-                    toast.error("Erreur lors de la suppression");
+                    const data = await res.json();
+                    toast.error(data.error || "Erreur lors de la suppression de l'adresse");
                 }
             } catch (error) {
-                toast.error("Erreur réseau");
+                console.error("Delete error:", error);
+                toast.error("Erreur réseau lors de la suppression");
             } finally {
                 setIsSaving(false);
             }
