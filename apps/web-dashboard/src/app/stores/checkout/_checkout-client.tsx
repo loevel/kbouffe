@@ -161,31 +161,54 @@ export function CheckoutPageClient() {
         try {
             if (!navigator.geolocation) {
                 setError("La géolocalisation n'est pas disponible sur cet appareil.");
+                setIsLocating(false);
                 return;
             }
 
+            // Check and request permission explicitly
+            if (navigator.permissions) {
+                try {
+                    const permissionStatus = await navigator.permissions.query({ name: "geolocation" });
+
+                    if (permissionStatus.state === "denied") {
+                        setError("Permission GPS refusée. Veuillez activer la géolocalisation dans les paramètres de votre navigateur.");
+                        setIsLocating(false);
+                        return;
+                    }
+
+                    if (permissionStatus.state === "prompt") {
+                        // Permission not yet requested - will be requested by getCurrentPosition
+                        console.log("Permission will be requested by browser");
+                    }
+                } catch (permErr) {
+                    console.log("Permissions API not available, will request on getPosition");
+                }
+            }
+
+            // Get the position
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
                     // Format as readable coordinates
                     const address = `📍 ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
                     setDeliveryAddress(address);
+                    setError(null);
                     setIsLocating(false);
                 },
                 (error) => {
                     console.error("Geolocation error:", error);
                     switch (error.code) {
                         case error.PERMISSION_DENIED:
-                            setError("Permission refusée. Veuillez autoriser la géolocalisation dans les paramètres.");
+                            setError("Permission refusée. Veuillez autoriser la géolocalisation dans les paramètres de votre navigateur.");
                             break;
                         case error.POSITION_UNAVAILABLE:
-                            setError("Position indisponible. Vérifiez votre connexion GPS.");
+                            setError("Position indisponible. Vérifiez que le GPS est activé sur votre appareil.");
                             break;
                         case error.TIMEOUT:
-                            setError("Délai d'attente dépassé. Réessayez.");
+                            setError("Délai d'attente dépassé. Vérifiez votre connexion et réessayez.");
                             break;
                         default:
-                            setError("Impossible de récupérer votre position.");
+                            setError("Impossible de récupérer votre position. Réessayez.");
                     }
                     setIsLocating(false);
                 },
