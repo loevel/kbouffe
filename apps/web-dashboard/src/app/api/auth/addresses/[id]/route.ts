@@ -106,21 +106,15 @@ export async function DELETE(
         }
 
         // Supprimer l'adresse
-        const { error: deleteError, count } = await supabase
+        const { error: deleteError } = await supabase
             .from("addresses")
             .delete()
             .eq("id", id)
-            .eq("user_id", user.id)
-            .select("*", { count: "exact", head: true });
+            .eq("user_id", user.id);
 
         if (deleteError) {
             console.error("Erreur delete Supabase address:", deleteError);
             return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
-        }
-
-        // Vérifier que l'adresse a été supprimée
-        if (!count || count === 0) {
-            return NextResponse.json({ error: "Adresse non trouvée" }, { status: 404 });
         }
 
         return NextResponse.json({ success: true, message: "Adresse supprimée" });
