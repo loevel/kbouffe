@@ -37,6 +37,7 @@ export const fr = {
         free: "Gratuit",
         copy: "(copie)",
         copied: "Copie",
+        reset: "Réinitialiser",
         share: "Partager",
         open: "Ouvrir",
         download: "Telecharger",
@@ -443,6 +444,8 @@ export const fr = {
         logoHint: "Format recommandé : 512x512px, PNG ou JPG",
         coverHint: "Format recommandé : 1200x400px, PNG ou JPG",
         dragOrClick: "Glissez une image ou cliquez pour sélectionner",
+        primaryColor: "Couleur primaire",
+        primaryColorDesc: "Couleur utilisée pour les boutons et accents de l'interface",
         brandingUpdated: "Image de marque mise à jour",
         // Notifications
         notifications: "Notifications",

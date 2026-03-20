@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { Save, Upload, X, Image as ImageIcon } from "lucide-react";
-import { Card, Button } from "@kbouffe/module-core/ui";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Save, Upload, X, Image as ImageIcon, Palette } from "lucide-react";
+import { Card, Button, Input } from "@kbouffe/module-core/ui";
 import { toast } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -119,15 +119,17 @@ export function BrandingForm() {
     const { upload } = useUploadImage();
     const [logo, setLogo] = useState<string | null>(null);
     const [cover, setCover] = useState<string | null>(null);
+    const [primaryColor, setPrimaryColor] = useState<string>("#f97316");
     const [loading, setLoading] = useState(false);
 
     // Synchroniser avec les données du restaurant
-    useState(() => {
+    useEffect(() => {
         if (restaurant) {
             setLogo(restaurant.logo_url ?? null);
             setCover(restaurant.banner_url ?? null);
+            setPrimaryColor(restaurant.primary_color ?? "#f97316");
         }
-    });
+    }, [restaurant]);
 
     const uploadImage = async (file: File, type: "logo" | "cover"): Promise<string | null> => {
         try {
@@ -161,6 +163,7 @@ export function BrandingForm() {
         const { error } = await updateRestaurant({
             logo_url: logo,
             banner_url: cover,
+            primary_color: primaryColor,
         });
 
         if (error) {
@@ -209,6 +212,58 @@ export function BrandingForm() {
                         onRemove={() => setCover(null)}
                     />
                 </div>
+
+                {/* Primary Color Picker */}
+                <div className="mt-8 pt-6 border-t border-surface-200 dark:border-surface-700">
+                    <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                            <Palette size={18} className="text-brand-500 mt-0.5" />
+                            <div className="flex-1">
+                                <label className="text-sm font-semibold text-surface-900 dark:text-white">
+                                    {t.settings.primaryColor ?? "Couleur primaire"}
+                                </label>
+                                <p className="text-xs text-surface-500 mt-1">
+                                    {t.settings.primaryColorDesc ?? "Couleur utilisée pour les boutons et accents"}
+                                </p>
+                                <div className="flex items-center gap-3 mt-4">
+                                    <input
+                                        type="color"
+                                        value={primaryColor}
+                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                        className="h-12 w-24 rounded-lg cursor-pointer border border-surface-200 dark:border-surface-700"
+                                    />
+                                    <Input
+                                        type="text"
+                                        value={primaryColor}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            // Valider format hex
+                                            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                                                setPrimaryColor(val);
+                                            } else if (val.length <= 7) {
+                                                // Allow typing
+                                                setPrimaryColor(val);
+                                            }
+                                        }}
+                                        placeholder="#f97316"
+                                        maxLength={7}
+                                        className="w-32"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setPrimaryColor("#f97316")}
+                                        className="text-xs"
+                                    >
+                                        {t.common.reset ?? "Réinitialiser"}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="mt-6 flex justify-end">
                     <Button type="submit" leftIcon={<Save size={18} />} isLoading={loading}>
                         {t.common.save}
