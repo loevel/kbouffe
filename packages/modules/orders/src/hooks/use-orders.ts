@@ -76,7 +76,7 @@ export function useOrders(params?: {
     const { data, error, isLoading, mutate } = useSWR<OrdersResponse>(
         key,
         fetcher,
-        { revalidateOnFocus: true },
+        { revalidateOnFocus: true, refreshInterval: 30_000 },
     );
 
     return {

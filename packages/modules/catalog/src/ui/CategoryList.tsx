@@ -16,12 +16,22 @@ interface CatalogPack {
 
 // Fetcher for SWR
 async function fetchAvailablePacks(): Promise<CatalogPack[]> {
-    const res = await authFetch("/api/categories/available-packs");
-    if (!res.ok) {
-        throw new Error("Failed to load packs");
+    try {
+        const res = await authFetch("/api/categories/available-packs");
+        if (!res.ok) {
+            console.warn("[fetchAvailablePacks] API returned error:", res.status);
+            throw new Error(`API error ${res.status}`);
+        }
+        const data = await res.json();
+        if (!data.packs || !Array.isArray(data.packs)) {
+            console.warn("[fetchAvailablePacks] Invalid response format:", data);
+            return [];
+        }
+        return data.packs;
+    } catch (error) {
+        console.error("[fetchAvailablePacks] Error:", error);
+        throw error;
     }
-    const data = await res.json();
-    return data.packs || [];
 }
 
 export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?: string; isAdmin?: boolean }) {
@@ -33,13 +43,17 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
     const { products } = useProducts(effectiveRestaurantId, isAdmin);
 
     // Use SWR to cache packs (revalidates every 5 minutes)
-    const { data: availablePacks = [], isLoading: packsLoading } = useSWR<CatalogPack[]>(
+    const { data: availablePacks = [], isLoading: packsLoading, error: packsError } = useSWR<CatalogPack[]>(
         "/api/categories/available-packs",
         fetchAvailablePacks,
         {
             revalidateOnFocus: false,
             revalidateOnReconnect: false,
             dedupingInterval: 60000, // 1 minute
+            errorRetryCount: 2,
+            onError: (error) => {
+                console.error("[CategoryList] Failed to load packs:", error);
+            },
         }
     );
 
@@ -251,9 +265,17 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
                     </p>
                     <div>
                         <label className="block text-sm font-medium mb-1">Sélectionner un pack</label>
-                        {availablePacks.length === 0 ? (
+                        {packsLoading && availablePacks.length === 0 ? (
                             <div className="text-sm text-surface-500 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
                                 ⏳ Chargement des packs disponibles...
+                            </div>
+                        ) : packsError && availablePacks.length === 0 ? (
+                            <div className="text-sm text-red-600 dark:text-red-400 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                ⚠️ Erreur lors du chargement des packs. Veuillez recharger la page.
+                            </div>
+                        ) : availablePacks.length === 0 ? (
+                            <div className="text-sm text-surface-500 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
+                                Aucun pack disponible
                             </div>
                         ) : (
                             <select

@@ -18,7 +18,35 @@ export function OrderActions({ orderId, status, onStatusChange }: OrderActionsPr
     const [showRefundModal, setShowRefundModal] = useState(false);
     const [cancelReason, setCancelReason] = useState("");
     const [preparationTime, setPreparationTime] = useState("25");
+    const [prepTimeError, setPrepTimeError] = useState<string>("");
     const [updating, setUpdating] = useState(false);
+
+    // Validate preparation time value
+    const validatePrepTime = (value: string): string => {
+        const parsedMinutes = Number(value);
+
+        if (!value.trim()) {
+            return t.orders.preparationTimeRequired || "La durée est requise";
+        }
+
+        if (!Number.isFinite(parsedMinutes)) {
+            return "Veuillez entrer un nombre valide";
+        }
+
+        if (!Number.isInteger(parsedMinutes)) {
+            return "Veuillez entrer un nombre entier";
+        }
+
+        if (parsedMinutes <= 0) {
+            return "La durée doit être au moins 1 minute";
+        }
+
+        if (parsedMinutes > 600) {
+            return "La durée maximum est 600 minutes";
+        }
+
+        return "";
+    };
 
     const nextActions: Partial<Record<OrderStatus, { label: string; next: OrderStatus; icon: React.ReactNode; variant: "primary" | "secondary" }>> = {
         pending: { label: t.orders.acceptOrder, next: "accepted", icon: <Check size={18} />, variant: "primary" },
@@ -40,24 +68,29 @@ export function OrderActions({ orderId, status, onStatusChange }: OrderActionsPr
     };
 
     const handleAccept = async () => {
-        const parsedMinutes = Number(preparationTime);
-        if (
-            !Number.isFinite(parsedMinutes) ||
-            !Number.isInteger(parsedMinutes) ||
-            parsedMinutes <= 0 ||
-            parsedMinutes > 600
-        ) {
-            toast.error(t.orders.preparationTimeRequired);
+        // Validate before sending
+        const error = validatePrepTime(preparationTime);
+        if (error) {
+            setPrepTimeError(error);
+            toast.error(error);
             return;
         }
 
+        const parsedMinutes = Number(preparationTime);
         setUpdating(true);
-        const { success, error } = await updateOrderStatus(orderId, "accepted", undefined, parsedMinutes);
+        const { success, error: apiError } = await updateOrderStatus(orderId, "accepted", undefined, parsedMinutes);
         setUpdating(false);
-        if (!success) { toast.error(error ?? "Erreur"); return; }
+
+        if (!success) {
+            toast.error(apiError ?? "Erreur lors de l'acceptation de la commande");
+            return;
+        }
+
         onStatusChange("accepted");
         toast.success(t.orders.orderAccepted);
         setShowAcceptModal(false);
+        setPreparationTime("25");
+        setPrepTimeError("");
     };
 
     const handleRefund = async () => {
@@ -146,7 +179,10 @@ export function OrderActions({ orderId, status, onStatusChange }: OrderActionsPr
 
             <Modal
                 isOpen={showAcceptModal}
-                onClose={() => setShowAcceptModal(false)}
+                onClose={() => {
+                    setShowAcceptModal(false);
+                    setPrepTimeError("");
+                }}
                 title={t.kds.prepTimeModalTitle}
                 description={t.kds.prepTimeModalDesc}
                 size="sm"
@@ -158,15 +194,31 @@ export function OrderActions({ orderId, status, onStatusChange }: OrderActionsPr
                     step={1}
                     label={t.orders.preparationTime}
                     value={preparationTime}
-                    onChange={(e) => setPreparationTime(e.target.value)}
+                    onChange={(e) => {
+                        const newValue = e.target.value;
+                        setPreparationTime(newValue);
+                        // Real-time validation
+                        const validationError = validatePrepTime(newValue);
+                        setPrepTimeError(validationError);
+                    }}
                     placeholder={t.orders.preparationTimePlaceholder}
-                    hint={t.orders.preparationTimeHint}
+                    hint={!prepTimeError ? t.orders.preparationTimeHint : undefined}
+                    error={prepTimeError || undefined}
+                    autoFocus
                 />
                 <ModalFooter>
-                    <Button variant="outline" onClick={() => setShowAcceptModal(false)}>
+                    <Button variant="outline" onClick={() => {
+                        setShowAcceptModal(false);
+                        setPrepTimeError("");
+                    }}>
                         {t.common.back}
                     </Button>
-                    <Button variant="primary" isLoading={updating} onClick={handleAccept}>
+                    <Button
+                        variant="primary"
+                        isLoading={updating}
+                        onClick={handleAccept}
+                        disabled={!!prepTimeError || updating}
+                    >
                         {t.orders.confirmAcceptWithPrep}
                     </Button>
                 </ModalFooter>

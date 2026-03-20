@@ -96,6 +96,19 @@ export async function PATCH(
 
     updateData.updated_at = new Date().toISOString();
 
+    // Verify order exists and belongs to restaurant before updating
+    const { data: existingOrder, error: checkError } = await ctx.supabase
+      .from("orders")
+      .select("id, status")
+      .eq("id", id)
+      .eq("restaurant_id", ctx.restaurantId)
+      .single();
+
+    if (checkError || !existingOrder) {
+      console.error("Order check failed:", checkError?.message || "Order not found");
+      return apiError("Commande non trouvée ou accès refusé", 404);
+    }
+
     const { data, error } = await ctx.supabase
       .from("orders")
       .update(updateData as any)
@@ -105,8 +118,20 @@ export async function PATCH(
       .single();
 
     if (error) {
-      console.error("Update order error:", error);
-      return apiError("Erreur lors de la mise à jour");
+      console.error("Update order error:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        orderId: id,
+        restaurantId: ctx.restaurantId,
+        updateData,
+      });
+
+      // Return detailed error message for debugging
+      const errorMsg = error.message || "Erreur lors de la mise à jour";
+      const details = error.details ? ` (${error.details})` : "";
+      return apiError(`${errorMsg}${details}`);
     }
 
     // ── SMS notification on status change (fire-and-forget) ─────────────

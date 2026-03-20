@@ -115,17 +115,27 @@ categoriesRoutes.delete("/:id", async (c) => {
 /** GET /categories/available-packs — Get all available catalog packs */
 categoriesRoutes.get("/available-packs", async (c) => {
     try {
+        // First try to get from database
         const { data, error } = await c.var.supabase
             .from("catalog_packs")
             .select("id, slug, name, description, is_active")
             .eq("is_active", true);
 
-        if (error) {
-            console.error("[Available Packs] Error:", error);
-            return c.json({ error: "Erreur lors de la récupération des packs" }, 500);
+        if (!error && data && data.length > 0) {
+            return c.json({ packs: data });
         }
 
-        return c.json({ packs: data ?? [] });
+        // Fallback to built-in packs if database is empty
+        console.log("[Available Packs] No packs in database, using built-in packs");
+        const builtInPacks = [
+            { id: "boissons", slug: "boissons", name: "🥤 Boissons", description: "Bières, sodas, jus" },
+            { id: "braiserie", slug: "braiserie", name: "🍖 Braiserie", description: "Poissons et viandes braisés" },
+            { id: "traditionnel", slug: "traditionnel", name: "🥘 Cuisine Traditionnelle", description: "Ndole, Eru, Sauces" },
+            { id: "streetfood", slug: "streetfood", name: "🌮 Street Food", description: "Beignets et sandwichs" },
+            { id: "petitdej", slug: "petitdej", name: "🥐 Petit Déjeuner", description: "Café, thé, viennoiseries" },
+        ];
+
+        return c.json({ packs: builtInPacks });
     } catch (error) {
         console.error("[Available Packs] Exception:", error);
         return c.json({ error: "Erreur serveur" }, 500);
@@ -142,23 +152,23 @@ const LEGACY_PACKS = {
             { id: "cat_jus", name: "Jus Naturels", description: "Jus frais et boissons artisanales", sort_order: 4, is_active: true },
         ],
         products: [
-            { category_id: "cat_bieres", name: "33 Export", description: "Bière blonde lager", price: 800, is_available: false },
-            { category_id: "cat_bieres", name: "Castel Beer", description: "Bière blonde premium", price: 800, is_available: false },
-            { category_id: "cat_bieres", name: "Mutzig", description: "Bière forte premium", price: 900, is_available: false },
-            { category_id: "cat_bieres", name: "Beaufort Lager", description: "Bière blonde classique", price: 700, is_available: false },
-            { category_id: "cat_bieres", name: "Heineken", description: "Bière internationale premium", price: 1000, is_available: false },
-            { category_id: "cat_gazeuses", name: "Top Ananas", description: "Boisson gazeuse à l'ananas", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "Top Orange", description: "Boisson gazeuse à l'orange", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "Top Grenadine", description: "Boisson gazeuse", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "World Cola", description: "Cola", price: 400, is_available: false },
-            { category_id: "cat_gazeuses", name: "Orangina", description: "Boisson à l'orange", price: 500, is_available: false },
-            { category_id: "cat_eaux", name: "Tangui", description: "Eau minérale naturelle", price: 300, is_available: false },
-            { category_id: "cat_eaux", name: "Supermont", description: "Eau minérale naturelle plate", price: 300, is_available: false },
-            { category_id: "cat_eaux", name: "Vitale", description: "Eau purifiée premium", price: 250, is_available: false },
-            { category_id: "cat_eaux", name: "Aqua Belle", description: "Eau de source", price: 250, is_available: false },
-            { category_id: "cat_jus", name: "Jus d'Orange Frais", description: "100% pur jus pressé", price: 1200, is_available: false },
-            { category_id: "cat_jus", name: "Jus d'Ananas Naturel", description: "Jus d'ananas frais de Penja", price: 1000, is_available: false },
-            { category_id: "cat_jus", name: "Foléré", description: "Bissap rouge traditionnel", price: 500, is_available: false },
+            { category_id: "cat_bieres", name: "33 Export", description: "Bière blonde lager", price: 800, is_available: false, image_url: "https://images.unsplash.com/photo-1608270861620-7cf5903d5b07?w=400&h=400&fit=crop" },
+            { category_id: "cat_bieres", name: "Castel Beer", description: "Bière blonde premium", price: 800, is_available: false, image_url: "https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=400&h=400&fit=crop" },
+            { category_id: "cat_bieres", name: "Mutzig", description: "Bière forte premium", price: 900, is_available: false, image_url: "https://images.unsplash.com/photo-1608270861620-7cf5903d5b07?w=400&h=400&fit=crop" },
+            { category_id: "cat_bieres", name: "Beaufort Lager", description: "Bière blonde classique", price: 700, is_available: false, image_url: "https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=400&h=400&fit=crop" },
+            { category_id: "cat_bieres", name: "Heineken", description: "Bière internationale premium", price: 1000, is_available: false, image_url: "https://images.unsplash.com/photo-1608270861620-7cf5903d5b07?w=400&h=400&fit=crop" },
+            { category_id: "cat_gazeuses", name: "Top Ananas", description: "Boisson gazeuse à l'ananas", price: 400, is_available: false, image_url: "https://images.unsplash.com/photo-1554866585-92c21c93d6f1?w=400&h=400&fit=crop" },
+            { category_id: "cat_gazeuses", name: "Top Orange", description: "Boisson gazeuse à l'orange", price: 400, is_available: false, image_url: "https://images.unsplash.com/photo-1599599810694-b5ac4dd5ccf1?w=400&h=400&fit=crop" },
+            { category_id: "cat_gazeuses", name: "Top Grenadine", description: "Boisson gazeuse", price: 400, is_available: false, image_url: "https://images.unsplash.com/photo-1554866585-92c21c93d6f1?w=400&h=400&fit=crop" },
+            { category_id: "cat_gazeuses", name: "World Cola", description: "Cola", price: 400, is_available: false, image_url: "https://images.unsplash.com/photo-1554866585-92c21c93d6f1?w=400&h=400&fit=crop" },
+            { category_id: "cat_gazeuses", name: "Orangina", description: "Boisson à l'orange", price: 500, is_available: false, image_url: "https://images.unsplash.com/photo-1599599810694-b5ac4dd5ccf1?w=400&h=400&fit=crop" },
+            { category_id: "cat_eaux", name: "Tangui", description: "Eau minérale naturelle", price: 300, is_available: false, image_url: "https://images.unsplash.com/photo-1610932656061-f1c5b80e267f?w=400&h=400&fit=crop" },
+            { category_id: "cat_eaux", name: "Supermont", description: "Eau minérale naturelle plate", price: 300, is_available: false, image_url: "https://images.unsplash.com/photo-1610932656061-f1c5b80e267f?w=400&h=400&fit=crop" },
+            { category_id: "cat_eaux", name: "Vitale", description: "Eau purifiée premium", price: 250, is_available: false, image_url: "https://images.unsplash.com/photo-1610932656061-f1c5b80e267f?w=400&h=400&fit=crop" },
+            { category_id: "cat_eaux", name: "Aqua Belle", description: "Eau de source", price: 250, is_available: false, image_url: "https://images.unsplash.com/photo-1610932656061-f1c5b80e267f?w=400&h=400&fit=crop" },
+            { category_id: "cat_jus", name: "Jus d'Orange Frais", description: "100% pur jus pressé", price: 1200, is_available: false, image_url: "https://images.unsplash.com/photo-1599599810694-b5ac4dd5ccf1?w=400&h=400&fit=crop" },
+            { category_id: "cat_jus", name: "Jus d'Ananas Naturel", description: "Jus d'ananas frais de Penja", price: 1000, is_available: false, image_url: "https://images.unsplash.com/photo-1628840042765-356cda07f7d8?w=400&h=400&fit=crop" },
+            { category_id: "cat_jus", name: "Foléré", description: "Bissap rouge traditionnel", price: 500, is_available: false, image_url: "https://images.unsplash.com/photo-1600788148184-fb3348f5b50d?w=400&h=400&fit=crop" },
         ]
     },
     braiserie: {
@@ -168,12 +178,12 @@ const LEGACY_PACKS = {
             { id: "cat_accompagnements", name: "Accompagnements", description: "Compléments pour vos plats", sort_order: 3, is_active: true },
         ],
         products: [
-            { category_id: "cat_poissons", name: "Bar Braisé (Moyen)", description: "Poisson bar frais mariné aux épices", price: 4500, is_available: false },
-            { category_id: "cat_poissons", name: "Carpe Braisée", description: "Carpe d'eau douce braisée au charbon", price: 3500, is_available: false },
-            { category_id: "cat_viandes", name: "Demi-Poulet Braisé", description: "Poulet bicyclette tendre et parfumé", price: 4500, is_available: false },
-            { category_id: "cat_viandes", name: "Soya (Boeuf)", description: "Brochettes de boeuf épicées", price: 2000, is_available: false },
-            { category_id: "cat_accompagnements", name: "Miondo (3 bâtons)", description: "Bâtons de manioc fins", price: 500, is_available: false },
-            { category_id: "cat_accompagnements", name: "Frites de Plantain", description: "Plantains mûrs frits", price: 1000, is_available: false },
+            { category_id: "cat_poissons", name: "Bar Braisé (Moyen)", description: "Poisson bar frais mariné aux épices", price: 4500, is_available: false, image_url: "https://images.unsplash.com/photo-1669237277313-4b7cf15fb052?w=400&h=400&fit=crop" },
+            { category_id: "cat_poissons", name: "Carpe Braisée", description: "Carpe d'eau douce braisée au charbon", price: 3500, is_available: false, image_url: "https://images.unsplash.com/photo-1669237277313-4b7cf15fb052?w=400&h=400&fit=crop" },
+            { category_id: "cat_viandes", name: "Demi-Poulet Braisé", description: "Poulet bicyclette tendre et parfumé", price: 4500, is_available: false, image_url: "https://images.unsplash.com/photo-1598103442097-8b74394b95c6?w=400&h=400&fit=crop" },
+            { category_id: "cat_viandes", name: "Soya (Boeuf)", description: "Brochettes de boeuf épicées", price: 2000, is_available: false, image_url: "https://images.unsplash.com/photo-1555939594-58d7cb561e1f?w=400&h=400&fit=crop" },
+            { category_id: "cat_accompagnements", name: "Miondo (3 bâtons)", description: "Bâtons de manioc fins", price: 500, is_available: false, image_url: "https://images.unsplash.com/photo-1585238341710-57b0e4bef72e?w=400&h=400&fit=crop" },
+            { category_id: "cat_accompagnements", name: "Frites de Plantain", description: "Plantains mûrs frits", price: 1000, is_available: false, image_url: "https://images.unsplash.com/photo-1585238341710-57b0e4bef72e?w=400&h=400&fit=crop" },
         ]
     },
     traditionnel: {
@@ -182,12 +192,12 @@ const LEGACY_PACKS = {
             { id: "cat_fufu", name: "Couscous & Fufu", description: "Les bases de nos plats", sort_order: 2, is_active: true },
         ],
         products: [
-            { category_id: "cat_sauces", name: "Ndole Complet", description: "Viande, crevettes et morue", price: 3500, is_available: false },
-            { category_id: "cat_sauces", name: "Eru & Waterleaf", description: "Mélange de légumes verts", price: 3000, is_available: false },
-            { category_id: "cat_sauces", name: "Sauce Jaune (Achu)", description: "Spécialité du Nord-Ouest", price: 4000, is_available: false },
-            { category_id: "cat_sauces", name: "Okok Sucré/Salé", description: "Feuilles d'okok et arachide", price: 2500, is_available: false },
-            { category_id: "cat_fufu", name: "Couscous Maïs", description: "Boule de maïs jaune", price: 500, is_available: false },
-            { category_id: "cat_fufu", name: "Waterfufu", description: "Fufu de manioc fermenté", price: 500, is_available: false },
+            { category_id: "cat_sauces", name: "Ndole Complet", description: "Viande, crevettes et morue", price: 3500, is_available: false, image_url: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop" },
+            { category_id: "cat_sauces", name: "Eru & Waterleaf", description: "Mélange de légumes verts", price: 3000, is_available: false, image_url: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop" },
+            { category_id: "cat_sauces", name: "Sauce Jaune (Achu)", description: "Spécialité du Nord-Ouest", price: 4000, is_available: false, image_url: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop" },
+            { category_id: "cat_sauces", name: "Okok Sucré/Salé", description: "Feuilles d'okok et arachide", price: 2500, is_available: false, image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=400&fit=crop" },
+            { category_id: "cat_fufu", name: "Couscous Maïs", description: "Boule de maïs jaune", price: 500, is_available: false, image_url: "https://images.unsplash.com/photo-1476124369162-f4978ffba715?w=400&h=400&fit=crop" },
+            { category_id: "cat_fufu", name: "Waterfufu", description: "Fufu de manioc fermenté", price: 500, is_available: false, image_url: "https://images.unsplash.com/photo-1476124369162-f4978ffba715?w=400&h=400&fit=crop" },
         ]
     },
     streetfood: {
@@ -196,10 +206,10 @@ const LEGACY_PACKS = {
             { id: "cat_sandwichs", name: "Sandwichs & Burgers", description: "Le goût de la rue", sort_order: 2, is_active: true },
         ],
         products: [
-            { category_id: "cat_beignets", name: "Beignets Haricots", description: "Le classique indémodable", price: 500, is_available: false },
-            { category_id: "cat_beignets", name: "Accras de Morue", description: "Petits beignets de poisson", price: 1000, is_available: false },
-            { category_id: "cat_sandwichs", name: "Pain Chargé", description: "Omelette, spaghetti, avocat", price: 800, is_available: false },
-            { category_id: "cat_sandwichs", name: "Burger Maison", description: "Boeuf frais et sauce secrète", price: 2500, is_available: false },
+            { category_id: "cat_beignets", name: "Beignets Haricots", description: "Le classique indémodable", price: 500, is_available: false, image_url: "https://images.unsplash.com/photo-1615673179914-d71ee28c169f?w=400&h=400&fit=crop" },
+            { category_id: "cat_beignets", name: "Accras de Morue", description: "Petits beignets de poisson", price: 1000, is_available: false, image_url: "https://images.unsplash.com/photo-1615673179914-d71ee28c169f?w=400&h=400&fit=crop" },
+            { category_id: "cat_sandwichs", name: "Pain Chargé", description: "Omelette, spaghetti, avocat", price: 800, is_available: false, image_url: "https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?w=400&h=400&fit=crop" },
+            { category_id: "cat_sandwichs", name: "Burger Maison", description: "Boeuf frais et sauce secrète", price: 2500, is_available: false, image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=400&fit=crop" },
         ]
     },
     petitdej: {
@@ -208,10 +218,10 @@ const LEGACY_PACKS = {
             { id: "cat_pains", name: "Viennoiseries & Pains", description: "Fraîchement cuits", sort_order: 2, is_active: true },
         ],
         products: [
-            { category_id: "cat_chaud", name: "Café de l'Ouest", description: "100% Arabica local", price: 1000, is_available: false },
-            { category_id: "cat_chaud", name: "Chocolat Chaud", description: "Cacao du pays", price: 1200, is_available: false },
-            { category_id: "cat_pains", name: "Pain au Chocolat", description: "Beurre pur", price: 600, is_available: false },
-            { category_id: "cat_pains", name: "Omelette Garnie", description: "3 oeufs, oignons, piment", price: 1500, is_available: false },
+            { category_id: "cat_chaud", name: "Café de l'Ouest", description: "100% Arabica local", price: 1000, is_available: false, image_url: "https://images.unsplash.com/photo-1559056199-641a0ac8b3f4?w=400&h=400&fit=crop" },
+            { category_id: "cat_chaud", name: "Chocolat Chaud", description: "Cacao du pays", price: 1200, is_available: false, image_url: "https://images.unsplash.com/photo-1578369254639-5f3fb8a7ef1a?w=400&h=400&fit=crop" },
+            { category_id: "cat_pains", name: "Pain au Chocolat", description: "Beurre pur", price: 600, is_available: false, image_url: "https://images.unsplash.com/photo-1558636508-e0db3814a4ee?w=400&h=400&fit=crop" },
+            { category_id: "cat_pains", name: "Omelette Garnie", description: "3 oeufs, oignons, piment", price: 1500, is_available: false, image_url: "https://images.unsplash.com/photo-1585238341710-57b0e4bef72e?w=400&h=400&fit=crop" },
         ]
     }
 };
@@ -238,24 +248,39 @@ categoriesRoutes.post("/import-pack", async (c) => {
 
         const supabase = c.var.supabase;
 
-        // 1. Get the pack from the database
+        // 1. Get the pack from the database or built-in packs
+        let pack: any = null;
+
+        // Try database first
         const { data: packData, error: packError } = await supabase
             .from("catalog_packs")
             .select("*")
             .eq("slug", packId)
             .single();
 
-        if (packError || !packData) {
-            console.error("[Import Pack] Pack not found in database:", packId);
-            return c.json({ error: `Pack "${packId}" non trouvé en base de données` }, 404);
+        if (!packError && packData) {
+            pack = {
+                categories: packData.categories || [],
+                products: packData.products || []
+            };
+        } else {
+            // Fallback to built-in LEGACY_PACKS
+            console.log("[Import Pack] Pack not in database, checking built-in packs:", packId);
+            pack = LEGACY_PACKS[packId as keyof typeof LEGACY_PACKS];
         }
 
-        const pack = {
-            categories: packData.categories || [],
-            products: packData.products || []
-        };
+        if (!pack) {
+            console.error("[Import Pack] Pack not found anywhere:", packId);
+            return c.json({ error: `Pack "${packId}" non trouvé` }, 404);
+        }
 
         // 1. Insert Categories
+        // Map: original_category_id -> category_name (for product matching)
+        const categoryIdMap: Record<string, string> = {};
+        pack.categories.forEach((cat: any) => {
+            categoryIdMap[cat.id] = cat.name;
+        });
+
         const categoriesToInsert = pack.categories.map(cat => ({
             restaurant_id: targetRestaurantId,
             name: cat.name,
@@ -284,9 +309,15 @@ categoriesRoutes.post("/import-pack", async (c) => {
 
         // 2. Insert Products
         const productsToInsert = pack.products.map((prod: any) => {
-            const categoryId = categoryNameMap[prod.category_name];
+            // Resolve category_id to category_name from the pack
+            const categoryName = categoryIdMap[prod.category_id];
+            if (!categoryName) {
+                console.warn(`[Import Pack] Category not found for product: ${prod.name} (category_id: ${prod.category_id})`);
+                return null;
+            }
+            const categoryId = categoryNameMap[categoryName];
             if (!categoryId) {
-                console.warn(`[Import Pack] Category not found for product: ${prod.name} (${prod.category_name})`);
+                console.warn(`[Import Pack] Inserted category not found: ${categoryName}`);
                 return null;
             }
             return {
@@ -296,6 +327,7 @@ categoriesRoutes.post("/import-pack", async (c) => {
                 description: prod.description,
                 price: prod.price,
                 is_available: prod.is_available,
+                image_url: prod.image_url || null,
             };
         }).filter(p => p !== null);
 

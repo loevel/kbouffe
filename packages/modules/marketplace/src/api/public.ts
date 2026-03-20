@@ -18,8 +18,8 @@ publicRoutes.get('/packs', async (c) => {
       .from('marketplace_packs')
       .select('*')
       .eq('is_active', true)
-      .order('sort_order', { ascending: false })
-      .order('is_featured', { ascending: false });
+      .order('is_featured', { ascending: false })
+      .order('sort_order', { ascending: false });
 
     if (error) {
       console.error('Marketplace packs fetch error:', error);

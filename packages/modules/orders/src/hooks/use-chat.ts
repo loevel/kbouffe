@@ -16,7 +16,17 @@ export interface Message {
 }
 
 const fetcher = async (url: string) => {
-    const res = await fetch(url);
+    const supabase = createClient();
+    const headers: Record<string, string> = {};
+
+    if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+            headers["Authorization"] = `Bearer ${session.access_token}`;
+        }
+    }
+
+    const res = await fetch(url, { headers });
     if (!res.ok) throw new Error("API error");
     return res.json() as Promise<any>;
 };
@@ -65,17 +75,37 @@ export function useChat(orderId: string) {
 
         setIsSending(true);
         try {
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+            if (supabase) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.access_token) {
+                    headers["Authorization"] = `Bearer ${session.access_token}`;
+                }
+            }
+
             const res = await fetch(`/api/chat/orders/${orderId}/messages`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({ content, type, attachmentUrl }),
             });
 
-            if (!res.ok) throw new Error("Failed to send message");
-            
-            // Note: We don't manually add to state because we'll receive it via broadcast
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Failed to send message");
+            }
+
+            const newMessage = await res.json();
+            // Manually add the message to state since broadcast might not fire immediately
+            setMessages((prev) => {
+                // Avoid duplicates
+                if (prev.some((m) => m.id === newMessage.id)) return prev;
+                return [...prev, newMessage];
+            });
         } catch (error) {
-            console.error("Chat error:", error);
+            console.error("[Chat] Error sending message:", error);
+            // Re-throw error for component to handle (e.g., show toast)
+            throw error;
         } finally {
             setIsSending(false);
         }
@@ -86,12 +116,25 @@ export function useChat(orderId: string) {
         const formData = new FormData();
         formData.append("file", file);
 
+        const headers: Record<string, string> = {};
+
+        if (supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+                headers["Authorization"] = `Bearer ${session.access_token}`;
+            }
+        }
+
         const res = await fetch(`/api/chat/orders/${orderId}/upload`, {
             method: "POST",
+            headers,
             body: formData,
         });
 
-        if (!res.ok) throw new Error("Upload failed");
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.error || "Upload failed");
+        }
         const data = await res.json() as { url: string };
         return data.url;
     }, [orderId]);

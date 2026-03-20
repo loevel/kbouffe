@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
-import type { 
-  MarketplaceInitiatePurchaseRequest, 
-  RestaurantPackSubscription 
+import type {
+  MarketplaceInitiatePurchaseRequest,
+  RestaurantPackSubscription
 } from '../lib/types.js';
+import { validateInitiatePurchase } from '../lib/validation.js';
 
 export const merchantRoutes = new Hono();
 
@@ -81,12 +82,15 @@ merchantRoutes.post('/purchase', async (c) => {
       return c.json({ error: 'Non autorisé' }, 401);
     }
 
-    const body = await c.req.json() as MarketplaceInitiatePurchaseRequest;
-    const { pack_id, payer_msisdn } = body;
+    const body = await c.req.json();
 
-    if (!pack_id || !payer_msisdn) {
-      return c.json({ error: 'Données manquantes' }, 400);
+    if (!validateInitiatePurchase(body)) {
+      return c.json({
+        error: 'Données invalides: pack_id et payer_msisdn (string) requis'
+      }, 400);
     }
+
+    const { pack_id, payer_msisdn } = body;
 
     // Appeler la stored procedure
     const { data, error } = await supabase

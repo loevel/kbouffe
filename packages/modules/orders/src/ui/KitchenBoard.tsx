@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Clock, Utensils, Package, Bike, RefreshCw, CheckCircle2, CalendarClock, Truck } from "lucide-react";
-import { Badge, Button, EmptyState, Input, Modal, ModalFooter, Spinner, toast, cn, formatOrderId, useLocale } from "@kbouffe/module-core/ui";
+import { Badge, Button, EmptyState, Input, Modal, ModalFooter, Spinner, toast, cn, formatOrderId, useLocale, createClient, useDashboard } from "@kbouffe/module-core/ui";
 import { useOrders, updateOrderStatus } from "../hooks/use-orders";
 import type { Order, OrderItemData } from "@kbouffe/module-core/ui";
+
+// ── Types for server-computed KDS fields ──────────────────────────────────
+
+interface KdsOrder extends Order {
+    /** Server-computed: minutes since order creation */
+    elapsed_minutes?: number;
+    /** Server-computed: true when elapsed >= restaurant threshold */
+    is_urgent?: boolean;
+    /** Restaurant-specific threshold in minutes */
+    threshold_minutes?: number;
+}
 
 // ── Column definitions ────────────────────────────────────────────────────
 
@@ -30,19 +41,23 @@ const COLUMN_BADGE: Record<string, "warning" | "info" | "brand" | "success"> = {
 };
 
 // ── Elapsed time helper ──────────────────────────────────────────────────
+// Uses server-computed elapsed_minutes when available, falls back to client calc.
 
-function useElapsed(createdAt: string) {
-    const diff = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60_000);
-    return diff;
+function useElapsed(order: KdsOrder) {
+    if (typeof order.elapsed_minutes === "number") {
+        return order.elapsed_minutes;
+    }
+    return Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60_000);
 }
 
 // ── Order Card ────────────────────────────────────────────────────────────
 
-function OrderCard({ order, nextStatus, actionKey, t }: {
-    order: Order;
+function OrderCard({ order, nextStatus, actionKey, t, urgentThreshold = 15 }: {
+    order: KdsOrder;
     nextStatus: string | null;
     actionKey: string | null;
     t: ReturnType<typeof useLocale>["t"];
+    urgentThreshold?: number;
 }) {
     const [loading, setLoading] = useState(false);
     const [showPrepModal, setShowPrepModal] = useState(false);
@@ -51,8 +66,11 @@ function OrderCard({ order, nextStatus, actionKey, t }: {
     const [prepMinutes, setPrepMinutes] = useState(
         String(order.preparation_time_minutes ?? 25)
     );
-    const elapsed = useElapsed(order.created_at);
-    const urgent = elapsed >= (t.kds.urgentAfter ? 15 : 15);
+    const elapsed = useElapsed(order);
+    // Use server-computed is_urgent when available, fall back to client calculation
+    const urgent = typeof order.is_urgent === "boolean"
+        ? order.is_urgent
+        : elapsed >= urgentThreshold;
     const isScheduled = !!order.scheduled_for;
 
     const deliveryIcon =
@@ -277,18 +295,176 @@ function OrderCard({ order, nextStatus, actionKey, t }: {
     );
 }
 
+// ── Helper functions ─────────────────────────────────────────────────────
+
+function playOrderSound() {
+    const soundEnabled = localStorage.getItem("kitchen_sound_enabled") !== "false";
+    if (!soundEnabled) return;
+
+    try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+    } catch (err) {
+        console.error("Failed to play order sound:", err);
+    }
+}
+
+function showBrowserNotification(
+    order: { id: string; delivery_type: string; customer_name?: string },
+    isUrgent = false,
+) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    try {
+        const orderId = (order.id as string)?.slice(-6).toUpperCase() ?? "?";
+        const deliveryLabel =
+            order.delivery_type === "dine_in" ? "Sur place" :
+            order.delivery_type === "delivery" ? "Livraison" :
+            "A emporter";
+
+        const title = isUrgent
+            ? `Commande #${orderId} en attente !`
+            : `Nouvelle commande #${orderId}`;
+
+        const body = isUrgent
+            ? `${order.customer_name ?? ""} - ${deliveryLabel}`
+            : `${order.customer_name ?? ""} - ${deliveryLabel}`;
+
+        new Notification(title, {
+            body,
+            icon: "/favicon.ico",
+            tag: isUrgent ? `urgent-${order.id}` : `new-${order.id}`,
+        });
+    } catch (err) {
+        console.error("Failed to show notification:", err);
+    }
+}
+
 // ── KitchenBoard ──────────────────────────────────────────────────────────
 
 export function KitchenBoard() {
     const { t } = useLocale();
+    const { restaurant } = useDashboard();
+    const supabase = createClient();
     const { orders, isLoading, mutate } = useOrders({
         limit: 200,
         status: "pending,accepted,preparing,ready",
     });
+    const [tick, setTick] = useState(0);
+    const lastNotifiedRef = useRef<Set<string>>(new Set());
 
-    const activeOrders = orders.filter((o) =>
+    const activeOrders = (orders as KdsOrder[]).filter((o) =>
         ["pending", "accepted", "preparing", "ready"].includes(o.status)
     );
+
+    const urgentThreshold = (restaurant as any)?.waitAlertThresholdMinutes ?? 15;
+
+    // Request browser notification permission on mount
+    useEffect(() => {
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+    }, []);
+
+    // Subscribe to real-time order changes AND kds_notifications
+    useEffect(() => {
+        if (!restaurant?.id || !supabase) return;
+
+        const channel = supabase
+            .channel("kitchen-orders")
+            // Listen to order inserts (for data refresh)
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "orders",
+                    filter: `restaurant_id=eq.${restaurant.id}`,
+                },
+                () => {
+                    mutate();
+                }
+            )
+            // Listen to order updates (for data refresh)
+            .on(
+                "postgres_changes",
+                {
+                    event: "UPDATE",
+                    schema: "public",
+                    table: "orders",
+                    filter: `restaurant_id=eq.${restaurant.id}`,
+                },
+                () => {
+                    mutate();
+                }
+            )
+            // Listen to kds_notifications for sound/browser alerts
+            // This is driven by server-side triggers, not client logic.
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "kds_notifications",
+                    filter: `restaurant_id=eq.${restaurant.id}`,
+                },
+                (payload) => {
+                    const notification = payload.new as {
+                        id: string;
+                        event_type: string;
+                        payload: Record<string, unknown>;
+                    };
+
+                    // Deduplicate: don't re-notify the same event
+                    if (lastNotifiedRef.current.has(notification.id)) return;
+                    lastNotifiedRef.current.add(notification.id);
+                    // Keep the set bounded
+                    if (lastNotifiedRef.current.size > 100) {
+                        const entries = Array.from(lastNotifiedRef.current);
+                        lastNotifiedRef.current = new Set(entries.slice(-50));
+                    }
+
+                    const eventType = notification.event_type;
+
+                    if (eventType === "new_order") {
+                        playOrderSound();
+                        showBrowserNotification({
+                            id: notification.payload.order_id as string,
+                            delivery_type: notification.payload.delivery_type as string,
+                            customer_name: notification.payload.customer_name as string,
+                        });
+                        mutate();
+                    } else if (eventType === "order_urgent") {
+                        // Play a more urgent sound for overdue orders
+                        playOrderSound();
+                        showBrowserNotification({
+                            id: notification.payload.order_id as string,
+                            delivery_type: notification.payload.delivery_type as string,
+                            customer_name: `${notification.payload.customer_name} (${notification.payload.elapsed_minutes} min)`,
+                        }, true);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [supabase, restaurant?.id, mutate]);
+
+    // Auto-refresh elapsed time every 60 seconds
+    useEffect(() => {
+        const id = setInterval(() => setTick((n) => n + 1), 60_000);
+        return () => clearInterval(id);
+    }, []);
 
     function handleRefresh() {
         mutate();
@@ -348,6 +524,7 @@ export function KitchenBoard() {
                                         nextStatus={col.nextStatus}
                                         actionKey={col.actionKey}
                                         t={t}
+                                        urgentThreshold={urgentThreshold}
                                     />
                                 ))
                             )}
