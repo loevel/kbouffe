@@ -89,20 +89,15 @@ export async function DELETE(
 
         const { id } = await params;
 
-        // Vérifier que l'adresse existe et appartient à l'utilisateur
-        const { data: addressToDelete, error: fetchError } = await supabase
+        // Récupérer l'adresse pour vérifier le flag is_default
+        const { data: addressToDelete } = await supabase
             .from("addresses")
-            .select("id, is_default")
+            .select("is_default")
             .eq("id", id)
-            .eq("user_id", user.id)
-            .single();
-
-        if (fetchError || !addressToDelete) {
-            return NextResponse.json({ error: "Adresse non trouvée" }, { status: 404 });
-        }
+            .eq("user_id", user.id);
 
         // Si c'est l'adresse par défaut, d'abord la désactiver
-        if (addressToDelete.is_default) {
+        if (addressToDelete && addressToDelete.length > 0 && addressToDelete[0].is_default) {
             await supabase
                 .from("addresses")
                 .update({ is_default: false })
@@ -110,16 +105,22 @@ export async function DELETE(
                 .eq("user_id", user.id);
         }
 
-        // Maintenant supprimer l'adresse
-        const { error: deleteError } = await supabase
+        // Supprimer l'adresse
+        const { error: deleteError, count } = await supabase
             .from("addresses")
             .delete()
             .eq("id", id)
-            .eq("user_id", user.id);
+            .eq("user_id", user.id)
+            .select("*", { count: "exact", head: true });
 
         if (deleteError) {
             console.error("Erreur delete Supabase address:", deleteError);
             return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
+        }
+
+        // Vérifier que l'adresse a été supprimée
+        if (!count || count === 0) {
+            return NextResponse.json({ error: "Adresse non trouvée" }, { status: 404 });
         }
 
         return NextResponse.json({ success: true, message: "Adresse supprimée" });
