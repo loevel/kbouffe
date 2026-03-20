@@ -86,7 +86,7 @@ export function ReservationsFilters({
                     <Input
                         type="number"
                         min={1}
-                        placeholder={t.reservations.minParty ?? "Taille min"}
+                        placeholder={(t.reservations as any).minParty ?? "Taille min"}
                         value={minParty ?? ""}
                         onChange={(e) => onMinPartyChange(e.target.value ? parseInt(e.target.value, 10) : null)}
                         leftIcon={<Filter size={14} />}
@@ -98,9 +98,9 @@ export function ReservationsFilters({
                         onChange={(e) => onSortChange(e.target.value as any)}
                         className="w-full h-10 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm px-3"
                     >
-                        <option value="time">{t.reservations.sortTime ?? "Trier par heure"}</option>
-                        <option value="party">{t.reservations.sortParty ?? "Trier par groupe"}</option>
-                        <option value="status">{t.reservations.sortStatus ?? "Trier par statut"}</option>
+                        <option value="time">{(t.reservations as any).sortTime ?? "Trier par heure"}</option>
+                        <option value="party">{(t.reservations as any).sortParty ?? "Trier par groupe"}</option>
+                        <option value="status">{(t.reservations as any).sortStatus ?? "Trier par statut"}</option>
                     </select>
                 </div>
                 <div className="lg:col-span-3 flex justify-end">
