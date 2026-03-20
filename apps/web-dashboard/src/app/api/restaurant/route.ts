@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 const fieldMapping: Record<string, string> = {
   logoUrl: "logo_url",
   coverUrl: "banner_url",
+  primaryColor: "primary_color",
   postalCode: "postal_code",
   cuisineType: "cuisine_type",
   priceRange: "price_range",
@@ -69,15 +70,15 @@ export async function PATCH(request: NextRequest) {
 
     // Champs autorisés à mettre à jour
     const allowedFields = [
-      "name", "description", "logoUrl", "coverUrl", "address", "city", "postalCode", "country",
+      "name", "description", "logoUrl", "coverUrl", "primaryColor", "address", "city", "postalCode", "country",
       "cuisineType", "priceRange", "isActive", "slug", "phone", "email", "lat", "lng",
       "minOrderAmount", "deliveryFee", "openingHours", "hasDineIn", "hasReservations",
       "corkageFeeAmount", "dineInServiceFee", "totalTables", "reservationCancelPolicy",
       "reservationCancelNoticeMinutes", "reservationCancellationFeeAmount",
       "orderCancelPolicy", "orderCancelNoticeMinutes", "orderCancellationFeeAmount",
       "payment_methods", "payment_credentials", "paymentMethods", "paymentCredentials",
-      "sms_notifications_enabled", "smsNotificationsEnabled", 
-      "notification_channels", "notificationChannels", 
+      "sms_notifications_enabled", "smsNotificationsEnabled",
+      "notification_channels", "notificationChannels",
       "notification_info", "notificationInfo",
       "delivery_zones", "deliveryZones",
       "delivery_base_fee", "deliveryBaseFee",
