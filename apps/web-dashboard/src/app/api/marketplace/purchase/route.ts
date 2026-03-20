@@ -41,54 +41,51 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get service details
-        const { data: service, error: serviceError } = await supabase
-            .from("marketplace_services")
+        // Get pack details
+        const { data: pack, error: packError } = await supabase
+            .from("marketplace_packs")
             .select("*")
             .eq("id", serviceId)
             .eq("is_active", true)
             .single();
 
-        if (serviceError || !service) {
+        if (packError || !pack) {
             return NextResponse.json(
-                { error: "Service non trouvé ou inactif" },
+                { error: "Pack non trouvé ou inactif" },
                 { status: 404 }
             );
         }
 
-        // Calculate expiration date if duration is set
-        const startsAt = new Date();
-        let expiresAt: Date | null = null;
-        if (service.duration_days) {
-            expiresAt = new Date(startsAt);
-            expiresAt.setDate(expiresAt.getDate() + service.duration_days);
-        }
+        // Initiate purchase via RPC (payment integration)
+        const { data: purchaseData, error: purchaseError } = await supabase.rpc(
+            'marketplace_initiate_purchase',
+            {
+                p_restaurant_id: restaurantId,
+                p_pack_id: serviceId,
+                p_payer_msisdn: user.email, // Using email as fallback msisdn
+            }
+        );
 
-        // Create purchase record (in real app, would integrate with payment processor)
-        const { data: purchase, error: purchaseError } = await supabase
-            .from("marketplace_purchases")
-            .insert({
-                restaurant_id: restaurantId,
-                service_id: serviceId,
-                admin_id: user.id, // Current user initiating the purchase
-                status: "active",
-                starts_at: startsAt.toISOString(),
-                expires_at: expiresAt?.toISOString() || null,
-                amount_paid: service.price,
-                notes: "Purchase via dashboard",
-            })
-            .select("*, service:marketplace_services(name, slug, category, icon), restaurant:restaurants(name, slug)")
-            .single();
-
-        if (purchaseError) {
+        if (purchaseError || !purchaseData || purchaseData.length === 0) {
             console.error("Purchase error:", purchaseError);
             return NextResponse.json(
-                { error: "Erreur lors de l'achat du pack" },
+                { error: "Erreur lors de l'initiation de l'achat" },
                 { status: 500 }
             );
         }
 
-        return NextResponse.json(purchase, { status: 201 });
+        const { subscription_id, transaction_id, reference_id } = purchaseData[0];
+
+        return NextResponse.json({
+            success: true,
+            data: {
+                subscription_id,
+                transaction_id,
+                reference_id,
+                amount: pack.price,
+                currency: 'XAF',
+            }
+        }, { status: 201 });
     } catch (error) {
         console.error("Marketplace purchase API error:", error);
         return NextResponse.json(

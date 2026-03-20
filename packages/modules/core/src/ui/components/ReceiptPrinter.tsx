@@ -17,8 +17,8 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
         const items = order.items || [];
         const itemsHtml = items.map((item: any) => `
             <tr>
-                <td style="padding: 5px 0;">${item.quantity}x ${item.productName}</td>
-                <td style="text-align: right; padding: 5px 0;">${formatCFA(item.unitPrice * item.quantity)}</td>
+                <td style="padding: 5px 0;">${item.quantity}x ${item.name || "Produit"}</td>
+                <td style="text-align: right; padding: 5px 0;">${formatCFA((item.price || 0) * item.quantity)}</td>
             </tr>
             ${item.selectedOptions ? `
                 <tr>

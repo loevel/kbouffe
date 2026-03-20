@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { MarketplacePack } from '../lib/types.js';
+import { validateMarketplacePack, packTypes } from '../lib/validation.js';
 
 export const adminRoutes = new Hono();
 
@@ -46,11 +47,29 @@ adminRoutes.post('/packs', async (c) => {
       return c.json({ error: 'Non autorisé' }, 401);
     }
 
-    const body = await c.req.json() as Partial<MarketplacePack>;
-    const { name, slug, type, price, duration_days, description, features, is_active, sort_order } = body;
+    const body = await c.req.json();
 
-    if (!name || !slug || !type || price === undefined || !duration_days) {
-      return c.json({ error: 'Données manquantes' }, 400);
+    if (!validateMarketplacePack(body)) {
+      return c.json({
+        error: 'Données invalides: name, slug, type (string) requis'
+      }, 400);
+    }
+
+    const {
+      name, slug, type, price, duration_days, description,
+      features, limits, badge_color, image_url, is_active, is_featured, sort_order
+    } = body;
+
+    if (price === undefined || duration_days === undefined) {
+      return c.json({
+        error: 'Données manquantes: price et duration_days (number) requis'
+      }, 400);
+    }
+
+    if (!packTypes.includes(type as typeof packTypes[number])) {
+      return c.json({
+        error: `Type invalide. Types autorisés: ${packTypes.join(', ')}`
+      }, 400);
     }
 
     const { data, error } = await supabase
@@ -63,7 +82,11 @@ adminRoutes.post('/packs', async (c) => {
         duration_days,
         description: description || null,
         features: features || [],
+        limits: limits || {},
+        badge_color: badge_color || null,
+        image_url: image_url || null,
         is_active: is_active ?? true,
+        is_featured: is_featured ?? false,
         sort_order: sort_order ?? 0,
         created_by: user.id,
       })

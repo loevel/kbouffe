@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Send, Image as ImageIcon, Loader2, User, UserCheck } from "lucide-react";
-import { Card, Button, Input, Badge } from "@kbouffe/module-core/ui";
+import { Card, Button, Input, Badge, toast } from "@kbouffe/module-core/ui";
 import { useChat, type Message } from "../hooks/use-chat";
 import { formatDateTime } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -24,7 +24,11 @@ export function OrderChat({ orderId, customerName }: OrderChatProps) {
         if (!input.trim() || isSending) return;
         const text = input;
         setInput("");
-        await sendMessage(text);
+        try {
+            await sendMessage(text);
+        } catch (error: any) {
+            toast.error(error.message || "Failed to send message");
+        }
     };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,8 +38,9 @@ export function OrderChat({ orderId, customerName }: OrderChatProps) {
         try {
             const url = await uploadImage(file);
             await sendMessage("Image", "image", url);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Upload error:", error);
+            toast.error(error.message || "Failed to upload image");
         }
     };
 

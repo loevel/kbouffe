@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { MarketplaceWebhookPayload } from '../lib/types.js';
+import { validateWebhookPayload } from '../lib/validation.js';
 
 export const webhookRoutes = new Hono();
 
@@ -24,12 +25,15 @@ webhookRoutes.post('/mtn', async (c) => {
       return c.json({ error: 'Service indisponible' }, 503);
     }
 
-    const payload = await c.req.json() as MarketplaceWebhookPayload;
-    const { reference_id, external_id, status } = payload;
+    const payload = await c.req.json();
 
-    if (!reference_id || !status) {
-      return c.json({ error: 'Données manquantes' }, 400);
+    if (!validateWebhookPayload(payload)) {
+      return c.json({
+        error: 'Données invalides: reference_id et status (paid|failed) requis'
+      }, 400);
     }
+
+    const { reference_id, external_id, status } = payload;
 
     if (status === 'paid') {
       // Confirmer le paiement via stored procedure
@@ -57,19 +61,12 @@ webhookRoutes.post('/mtn', async (c) => {
         return c.json({ error: 'Erreur serveur' }, 500);
       }
 
-      // Annuler la souscription
-      const { data: tx } = await supabase
-        .from('payment_transactions')
-        .select('marketplace_subscription_id')
-        .eq('reference_id', reference_id)
-        .single();
-
-      if (tx?.marketplace_subscription_id) {
-        await supabase
-          .from('restaurant_pack_subscriptions')
-          .update({ status: 'cancelled', cancellation_reason: 'Paiement échoué' })
-          .eq('id', tx.marketplace_subscription_id);
-      }
+      // Annuler la souscription via stored procedure
+      await supabase.rpc('marketplace_cancel_on_payment_failure', {
+        p_reference_id: reference_id,
+      }).catch((err) => {
+        console.error('Error cancelling subscription on payment failure:', err);
+      });
 
       return c.json({ success: true, message: 'Paiement marqué comme échoué' });
     }

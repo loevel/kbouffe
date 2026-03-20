@@ -149,13 +149,24 @@ export function ConfirmationPageClient() {
 
                 {/* ── CTAs ─────────────────────────────────────────────── */}
                 <div className="space-y-3">
-                    <Link
-                        href="/stores/orders"
-                        className="w-full h-13 py-3.5 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-2xl shadow-lg shadow-brand-500/25 transition-colors"
-                    >
-                        <ClipboardList size={18} />
-                        Suivre ma commande
-                    </Link>
+                    {orderId ? (
+                        <Link
+                            href={`/stores/orders/${orderId}`}
+                            className="w-full h-13 py-3.5 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-2xl shadow-lg shadow-brand-500/25 transition-colors"
+                        >
+                            <ClipboardList size={18} />
+                            Suivre ma commande
+                        </Link>
+                    ) : (
+                        <Link
+                            href="/stores/orders"
+                            className="w-full h-13 py-3.5 flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-2xl shadow-lg shadow-brand-500/25 transition-colors"
+                        >
+                            <ClipboardList size={18} />
+                            Suivre ma commande
+                        </Link>
+                    )}
+
                     <Link
                         href="/stores"
                         className="w-full h-13 py-3.5 flex items-center justify-center gap-2 bg-white dark:bg-surface-900 hover:bg-surface-50 dark:hover:bg-surface-800 text-surface-900 dark:text-white font-semibold rounded-2xl border border-surface-200 dark:border-surface-700 transition-colors"

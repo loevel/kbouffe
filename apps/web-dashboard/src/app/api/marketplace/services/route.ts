@@ -3,42 +3,44 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/marketplace/services
- * Récupère tous les services marketplace actifs
+ * Récupère tous les packs marketplace actifs
  */
 export async function GET(request: NextRequest) {
     try {
         const supabase = await createClient();
-        const category = request.nextUrl.searchParams.get("category");
+        const type = request.nextUrl.searchParams.get("type");
 
         let query = supabase
-            .from("marketplace_services")
+            .from("marketplace_packs")
             .select("*")
             .eq("is_active", true)
+            .order("is_featured", { ascending: false })
             .order("sort_order", { ascending: true });
 
-        if (category && category !== "all") {
-            query = query.eq("category", category);
+        if (type && type !== "all") {
+            query = query.eq("type", type);
         }
 
         const { data, error } = await query;
 
         if (error) {
-            console.error("Error fetching marketplace services:", error);
+            console.error("Error fetching marketplace packs:", error);
             return NextResponse.json(
-                { error: "Impossible de charger les services" },
+                { error: "Impossible de charger les packs" },
                 { status: 500 }
             );
         }
 
-        // Transform features from JSONB array to string array if needed
-        const services = (data || []).map((service: any) => ({
-            ...service,
-            features: Array.isArray(service.features) ? service.features : [],
+        // Ensure features is always an array
+        const packs = (data || []).map((pack: any) => ({
+            ...pack,
+            features: Array.isArray(pack.features) ? pack.features : [],
+            limits: pack.limits || {},
         }));
 
-        return NextResponse.json({ data: services });
+        return NextResponse.json({ success: true, data: packs });
     } catch (error) {
-        console.error("Marketplace services API error:", error);
+        console.error("Marketplace packs API error:", error);
         return NextResponse.json(
             { error: "Erreur serveur" },
             { status: 500 }

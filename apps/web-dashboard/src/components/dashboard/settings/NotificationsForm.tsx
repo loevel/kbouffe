@@ -20,7 +20,11 @@ export function NotificationsForm() {
     const { t } = useLocale();
     const { restaurant, updateRestaurant } = useDashboard();
     const [loading, setLoading] = useState(false);
-    const [soundEnabled, setSoundEnabled] = useState(true);
+    const [soundEnabled, setSoundEnabled] = useState(() =>
+        typeof window !== "undefined"
+            ? localStorage.getItem("kitchen_sound_enabled") !== "false"
+            : true
+    );
 
     // SMS notification channel settings
     const currentChannels = (restaurant?.notification_channels as string[] | null) ?? ["email", "push"];
@@ -87,6 +91,9 @@ export function NotificationsForm() {
             const channels: string[] = ["email", "push"];
             if (smsEnabled) channels.push("sms");
             if (whatsappEnabled) channels.push("whatsapp");
+
+            // Save sound preference to localStorage
+            localStorage.setItem("kitchen_sound_enabled", soundEnabled.toString());
 
             // Save preferences to restaurant settings
             if (updateRestaurant) {
