@@ -1,9 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export const runtime = "edge";
+
+interface R2Bucket {
+  put(
+    key: string,
+    value: ReadableStream<Uint8Array> | ArrayBuffer | string,
+    options?: { httpMetadata?: { contentType: string }; customMetadata?: Record<string, string> }
+  ): Promise<R2Object>;
+}
+
+interface R2Object {
+  key: string;
+  version: string;
+  size: number;
+  etag: string;
+  httpEtag: string;
+  checksums: Record<string, string>;
+  uploaded: Date;
+  httpMetadata: { contentType: string };
+  customMetadata: Record<string, string>;
+  range?: { offset: number; length: number };
+}
+
 const MAX_SIZE = 5 * 1024 * 1024; // 5 Mo
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-const SUPABASE_BUCKET = "restaurant-images";
 
 export async function POST(request: NextRequest) {
     try {
@@ -42,35 +64,34 @@ export async function POST(request: NextRequest) {
 
         // 4. Préparation de l'upload
         const ext = file.name.split(".").pop() || "jpg";
-        const key = `restaurants/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+        const key = `dishes/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
         console.log("[Upload API] Clé préparée:", key);
 
-        // 5. Upload vers Supabase Storage
-        console.log("[Upload API] Upload vers Supabase Storage...");
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        // 5. Upload vers R2
+        console.log("[Upload API] Accès au bucket R2...");
+        const bucket = (request as any).env?.IMAGES_BUCKET as R2Bucket | undefined;
 
-        const { data, error } = await supabase.storage
-            .from(SUPABASE_BUCKET)
-            .upload(key, buffer, {
-                contentType: file.type,
-                cacheControl: "3600",
-                upsert: false,
-            });
-
-        if (error) {
-            console.error("[Upload API] Erreur Supabase Storage:", error);
-            throw new Error(`Erreur upload: ${error.message}`);
+        if (!bucket) {
+            console.error("[Upload API] IMAGES_BUCKET binding non trouvé");
+            console.error("[Upload API] env keys:", Object.keys((request as any).env || {}));
+            throw new Error("Binding IMAGES_BUCKET non disponible. Vérifiez que le binding est configuré dans wrangler.toml");
         }
 
-        console.log("[Upload API] Upload réussi:", data);
+        console.log("[Upload API] Début de l'upload R2...");
+        const arrayBuffer = await file.arrayBuffer();
 
-        // URL publique du bucket Supabase
-        const { data: publicData } = supabase.storage
-            .from(SUPABASE_BUCKET)
-            .getPublicUrl(key);
+        await bucket.put(key, arrayBuffer, {
+            httpMetadata: {
+                contentType: file.type,
+            },
+            customMetadata: {
+                uploadedBy: user.id,
+            }
+        });
+        console.log("[Upload API] Upload R2 réussi");
 
-        const publicUrl = publicData?.publicUrl;
+        // URL publique du bucket R2
+        const publicUrl = `https://pub-1729b536b57c42c9a54d530432764964.r2.dev/${key}`;
 
         console.log("[Upload API] Succès:", { url: publicUrl });
         return NextResponse.json({
