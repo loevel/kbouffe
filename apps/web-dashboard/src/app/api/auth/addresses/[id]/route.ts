@@ -20,49 +20,43 @@ export async function PATCH(
         const body = await request.json();
         const { label, address: addressLine, city, instructions, is_default } = body;
 
-        // Security check: ensure address belongs to user
-        const { data: existing, error: fetchError } = await supabase
-            .from("addresses")
-            .select("id")
-            .eq("id", id)
-            .eq("user_id", user.id)
-            .single();
-
-        if (fetchError || !existing) {
-            return NextResponse.json({ error: "Adresse non trouvée" }, { status: 404 });
-        }
-
-        // If marking as default, unset others first in Supabase
+        // If marking as default, unset others first
         if (is_default) {
-            await supabase
+            const { error: unsetError } = await supabase
                 .from("addresses")
                 .update({ is_default: false })
                 .eq("user_id", user.id);
+
+            if (unsetError) {
+                console.error("Erreur unsetting default addresses:", unsetError);
+                return NextResponse.json({ error: "Erreur lors de la mise à jour" }, { status: 500 });
+            }
         }
 
-        const updates: any = {
-            updated_at: new Date().toISOString()
-        };
+        const updates: any = {};
         if (label !== undefined) updates.label = label;
         if (addressLine !== undefined) updates.address = addressLine;
         if (city !== undefined) updates.city = city;
         if (instructions !== undefined) updates.instructions = instructions;
         if (is_default !== undefined) updates.is_default = !!is_default;
 
+        // RLS policies will ensure user can only update their own addresses
         const { data: result, error: updateError } = await supabase
             .from("addresses")
             .update(updates)
             .eq("id", id)
-            .eq("user_id", user.id)
-            .select()
-            .single();
+            .select();
 
         if (updateError) {
             console.error("Erreur update Supabase address:", updateError);
             return NextResponse.json({ error: "Erreur lors de la mise à jour" }, { status: 500 });
         }
 
-        return NextResponse.json(result);
+        if (!result || result.length === 0) {
+            return NextResponse.json({ error: "Adresse non trouvée" }, { status: 404 });
+        }
+
+        return NextResponse.json(result[0]);
     } catch (error) {
         console.error("Erreur API update address:", error);
         return NextResponse.json(
@@ -89,50 +83,43 @@ export async function DELETE(
 
         const { id } = await params;
 
-        console.log(`[DELETE /api/auth/addresses/${id}] User: ${user.id}`);
-
-        // Récupérer l'adresse pour vérifier le flag is_default
+        // Récupérer l'adresse avant suppression
         const { data: addressToDelete, error: selectError } = await supabase
             .from("addresses")
-            .select("is_default")
-            .eq("id", id)
-            .eq("user_id", user.id);
+            .select("id, is_default")
+            .eq("id", id);
 
-        if (selectError) {
-            console.error(`[DELETE] Error selecting address:`, selectError);
+        if (selectError || !addressToDelete || addressToDelete.length === 0) {
+            return NextResponse.json({ error: "Adresse non trouvée" }, { status: 404 });
         }
 
         // Si c'est l'adresse par défaut, d'abord la désactiver
-        if (addressToDelete && addressToDelete.length > 0 && addressToDelete[0].is_default) {
-            console.log(`[DELETE] Address is default, unsetting flag first`);
+        if (addressToDelete[0].is_default) {
             const { error: unsetError } = await supabase
                 .from("addresses")
                 .update({ is_default: false })
-                .eq("id", id)
-                .eq("user_id", user.id);
+                .eq("id", id);
 
             if (unsetError) {
-                console.error(`[DELETE] Error unsetting default flag:`, unsetError);
+                console.error("Erreur unsetting default flag:", unsetError);
+                return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
             }
         }
 
-        // Supprimer l'adresse
-        console.log(`[DELETE] Attempting to delete address ${id} for user ${user.id}`);
+        // Supprimer l'adresse (RLS policies ensure user can only delete their own)
         const { error: deleteError } = await supabase
             .from("addresses")
             .delete()
-            .eq("id", id)
-            .eq("user_id", user.id);
+            .eq("id", id);
 
         if (deleteError) {
-            console.error(`[DELETE] Supabase error:`, deleteError);
+            console.error("Erreur delete address:", deleteError);
             return NextResponse.json({
                 error: "Erreur lors de la suppression",
                 details: deleteError.message
             }, { status: 500 });
         }
 
-        console.log(`[DELETE] Address deleted successfully`);
         return NextResponse.json({ success: true, message: "Adresse supprimée" });
     } catch (error) {
         console.error("Erreur API delete address:", error);
