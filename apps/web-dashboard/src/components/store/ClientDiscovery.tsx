@@ -174,14 +174,34 @@ function RestaurantTile({ r, promoLabel }: { r: RestaurantItem; promoLabel?: str
     const favorites = preferences.favoriteRestaurants || [];
     const isFavorite = favorites.includes(r.slug);
 
-    const toggleFavorite = (ev: React.MouseEvent) => {
+    const toggleFavorite = async (ev: React.MouseEvent) => {
         ev.preventDefault();
         ev.stopPropagation();
-        updatePreferences({
-            favoriteRestaurants: isFavorite
-                ? favorites.filter((f) => f !== r.slug)
-                : [...favorites, r.slug],
-        });
+
+        try {
+            if (isFavorite) {
+                // Remove from favorites using restaurantId
+                await fetch(`/api/auth/favorites/${r.id}`, {
+                    method: "DELETE",
+                });
+            } else {
+                // Add to favorites
+                await fetch("/api/auth/favorites", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ restaurantId: r.id }),
+                });
+            }
+
+            // Update local store
+            updatePreferences({
+                favoriteRestaurants: isFavorite
+                    ? favorites.filter((f) => f !== r.slug)
+                    : [...favorites, r.slug],
+            });
+        } catch (error) {
+            console.error("Erreur ajout/retrait favori:", error);
+        }
     };
 
     return (
