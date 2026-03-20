@@ -22,7 +22,9 @@ export async function GET() {
                 created_at,
                 delivery_type,
                 items,
+                restaurant_id,
                 restaurants (
+                    id,
                     name,
                     slug
                 )
@@ -38,6 +40,7 @@ export async function GET() {
         // Map and format for UI
         const formattedOrders = orders.map((o: any) => ({
             id: o.id,
+            restaurantId: o.restaurant_id,
             restaurantName: o.restaurants?.name || "Restaurant inconnu",
             restaurantSlug: o.restaurants?.slug || "",
             total: o.total, // En centimes selon le schema
