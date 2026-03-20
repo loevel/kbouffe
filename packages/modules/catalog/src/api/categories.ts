@@ -281,7 +281,7 @@ categoriesRoutes.post("/import-pack", async (c) => {
             categoryIdMap[cat.id] = cat.name;
         });
 
-        const categoriesToInsert = pack.categories.map(cat => ({
+        const categoriesToInsert = pack.categories.map((cat: any) => ({
             restaurant_id: targetRestaurantId,
             name: cat.name,
             description: cat.description,
@@ -329,7 +329,7 @@ categoriesRoutes.post("/import-pack", async (c) => {
                 is_available: prod.is_available,
                 image_url: prod.image_url || null,
             };
-        }).filter(p => p !== null);
+        }).filter((p: any) => p !== null);
 
         if (productsToInsert.length > 0) {
             const { error: prodError } = await supabase

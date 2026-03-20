@@ -44,17 +44,16 @@ async function getOrCreateOrderConversation(supabase: any, orderId: string) {
  */
 export async function GET(
     request: NextRequest,
-    { params }: { params: { orderId: string } }
+    { params }: { params: Promise<{ orderId: string }> }
 ) {
     try {
         const supabase = await createClient();
+        const { orderId } = await params;
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
             return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
         }
-
-        const orderId = params.orderId;
 
         try {
             const conv = await getOrCreateOrderConversation(supabase, orderId);
@@ -105,17 +104,16 @@ export async function GET(
  */
 export async function POST(
     request: NextRequest,
-    { params }: { params: { orderId: string } }
+    { params }: { params: Promise<{ orderId: string }> }
 ) {
     try {
         const supabase = await createClient();
+        const { orderId } = await params;
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
             return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
         }
-
-        const orderId = params.orderId;
         const body = await request.json();
         const { content, type = "text", attachmentUrl } = body;
 
@@ -152,7 +150,7 @@ export async function POST(
                     .eq("id", order.restaurant_id)
                     .single();
 
-                isMerchant = restaurant && restaurant.owner_id === user.id;
+                isMerchant = !!(restaurant && restaurant.owner_id === user.id);
             }
 
             if (!isCustomer && !isMerchant) {

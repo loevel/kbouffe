@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
         const type = request.nextUrl.searchParams.get("type");
 
         let query = supabase
-            .from("marketplace_packs")
+            .from("marketplace_packs" as any)
             .select("*")
             .eq("is_active", true)
             .order("is_featured", { ascending: false })

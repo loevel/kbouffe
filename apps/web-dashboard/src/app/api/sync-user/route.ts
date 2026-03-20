@@ -58,13 +58,13 @@ export async function GET(request: NextRequest) {
         }
 
         // Récupérer les modules actifs du restaurant
-        const { data: moduleData } = await supabase
+        const { data: moduleData } = (await supabase
             .from("restaurant_modules" as any)
             .select("module_id")
             .eq("restaurant_id", restaurant.id)
-            .eq("is_active", true);
+            .eq("is_active", true)) as any;
 
-        const activeModules = moduleData?.map(m => m.module_id) || [];
+        const activeModules = moduleData?.map((m: any) => m.module_id) || [];
 
         return NextResponse.json({
             user: userProfile,
@@ -156,13 +156,13 @@ export async function POST(request: NextRequest) {
 
         // Récupérer les modules actifs
         if (restaurantId) {
-            const { data: moduleData } = await supabase
+            const { data: moduleData } = (await supabase
                 .from("restaurant_modules" as any)
                 .select("module_id")
                 .eq("restaurant_id", restaurantId)
-                .eq("is_active", true);
+                .eq("is_active", true)) as any;
 
-            const activeModules = moduleData?.map(m => m.module_id) || [];
+            const activeModules = moduleData?.map((m: any) => m.module_id) || [];
 
             return NextResponse.json({
                 user,

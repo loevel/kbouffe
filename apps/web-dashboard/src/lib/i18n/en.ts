@@ -39,6 +39,7 @@ export const en: TranslationKeys = {
         free: "Free",
         copy: "(copy)",
         copied: "Copied",
+        reset: "Reset",
         share: "Share",
         open: "Open",
         download: "Download",
@@ -445,6 +446,8 @@ export const en: TranslationKeys = {
         logoHint: "Recommended: 512x512px, PNG or JPG",
         coverHint: "Recommended: 1200x400px, PNG or JPG",
         dragOrClick: "Drag an image or click to select",
+        primaryColor: "Primary color",
+        primaryColorDesc: "Color used for buttons and interface accents",
         brandingUpdated: "Branding updated",
         // Notifications
         notifications: "Notifications",

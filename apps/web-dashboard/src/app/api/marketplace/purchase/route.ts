@@ -42,12 +42,12 @@ export async function POST(request: NextRequest) {
         }
 
         // Get pack details
-        const { data: pack, error: packError } = await supabase
-            .from("marketplace_packs")
+        const { data: pack, error: packError } = await (supabase
+            .from("marketplace_packs" as any)
             .select("*")
             .eq("id", serviceId)
             .eq("is_active", true)
-            .single();
+            .single() as any);
 
         if (packError || !pack) {
             return NextResponse.json(
@@ -58,13 +58,13 @@ export async function POST(request: NextRequest) {
 
         // Initiate purchase via RPC (payment integration)
         const { data: purchaseData, error: purchaseError } = await supabase.rpc(
-            'marketplace_initiate_purchase',
+            'marketplace_initiate_purchase' as any,
             {
                 p_restaurant_id: restaurantId,
                 p_pack_id: serviceId,
                 p_payer_msisdn: user.email, // Using email as fallback msisdn
             }
-        );
+        ) as any;
 
         if (purchaseError || !purchaseData || purchaseData.length === 0) {
             console.error("Purchase error:", purchaseError);
