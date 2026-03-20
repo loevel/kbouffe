@@ -110,7 +110,7 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
                 )}
             </div>
             <p className="text-[10px] text-surface-400 italic leading-tight">
-                {t.orders.deliveryDisclaimer}
+                {(t.orders as any).deliveryDisclaimer}
             </p>
         </div>
     );

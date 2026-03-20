@@ -7,10 +7,11 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function POST(
     request: NextRequest,
-    { params }: { params: { orderId: string } }
+    { params }: { params: Promise<{ orderId: string }> }
 ) {
     try {
         const supabase = await createClient();
+        const { orderId } = await params;
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
@@ -49,7 +50,7 @@ export async function POST(
             const { data: order, error: orderError } = await supabase
                 .from("orders")
                 .select("customer_id, restaurant_id")
-                .eq("id", params.orderId)
+                .eq("id", orderId)
                 .single();
 
             if (orderError || !order) {
@@ -69,7 +70,7 @@ export async function POST(
                     .eq("id", order.restaurant_id)
                     .single();
 
-                isMerchant = restaurant && restaurant.owner_id === user.id;
+                isMerchant = !!(restaurant && restaurant.owner_id === user.id);
             }
 
             if (!isCustomer && !isMerchant) {
@@ -81,7 +82,7 @@ export async function POST(
 
             // Upload to R2 via Supabase Storage (or direct R2 if configured)
             const fileName = `${crypto.randomUUID()}-${file.name}`;
-            const filePath = `chat/orders/${params.orderId}/${fileName}`;
+            const filePath = `chat/orders/${orderId}/${fileName}`;
 
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from("images")

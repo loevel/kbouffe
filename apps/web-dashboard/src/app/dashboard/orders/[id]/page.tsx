@@ -85,7 +85,7 @@ export default function OrderDetailPage() {
                                             {item.quantity}x
                                         </div>
                                         <div>
-                                            <p className="font-medium text-surface-900 dark:text-white">{item.name || "Produit"}</p>
+                                            <p className="font-medium text-surface-900 dark:text-white">{item.productName || "Produit"}</p>
                                             {item.selectedOptions && (
                                                 <p className="text-xs text-surface-500 mt-0.5">
                                                     {Object.entries(item.selectedOptions).map(([k, v]) => `${k}: ${v}`).join(" · ")}
@@ -93,7 +93,7 @@ export default function OrderDetailPage() {
                                             )}
                                         </div>
                                     </div>
-                                    <p className="font-medium text-surface-900 dark:text-white">{formatCFA((item.price || 0) * item.quantity)}</p>
+                                    <p className="font-medium text-surface-900 dark:text-white">{formatCFA((item.unitPrice || 0) * item.quantity)}</p>
                                 </div>
                             ))}
                         </div>

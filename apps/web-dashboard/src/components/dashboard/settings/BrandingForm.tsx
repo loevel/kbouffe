@@ -220,10 +220,10 @@ export function BrandingForm() {
                             <Palette size={18} className="text-brand-500 mt-0.5" />
                             <div className="flex-1">
                                 <label className="text-sm font-semibold text-surface-900 dark:text-white">
-                                    {t.settings.primaryColor ?? "Couleur primaire"}
+                                    {(t.settings as any).primaryColor ?? "Couleur primaire"}
                                 </label>
                                 <p className="text-xs text-surface-500 mt-1">
-                                    {t.settings.primaryColorDesc ?? "Couleur utilisée pour les boutons et accents"}
+                                    {(t.settings as any).primaryColorDesc ?? "Couleur utilisée pour les boutons et accents"}
                                 </p>
                                 <div className="flex items-center gap-3 mt-4">
                                     <input
@@ -256,7 +256,7 @@ export function BrandingForm() {
                                         onClick={() => setPrimaryColor("#f97316")}
                                         className="text-xs"
                                     >
-                                        {t.common.reset ?? "Réinitialiser"}
+                                        {(t.common as any).reset ?? "Réinitialiser"}
                                     </Button>
                                 </div>
                             </div>
