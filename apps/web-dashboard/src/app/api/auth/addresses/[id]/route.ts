@@ -89,23 +89,35 @@ export async function DELETE(
 
         const { id } = await params;
 
+        console.log(`[DELETE /api/auth/addresses/${id}] User: ${user.id}`);
+
         // Récupérer l'adresse pour vérifier le flag is_default
-        const { data: addressToDelete } = await supabase
+        const { data: addressToDelete, error: selectError } = await supabase
             .from("addresses")
             .select("is_default")
             .eq("id", id)
             .eq("user_id", user.id);
 
+        if (selectError) {
+            console.error(`[DELETE] Error selecting address:`, selectError);
+        }
+
         // Si c'est l'adresse par défaut, d'abord la désactiver
         if (addressToDelete && addressToDelete.length > 0 && addressToDelete[0].is_default) {
-            await supabase
+            console.log(`[DELETE] Address is default, unsetting flag first`);
+            const { error: unsetError } = await supabase
                 .from("addresses")
                 .update({ is_default: false })
                 .eq("id", id)
                 .eq("user_id", user.id);
+
+            if (unsetError) {
+                console.error(`[DELETE] Error unsetting default flag:`, unsetError);
+            }
         }
 
         // Supprimer l'adresse
+        console.log(`[DELETE] Attempting to delete address ${id} for user ${user.id}`);
         const { error: deleteError } = await supabase
             .from("addresses")
             .delete()
@@ -113,10 +125,14 @@ export async function DELETE(
             .eq("user_id", user.id);
 
         if (deleteError) {
-            console.error("Erreur delete Supabase address:", deleteError);
-            return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
+            console.error(`[DELETE] Supabase error:`, deleteError);
+            return NextResponse.json({
+                error: "Erreur lors de la suppression",
+                details: deleteError.message
+            }, { status: 500 });
         }
 
+        console.log(`[DELETE] Address deleted successfully`);
         return NextResponse.json({ success: true, message: "Adresse supprimée" });
     } catch (error) {
         console.error("Erreur API delete address:", error);
