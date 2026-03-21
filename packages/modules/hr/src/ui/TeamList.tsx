@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Loader2 } from "lucide-react";
-import { Card, Button, Badge, toast, useDashboard, useLocale } from "@kbouffe/module-core/ui";
+import { Card, Button, Badge, toast, useDashboard, useLocale, authFetch } from "@kbouffe/module-core/ui";
 import { type TeamRole, ASSIGNABLE_ROLES, canManageRole } from "../api/permissions";
 import { ROLE_BADGE_VARIANT } from "./constants";
 import { InviteModal } from "./InviteModal";
@@ -21,7 +21,7 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
 
     const fetchMembers = useCallback(async () => {
         try {
-            const res = await fetch("/api/team");
+            const res = await authFetch("/api/team");
             if (!res.ok) return;
             const data = await res.json();
             const fetchedMembers: TeamMember[] = (data as any).members ?? [];
@@ -42,7 +42,7 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
     }, [fetchMembers]);
 
     const handleRoleChange = async (memberId: string, newRole: TeamRole) => {
-        const res = await fetch(`/api/team/${memberId}`, {
+        const res = await authFetch(`/api/team/${memberId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ role: newRole }),
@@ -57,7 +57,7 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
     };
 
     const handleRevoke = async (memberId: string) => {
-        const res = await fetch(`/api/team/${memberId}`, { method: "DELETE" });
+        const res = await authFetch(`/api/team/${memberId}`, { method: "DELETE" });
         if (!res.ok) {
             const data = await res.json();
             toast.error((data as any).error ?? t.common.error);

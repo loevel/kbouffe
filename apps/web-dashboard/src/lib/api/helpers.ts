@@ -36,15 +36,16 @@ export async function withAuth(): Promise<
     };
   }
 
-  const { data: dbUser } = await supabase
-    .from("users")
-    .select("restaurant_id")
-    .eq("id", user.id)
+  // Primary: find restaurant by owner_id
+  const { data: ownedRestaurant } = await supabase
+    .from("restaurants")
+    .select("id")
+    .eq("owner_id", user.id)
     .maybeSingle();
 
-  let restaurantId = dbUser?.restaurant_id;
+  let restaurantId = ownedRestaurant?.id;
 
-  // Fallback to restaurant_members if not in user profile
+  // Fallback: check restaurant_members (staff accounts)
   if (!restaurantId) {
     const { data: memberData } = await supabase
       // @ts-expect-error — Table might be missing from generated types
@@ -54,7 +55,7 @@ export async function withAuth(): Promise<
       .eq("status", "active")
       .limit(1)
       .maybeSingle();
-    
+
     // @ts-expect-error — Property might be missing from inferred type
     restaurantId = memberData?.restaurant_id;
   }

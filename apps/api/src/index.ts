@@ -13,6 +13,7 @@ import { logger } from "hono/logger";
 import { createClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "./types";
 import { authMiddleware } from "./middleware/auth";
+import { userAuthMiddleware } from "./middleware/user-auth";
 import { adminMiddleware } from "./middleware/admin";
 import { requireModule } from "./middleware/module";
 
@@ -112,8 +113,12 @@ const merchantPaths = [
     "/dashboard", "/coupons", "/tables", "/restaurant",
     "/customers", "/account", "/security", "/register-restaurant",
     "/marketing", "/notifications", "/payouts",
-    "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload", "/chat"
+    "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload"
 ] as const;
+
+// Chat uses userAuthMiddleware (works for clients + merchants, no restaurant required)
+api.use("/chat/*", userAuthMiddleware);
+api.use("/chat", userAuthMiddleware);
 
 for (const path of merchantPaths) {
     api.use(`${path}/*`, authMiddleware);

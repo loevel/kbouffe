@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, MapPin, Phone, User, Truck, Store, StickyNote } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const DeliveryTracker = dynamic(
+    () => import("@/components/delivery/DeliveryTracker").then((m) => m.DeliveryTracker),
+    { ssr: false }
+);
 import { Card, Badge, Button } from "@kbouffe/module-core/ui";
 import { ordersUi } from "@kbouffe/module-orders";
 import { useOrder, type OrderStatus } from "@kbouffe/module-orders/ui";
@@ -158,13 +164,28 @@ export default function OrderDetailPage() {
                         )}
                         
                         {order.delivery_type === "delivery" && (
-                            <AssignDriver 
-                                orderId={orderId} 
-                                currentDriverId={(order as any).driver_id} 
-                                onAssigned={() => mutate()} 
+                            <AssignDriver
+                                orderId={orderId}
+                                currentDriverId={(order as any).driver_id}
+                                onAssigned={() => mutate()}
                             />
                         )}
                     </Card>
+
+                    {/* Delivery tracking map (livreur) */}
+                    {order.delivery_type === "delivery" && ["out_for_delivery", "delivering", "delivered"].includes(currentStatus) && (
+                        <Card>
+                            <h3 className="font-semibold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Truck size={16} className="text-brand-500" />
+                                Suivi en temps réel
+                            </h3>
+                            <DeliveryTracker
+                                orderId={orderId}
+                                delivererName={(order as any).delivered_by ?? "Livreur"}
+                                isDeliverer={true}
+                            />
+                        </Card>
+                    )}
 
                     <Card>
                         <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.orders.payment}</h3>

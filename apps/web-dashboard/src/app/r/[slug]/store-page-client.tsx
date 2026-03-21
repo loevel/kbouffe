@@ -22,6 +22,7 @@ import {
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/store/CartDrawer";
+import { RestaurantGallery } from "@/components/store/RestaurantGallery";
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Restaurant {
@@ -616,6 +617,11 @@ export function StorePageClient({ slug }: { slug: string }) {
                         )}
                     </div>
                 </div>
+            </div>
+
+            {/* Gallery */}
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+                <RestaurantGallery restaurantId={restaurant.id} />
             </div>
 
             {/* Sidebar + Menu */}

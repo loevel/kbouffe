@@ -1,6 +1,7 @@
 "use client";
 
-import { Menu, Bell, ExternalLink, Sun, Moon, Monitor, Globe } from "lucide-react";
+import { Menu, ExternalLink, Sun, Moon, Monitor, Globe } from "lucide-react";
+import { NotificationBell } from "./NotificationBell";
 import { Dropdown } from "../Dropdown";
 import { useDashboard } from "../../contexts/DashboardContext";
 import { useTheme, type Theme } from "../../contexts/ThemeContext";
@@ -81,10 +82,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                     }
                 />
 
-                <button className="relative p-2 text-surface-500 hover:text-surface-900 dark:hover:text-white rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors">
-                    <Bell size={20} />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full" />
-                </button>
+                <NotificationBell />
 
                 <Dropdown
                     items={[

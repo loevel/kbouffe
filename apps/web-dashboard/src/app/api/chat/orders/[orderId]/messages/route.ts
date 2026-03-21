@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 /**
- * Helper: Get or create a conversation for an order
+ * Service-role client — bypasses RLS.
+ * The API does its own authorization (isCustomer || isMerchant).
  */
-async function getOrCreateOrderConversation(supabase: any, orderId: string) {
-    // Check if conversation exists
-    const { data: conv } = await supabase
+function chatDb() {
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+}
+
+/**
+ * Helper: Get or create a conversation for an order.
+ * conversations schema: id, restaurant_id (NOT NULL), order_id, metadata, created_at, updated_at
+ */
+async function getOrCreateOrderConversation(db: any, orderId: string, restaurantId: string) {
+    const { data: conv } = await db
         .from("conversations")
         .select("*")
         .eq("order_id", orderId)
@@ -14,19 +27,14 @@ async function getOrCreateOrderConversation(supabase: any, orderId: string) {
 
     if (conv) return conv;
 
-    // Create if doesn't exist
-    const id = crypto.randomUUID();
-    const newConv = {
-        id,
-        order_id: orderId,
-        type: "order_support",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-    };
-
-    const { data: createdConv, error: insertError } = await supabase
+    const { data: createdConv, error: insertError } = await db
         .from("conversations")
-        .insert(newConv)
+        .insert({
+            id: crypto.randomUUID(),
+            restaurant_id: restaurantId,
+            order_id: orderId,
+            metadata: { type: "order_support" },
+        })
         .select()
         .single();
 
@@ -40,180 +48,199 @@ async function getOrCreateOrderConversation(supabase: any, orderId: string) {
 
 /**
  * GET /api/chat/orders/[orderId]/messages
- * Fetch conversation messages for an order
+ * Fetch conversation messages for an order (customer or restaurant merchant/staff)
  */
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ orderId: string }> }
 ) {
+    const supabase = await createServerClient();
+    const { orderId } = await params;
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+        return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const db = chatDb();
+
+    // Fetch order to verify authorization
+    const { data: order, error: orderError } = await db
+        .from("orders")
+        .select("customer_id, restaurant_id")
+        .eq("id", orderId)
+        .single();
+
+    if (orderError || !order) {
+        return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const isCustomer = user.id === order.customer_id;
+    let isMerchant = false;
+
+    if (!isCustomer) {
+        const { data: restaurant } = await db
+            .from("restaurants")
+            .select("owner_id")
+            .eq("id", order.restaurant_id)
+            .single();
+
+        isMerchant = !!(restaurant && restaurant.owner_id === user.id);
+
+        if (!isMerchant) {
+            const { data: member } = await db
+                .from("restaurant_members")
+                .select("id")
+                .eq("restaurant_id", order.restaurant_id)
+                .eq("user_id", user.id)
+                .eq("status", "active")
+                .maybeSingle();
+            isMerchant = !!member;
+        }
+    }
+
+    if (!isCustomer && !isMerchant) {
+        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+
     try {
-        const supabase = await createClient();
-        const { orderId } = await params;
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const conv = await getOrCreateOrderConversation(db, orderId, order.restaurant_id);
 
-        if (authError || !user) {
-            return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-        }
+        const { data: messages, error } = await db
+            .from("messages")
+            .select("id, conversation_id, sender_id, content, content_type, is_read, created_at")
+            .eq("conversation_id", conv.id)
+            .order("created_at", { ascending: true });
 
-        try {
-            const conv = await getOrCreateOrderConversation(supabase, orderId);
+        if (error) throw error;
 
-            const { data: messages, error } = await supabase
-                .from("messages")
-                .select("*")
-                .eq("conversation_id", conv.id)
-                .order("created_at", { ascending: true });
+        const transformed = (messages || []).map((msg: any) => ({
+            id: msg.id,
+            conversationId: msg.conversation_id,
+            senderId: msg.sender_id,
+            content: msg.content,
+            type: msg.content_type ?? "text",
+            createdAt: msg.created_at,
+        }));
 
-            if (error) throw error;
-
-            // Transform snake_case to camelCase for frontend
-            const transformedMessages = (messages || []).map((msg: any) => ({
-                id: msg.id,
-                conversationId: msg.conversation_id,
-                senderId: msg.sender_id,
-                content: msg.content,
-                type: msg.type,
-                attachmentUrl: msg.attachment_url,
-                createdAt: msg.created_at,
-                readAt: msg.read_at,
-            }));
-
-            return NextResponse.json({
-                conversationId: conv.id,
-                messages: transformedMessages,
-            });
-        } catch (err) {
-            console.error("[Chat] Error fetching messages:", err);
-            return NextResponse.json(
-                { error: "Failed to fetch messages" },
-                { status: 500 }
-            );
-        }
-    } catch (error) {
-        console.error("[Chat] Unexpected error:", error);
-        return NextResponse.json(
-            { error: "Internal server error" },
-            { status: 500 }
-        );
+        return NextResponse.json({ conversationId: conv.id, messages: transformed });
+    } catch (err) {
+        console.error("[Chat] Error fetching messages:", err);
+        return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
     }
 }
 
 /**
  * POST /api/chat/orders/[orderId]/messages
- * Send a message for an order
+ * Send a message (customer or restaurant merchant/staff)
  */
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ orderId: string }> }
 ) {
+    const supabase = await createServerClient();
+    const { orderId } = await params;
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+        return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => ({})) as { content?: string };
+    const { content } = body;
+
+    if (!content?.trim()) {
+        return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    }
+
+    const db = chatDb();
+
+    // Verify authorization
+    const { data: order, error: orderError } = await db
+        .from("orders")
+        .select("customer_id, restaurant_id")
+        .eq("id", orderId)
+        .single();
+
+    if (orderError || !order) {
+        return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const isCustomer = user.id === order.customer_id;
+    let isMerchant = false;
+
+    if (!isCustomer) {
+        const { data: restaurant } = await db
+            .from("restaurants")
+            .select("owner_id")
+            .eq("id", order.restaurant_id)
+            .single();
+
+        isMerchant = !!(restaurant && restaurant.owner_id === user.id);
+
+        if (!isMerchant) {
+            const { data: member } = await db
+                .from("restaurant_members")
+                .select("id")
+                .eq("restaurant_id", order.restaurant_id)
+                .eq("user_id", user.id)
+                .eq("status", "active")
+                .maybeSingle();
+            isMerchant = !!member;
+        }
+    }
+
+    if (!isCustomer && !isMerchant) {
+        return NextResponse.json({ error: "Not authorized to send messages for this order" }, { status: 403 });
+    }
+
     try {
-        const supabase = await createClient();
-        const { orderId } = await params;
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const conv = await getOrCreateOrderConversation(db, orderId, order.restaurant_id);
 
-        if (authError || !user) {
-            return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-        }
-        const body = await request.json();
-        const { content, type = "text", attachmentUrl } = body;
+        const messageId = crypto.randomUUID();
+        const now = new Date().toISOString();
 
-        if (!content) {
-            return NextResponse.json(
-                { error: "Content is required" },
-                { status: 400 }
-            );
-        }
-
-        try {
-            // Verify authorization: user must be the customer or the restaurant owner
-            const { data: order, error: orderError } = await supabase
-                .from("orders")
-                .select("customer_id, restaurant_id")
-                .eq("id", orderId)
-                .single();
-
-            if (orderError || !order) {
-                return NextResponse.json(
-                    { error: "Order not found" },
-                    { status: 404 }
-                );
-            }
-
-            const isCustomer = user.id === order.customer_id;
-            let isMerchant = false;
-
-            if (!isCustomer) {
-                // Check if user is the restaurant owner/merchant
-                const { data: restaurant } = await supabase
-                    .from("restaurants")
-                    .select("owner_id")
-                    .eq("id", order.restaurant_id)
-                    .single();
-
-                isMerchant = !!(restaurant && restaurant.owner_id === user.id);
-            }
-
-            if (!isCustomer && !isMerchant) {
-                return NextResponse.json(
-                    { error: "Not authorized to send messages for this order" },
-                    { status: 403 }
-                );
-            }
-
-            const conv = await getOrCreateOrderConversation(supabase, orderId);
-
-            const newMessage = {
-                id: crypto.randomUUID(),
+        const { error: insertError } = await db
+            .from("messages")
+            .insert({
+                id: messageId,
                 conversation_id: conv.id,
                 sender_id: user.id,
-                content,
-                type,
-                attachment_url: attachmentUrl || null,
-                created_at: new Date().toISOString(),
-            };
+                content: content.trim(),
+                content_type: "text",
+                is_read: false,
+                created_at: now,
+            });
 
-            const { error: insertError } = await supabase
-                .from("messages")
-                .insert(newMessage);
+        if (insertError) throw insertError;
 
-            if (insertError) throw insertError;
+        const newMessage = {
+            id: messageId,
+            conversationId: conv.id,
+            senderId: user.id,
+            content: content.trim(),
+            type: "text",
+            createdAt: now,
+        };
 
-            // Transform to camelCase for response
-            const transformedMessage = {
-                id: newMessage.id,
-                conversationId: newMessage.conversation_id,
-                senderId: newMessage.sender_id,
-                content: newMessage.content,
-                type: newMessage.type,
-                attachmentUrl: newMessage.attachment_url,
-                createdAt: newMessage.created_at,
-            };
-
-            // Attempt to broadcast via Realtime (optional)
-            try {
-                await supabase.channel(`conversation:${conv.id}`).send({
-                    type: "broadcast",
-                    event: "new_message",
-                    payload: transformedMessage,
-                });
-            } catch (err) {
-                console.error("[Chat] Realtime broadcast error:", err);
-                // Continue even if broadcast fails
-            }
-
-            return NextResponse.json(transformedMessage, { status: 201 });
-        } catch (err) {
-            console.error("[Chat] Error sending message:", err);
-            return NextResponse.json(
-                { error: "Failed to send message" },
-                { status: 500 }
+        // Broadcast via Realtime so both sides receive instantly
+        try {
+            const rtClient = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
             );
+            await rtClient.channel(`conversation:${conv.id}`).send({
+                type: "broadcast",
+                event: "new_message",
+                payload: newMessage,
+            });
+        } catch (err) {
+            console.error("[Chat] Realtime broadcast error:", err);
         }
-    } catch (error) {
-        console.error("[Chat] Unexpected error:", error);
-        return NextResponse.json(
-            { error: "Internal server error" },
-            { status: 500 }
-        );
+
+        return NextResponse.json(newMessage, { status: 201 });
+    } catch (err) {
+        console.error("[Chat] Error sending message:", err);
+        return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
     }
 }

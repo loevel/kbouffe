@@ -8,22 +8,37 @@ import {
     CheckCircle2,
     ChefHat,
     Clock,
+    CreditCard,
     Loader2,
     MapPin,
     Package,
+    Phone,
     RotateCcw,
+    Smartphone,
+    Store,
     Truck,
     Utensils,
     X,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useRecentOrders } from "@/store/client-store";
+import dynamic from "next/dynamic";
+
+const OrderTrackingMap = dynamic(
+    () => import("@/components/store/OrderTrackingMap").then((m) => m.OrderTrackingMap),
+    { ssr: false }
+);
+const ClientOrderChat = dynamic(
+    () => import("@/components/store/ClientOrderChat").then((m) => m.ClientOrderChat),
+    { ssr: false }
+);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface OrderDetail {
     id: string;
     status: string;
     payment_status: string;
+    payment_method: string | null;
     delivery_type: string;
     delivery_address: string | null;
     customer_name: string;
@@ -41,6 +56,7 @@ interface OrderDetail {
     delivery_note: string | null;
     notes: string | null;
     table_number: string | null;
+    restaurants: { id: string; name: string; slug: string } | null;
 }
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -240,13 +256,11 @@ export function OrderTrackingClient() {
                         </Link>
                         <div>
                             <h1 className="font-bold text-surface-900 dark:text-white leading-tight">
-                                Suivi commande
+                                {order?.restaurants?.name ?? "Suivi commande"}
                             </h1>
-                            {order && (
-                                <p className="text-xs text-surface-500 dark:text-surface-400 leading-tight">
-                                    {shortRef}
-                                </p>
-                            )}
+                            <p className="text-xs text-surface-500 dark:text-surface-400 leading-tight">
+                                {shortRef}
+                            </p>
                         </div>
                     </div>
                     {isActive && (
@@ -342,18 +356,74 @@ export function OrderTrackingClient() {
 
                         {/* Delivery info */}
                         <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
-                            <h2 className="font-bold text-surface-900 dark:text-white mb-3">Informations</h2>
+                            <h2 className="font-bold text-surface-900 dark:text-white mb-4">Informations</h2>
                             <div className="space-y-3 text-sm">
+                                {/* Restaurant */}
+                                {order.restaurants && (
+                                    <div className="flex items-center gap-3 text-surface-600 dark:text-surface-400">
+                                        <Store size={16} className="shrink-0" />
+                                        <span>{order.restaurants.name}</span>
+                                    </div>
+                                )}
+
+                                {/* Delivery type */}
                                 <div className="flex items-center gap-3 text-surface-600 dark:text-surface-400">
                                     {DELIVERY_TYPE_ICONS[order.delivery_type] ?? <Package size={16} />}
                                     <span>{DELIVERY_TYPE_LABELS[order.delivery_type] ?? order.delivery_type}</span>
                                 </div>
+
+                                {/* Delivery address */}
                                 {order.delivery_address && (
                                     <div className="flex items-start gap-3 text-surface-600 dark:text-surface-400">
                                         <MapPin size={16} className="shrink-0 mt-0.5" />
                                         <span>{order.delivery_address}</span>
                                     </div>
                                 )}
+
+                                {/* Table number (dine-in) */}
+                                {order.table_number && (
+                                    <div className="flex items-center gap-3 text-surface-600 dark:text-surface-400">
+                                        <Utensils size={16} className="shrink-0" />
+                                        <span>Table {order.table_number}</span>
+                                    </div>
+                                )}
+
+                                {/* Customer */}
+                                <div className="flex items-center gap-3 text-surface-600 dark:text-surface-400">
+                                    <Phone size={16} className="shrink-0" />
+                                    <span>{order.customer_name} · {order.customer_phone}</span>
+                                </div>
+
+                                {/* Payment method */}
+                                <div className="flex items-center gap-3 text-surface-600 dark:text-surface-400">
+                                    {order.payment_method === "cash" ? (
+                                        <CreditCard size={16} className="shrink-0" />
+                                    ) : (
+                                        <Smartphone size={16} className="shrink-0" />
+                                    )}
+                                    <span>
+                                        {order.payment_method === "cash" ? "Espèces" :
+                                         order.payment_method === "mobile_money_mtn" ? "MTN Mobile Money" :
+                                         order.payment_method === "mobile_money_orange" ? "Orange Money" :
+                                         order.payment_method ?? "—"}
+                                    </span>
+                                    <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                        order.payment_status === "paid"
+                                            ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400"
+                                    }`}>
+                                        {order.payment_status === "paid" ? "Payé" : "En attente"}
+                                    </span>
+                                </div>
+
+                                {/* Notes */}
+                                {order.notes && (
+                                    <div className="p-3 bg-surface-50 dark:bg-surface-800 rounded-lg text-xs text-surface-600 dark:text-surface-400 italic">
+                                        « {order.notes} »
+                                    </div>
+                                )}
+
+                                {/* Totals */}
                                 <div className="pt-3 border-t border-surface-100 dark:border-surface-800 space-y-1.5">
                                     <div className="flex justify-between">
                                         <span className="text-surface-500 dark:text-surface-400">Sous-total</span>
@@ -376,14 +446,36 @@ export function OrderTrackingClient() {
                                         <span className="font-extrabold text-surface-900 dark:text-white">{formatCFA(order.total)}</span>
                                     </div>
                                 </div>
+
+                                {/* Date */}
+                                <p className="text-xs text-surface-400 dark:text-surface-500 pt-1">
+                                    Commandé le {new Date(order.created_at).toLocaleString("fr-FR", {
+                                        day: "numeric", month: "long", year: "numeric",
+                                        hour: "2-digit", minute: "2-digit",
+                                    })}
+                                </p>
                             </div>
                         </section>
 
+                        {/* Real-time delivery tracking map (client view) */}
+                        {order.delivery_type === "delivery" && (
+                            <OrderTrackingMap
+                                orderId={order.id}
+                                orderStatus={order.status}
+                            />
+                        )}
+
+                        {/* Chat with restaurant */}
+                        <ClientOrderChat
+                            orderId={order.id}
+                            restaurantName={order.restaurants?.name ?? "Restaurant"}
+                        />
+
                         {/* CTAs */}
                         <div className="space-y-2">
-                            {order.status === "delivered" && (
+                            {order.restaurants?.slug && (
                                 <Link
-                                    href="/stores"
+                                    href={`/r/${order.restaurants.slug}`}
                                     className="w-full flex items-center justify-center gap-2 h-12 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-2xl transition-colors"
                                 >
                                     <RotateCcw size={16} />

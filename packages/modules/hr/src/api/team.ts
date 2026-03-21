@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createClient } from "@supabase/supabase-js";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
 import { hasPermission, canManageRole, ASSIGNABLE_ROLES, type TeamRole, type Permission } from "./permissions";
 
@@ -199,6 +200,146 @@ teamRoutes.post("/invite", async (c) => {
         return c.json({ success: true, memberId });
     } catch (error) {
         console.error("POST /team/invite error:", error);
+        return c.json({ error: "Erreur interne" }, 500);
+    }
+});
+
+/**
+ * POST /team/create
+ * Crée un compte utilisateur Supabase + l'ajoute directement comme membre actif.
+ */
+teamRoutes.post("/create", async (c) => {
+    try {
+        const body = await c.req.json().catch(() => ({})) as {
+            fullName?: string;
+            email?: string;
+            phone?: string;
+            password?: string;
+            role?: string;
+        };
+        const { fullName, email, phone, password, role } = body;
+
+        if (!fullName || !email || !password || !role) {
+            return c.json({ error: "Nom, email, mot de passe et rôle requis" }, 400);
+        }
+
+        if (!ASSIGNABLE_ROLES.includes(role as TeamRole)) {
+            return c.json({ error: "Rôle invalide" }, 400);
+        }
+
+        if (password.length < 8) {
+            return c.json({ error: "Le mot de passe doit contenir au moins 8 caractères" }, 400);
+        }
+
+        const auth = await getCallerRole(c, "team:invite");
+        if (auth instanceof Response) return auth;
+        const { role: callerRole, userId: callerUserId, restaurantId } = auth;
+
+        if (!canManageRole(callerRole, role as TeamRole)) {
+            return c.json({ error: "Vous ne pouvez pas attribuer ce rôle" }, 403);
+        }
+
+        if (!c.env.SUPABASE_SERVICE_ROLE_KEY) {
+            return c.json({ error: "Configuration serveur manquante" }, 500);
+        }
+
+        const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY, {
+            auth: { autoRefreshToken: false, persistSession: false },
+        });
+
+        // Check if user with this email already exists
+        const { data: existingUser } = await c.var.supabase
+            .from("users")
+            .select("id")
+            .eq("email", email.toLowerCase().trim())
+            .maybeSingle();
+
+        let targetUserId: string;
+
+        if (existingUser) {
+            targetUserId = existingUser.id;
+
+            // Check if already a member
+            const { data: existing } = await c.var.supabase
+                .from("restaurant_members")
+                .select("id, status")
+                .eq("restaurant_id", restaurantId)
+                .eq("user_id", targetUserId)
+                .maybeSingle();
+
+            if (existing?.status === "active") {
+                return c.json({ error: "Cet utilisateur est déjà membre de votre restaurant" }, 409);
+            }
+            if (existing?.status === "pending") {
+                return c.json({ error: "Une invitation est déjà en attente pour cet utilisateur" }, 409);
+            }
+        } else {
+            // Create the Supabase auth user
+            const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                email: email.toLowerCase().trim(),
+                password,
+                email_confirm: true,
+                user_metadata: { full_name: fullName, phone: phone ?? null },
+            });
+
+            if (createError || !authData.user) {
+                return c.json({ error: createError?.message ?? "Erreur lors de la création du compte" }, 500);
+            }
+
+            targetUserId = authData.user.id;
+
+            // Create the users table record
+            await supabaseAdmin.from("users").upsert({
+                id: targetUserId,
+                email: email.toLowerCase().trim(),
+                full_name: fullName,
+                phone: phone ?? null,
+                role: "user",
+            }, { onConflict: "id" });
+        }
+
+        const memberId = `mbr-${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+
+        // Upsert the membership as directly active
+        const { data: existing } = await c.var.supabase
+            .from("restaurant_members")
+            .select("id")
+            .eq("restaurant_id", restaurantId)
+            .eq("user_id", targetUserId)
+            .maybeSingle();
+
+        if (existing) {
+            await c.var.supabase
+                .from("restaurant_members")
+                .update({
+                    role,
+                    status: "active",
+                    invited_by: callerUserId,
+                    accepted_at: new Date().toISOString(),
+                })
+                .eq("id", existing.id);
+        } else {
+            const { error: insertError } = await c.var.supabase
+                .from("restaurant_members")
+                .insert({
+                    id: memberId,
+                    restaurant_id: restaurantId,
+                    user_id: targetUserId,
+                    role,
+                    invited_by: callerUserId,
+                    status: "active",
+                    created_at: new Date().toISOString(),
+                    accepted_at: new Date().toISOString(),
+                });
+
+            if (insertError) {
+                return c.json({ error: insertError.message }, 500);
+            }
+        }
+
+        return c.json({ success: true, memberId: existing?.id ?? memberId });
+    } catch (error) {
+        console.error("POST /team/create error:", error);
         return c.json({ error: "Erreur interne" }, 500);
     }
 });

@@ -37,7 +37,9 @@
     "react-hot-toast": "^2.6.0",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.11",
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.17.1",
@@ -47,6 +49,7 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
+    "@types/leaflet": "^1.9.4",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "typescript": "^5",
