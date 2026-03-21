@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, Image, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { StyleSheet, View, Text, Image, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, FlatList, NativeSyntheticEvent, NativeScrollEvent, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '@/contexts/cart-context';
@@ -23,7 +23,18 @@ export default function ProductModal() {
     const product = getProduct(productId ?? '');
     const restaurant = getRestaurant();
 
-    const [quantity, setQuantity] = useState(1);
+    // Image gallery state
+    const screenWidth = Dimensions.get('window').width;
+    const allImages = product?.images && product.images.length > 0
+        ? product.images
+        : product?.image ? [product.image] : [];
+    const [activeImgIdx, setActiveImgIdx] = useState(0);
+    const imgFlatRef = useRef<FlatList>(null);
+
+    const handleImageScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+        setActiveImgIdx(idx);
+    };
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
     // Product reviews state
@@ -107,8 +118,46 @@ export default function ProductModal() {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
-                {product.image && (
-                    <Image source={{ uri: product.image }} style={styles.image} />
+                {/* Image gallery */}
+                {allImages.length > 0 && (
+                    <View style={styles.galleryContainer}>
+                        <FlatList
+                            ref={imgFlatRef}
+                            data={allImages}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            onScroll={handleImageScroll}
+                            scrollEventThrottle={16}
+                            keyExtractor={(_, i) => String(i)}
+                            renderItem={({ item }) => (
+                                <Image
+                                    source={{ uri: item }}
+                                    style={[styles.image, { width: screenWidth }]}
+                                    resizeMode="cover"
+                                />
+                            )}
+                        />
+                        {allImages.length > 1 && (
+                            <View style={styles.dotRow}>
+                                {allImages.map((_, i) => (
+                                    <Pressable
+                                        key={i}
+                                        onPress={() => imgFlatRef.current?.scrollToIndex({ index: i, animated: true })}
+                                        style={[
+                                            styles.dot,
+                                            i === activeImgIdx ? styles.dotActive : styles.dotInactive,
+                                        ]}
+                                    />
+                                ))}
+                            </View>
+                        )}
+                        {allImages.length > 1 && (
+                            <View style={styles.countBadge}>
+                                <Text style={styles.countBadgeText}>{activeImgIdx + 1}/{allImages.length}</Text>
+                            </View>
+                        )}
+                    </View>
                 )}
 
                 <Pressable
@@ -351,7 +400,31 @@ export default function ProductModal() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    image: { width: '100%', height: 280 },
+    galleryContainer: { position: 'relative' },
+    image: { height: 280 },
+    dotRow: {
+        position: 'absolute',
+        bottom: 10,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6,
+    },
+    dot: { height: 6, borderRadius: 3 },
+    dotActive: { width: 20, backgroundColor: 'rgba(255,255,255,0.95)' },
+    dotInactive: { width: 6, backgroundColor: 'rgba(255,255,255,0.5)' },
+    countBadge: {
+        position: 'absolute',
+        top: 10,
+        left: 12,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    countBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
     closeButton: {
         position: 'absolute',
         right: Spacing.md,

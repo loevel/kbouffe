@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { authFetch } from "@kbouffe/module-core/ui";
 
 export function useUploadImage() {
   const [uploading, setUploading] = useState(false);
@@ -20,10 +21,9 @@ export function useUploadImage() {
 
       console.log("[useUploadImage] Upload URL:", uploadUrl);
 
-      const response = await fetch(uploadUrl, {
+      const response = await authFetch(uploadUrl, {
         method: "POST",
         body: formData,
-        credentials: "include", // Include cookies for authentication
       });
 
       console.log("[useUploadImage] Réponse API:", { status: response.status, ok: response.ok });

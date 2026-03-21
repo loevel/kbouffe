@@ -192,8 +192,8 @@ storePublicRoutes.get("/:slug", async (c) => {
 
         const rest = results[0];
 
-        // 2. Get categories + products and reviews from Supabase in parallel
-        const [categoriesRes, productsRes, reviewsRes] = await Promise.all([
+        // 2. Get categories + products + reviews + showcase sections from Supabase in parallel
+        const [categoriesRes, productsRes, reviewsRes, showcaseRes] = await Promise.all([
             supabase
                 .from("categories")
                 .select("id, name, description, sort_order")
@@ -201,18 +201,38 @@ storePublicRoutes.get("/:slug", async (c) => {
                 .order("sort_order"),
             supabase
                 .from("products")
-                .select("id, name, description, price, compare_at_price, image_url, is_available, category_id, sort_order")
+                .select("id, name, description, price, compare_at_price, image_url, is_available, category_id, sort_order, product_images(url, display_order)")
                 .eq("restaurant_id", rest.id)
                 .eq("is_available", true)
                 .order("sort_order"),
             supabase
                 .from("reviews")
-                .select("id, rating, comment, response, created_at")
+                .select("id, rating, comment, response, created_at, customer_id")
                 .eq("restaurant_id", rest.id)
                 .eq("is_visible", true)
                 .order("created_at", { ascending: false })
-                .limit(20)
+                .limit(20),
+            supabase
+                .from("showcase_sections")
+                .select("id, section_type, title, subtitle, content, display_order, is_visible, settings")
+                .eq("restaurant_id", rest.id)
+                .eq("is_visible", true)
+                .order("display_order"),
         ]);
+
+        // Resolve customer names for reviews
+        const reviewData = reviewsRes.data ?? [];
+        const customerIds = [...new Set(reviewData.map(r => r.customer_id).filter(Boolean))];
+        let customerMap: Record<string, string> = {};
+        if (customerIds.length > 0) {
+            const { data: users } = await supabase
+                .from("users")
+                .select("id, full_name")
+                .in("id", customerIds);
+            for (const u of users ?? []) {
+                customerMap[u.id] = u.full_name ?? "Client";
+            }
+        }
 
         return c.json({
             restaurant: {
@@ -221,19 +241,45 @@ storePublicRoutes.get("/:slug", async (c) => {
                 slug: rest.slug,
                 description: rest.description,
                 logoUrl: rest.logo_url,
-                coverUrl: rest.cover_url,
+                coverUrl: rest.cover_url ?? rest.banner_url,
                 address: rest.address,
                 city: rest.city,
+                phone: rest.phone,
+                email: rest.email,
                 cuisineType: rest.cuisine_type,
+                primaryColor: rest.primary_color,
+                openingHours: rest.opening_hours,
                 rating: rest.rating,
                 reviewCount: rest.review_count,
                 orderCount: rest.order_count,
                 isVerified: rest.is_verified,
                 isPremium: rest.is_premium,
+                hasDineIn: rest.has_dine_in,
+                hasReservations: rest.has_reservations,
+                totalTables: rest.total_tables,
+                deliveryFee: rest.delivery_fee,
+                minOrderAmount: rest.min_order_amount,
             },
             categories: categoriesRes.data ?? [],
-            products: productsRes.data ?? [],
-            reviews: reviewsRes.data ?? [],
+            products: (productsRes.data ?? []).map((p: any) => {
+                const extraImages: string[] = (p.product_images ?? [])
+                    .sort((a: any, b: any) => a.display_order - b.display_order)
+                    .map((img: any) => img.url);
+                const images = p.image_url
+                    ? [p.image_url, ...extraImages]
+                    : extraImages;
+                const { product_images: _, ...product } = p;
+                return { ...product, images };
+            }),
+            reviews: reviewData.map(r => ({
+                id: r.id,
+                rating: r.rating,
+                comment: r.comment,
+                response: r.response,
+                created_at: r.created_at,
+                customerName: customerMap[r.customer_id] ?? "Client",
+            })),
+            showcaseSections: showcaseRes.data ?? [],
         });
     } catch (error) {
         console.error("[GET /store/:slug] error:", error);

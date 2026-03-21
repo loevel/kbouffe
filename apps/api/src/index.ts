@@ -47,7 +47,7 @@ const { teamRoutes, payoutsRoutes } = hrApi;
 import { chatApi } from "@kbouffe/module-chat";
 const { chatRoutes } = chatApi;
 import { notificationsRoutes } from "./modules/core/notifications";
-import { customerReviewRoutes, merchantReviewRoutes, publicProductReviewRoutes } from "./modules/reviews";
+import { customerReviewRoutes, merchantReviewRoutes, publicProductReviewRoutes, publicRestaurantReviewRoutes } from "./modules/reviews";
 
 // ── Admin routes ─────────────────────────────────────────────────────
 import { adminRoutes } from "./modules/admin";
@@ -102,6 +102,7 @@ api.route("/menu", menuRoutes);
 api.route("/store", storePublicRoutes);                   // guest orders
 api.route("/store", publicReservationsRoutes);             // public reservation booking
 api.route("/store", publicProductReviewRoutes);            // public product reviews
+api.route("/store", publicRestaurantReviewRoutes);          // public restaurant reviews
 api.route("/coupons/validate", couponValidateRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
 api.route("/sms", smsRoutes);

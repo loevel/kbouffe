@@ -8,7 +8,48 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '@/contexts/cart-context';
 import { useRestaurantCache } from '@/contexts/restaurant-context';
-import { getStore, type MobileProduct } from '@/lib/api';
+import { getStore, type MobileProduct, type MobileReview } from '@/lib/api';
+
+// ── Review Card ──────────────────────────────────────────────────────
+function ReviewCard({ review, theme }: { review: MobileReview; theme: typeof Colors.light }) {
+    const date = new Date(review.created_at);
+    const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    return (
+        <View style={[reviewStyles.card, { borderColor: theme.border }]}>
+            <View style={reviewStyles.cardHeader}>
+                <View style={reviewStyles.avatarCircle}>
+                    <Ionicons name="person" size={14} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={[reviewStyles.customerName, { color: theme.text }]}>
+                        {review.customerName ?? 'Client'}
+                    </Text>
+                    <Text style={[reviewStyles.date, { color: theme.icon }]}>{formattedDate}</Text>
+                </View>
+                <View style={reviewStyles.starRow}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                        <Ionicons
+                            key={s}
+                            name={s <= review.rating ? 'star' : 'star-outline'}
+                            size={14}
+                            color={s <= review.rating ? '#f59e0b' : theme.border}
+                        />
+                    ))}
+                </View>
+            </View>
+            {review.comment ? (
+                <Text style={[reviewStyles.comment, { color: theme.text }]}>{review.comment}</Text>
+            ) : null}
+            {review.response ? (
+                <View style={[reviewStyles.responseBox, { backgroundColor: theme.border + '30' }]}>
+                    <Text style={[reviewStyles.responseLabel, { color: theme.icon }]}>Réponse du restaurant</Text>
+                    <Text style={[reviewStyles.responseText, { color: theme.text }]}>{review.response}</Text>
+                </View>
+            ) : null}
+        </View>
+    );
+}
 
 export default function RestaurantScreen() {
     // `id` param is actually the restaurant slug
@@ -37,6 +78,7 @@ export default function RestaurantScreen() {
     }, [slug, setCurrentStore]);
 
     const restaurant = data?.restaurant;
+    const reviews = data?.reviews ?? [];
 
     // Show cart FAB when items are from this restaurant
     const showCartFab = itemCount > 0 && restaurant && cartRestaurantId === restaurant.id;
@@ -59,6 +101,14 @@ export default function RestaurantScreen() {
         });
     };
 
+    const handleLeaveReview = () => {
+        if (!restaurant) return;
+        router.push({
+            pathname: '/review/restaurant' as any,
+            params: { restaurantId: restaurant.id, restaurantName: restaurant.name },
+        });
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -77,6 +127,10 @@ export default function RestaurantScreen() {
             </View>
         );
     }
+
+    // Compute review stats from available data
+    const avgRating = restaurant.rating ?? 0;
+    const reviewCount = restaurant.reviewCount ?? reviews.length;
 
     const renderHeader = () => (
         <View style={styles.header}>
@@ -114,6 +168,51 @@ export default function RestaurantScreen() {
                         {restaurant.deliveryFee === 0 ? 'Livraison gratuite' : `${restaurant.deliveryFee} FCFA`}
                     </Text>
                 </View>
+            </View>
+
+            {/* ── Reviews Section ─────────────────────────────────── */}
+            <View style={[reviewStyles.section, { borderColor: theme.border }]}>
+                <View style={reviewStyles.sectionHeader}>
+                    <View>
+                        <Text style={[reviewStyles.sectionTitle, { color: theme.text }]}>Avis clients</Text>
+                        <View style={reviewStyles.summaryRow}>
+                            <Ionicons name="star" size={18} color="#f59e0b" />
+                            <Text style={[reviewStyles.avgRating, { color: theme.text }]}>
+                                {avgRating.toFixed(1)}
+                            </Text>
+                            <Text style={[reviewStyles.reviewCount, { color: theme.icon }]}>
+                                ({reviewCount} avis)
+                            </Text>
+                        </View>
+                    </View>
+                    <Pressable style={[reviewStyles.leaveReviewBtn, { backgroundColor: theme.primary }]} onPress={handleLeaveReview}>
+                        <Ionicons name="create-outline" size={16} color="#fff" />
+                        <Text style={reviewStyles.leaveReviewTxt}>Donner un avis</Text>
+                    </Pressable>
+                </View>
+
+                {reviews.length > 0 ? (
+                    <>
+                        {reviews.slice(0, 5).map((review) => (
+                            <ReviewCard key={review.id} review={review} theme={theme} />
+                        ))}
+                        {reviews.length > 5 && (
+                            <Text style={[reviewStyles.moreText, { color: theme.primary }]}>
+                                + {reviews.length - 5} autres avis
+                            </Text>
+                        )}
+                    </>
+                ) : (
+                    <View style={reviewStyles.emptyContainer}>
+                        <Ionicons name="chatbubble-outline" size={32} color={theme.border} />
+                        <Text style={[reviewStyles.emptyText, { color: theme.icon }]}>
+                            Aucun avis pour le moment
+                        </Text>
+                        <Text style={[reviewStyles.emptySubtext, { color: theme.icon }]}>
+                            Soyez le premier à donner votre avis !
+                        </Text>
+                    </View>
+                )}
             </View>
         </View>
     );
@@ -272,5 +371,121 @@ const styles = StyleSheet.create({
         color: '#fff',
         ...Typography.body,
         fontWeight: '700',
+    },
+});
+
+const reviewStyles = StyleSheet.create({
+    section: {
+        marginHorizontal: Spacing.md,
+        marginTop: Spacing.sm,
+        marginBottom: Spacing.md,
+        borderWidth: 1,
+        borderRadius: Radii.lg,
+        padding: Spacing.md,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.md,
+    },
+    sectionTitle: {
+        ...Typography.title3,
+        marginBottom: 4,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    avgRating: {
+        ...Typography.body,
+        fontWeight: '700',
+        marginLeft: 2,
+    },
+    reviewCount: {
+        ...Typography.caption,
+    },
+    leaveReviewBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.sm,
+        borderRadius: Radii.full,
+    },
+    leaveReviewTxt: {
+        color: '#fff',
+        ...Typography.caption,
+        fontWeight: '600',
+    },
+    card: {
+        borderWidth: 1,
+        borderRadius: Radii.md,
+        padding: Spacing.md,
+        marginBottom: Spacing.sm,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginBottom: Spacing.xs,
+    },
+    avatarCircle: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#94a3b8',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    customerName: {
+        ...Typography.caption,
+        fontWeight: '600',
+    },
+    date: {
+        ...Typography.caption,
+        fontSize: 11,
+    },
+    starRow: {
+        flexDirection: 'row',
+        gap: 1,
+    },
+    comment: {
+        ...Typography.body,
+        fontSize: 13,
+        marginTop: 2,
+    },
+    responseBox: {
+        marginTop: Spacing.sm,
+        padding: Spacing.sm,
+        borderRadius: Radii.md,
+    },
+    responseLabel: {
+        ...Typography.caption,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    responseText: {
+        ...Typography.body,
+        fontSize: 13,
+    },
+    moreText: {
+        ...Typography.caption,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: Spacing.sm,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        paddingVertical: Spacing.lg,
+    },
+    emptyText: {
+        ...Typography.body,
+        marginTop: Spacing.sm,
+    },
+    emptySubtext: {
+        ...Typography.caption,
+        marginTop: 2,
     },
 });

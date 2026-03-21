@@ -163,4 +163,5 @@ export const NAV_PERMISSIONS: Record<string, Permission> = {
     "/dashboard/marketing":         "marketing:read",
     "/dashboard/marketing/coupons": "marketing:read",
     "/dashboard/marketing/ads":     "marketing:read",
+    "/dashboard/showcase":           "store:manage",
 };

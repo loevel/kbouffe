@@ -63,6 +63,7 @@ export function ConfirmationPageClient() {
     const restaurantName = searchParams.get("restaurant") ?? "le restaurant";
     const totalParam     = searchParams.get("total");
     const total          = totalParam ? parseInt(totalParam, 10) : null;
+    const deliveryType   = searchParams.get("deliveryType") ?? "delivery";
 
     const [visible, setVisible] = useState(false);
 
@@ -134,17 +135,41 @@ export function ConfirmationPageClient() {
                     {/* ETA */}
                     <div className="mt-4 inline-flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 bg-brand-50 dark:bg-brand-500/10 px-4 py-2 rounded-full">
                         <Clock size={14} className="text-brand-500" />
-                        <span>Livraison estimée dans <strong className="text-surface-900 dark:text-white">30 – 50 min</strong></span>
+                        <span>
+                            {deliveryType === "delivery"
+                                ? <>Livraison estimée dans <strong className="text-surface-900 dark:text-white">30 – 50 min</strong></>
+                                : deliveryType === "dine_in"
+                                ? <>Vos plats seront prêts dans <strong className="text-surface-900 dark:text-white">20 – 35 min</strong></>
+                                : <>Prêt à retirer dans <strong className="text-surface-900 dark:text-white">20 – 35 min</strong></>}
+                        </span>
                     </div>
                 </div>
 
                 {/* ── Status timeline ──────────────────────────────────── */}
                 <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6 mb-6">
                     <h2 className="font-bold text-surface-900 dark:text-white mb-5">Suivi de la commande</h2>
-                    <TimelineStep label="Commande reçue"      desc="Votre commande a été enregistrée"         done active={false} />
-                    <TimelineStep label="En préparation"      desc="Le restaurant prépare vos plats"          done={false} active />
-                    <TimelineStep label="En cours de livraison" desc="Un livreur est en route vers vous"      done={false} active={false} />
-                    <TimelineStep label="Livré !"             desc="Votre commande vous a été remise"         done={false} active={false} />
+                    {deliveryType === "pickup" ? (
+                        <>
+                            <TimelineStep label="Commande reçue"  desc="Votre commande a été enregistrée"                  done active={false} />
+                            <TimelineStep label="En préparation"  desc="Le restaurant prépare vos plats"                 done={false} active />
+                            <TimelineStep label="Prête à retirer" desc="Vous pouvez venir récupérer votre commande"     done={false} active={false} />
+                            <TimelineStep label="Récupérée"       desc="Commande récupérée avec succès"                  done={false} active={false} />
+                        </>
+                    ) : deliveryType === "dine_in" ? (
+                        <>
+                            <TimelineStep label="Commande reçue"  desc="Votre commande a été enregistrée"                  done active={false} />
+                            <TimelineStep label="En préparation"  desc="La cuisine prépare vos plats"                    done={false} active />
+                            <TimelineStep label="Prête"           desc="Votre commande est prête"                       done={false} active={false} />
+                            <TimelineStep label="Servie"         desc="Vos plats ont été servis à votre table"          done={false} active={false} />
+                        </>
+                    ) : (
+                        <>
+                            <TimelineStep label="Commande reçue"      desc="Votre commande a été enregistrée"         done active={false} />
+                            <TimelineStep label="En préparation"      desc="Le restaurant prépare vos plats"          done={false} active />
+                            <TimelineStep label="En cours de livraison" desc="Un livreur est en route vers vous"      done={false} active={false} />
+                            <TimelineStep label="Livrée"              desc="Votre commande vous a été remise"         done={false} active={false} />
+                        </>
+                    )}
                 </section>
 
                 {/* ── CTAs ─────────────────────────────────────────────── */}

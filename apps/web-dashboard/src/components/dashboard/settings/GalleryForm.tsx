@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, X, Star, Trash2, Zap, Lock } from "lucide-react";
+import { Upload, X, Star, Trash2, Zap, Lock, Link2 } from "lucide-react";
 import { Card, Button, Input } from "@kbouffe/module-core/ui";
 import { toast } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useGallery } from "@/hooks/use-gallery";
 import { useUploadImage } from "@/hooks/use-upload-image";
-import Image from "next/image";
 
 interface PhotoGridItemProps {
   id: string;
@@ -50,11 +49,11 @@ function PhotoGridItem({
   return (
     <div className="relative group">
       <div className="aspect-square relative rounded-lg overflow-hidden bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={photoUrl}
           alt={altText || "Restaurant photo"}
-          fill
-          className="object-cover group-hover:opacity-75 transition-opacity"
+          className="absolute inset-0 w-full h-full object-cover group-hover:opacity-75 transition-opacity"
         />
         {isFeatured && (
           <div className="absolute top-2 left-2 flex items-center gap-1 bg-brand-500 text-white px-2 py-1 rounded text-xs font-medium">
@@ -163,6 +162,7 @@ export function GalleryForm() {
   const [packInfo, setPackInfo] = useState<GalleryPackInfo | null>(null);
   const [allPacks, setAllPacks] = useState<GalleryPack[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(true);
+  const [galleryUrlInput, setGalleryUrlInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -226,6 +226,25 @@ export function GalleryForm() {
         await addPhoto(result.url, file.name);
         toast.success("Photo ajoutée avec succès");
       }
+    } catch (error) {
+      toast.error("Erreur lors de l'ajout de la photo");
+      console.error(error);
+    }
+  };
+
+  const handleUrlSubmit = async () => {
+    const trimmed = galleryUrlInput.trim();
+    if (!trimmed) return;
+    try {
+      new URL(trimmed);
+    } catch {
+      toast.error("URL invalide");
+      return;
+    }
+    try {
+      await addPhoto(trimmed, "Photo URL");
+      setGalleryUrlInput("");
+      toast.success("Photo ajoutée avec succès");
     } catch (error) {
       toast.error("Erreur lors de l'ajout de la photo");
       console.error(error);
@@ -430,6 +449,33 @@ export function GalleryForm() {
           />
         </div>
       )}
+
+        {/* URL input */}
+        {!quotaReached && (
+          <div className="flex items-center gap-3 mb-8">
+            <div className="flex items-center gap-2 text-surface-400">
+              <Link2 size={16} />
+              <span className="text-xs font-medium whitespace-nowrap">ou via URL</span>
+            </div>
+            <div className="flex-1">
+              <Input
+                type="url"
+                value={galleryUrlInput}
+                onChange={(e) => setGalleryUrlInput(e.target.value)}
+                placeholder="https://exemple.com/photo.jpg"
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleUrlSubmit(); } }}
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleUrlSubmit}
+              disabled={!galleryUrlInput.trim()}
+            >
+              Ajouter
+            </Button>
+          </div>
+        )}
 
         {/* Quota reached message */}
         {quotaReached && (

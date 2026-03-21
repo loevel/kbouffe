@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ImagePlus, Upload } from "lucide-react";
-import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale, useDashboard } from "@kbouffe/module-core/ui";
+import { Save, ImagePlus, Upload, Trash2, PlusCircle, Link2 } from "lucide-react";
+import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale, useDashboard, authFetch } from "@kbouffe/module-core/ui";
 
 import { ProductOptionEditor } from "./ProductOptionEditor";
 import { useCategories, createProduct, updateProduct as apiUpdateProduct } from "../hooks/use-catalog";
@@ -41,8 +41,68 @@ export function ProductForm({ product }: ProductFormProps) {
     const [imageUrl, setImageUrl] = useState<string | null>(product?.image_url ?? null);
     const [loading, setLoading] = useState(false);
     const [dragActive, setDragActive] = useState(false);
+    const [imageMode, setImageMode] = useState<"file" | "url">("file");
+    const [urlInput, setUrlInput] = useState("");
+    const [galleryUrlInput, setGalleryUrlInput] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { upload, uploading } = useUploadImage();
+
+    const handleUrlSubmit = () => {
+        const url = urlInput.trim();
+        if (!url) return;
+        try { new URL(url); } catch { toast.error("URL invalide"); return; }
+        setImageUrl(url);
+        setUrlInput("");
+        toast.success("Image ajoutée via URL");
+    };
+
+    // Extra images gallery (only when editing)
+    const [extraImages, setExtraImages] = useState<{ id: string; url: string; display_order: number }[]>([]);
+    const [galleryUploading, setGalleryUploading] = useState(false);
+    const galleryInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!isEditing || !product?.id) return;
+        authFetch(`/api/products/${product.id}/images`)
+            .then((r) => r.json())
+            .then((data: any) => setExtraImages(data.images ?? []))
+            .catch(() => {});
+    }, [isEditing, product?.id]);
+
+    const handleGalleryUpload = async (file: File) => {
+        if (!file || !product?.id) return;
+        setGalleryUploading(true);
+        try {
+            const uploadData = await upload(file);
+            if (!uploadData?.url) { toast.error("Impossible d'uploader l'image."); return; }
+            const res = await authFetch(`/api/products/${product.id}/images`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: uploadData.url, display_order: extraImages.length }),
+            });
+            const json = await res.json() as any;
+            if (json.success) {
+                setExtraImages((prev) => [...prev, json.image]);
+                toast.success("Image ajoutée à la galerie");
+            } else {
+                toast.error(json.error ?? "Erreur lors de l'ajout.");
+            }
+        } finally {
+            setGalleryUploading(false);
+        }
+    };
+
+    const handleDeleteGalleryImage = async (imageId: string) => {
+        if (!product?.id) return;
+        const res = await authFetch(`/api/products/${product.id}/images/${imageId}`, { method: "DELETE" });
+        const json = await res.json() as any;
+        if (json.success) {
+            setExtraImages((prev) => prev.filter((img) => img.id !== imageId));
+            toast.success("Image supprimée");
+        } else {
+            toast.error(json.error ?? "Erreur lors de la suppression.");
+        }
+    };
 
     const updateField = (field: string, value: unknown) => {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -163,57 +223,190 @@ export function ProductForm({ product }: ProductFormProps) {
                     </Card>
 
                     <Card>
-                        <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.menu.productImage}</h3>
-                        <label
-                            onDragEnter={handleDrag}
-                            onDragLeave={handleDrag}
-                            onDragOver={handleDrag}
-                            onDrop={handleDrop}
-                            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer block ${
-                                dragActive
-                                    ? "border-brand-400 bg-brand-50/50 dark:bg-brand-900/20"
-                                    : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700"
-                            } ${uploading ? "opacity-50 cursor-wait" : ""}`}
-                        >
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileInputChange}
-                                className="hidden"
-                                disabled={uploading}
-                            />
-                            {imageUrl ? (
-                                <div className="space-y-2">
-                                    <img src={imageUrl} alt="Product" className="w-32 h-32 object-cover rounded-lg mx-auto" />
-                                    <p className="text-xs text-surface-500">{t.menu.productImageHint}</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={uploading}
-                                        className="text-xs text-brand-600 hover:text-brand-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Changer l'image
-                                    </button>
-                                </div>
-                            ) : uploading ? (
-                                <div className="space-y-2">
-                                    <Upload size={32} className="mx-auto text-brand-500 animate-pulse" />
-                                    <p className="text-sm text-surface-500">Upload en cours...</p>
-                                </div>
-                            ) : (
-                                <div className="cursor-pointer">
-                                    <ImagePlus size={32} className="mx-auto text-surface-400 mb-3" />
-                                    <p className="text-sm font-medium text-surface-700 dark:text-surface-300">{t.menu.productImageDrop}</p>
-                                    <p className="text-xs text-surface-400 mt-1">{t.menu.productImageHint}</p>
-                                </div>
-                            )}
-                        </label>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold text-surface-900 dark:text-white">{t.menu.productImage}</h3>
+                            <div className="flex gap-1 p-0.5 bg-surface-100 dark:bg-surface-800 rounded-lg">
+                                <button
+                                    type="button"
+                                    onClick={() => setImageMode("file")}
+                                    className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${imageMode === "file" ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"}`}
+                                >
+                                    <Upload size={12} /> Fichier
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setImageMode("url")}
+                                    className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${imageMode === "url" ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"}`}
+                                >
+                                    <Link2 size={12} /> URL
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Current image preview */}
+                        {imageUrl && (
+                            <div className="mb-4 text-center space-y-2">
+                                <img src={imageUrl} alt="Product" className="w-32 h-32 object-cover rounded-lg mx-auto" />
+                                <button
+                                    type="button"
+                                    onClick={() => setImageUrl(null)}
+                                    className="text-xs text-red-500 hover:text-red-600 underline"
+                                >
+                                    Supprimer l'image
+                                </button>
+                            </div>
+                        )}
+
+                        {imageMode === "file" ? (
+                            <label
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
+                                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer block ${
+                                    dragActive
+                                        ? "border-brand-400 bg-brand-50/50 dark:bg-brand-900/20"
+                                        : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700"
+                                } ${uploading ? "opacity-50 cursor-wait" : ""}`}
+                            >
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileInputChange}
+                                    className="hidden"
+                                    disabled={uploading}
+                                />
+                                {uploading ? (
+                                    <div className="space-y-2">
+                                        <Upload size={32} className="mx-auto text-brand-500 animate-pulse" />
+                                        <p className="text-sm text-surface-500">Upload en cours...</p>
+                                    </div>
+                                ) : (
+                                    <div className="cursor-pointer">
+                                        <ImagePlus size={32} className="mx-auto text-surface-400 mb-3" />
+                                        <p className="text-sm font-medium text-surface-700 dark:text-surface-300">{t.menu.productImageDrop}</p>
+                                        <p className="text-xs text-surface-400 mt-1">{t.menu.productImageHint}</p>
+                                    </div>
+                                )}
+                            </label>
+                        ) : (
+                            <div className="flex gap-2">
+                                <input
+                                    type="url"
+                                    value={urlInput}
+                                    onChange={(e) => setUrlInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleUrlSubmit(); } }}
+                                    placeholder="https://exemple.com/image-produit.jpg"
+                                    className="flex-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleUrlSubmit}
+                                    className="px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-semibold transition-colors shrink-0"
+                                >
+                                    Ajouter
+                                </button>
+                            </div>
+                        )}
                     </Card>
 
                     <Card>
                         <ProductOptionEditor options={options} onChange={setOptions} />
                     </Card>
+
+                    {/* Extra images gallery — only when editing */}
+                    {isEditing && (
+                        <Card>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-surface-900 dark:text-white">Galerie d'images</h3>
+                                <span className="text-xs text-surface-400">{extraImages.length} photo{extraImages.length !== 1 ? "s" : ""} supplémentaire{extraImages.length !== 1 ? "s" : ""}</span>
+                            </div>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-4">
+                                {extraImages.map((img) => (
+                                    <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700">
+                                        <img src={img.url} alt="" className="w-full h-full object-cover" />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteGalleryImage(img.id)}
+                                            className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <Trash2 size={18} className="text-white" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <label className={`aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors ${galleryUploading ? "opacity-50 cursor-wait border-surface-300 dark:border-surface-600" : "border-surface-200 dark:border-surface-700 hover:border-brand-400"}`}>
+                                    <input
+                                        ref={galleryInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={galleryUploading}
+                                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleGalleryUpload(f); }}
+                                    />
+                                    {galleryUploading
+                                        ? <Upload size={20} className="text-brand-500 animate-pulse" />
+                                        : <><PlusCircle size={20} className="text-surface-400 mb-1" /><span className="text-xs text-surface-400">Fichier</span></>
+                                    }
+                                </label>
+                            </div>
+                            {/* Add gallery image via URL */}
+                            <div className="flex gap-2 mb-3">
+                                <input
+                                    type="url"
+                                    value={galleryUrlInput}
+                                    onChange={(e) => setGalleryUrlInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            const url = galleryUrlInput.trim();
+                                            if (!url) return;
+                                            try { new URL(url); } catch { toast.error("URL invalide"); return; }
+                                            (async () => {
+                                                setGalleryUploading(true);
+                                                try {
+                                                    const res = await authFetch(`/api/products/${product!.id}/images`, {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ url, display_order: extraImages.length }),
+                                                    });
+                                                    const json = await res.json() as any;
+                                                    if (json.success) { setExtraImages(prev => [...prev, json.image]); setGalleryUrlInput(""); toast.success("Image ajoutée"); }
+                                                    else toast.error(json.error ?? "Erreur");
+                                                } finally { setGalleryUploading(false); }
+                                            })();
+                                        }
+                                    }}
+                                    placeholder="https://exemple.com/photo.jpg"
+                                    className="flex-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                                <button
+                                    type="button"
+                                    disabled={galleryUploading}
+                                    onClick={async () => {
+                                        const url = galleryUrlInput.trim();
+                                        if (!url) return;
+                                        try { new URL(url); } catch { toast.error("URL invalide"); return; }
+                                        setGalleryUploading(true);
+                                        try {
+                                            const res = await authFetch(`/api/products/${product!.id}/images`, {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ url, display_order: extraImages.length }),
+                                            });
+                                            const json = await res.json() as any;
+                                            if (json.success) { setExtraImages(prev => [...prev, json.image]); setGalleryUrlInput(""); toast.success("Image ajoutée"); }
+                                            else toast.error(json.error ?? "Erreur");
+                                        } finally { setGalleryUploading(false); }
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors shrink-0"
+                                >
+                                    <Link2 size={14} /> Ajouter via URL
+                                </button>
+                            </div>
+                            <p className="text-xs text-surface-400">Ajoutez des photos par fichier ou par lien URL. Elles s'affichent dans la galerie côté client.</p>
+                        </Card>
+                    )}
                 </div>
 
                 <div className="space-y-6">
