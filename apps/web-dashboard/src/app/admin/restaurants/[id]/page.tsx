@@ -31,6 +31,11 @@ import {
     X,
     Trash2,
     AlertTriangle,
+    Puzzle,
+    CalendarDays,
+    Megaphone,
+    Truck,
+    Utensils,
 } from "lucide-react";
 import { Badge, Button, toast, adminFetch, Modal, ModalFooter } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
@@ -109,7 +114,14 @@ export default function AdminRestaurantDetailPage() {
     const [toggling, setToggling] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
     const [showRejectionInput, setShowRejectionInput] = useState(false);
-    const [activeTab, setActiveTab] = useState<"overview" | "team" | "catalog">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "team" | "catalog" | "modules">("overview");
+
+    // Modules state
+    const [modules, setModules] = useState<Array<{
+        id: string; name: string; description: string; icon: string; isActive: boolean;
+    }>>([]);
+    const [loadingModules, setLoadingModules] = useState(false);
+    const [togglingModule, setTogglingModule] = useState<string | null>(null);
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
     
@@ -132,7 +144,7 @@ export default function AdminRestaurantDetailPage() {
                     setRestaurant(data);
                     setEditForm(data);
                 }
-                
+
                 // Fetch members
                 setLoadingMembers(true);
                 const memRes = await adminFetch(`/api/admin/restaurants/${id}/members`);
@@ -140,15 +152,45 @@ export default function AdminRestaurantDetailPage() {
                     const data = await memRes.json();
                     setMembers(data.members || []);
                 }
+
+                // Fetch modules
+                setLoadingModules(true);
+                const modRes = await adminFetch(`/api/admin/restaurants/${id}/modules`);
+                if (modRes.ok) {
+                    const data = await modRes.json();
+                    setModules(data.modules || []);
+                }
             } catch (err) {
                 console.error("Failed to fetch restaurant details:", err);
                 toast.error("Échec du chargement du restaurant");
             } finally {
                 setLoading(false);
                 setLoadingMembers(false);
+                setLoadingModules(false);
             }
         })();
     }, [id]);
+
+    const toggleModule = async (moduleId: string, isActive: boolean) => {
+        setTogglingModule(moduleId);
+        try {
+            const res = await adminFetch(`/api/admin/restaurants/${id}/modules`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ moduleId, isActive }),
+            });
+            if (res.ok) {
+                setModules(prev => prev.map(m => m.id === moduleId ? { ...m, isActive } : m));
+                toast.success(isActive ? "Module activé" : "Module désactivé");
+            } else {
+                toast.error("Erreur lors de la mise à jour");
+            }
+        } catch {
+            toast.error("Une erreur est survenue");
+        } finally {
+            setTogglingModule(null);
+        }
+    };
 
     const updateRestaurant = async (updates: Partial<RestaurantDetail>) => {
         if (!restaurant) return;
@@ -473,12 +515,24 @@ export default function AdminRestaurantDetailPage() {
                     onClick={() => setActiveTab("catalog")}
                     className={cn(
                         "px-6 py-2 rounded-xl text-sm font-bold transition-all",
-                        activeTab === "catalog" 
-                            ? "bg-white dark:bg-surface-700 text-brand-500 shadow-sm" 
+                        activeTab === "catalog"
+                            ? "bg-white dark:bg-surface-700 text-brand-500 shadow-sm"
                             : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
                     )}
                 >
                     Catalogue
+                </button>
+                <button
+                    onClick={() => setActiveTab("modules")}
+                    className={cn(
+                        "px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5",
+                        activeTab === "modules"
+                            ? "bg-white dark:bg-surface-700 text-brand-500 shadow-sm"
+                            : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                    )}
+                >
+                    <Puzzle size={14} />
+                    Modules
                 </button>
             </div>
 
@@ -1004,6 +1058,113 @@ export default function AdminRestaurantDetailPage() {
                         className="space-y-6"
                     >
                         <AdminCatalogContent restaurantId={id} />
+                    </motion.div>
+                ) : activeTab === "modules" ? (
+                    <motion.div
+                        key="modules"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                    >
+                        <div className="bg-white dark:bg-surface-900 rounded-3xl border border-surface-200 dark:border-surface-800 overflow-hidden">
+                            {/* Header */}
+                            <div className="flex items-center gap-3 px-6 py-5 border-b border-surface-100 dark:border-surface-800">
+                                <div className="p-2 bg-brand-500/10 rounded-xl">
+                                    <Puzzle size={18} className="text-brand-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-surface-900 dark:text-white">Modules du système</h3>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">
+                                        Cochez ou décochez les fonctionnalités disponibles pour <span className="font-semibold text-surface-700 dark:text-surface-300">{restaurant?.name}</span>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Module list */}
+                            {loadingModules ? (
+                                <div className="flex items-center justify-center py-16">
+                                    <div className="w-7 h-7 border-4 border-brand-500/20 border-t-brand-500 rounded-full animate-spin" />
+                                </div>
+                            ) : modules.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 gap-3 text-surface-400">
+                                    <Puzzle size={32} className="opacity-40" />
+                                    <p className="text-sm">Aucun module trouvé pour ce restaurant.</p>
+                                </div>
+                            ) : (
+                                <ul className="divide-y divide-surface-100 dark:divide-surface-800">
+                                    {modules.map((mod) => {
+                                        const IconMap: Record<string, React.ElementType> = {
+                                            CalendarDays,
+                                            Megaphone,
+                                            Users,
+                                            Truck,
+                                            Utensils,
+                                        };
+                                        const Icon = IconMap[mod.icon] ?? Puzzle;
+                                        const isToggling = togglingModule === mod.id;
+
+                                        return (
+                                            <li
+                                                key={mod.id}
+                                                className={cn(
+                                                    "flex items-center gap-4 px-6 py-4 transition-colors",
+                                                    mod.isActive
+                                                        ? "bg-brand-50/40 dark:bg-brand-500/5"
+                                                        : "hover:bg-surface-50 dark:hover:bg-surface-800/50"
+                                                )}
+                                            >
+                                                {/* Icon */}
+                                                <div className={cn(
+                                                    "p-2 rounded-xl shrink-0",
+                                                    mod.isActive
+                                                        ? "bg-brand-500/10"
+                                                        : "bg-surface-100 dark:bg-surface-800"
+                                                )}>
+                                                    <Icon size={18} className={mod.isActive ? "text-brand-500" : "text-surface-400"} />
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-surface-900 dark:text-white">{mod.name}</p>
+                                                    <p className="text-xs text-surface-500 dark:text-surface-400 leading-relaxed">{mod.description}</p>
+                                                </div>
+
+                                                {/* Status badge */}
+                                                <span className={cn(
+                                                    "hidden sm:inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0",
+                                                    mod.isActive
+                                                        ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400"
+                                                        : "bg-surface-100 text-surface-400 dark:bg-surface-800 dark:text-surface-500"
+                                                )}>
+                                                    {mod.isActive ? "Activé" : "Désactivé"}
+                                                </span>
+
+                                                {/* Checkbox toggle */}
+                                                <label className={cn("relative inline-flex items-center shrink-0", isToggling ? "cursor-wait opacity-60" : "cursor-pointer")}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={mod.isActive}
+                                                        onChange={() => !isToggling && toggleModule(mod.id, !mod.isActive)}
+                                                        disabled={isToggling}
+                                                        className="sr-only peer"
+                                                        aria-label={`${mod.isActive ? "Désactiver" : "Activer"} le module ${mod.name}`}
+                                                    />
+                                                    <div className={cn(
+                                                        "w-11 h-6 rounded-full transition-colors duration-200 relative",
+                                                        "after:content-[''] after:absolute after:top-[2px] after:left-[2px]",
+                                                        "after:bg-white after:rounded-full after:h-5 after:w-5",
+                                                        "after:transition-transform after:duration-200 after:shadow-sm",
+                                                        mod.isActive
+                                                            ? "bg-brand-500 after:translate-x-5"
+                                                            : "bg-surface-300 dark:bg-surface-600 after:translate-x-0"
+                                                    )} />
+                                                </label>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
                     </motion.div>
                 ) : null}
             </AnimatePresence>

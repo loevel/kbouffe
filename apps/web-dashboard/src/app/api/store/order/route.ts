@@ -31,6 +31,7 @@ interface OrderBody {
     subtotal: number;
     deliveryFee: number;
     total: number;
+    customerId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .insert({
                 restaurant_id: body.restaurantId,
-                customer_id: null, // guest order (pas de compte requis)
+                customer_id: body.customerId ?? null,
                 customer_name: body.customerName.trim(),
                 customer_phone: body.customerPhone.trim(),
                 items: body.items,

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
+import { createClient } from "@/lib/supabase/client";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,13 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [orderId, setOrderId] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const supabase = createClient();
+        if (!supabase) return;
+        supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    }, []);
 
     // Reset step when drawer closes
     const prevOpen = useRef(open);
@@ -102,6 +110,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     subtotal,
                     deliveryFee,
                     total,
+                    customerId: userId ?? undefined,
                 }),
             });
 

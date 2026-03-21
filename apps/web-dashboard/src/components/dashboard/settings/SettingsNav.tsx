@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Clock, Truck, ImageIcon, Bell, CreditCard, Shield, Armchair, Star } from "lucide-react";
+import { Building2, Clock, Truck, ImageIcon, Bell, CreditCard, Shield, Armchair, Star, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@kbouffe/module-core/ui";
 
@@ -12,6 +12,7 @@ export function SettingsNav() {
     const settingsLinks = [
         { href: "/dashboard/settings", label: t.settings.generalInfo, icon: Building2 },
         { href: "/dashboard/settings/branding", label: t.settings.branding, icon: ImageIcon },
+        { href: "/dashboard/settings/gallery", label: (t.settings as any).gallery ?? "Galerie", icon: Images },
         { href: "/dashboard/settings/hours", label: t.settings.openingHours, icon: Clock },
         { href: "/dashboard/settings/delivery", label: t.settings.delivery, icon: Truck },
         { href: "/dashboard/settings/dine-in", label: t.dineIn.title, icon: Armchair },

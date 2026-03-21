@@ -56,7 +56,12 @@ export async function GET(request: NextRequest) {
       .eq("restaurant_id", ctx.restaurantId);
 
     if (status) {
-      query = query.eq("status", status as any);
+      const statusList = status.split(",").map((s) => s.trim()).filter(Boolean);
+      if (statusList.length === 1) {
+        query = query.eq("status", statusList[0] as any);
+      } else {
+        query = query.in("status", statusList as any);
+      }
     }
     if (payment) {
       query = query.eq("payment_status", payment as any);

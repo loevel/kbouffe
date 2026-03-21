@@ -25,6 +25,7 @@ import { FavoritesPanelReal } from "./FavoritesPanelReal";
 import { ProfilePanelReal }   from "./ProfilePanelReal";
 import { AddressesPanelReal } from "./AddressesPanelReal";
 import { PreferencesPanelReal } from "./PreferencesPanelReal";
+import { ClientNotificationsPanel } from "./ClientNotificationsPanel";
 
 function PanelShell({
     title,
@@ -49,18 +50,7 @@ function PanelShell({
 
 
 export function NotificationsPanel() {
-    return (
-        <PanelShell title="Notifications" subtitle="Choisissez comment vous souhaitez être informé.">
-            <div className="space-y-3">
-                {["Suivi des commandes", "Promotions Kbouffe", "Nouveaux restaurants proches"].map((item, idx) => (
-                    <div key={item} className="flex items-center justify-between p-4 rounded-xl border border-surface-200 dark:border-surface-700">
-                        <p className="text-sm font-medium text-surface-900 dark:text-white">{item}</p>
-                        {idx < 2 ? <CheckCircle2 size={18} className="text-brand-500" /> : <Circle size={18} className="text-surface-400" />}
-                    </div>
-                ))}
-            </div>
-        </PanelShell>
-    );
+    return <ClientNotificationsPanel />;
 }
 
 export function SecurityPanel() {
@@ -402,8 +392,9 @@ export function renderSectionPanel(section: ClientSectionId) {
         case "payments":
             return <PaymentMethodsPanel />;
         case "preferences":
-        case "notifications":
             return <PreferencesPanelReal />;
+        case "notifications":
+            return <NotificationsPanel />;
         case "security":
             return <SecurityPanel />;
         case "profile":

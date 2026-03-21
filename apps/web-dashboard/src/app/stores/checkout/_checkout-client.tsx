@@ -113,6 +113,7 @@ export function CheckoutPageClient() {
 
     // ── Form state ─────────────────────────────────────────────────────────
     const [step, setStep]                     = useState<"info" | "payment" | "review">("info");
+    const [userId, setUserId]                 = useState<string | null>(null);
     const [customerName, setCustomerName]     = useState("");
     const [customerPhone, setCustomerPhone]   = useState("");
     const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -132,6 +133,7 @@ export function CheckoutPageClient() {
                 // Get current user
                 const { data: { user: authUser } } = await supabase.auth.getUser();
                 if (!authUser) return;
+                setUserId(authUser.id);
 
                 // Fetch user profile
                 const { data: userProfile } = await supabase
@@ -269,6 +271,7 @@ export function CheckoutPageClient() {
                 subtotal,
                 deliveryFee,
                 total,
+                customerId:      userId ?? undefined,
             };
             const res = await fetch("/api/store/order", {
                 method:  "POST",

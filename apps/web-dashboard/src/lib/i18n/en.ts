@@ -493,6 +493,15 @@ export const en: TranslationKeys = {
         deleteAccount: "Delete account",
         deleteAccountDesc: "This action is irreversible",
         deleteConfirm: "Are you sure you want to delete your account?",
+        // Gallery
+        gallery: "Photo Gallery",
+        gallerySubtitle: "Manage your restaurant photos",
+        galleryCount: "photos",
+        galleryEmpty: "No photos yet. Add your first photo!",
+        galleryQuotaReached: "Quota reached. Contact an admin to increase the limit.",
+        galleryUploadHint: "JPEG, PNG or WebP — max 5 MB",
+        galleryAltLabel: "Alternative text",
+        galleryFeatured: "Featured photo",
     },
 
     store: {

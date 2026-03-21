@@ -491,6 +491,15 @@ export const fr = {
         deleteAccount: "Supprimer le compte",
         deleteAccountDesc: "Cette action est irréversible",
         deleteConfirm: "Êtes-vous sûr de vouloir supprimer votre compte ?",
+        // Gallery
+        gallery: "Galerie de photos",
+        gallerySubtitle: "Gérez les photos de votre restaurant",
+        galleryCount: "photos",
+        galleryEmpty: "Aucune photo. Ajoutez votre première photo !",
+        galleryQuotaReached: "Quota atteint. Contactez un admin pour augmenter la limite.",
+        galleryUploadHint: "JPEG, PNG ou WebP — max 5 Mo",
+        galleryAltLabel: "Texte alternatif",
+        galleryFeatured: "Photo à la une",
     },
 
     store: {

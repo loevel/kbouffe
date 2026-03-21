@@ -371,3 +371,69 @@ adminRestaurantsRoutes.delete("/:id/members/:memberId", async (c) => {
     return c.json({ success: true });
 });
 
+// ─── Modules ──────────────────────────────────────────────────────────────────
+
+const MODULE_CATALOG = [
+    { id: "reservations", name: "Réservations", description: "Gestion des réservations de tables et zones.", icon: "CalendarDays" },
+    { id: "marketing",    name: "Marketing",    description: "Campagnes, coupons et publicités SMS/MTN.", icon: "Megaphone" },
+    { id: "hr",           name: "Équipe (RH)",  description: "Gestion des membres, rôles et permissions.", icon: "Users" },
+    { id: "delivery",     name: "Livraison",    description: "Zones de livraison et suivi des commandes.", icon: "Truck" },
+    { id: "dine_in",      name: "Sur place",    description: "Commandes sur place et gestion de salle.", icon: "Utensils" },
+];
+
+adminRestaurantsRoutes.get("/:id/modules", async (c) => {
+    const denied = requireDomain(c, "restaurants:read");
+    if (denied) return denied;
+
+    const id = c.req.param("id");
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const { data: rows, error } = await supabase
+        .from("restaurant_modules")
+        .select("module_id, is_active")
+        .eq("restaurant_id", id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    const activeMap = new Map((rows ?? []).map((r: any) => [r.module_id, r.is_active]));
+
+    const modules = MODULE_CATALOG.map((m) => ({
+        ...m,
+        isActive: activeMap.has(m.id) ? !!activeMap.get(m.id) : false,
+    }));
+
+    return c.json({ modules });
+});
+
+adminRestaurantsRoutes.patch("/:id/modules", async (c) => {
+    const denied = requireDomain(c, "restaurants:write");
+    if (denied) return denied;
+
+    const id = c.req.param("id");
+    const { moduleId, isActive } = await c.req.json<{ moduleId: string; isActive: boolean }>();
+
+    if (!moduleId || typeof isActive !== "boolean") {
+        return c.json({ error: "moduleId et isActive sont requis" }, 400);
+    }
+
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const { error } = await supabase
+        .from("restaurant_modules")
+        .upsert(
+            { restaurant_id: id, module_id: moduleId, is_active: isActive, updated_at: new Date().toISOString() },
+            { onConflict: "restaurant_id,module_id" }
+        );
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    await logAdminAction(c, {
+        action: isActive ? "enable_module" : "disable_module",
+        targetType: "restaurant",
+        targetId: id,
+        details: { moduleId, isActive },
+    });
+
+    return c.json({ success: true });
+});
+

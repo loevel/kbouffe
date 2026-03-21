@@ -1,6 +1,7 @@
 "use client";
 
-import { Menu, Bell, Sun, Moon, Monitor, Globe, Shield } from "lucide-react";
+import { Menu, Sun, Moon, Monitor, Globe, Shield } from "lucide-react";
+import { AdminNotificationBell } from "./AdminNotificationBell";
 import { Dropdown } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
 import { useTheme, type Theme } from "@kbouffe/module-core/ui";
@@ -88,10 +89,7 @@ export function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
                     }
                 />
 
-                <button className="relative p-2 text-surface-500 hover:text-surface-900 dark:hover:text-white rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors">
-                    <Bell size={20} />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full" />
-                </button>
+                <AdminNotificationBell />
 
                 <Dropdown
                     items={[

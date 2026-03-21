@@ -104,17 +104,23 @@ export function OrdersPanelReal() {
     const syncStore = useRecentOrders((s) => s.addOrder);
 
     const fetchOrders = useCallback(async () => {
+        const localOrders = useRecentOrders.getState().orders;
         try {
             const res = await fetch("/api/auth/orders");
             if (res.ok) {
                 const data = await res.json();
-                setOrders(data);
-                
-                // Optional: Sync top orders with local store for notification/persistence
+                // Merge API orders with local store orders (dedup by id, API takes precedence)
+                const apiIds = new Set(data.map((o: RecentOrder) => o.id));
+                const localOnly = localOrders.filter((o) => !apiIds.has(o.id));
+                setOrders([...data, ...localOnly]);
                 data.slice(0, 5).forEach((o: RecentOrder) => syncStore(o));
+            } else {
+                // Not authenticated or API error — show local store orders
+                setOrders(localOrders);
             }
         } catch (error) {
             console.error("Error fetching orders:", error);
+            setOrders(localOrders);
         } finally {
             setIsLoading(false);
         }

@@ -27,7 +27,7 @@ export const requireModule = (moduleId: string) => {
 
         // Check if the module is active for this restaurant in Supabase
         const { data: activeModule, error } = await c.var.supabase
-            .from("store_modules")
+            .from("restaurant_modules")
             .select("*")
             .eq("restaurant_id", restaurantId)
             .eq("module_id", moduleId)

@@ -5,6 +5,7 @@ export * from './OrderTimeline';
 export * from './OrdersStats';
 export * from './OrdersTable';
 export * from '../hooks/use-orders';
+export * from '../hooks/use-chat';
 export * from '../lib/types';
 export * from './OrderChat';
 export * from './AssignDriver';
