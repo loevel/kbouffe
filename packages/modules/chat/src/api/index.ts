@@ -1,7 +1,18 @@
 import { Hono } from "hono";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { CoreEnv, CoreVariables } from "@kbouffe/module-core";
 
 const chat = new Hono<{ Bindings: CoreEnv; Variables: CoreVariables }>();
+
+/**
+ * Service-role Supabase client — bypasses RLS.
+ * Chat routes do their own authorization (isCustomer || isMerchant), so RLS is redundant.
+ */
+function chatDb(c: { env: CoreEnv }) {
+    return createSupabaseClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    });
+}
 
 /**
  * Helper: Obtenir ou créer une conversation pour une commande.
@@ -39,16 +50,15 @@ async function getOrCreateOrderConversation(supabase: any, orderId: string, rest
  * Récupérer l'historique d'une conversation par ID de commande
  */
 chat.get("/orders/:orderId/messages", async (c) => {
-    const supabase = c.var.supabase;
-    if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
-
     const orderId = c.req.param("orderId");
     const userId = c.var.userId;
     if (!userId) return c.json({ error: "Utilisateur non identifié" }, 401);
 
+    const db = chatDb(c);
+
     try {
         // Récupérer la commande pour obtenir restaurant_id et vérifier l'accès
-        const { data: order, error: orderError } = await supabase
+        const { data: order, error: orderError } = await db
             .from("orders")
             .select("customer_id, restaurant_id")
             .eq("id", orderId)
@@ -64,9 +74,9 @@ chat.get("/orders/:orderId/messages", async (c) => {
             return c.json({ error: "Vous n'êtes pas autorisé à accéder à cette conversation" }, 403);
         }
 
-        const conv = await getOrCreateOrderConversation(supabase, orderId, order.restaurant_id);
+        const conv = await getOrCreateOrderConversation(db, orderId, order.restaurant_id);
 
-        const { data: chatMessages, error } = await supabase
+        const { data: chatMessages, error } = await db
             .from("messages")
             .select("id, conversation_id, sender_id, content, content_type, is_read, created_at")
             .eq("conversation_id", conv.id)
@@ -96,12 +106,10 @@ chat.get("/orders/:orderId/messages", async (c) => {
  * Récupérer l'historique d'une conversation par ID direct
  */
 chat.get("/conversations/:id/messages", async (c) => {
-    const supabase = c.var.supabase;
-    if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
-
     const conversationId = c.req.param("id");
+    const db = chatDb(c);
 
-    const { data: chatMessages, error } = await supabase
+    const { data: chatMessages, error } = await db
         .from("messages")
         .select("id, conversation_id, sender_id, content, content_type, is_read, created_at")
         .eq("conversation_id", conversationId)
@@ -130,9 +138,6 @@ chat.get("/conversations/:id/messages", async (c) => {
  * Envoi d'un message lié à une commande
  */
 chat.post("/orders/:orderId/messages", async (c) => {
-    const supabase = c.var.supabase;
-    if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
-
     const orderId = c.req.param("orderId");
     const body = await c.req.json();
 
@@ -142,9 +147,11 @@ chat.post("/orders/:orderId/messages", async (c) => {
     const content = body.content?.trim();
     if (!content) return c.json({ error: "Contenu requis" }, 400);
 
+    const db = chatDb(c);
+
     try {
         // Récupérer la commande
-        const { data: order, error: orderError } = await supabase
+        const { data: order, error: orderError } = await db
             .from("orders")
             .select("customer_id, restaurant_id")
             .eq("id", orderId)
@@ -160,10 +167,10 @@ chat.post("/orders/:orderId/messages", async (c) => {
             return c.json({ error: "Vous n'êtes pas autorisé à envoyer un message pour cette commande" }, 403);
         }
 
-        const conv = await getOrCreateOrderConversation(supabase, orderId, order.restaurant_id);
+        const conv = await getOrCreateOrderConversation(db, orderId, order.restaurant_id);
 
         // Schema messages: id, conversation_id, sender_id, content, content_type, is_read, created_at
-        const { data: inserted, error: insertError } = await supabase
+        const { data: inserted, error: insertError } = await db
             .from("messages")
             .insert({
                 conversation_id: conv.id,
@@ -188,7 +195,7 @@ chat.post("/orders/:orderId/messages", async (c) => {
 
         // Broadcast Realtime
         try {
-            await supabase.channel(`conversation:${conv.id}`).send({
+            await db.channel(`conversation:${conv.id}`).send({
                 type: "broadcast",
                 event: "new_message",
                 payload: newMessage,
@@ -209,9 +216,6 @@ chat.post("/orders/:orderId/messages", async (c) => {
  * Envoi d'un message direct par ID de conversation
  */
 chat.post("/conversations/:id/messages", async (c) => {
-    const supabase = c.var.supabase;
-    if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
-
     const conversationId = c.req.param("id");
     const body = await c.req.json();
 
@@ -221,7 +225,9 @@ chat.post("/conversations/:id/messages", async (c) => {
     const content = body.content?.trim();
     if (!content) return c.json({ error: "Contenu requis" }, 400);
 
-    const { data: inserted, error: insertError } = await supabase
+    const db = chatDb(c);
+
+    const { data: inserted, error: insertError } = await db
         .from("messages")
         .insert({
             conversation_id: conversationId,
@@ -248,7 +254,7 @@ chat.post("/conversations/:id/messages", async (c) => {
     };
 
     try {
-        await supabase.channel(`conversation:${conversationId}`).send({
+        await db.channel(`conversation:${conversationId}`).send({
             type: "broadcast",
             event: "new_message",
             payload: newMessage,
@@ -314,12 +320,10 @@ chat.post("/conversations/:id/upload", async (c) => {
  * Marquer une conversation comme lue
  */
 chat.post("/conversations/:id/read", async (c) => {
-    const supabase = c.var.supabase;
-    if (!supabase) return c.json({ error: "Supabase client non configuré" }, 500);
-
     const conversationId = c.req.param("id");
+    const db = chatDb(c);
 
-    const { error } = await supabase
+    const { error } = await db
         .from("messages")
         .update({ is_read: true })
         .eq("conversation_id", conversationId);

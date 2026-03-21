@@ -47,6 +47,7 @@ const { teamRoutes, payoutsRoutes } = hrApi;
 import { chatApi } from "@kbouffe/module-chat";
 const { chatRoutes } = chatApi;
 import { notificationsRoutes } from "./modules/core/notifications";
+import { customerReviewRoutes, merchantReviewRoutes, publicProductReviewRoutes } from "./modules/reviews";
 
 // ── Admin routes ─────────────────────────────────────────────────────
 import { adminRoutes } from "./modules/admin";
@@ -100,6 +101,7 @@ api.route("/stores", storesRoutes);
 api.route("/menu", menuRoutes);
 api.route("/store", storePublicRoutes);                   // guest orders
 api.route("/store", publicReservationsRoutes);             // public reservation booking
+api.route("/store", publicProductReviewRoutes);            // public product reviews
 api.route("/coupons/validate", couponValidateRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
 api.route("/sms", smsRoutes);
@@ -119,6 +121,10 @@ const merchantPaths = [
 // Chat uses userAuthMiddleware (works for clients + merchants, no restaurant required)
 api.use("/chat/*", userAuthMiddleware);
 api.use("/chat", userAuthMiddleware);
+
+// Reviews uses userAuthMiddleware (customers submit reviews, no restaurant required)
+api.use("/reviews/*", userAuthMiddleware);
+api.use("/reviews", userAuthMiddleware);
 
 for (const path of merchantPaths) {
     api.use(`${path}/*`, authMiddleware);
@@ -170,6 +176,10 @@ api.route("/ads", adsRoutes);
 api.route("/team", teamRoutes);
 api.route("/upload", uploadRoutes);
 api.route("/chat", chatRoutes);
+api.route("/reviews", customerReviewRoutes);
+
+// ── Merchant review management (uses authMiddleware via /restaurant path) ──
+api.route("/restaurant/reviews", merchantReviewRoutes);
 
 // ── Admin routes ─────────────────────────────────────────────────────
 api.route("/admin", adminRoutes);

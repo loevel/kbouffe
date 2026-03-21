@@ -68,6 +68,7 @@ export const en: TranslationKeys = {
         tables: "Tables",
         reservations: "Reservations",
         customers: "Customers",
+        reviews: "Customer Reviews",
         finances: "Finances",
         marketing: "Marketing",
         reports: "Reports",

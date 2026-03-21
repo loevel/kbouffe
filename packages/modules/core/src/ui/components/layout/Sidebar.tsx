@@ -16,6 +16,7 @@ import {
     Flame,
     Megaphone,
     BarChart3,
+    MessageSquareText,
     Store as StoreIcon, // Alias to avoid conflict
 } from "lucide-react";
 import { KbouffeLogoWhite } from "../brand/Logo";
@@ -24,7 +25,7 @@ import { useLocale } from "../../contexts/LocaleContext";
 import { useDashboard } from "../../contexts/DashboardContext";
 import { NAV_PERMISSIONS } from "../../lib/permissions";
 
-export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "marketplace";
+export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "marketplace" | "reviews";
 
 export interface NavItem {
     href: string;
@@ -41,6 +42,7 @@ export const navItemsDef: NavItem[] = [
     { href: "/dashboard/tables", labelKey: "tables", icon: Armchair },
     { href: "/dashboard/reservations", labelKey: "reservations", icon: CalendarDays },
     { href: "/dashboard/customers", labelKey: "customers", icon: Users },
+    { href: "/dashboard/reviews", labelKey: "reviews", icon: MessageSquareText },
     { href: "/dashboard/finances", labelKey: "finances", icon: Wallet },
     { href: "/dashboard/reports", labelKey: "reports", icon: BarChart3 },
     { href: "/dashboard/marketing", labelKey: "marketing", icon: Megaphone },

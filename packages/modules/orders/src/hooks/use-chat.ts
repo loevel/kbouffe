@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import useSWR from "swr";
-import { createClient } from "@kbouffe/module-core/ui";
+import { createClient, playMessageSound } from "@kbouffe/module-core/ui";
 
 export interface Message {
     id: string;
@@ -31,11 +31,13 @@ const fetcher = async (url: string) => {
     return res.json() as Promise<any>;
 };
 
-export function useChat(orderId: string) {
+export function useChat(orderId: string, currentUserId?: string) {
     const supabase = createClient();
     const [messages, setMessages] = useState<Message[]>([]);
     const [isSending, setIsSending] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const userIdRef = useRef(currentUserId);
+    userIdRef.current = currentUserId;
 
     // Fetch initial messages and conversation status
     const { data, isLoading } = useSWR<{
@@ -61,6 +63,10 @@ export function useChat(orderId: string) {
                     if (prev.some((m) => m.id === newMessage.id)) return prev;
                     return [...prev, newMessage];
                 });
+                // Play sound if message is from the other party
+                if (newMessage.senderId !== userIdRef.current) {
+                    playMessageSound();
+                }
             })
             .subscribe();
 

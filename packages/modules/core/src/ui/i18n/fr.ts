@@ -66,6 +66,7 @@ export const fr = {
         tables: "Tables",
         reservations: "Reservations",
         customers: "Clients",
+        reviews: "Avis clients",
         finances: "Finances",
         marketing: "Marketing",
         reports: "Rapports",

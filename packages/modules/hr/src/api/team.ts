@@ -5,14 +5,35 @@ import { hasPermission, canManageRole, ASSIGNABLE_ROLES, type TeamRole, type Per
 
 export const teamRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+function getAdminClient(c: any) {
+    return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    });
+}
+
 async function getCallerRole(c: any, permission?: Permission): Promise<{ role: TeamRole; userId: string; restaurantId: string } | Response> {
-    const supabase = c.var.supabase;
+    const adminDb = getAdminClient(c);
     const userId = c.var.userId;
     const restaurantId = c.var.restaurantId;
 
     if (!userId || !restaurantId) return c.json({ error: "Non authentifié ou restaurant non spécifié" }, 401);
 
-    const { data: membership, error } = await supabase
+    // Check if the caller is the restaurant owner
+    const { data: restaurant } = await adminDb
+        .from("restaurants")
+        .select("owner_id")
+        .eq("id", restaurantId)
+        .maybeSingle();
+
+    if (restaurant?.owner_id === userId) {
+        const role: TeamRole = "owner";
+        if (permission && !hasPermission(role, permission)) {
+            return c.json({ error: `Permission manquante: ${permission}` }, 403);
+        }
+        return { role, userId, restaurantId };
+    }
+
+    const { data: membership, error } = await adminDb
         .from("restaurant_members")
         .select("role")
         .eq("user_id", userId)
@@ -38,10 +59,17 @@ teamRoutes.get("/", async (c) => {
         const auth = await getCallerRole(c, "team:read");
         if (auth instanceof Response) return auth;
         const { restaurantId } = auth;
-        const supabase = c.var.supabase;
+        const adminDb = getAdminClient(c);
+
+        // Get the restaurant owner
+        const { data: restaurant } = await adminDb
+            .from("restaurants")
+            .select("owner_id, created_at")
+            .eq("id", restaurantId)
+            .maybeSingle();
 
         // Get all members for this restaurant from Supabase
-        const { data: membersRaw, error: membersError } = await supabase
+        const { data: membersRaw, error: membersError } = await adminDb
             .from("restaurant_members")
             .select(`
                 id,
@@ -58,9 +86,26 @@ teamRoutes.get("/", async (c) => {
             return c.json({ error: membersError.message }, 500);
         }
 
+        // Include the owner if not already in restaurant_members
+        const ownerInMembers = restaurant?.owner_id && membersRaw.some(m => m.user_id === restaurant.owner_id);
+        const allMembers = ownerInMembers || !restaurant?.owner_id
+            ? membersRaw
+            : [
+                {
+                    id: `owner-${restaurant.owner_id}`,
+                    user_id: restaurant.owner_id,
+                    role: "owner",
+                    status: "active",
+                    created_at: restaurant.created_at,
+                    accepted_at: restaurant.created_at,
+                    invited_by: null,
+                },
+                ...membersRaw,
+            ];
+
         // Enrich with user info from Supabase
-        const userIds = membersRaw.map(m => m.user_id);
-        let membersWithUserInfo = membersRaw.map(m => ({
+        const userIds = allMembers.map(m => m.user_id);
+        let membersWithUserInfo = allMembers.map(m => ({
             id: m.id,
             userId: m.user_id,
             role: m.role,
@@ -75,14 +120,14 @@ teamRoutes.get("/", async (c) => {
         }));
 
         if (userIds.length > 0) {
-            const { data: supabaseUsers, error: usersError } = await supabase
+            const { data: supabaseUsers, error: usersError } = await adminDb
                 .from("users")
                 .select("id, email, full_name, avatar_url, phone")
                 .in("id", userIds);
             
             if (!usersError && supabaseUsers) {
                 const userMap = new Map(supabaseUsers.map(u => [u.id, u]));
-                membersWithUserInfo = membersRaw.map(m => {
+                membersWithUserInfo = allMembers.map(m => {
                     const u = userMap.get(m.user_id);
                     return {
                         id: m.id,
@@ -127,7 +172,7 @@ teamRoutes.post("/invite", async (c) => {
         const auth = await getCallerRole(c, "team:invite");
         if (auth instanceof Response) return auth;
         const { role: callerRole, userId: callerUserId, restaurantId } = auth;
-        const supabase = c.var.supabase;
+        const adminDb = getAdminClient(c);
 
         // Cannot invite someone to a higher or equal role than yours (unless owner)
         if (!canManageRole(callerRole, role as TeamRole)) {
@@ -135,7 +180,7 @@ teamRoutes.post("/invite", async (c) => {
         }
 
         // Find the target user by email in Supabase
-        const { data: targetUser, error: targetError } = await supabase
+        const { data: targetUser, error: targetError } = await adminDb
             .from("users")
             .select("id, email")
             .eq("email", email.toLowerCase().trim())
@@ -149,7 +194,7 @@ teamRoutes.post("/invite", async (c) => {
         }
 
         // Check if already a member
-        const { data: existing, error: existingError } = await supabase
+        const { data: existing, error: existingError } = await adminDb
             .from("restaurant_members")
             .select("*")
             .eq("restaurant_id", restaurantId)
@@ -164,7 +209,7 @@ teamRoutes.post("/invite", async (c) => {
                 return c.json({ error: "Une invitation est déjà en attente pour cet utilisateur" }, 409);
             }
             // If revoked, re-invite by updating
-            await supabase
+            await adminDb
                 .from("restaurant_members")
                 .update({ 
                     role, 
@@ -179,9 +224,9 @@ teamRoutes.post("/invite", async (c) => {
         }
 
         // Create the membership (pending)
-        const memberId = `mbr-${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+        const memberId = crypto.randomUUID();
 
-        const { error: insertError } = await supabase
+        const { error: insertError } = await adminDb
             .from("restaurant_members")
             .insert({
                 id: memberId,
@@ -243,73 +288,82 @@ teamRoutes.post("/create", async (c) => {
             return c.json({ error: "Configuration serveur manquante" }, 500);
         }
 
-        const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY, {
-            auth: { autoRefreshToken: false, persistSession: false },
-        });
+        const supabaseAdmin = getAdminClient(c);
 
-        // Check if user with this email already exists
-        const { data: existingUser } = await c.var.supabase
-            .from("users")
-            .select("id")
-            .eq("email", email.toLowerCase().trim())
-            .maybeSingle();
-
+        const normalizedEmail = email.toLowerCase().trim();
         let targetUserId: string;
 
-        if (existingUser) {
-            targetUserId = existingUser.id;
+        // Check if user already exists in the public users table
+        const { data: existingPublicUser } = await supabaseAdmin
+            .from("users")
+            .select("id")
+            .eq("email", normalizedEmail)
+            .maybeSingle();
 
-            // Check if already a member
-            const { data: existing } = await c.var.supabase
-                .from("restaurant_members")
-                .select("id, status")
-                .eq("restaurant_id", restaurantId)
-                .eq("user_id", targetUserId)
-                .maybeSingle();
-
-            if (existing?.status === "active") {
-                return c.json({ error: "Cet utilisateur est déjà membre de votre restaurant" }, 409);
-            }
-            if (existing?.status === "pending") {
-                return c.json({ error: "Une invitation est déjà en attente pour cet utilisateur" }, 409);
-            }
+        if (existingPublicUser) {
+            // User exists — add them directly without creating a new account
+            targetUserId = existingPublicUser.id;
         } else {
-            // Create the Supabase auth user
+            // Try to create the Supabase auth user
             const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-                email: email.toLowerCase().trim(),
+                email: normalizedEmail,
                 password,
                 email_confirm: true,
                 user_metadata: { full_name: fullName, phone: phone ?? null },
             });
 
-            if (createError || !authData.user) {
-                return c.json({ error: createError?.message ?? "Erreur lors de la création du compte" }, 500);
+            if (createError) {
+                // User may already exist in Auth but not in public.users — look them up
+                if (createError.message?.toLowerCase().includes("already been registered") || createError.message?.toLowerCase().includes("already registered")) {
+                    const { data: authList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+                    const authUser = authList?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+                    if (!authUser) {
+                        return c.json({ error: "Cet email est déjà utilisé mais son compte est inaccessible" }, 409);
+                    }
+                    targetUserId = authUser.id;
+                    // Sync into public.users in case it's missing
+                    await supabaseAdmin.from("users").upsert({
+                        id: targetUserId,
+                        email: normalizedEmail,
+                        full_name: authUser.user_metadata?.full_name ?? fullName,
+                        phone: authUser.user_metadata?.phone ?? phone ?? null,
+                        role: "user",
+                    }, { onConflict: "id" });
+                } else {
+                    return c.json({ error: createError.message ?? "Erreur lors de la création du compte" }, 500);
+                }
+            } else if (!authData.user) {
+                return c.json({ error: "Erreur lors de la création du compte" }, 500);
+            } else {
+                targetUserId = authData.user.id;
+                // Create the users table record
+                await supabaseAdmin.from("users").upsert({
+                    id: targetUserId,
+                    email: normalizedEmail,
+                    full_name: fullName,
+                    phone: phone ?? null,
+                    role: "user",
+                }, { onConflict: "id" });
             }
-
-            targetUserId = authData.user.id;
-
-            // Create the users table record
-            await supabaseAdmin.from("users").upsert({
-                id: targetUserId,
-                email: email.toLowerCase().trim(),
-                full_name: fullName,
-                phone: phone ?? null,
-                role: "user",
-            }, { onConflict: "id" });
         }
 
-        const memberId = `mbr-${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
-
-        // Upsert the membership as directly active
-        const { data: existing } = await c.var.supabase
+        // Check if already a member
+        const { data: existingMembership } = await supabaseAdmin
             .from("restaurant_members")
-            .select("id")
+            .select("id, status")
             .eq("restaurant_id", restaurantId)
             .eq("user_id", targetUserId)
             .maybeSingle();
 
-        if (existing) {
-            await c.var.supabase
+        if (existingMembership?.status === "active") {
+            return c.json({ error: "Cet utilisateur est déjà membre actif de votre restaurant" }, 409);
+        }
+
+        const memberId = crypto.randomUUID();
+
+        // Upsert the membership as directly active (reuse existingMembership query result)
+        if (existingMembership) {
+            await supabaseAdmin
                 .from("restaurant_members")
                 .update({
                     role,
@@ -317,9 +371,9 @@ teamRoutes.post("/create", async (c) => {
                     invited_by: callerUserId,
                     accepted_at: new Date().toISOString(),
                 })
-                .eq("id", existing.id);
+                .eq("id", existingMembership.id);
         } else {
-            const { error: insertError } = await c.var.supabase
+            const { error: insertError } = await supabaseAdmin
                 .from("restaurant_members")
                 .insert({
                     id: memberId,
@@ -337,7 +391,7 @@ teamRoutes.post("/create", async (c) => {
             }
         }
 
-        return c.json({ success: true, memberId: existing?.id ?? memberId });
+        return c.json({ success: true, memberId: existingMembership?.id ?? memberId });
     } catch (error) {
         console.error("POST /team/create error:", error);
         return c.json({ error: "Erreur interne" }, 500);
@@ -359,10 +413,10 @@ teamRoutes.post("/accept", async (c) => {
             return c.json({ error: "memberId requis" }, 400);
         }
 
-        const supabase = c.var.supabase;
+        const adminDb = getAdminClient(c);
 
         // Find the pending membership for this user
-        const { data: membership, error: membershipError } = await supabase
+        const { data: membership, error: membershipError } = await adminDb
             .from("restaurant_members")
             .select("*")
             .eq("id", memberId)
@@ -375,14 +429,14 @@ teamRoutes.post("/accept", async (c) => {
         }
 
         // Accept the invitation
-        await supabase
+        await adminDb
             .from("restaurant_members")
             .update({ status: "active", accepted_at: new Date().toISOString() })
             .eq("id", memberId);
 
         // If role is driver, update the drivers table to link to this restaurant
         if (membership.role === "driver") {
-            await supabase
+            await adminDb
                 .from("drivers")
                 .update({ restaurant_id: membership.restaurant_id })
                 .eq("user_id", userId);
@@ -411,10 +465,10 @@ teamRoutes.patch("/:memberId", async (c) => {
         const auth = await getCallerRole(c, "team:manage_roles");
         if (auth instanceof Response) return auth;
         const { role: callerRole, restaurantId } = auth;
-        const supabase = c.var.supabase;
+        const adminDb = getAdminClient(c);
 
         // Target membership
-        const { data: target, error: targetError } = await supabase
+        const { data: target, error: targetError } = await adminDb
             .from("restaurant_members")
             .select("*")
             .eq("id", memberId)
@@ -434,20 +488,20 @@ teamRoutes.patch("/:memberId", async (c) => {
         }
 
         const oldRole = target.role;
-        await supabase
+        await adminDb
             .from("restaurant_members")
             .update({ role })
             .eq("id", memberId);
 
         // Handle driver table sync
         if (role === "driver") {
-            await supabase
+            await adminDb
                 .from("drivers")
                 .update({ restaurant_id: restaurantId })
                 .eq("user_id", target.user_id);
         } else if (oldRole === "driver") {
             // If they were a driver and now something else, unlink from restaurant
-            await supabase
+            await adminDb
                 .from("drivers")
                 .update({ restaurant_id: null })
                 .eq("user_id", target.user_id);
@@ -470,10 +524,10 @@ teamRoutes.delete("/:memberId", async (c) => {
         const auth = await getCallerRole(c, "team:invite");
         if (auth instanceof Response) return auth;
         const { role: callerRole, restaurantId } = auth;
-        const supabase = c.var.supabase;
+        const adminDb = getAdminClient(c);
 
         // Target membership
-        const { data: target, error: targetError } = await supabase
+        const { data: target, error: targetError } = await adminDb
             .from("restaurant_members")
             .select("*")
             .eq("id", memberId)
@@ -492,14 +546,14 @@ teamRoutes.delete("/:memberId", async (c) => {
             return c.json({ error: "Vous ne pouvez pas révoquer ce membre" }, 403);
         }
 
-        await supabase
+        await adminDb
             .from("restaurant_members")
             .update({ status: "revoked" })
             .eq("id", memberId);
 
         // If they were a driver, unlink from restaurant
         if (target.role === "driver") {
-            await supabase
+            await adminDb
                 .from("drivers")
                 .update({ restaurant_id: null })
                 .eq("user_id", target.user_id);

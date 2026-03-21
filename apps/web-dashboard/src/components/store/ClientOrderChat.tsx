@@ -18,7 +18,7 @@ export function ClientOrderChat({ orderId, restaurantName }: ClientOrderChatProp
   const prevMessagesLen = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { messages, isLoading, isSending, sendMessage, scrollRef } = useChat(orderId);
+  const { messages, isLoading, isSending, sendMessage, scrollRef } = useChat(orderId, currentUserId ?? undefined);
 
   // Fetch current user ID from Supabase session
   useEffect(() => {
