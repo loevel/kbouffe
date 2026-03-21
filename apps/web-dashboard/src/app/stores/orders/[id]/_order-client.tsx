@@ -59,19 +59,41 @@ interface OrderDetail {
     restaurants: { id: string; name: string; slug: string } | null;
 }
 
-// ── Status config ─────────────────────────────────────────────────────────────
-const STATUS_STEPS = [
+// ── Status config (varies by delivery type) ──────────────────────────────────
+type StatusStep = { id: string; label: string; desc: string };
+
+const DELIVERY_STEPS: StatusStep[] = [
     { id: "pending",    label: "Commande reçue",       desc: "Votre commande a été enregistrée" },
     { id: "confirmed",  label: "Confirmée",             desc: "Le restaurant a confirmé votre commande" },
     { id: "preparing",  label: "En préparation",        desc: "Le restaurant prépare vos plats" },
     { id: "ready",      label: "Prête",                 desc: "Votre commande est prête" },
     { id: "delivering", label: "En cours de livraison", desc: "Un livreur est en route" },
     { id: "delivered",  label: "Livrée",                desc: "Commande remise avec succès" },
-] as const;
+];
+
+const PICKUP_STEPS: StatusStep[] = [
+    { id: "pending",   label: "Commande reçue",  desc: "Votre commande a été enregistrée" },
+    { id: "confirmed", label: "Confirmée",        desc: "Le restaurant a confirmé votre commande" },
+    { id: "preparing", label: "En préparation",   desc: "Le restaurant prépare vos plats" },
+    { id: "ready",     label: "Prête à retirer",  desc: "Vous pouvez venir récupérer votre commande" },
+    { id: "delivered", label: "Récupérée",        desc: "Commande récupérée avec succès" },
+];
+
+const DINE_IN_STEPS: StatusStep[] = [
+    { id: "pending",   label: "Commande reçue",  desc: "Votre commande a été enregistrée" },
+    { id: "confirmed", label: "Confirmée",        desc: "Le restaurant a confirmé votre commande" },
+    { id: "preparing", label: "En préparation",   desc: "La cuisine prépare vos plats" },
+    { id: "ready",     label: "Prête",            desc: "Votre commande est prête" },
+    { id: "delivered", label: "Servie",           desc: "Vos plats ont été servis à votre table" },
+];
+
+function getStepsForDeliveryType(deliveryType: string): StatusStep[] {
+    if (deliveryType === "pickup") return PICKUP_STEPS;
+    if (deliveryType === "dine_in") return DINE_IN_STEPS;
+    return DELIVERY_STEPS;
+}
 
 const CANCELLED_STEP = { id: "cancelled", label: "Annulée", desc: "Cette commande a été annulée" };
-
-const STATUS_ORDER = STATUS_STEPS.map((s) => s.id);
 
 const DELIVERY_TYPE_LABELS: Record<string, string> = {
     delivery: "Livraison à domicile",
@@ -86,9 +108,11 @@ const DELIVERY_TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
-function Timeline({ status }: { status: string }) {
+function Timeline({ status, deliveryType }: { status: string; deliveryType: string }) {
+    const steps = getStepsForDeliveryType(deliveryType);
+    const statusOrder = steps.map((s) => s.id);
     const isCancelled = status === "cancelled";
-    const currentIdx  = STATUS_ORDER.indexOf(status as typeof STATUS_ORDER[number]);
+    const currentIdx  = statusOrder.indexOf(status);
 
     if (isCancelled) {
         return (
@@ -104,7 +128,7 @@ function Timeline({ status }: { status: string }) {
 
     return (
         <div>
-            {STATUS_STEPS.map((step, idx) => {
+            {steps.map((step, idx) => {
                 const done   = idx < currentIdx;
                 const active = idx === currentIdx;
                 return (
@@ -119,7 +143,7 @@ function Timeline({ status }: { status: string }) {
                             >
                                 {done ? <CheckCircle2 size={14} /> : active && step.id === "preparing" ? <Loader2 size={14} className="animate-spin" /> : ""}
                             </span>
-                            {idx < STATUS_STEPS.length - 1 && (
+                            {idx < steps.length - 1 && (
                                 <div className={`w-0.5 h-7 mt-1 ${done ? "bg-brand-500" : "bg-surface-100 dark:bg-surface-800"}`} />
                             )}
                         </div>
@@ -187,7 +211,7 @@ function EtaBanner({
             <Clock size={18} className="text-brand-500 shrink-0" />
             <div>
                 <p className="font-semibold text-brand-700 dark:text-brand-300 text-sm">
-                    Livraison estimée à {etaLabel}
+                    Prête vers {etaLabel}
                 </p>
                 {remaining > 0 && (
                     <p className="text-xs text-brand-600/70 dark:text-brand-400">
@@ -327,7 +351,7 @@ export function OrderTrackingClient() {
                         {/* Timeline */}
                         <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
                             <h2 className="font-bold text-surface-900 dark:text-white mb-4">Statut de la commande</h2>
-                            <Timeline status={order.status} />
+                            <Timeline status={order.status} deliveryType={order.delivery_type} />
                         </section>
 
                         {/* Order items */}

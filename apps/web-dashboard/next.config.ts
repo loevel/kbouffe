@@ -15,12 +15,16 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_WORKER_URL ?? "http://localhost:8787"}/api/:path*`,
-      },
-    ];
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      fallback: [
+        {
+          source: "/api/:path*",
+          destination: `${process.env.NEXT_PUBLIC_API_WORKER_URL ?? "http://localhost:8787"}/api/:path*`,
+        },
+      ],
+    };
   },
 };
 

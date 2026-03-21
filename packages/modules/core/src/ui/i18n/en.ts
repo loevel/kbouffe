@@ -69,6 +69,7 @@ export const en: TranslationKeys = {
         reservations: "Reservations",
         customers: "Customers",
         reviews: "Customer Reviews",
+        messages: "Messages",
         finances: "Finances",
         marketing: "Marketing",
         reports: "Reports",
@@ -77,6 +78,7 @@ export const en: TranslationKeys = {
         team: "Team",
         drivers: "Delivery Fleet",
         marketplace: "Marketplace",
+        showcase: "Showcase",
         backToSite: "Back to site",
     },
 

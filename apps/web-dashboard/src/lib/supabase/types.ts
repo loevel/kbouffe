@@ -1431,6 +1431,70 @@ export type Database = {
           },
         ]
       }
+      showcase_sections: {
+        Row: {
+          content: Json | null
+          created_at: string
+          display_order: number
+          id: string
+          is_visible: boolean
+          restaurant_id: string
+          section_type: string
+          settings: Json | null
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          content?: Json | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_visible?: boolean
+          restaurant_id: string
+          section_type: string
+          settings?: Json | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: Json | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_visible?: boolean
+          restaurant_id?: string
+          section_type?: string
+          settings?: Json | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "showcase_sections_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "daily_revenue_stats"
+            referencedColumns: ["restaurant_id"]
+          },
+          {
+            foreignKeyName: "showcase_sections_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurant_stats"
+            referencedColumns: ["restaurant_id"]
+          },
+          {
+            foreignKeyName: "showcase_sections_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock: {
         Row: {
           id: string

@@ -216,6 +216,122 @@ productsRoutes.patch("/:id", async (c) => {
     return c.json({ success: true, product });
 });
 
+// ── Product Image Gallery ──────────────────────────────────────────────────────
+
+/** GET /products/:id/images — List extra images for a product */
+productsRoutes.get("/:id/images", async (c) => {
+    const id = c.req.param("id");
+
+    const { data, error } = await c.var.supabase
+        .from("product_images")
+        .select("id, url, display_order, created_at")
+        .eq("product_id", id)
+        .order("display_order");
+
+    if (error) {
+        return c.json({ error: "Erreur lors de la récupération des images" }, 500);
+    }
+
+    return c.json({ success: true, images: data ?? [] });
+});
+
+/** POST /products/:id/images — Add an extra image to a product */
+productsRoutes.post("/:id/images", async (c) => {
+    const productId = c.req.param("id");
+    const body = await c.req.json<{ url: string; display_order?: number }>();
+
+    if (!body.url) {
+        return c.json({ error: "URL de l'image requise" }, 400);
+    }
+
+    // Verify the product belongs to this restaurant
+    const { data: product } = await c.var.supabase
+        .from("products")
+        .select("id")
+        .eq("id", productId)
+        .eq("restaurant_id", c.var.restaurantId)
+        .single();
+
+    if (!product) {
+        return c.json({ error: "Produit introuvable" }, 404);
+    }
+
+    const { data, error } = await c.var.supabase
+        .from("product_images")
+        .insert({ product_id: productId, url: body.url, display_order: body.display_order ?? 0 })
+        .select("id, url, display_order, created_at")
+        .single();
+
+    if (error || !data) {
+        return c.json({ error: "Erreur lors de l'ajout de l'image" }, 500);
+    }
+
+    return c.json({ success: true, image: data }, 201);
+});
+
+/** PATCH /products/:id/images/:imageId — Update image order */
+productsRoutes.patch("/:id/images/:imageId", async (c) => {
+    const productId = c.req.param("id");
+    const imageId = c.req.param("imageId");
+    const body = await c.req.json<{ display_order: number }>();
+
+    // Verify ownership via product→restaurant
+    const { data: product } = await c.var.supabase
+        .from("products")
+        .select("id")
+        .eq("id", productId)
+        .eq("restaurant_id", c.var.restaurantId)
+        .single();
+
+    if (!product) {
+        return c.json({ error: "Produit introuvable" }, 404);
+    }
+
+    const { data, error } = await c.var.supabase
+        .from("product_images")
+        .update({ display_order: body.display_order })
+        .eq("id", imageId)
+        .eq("product_id", productId)
+        .select("id, url, display_order")
+        .single();
+
+    if (error || !data) {
+        return c.json({ error: "Erreur lors de la mise à jour" }, 500);
+    }
+
+    return c.json({ success: true, image: data });
+});
+
+/** DELETE /products/:id/images/:imageId — Remove an extra image */
+productsRoutes.delete("/:id/images/:imageId", async (c) => {
+    const productId = c.req.param("id");
+    const imageId = c.req.param("imageId");
+
+    // Verify ownership
+    const { data: product } = await c.var.supabase
+        .from("products")
+        .select("id")
+        .eq("id", productId)
+        .eq("restaurant_id", c.var.restaurantId)
+        .single();
+
+    if (!product) {
+        return c.json({ error: "Produit introuvable" }, 404);
+    }
+
+    const { error } = await c.var.supabase
+        .from("product_images")
+        .delete()
+        .eq("id", imageId)
+        .eq("product_id", productId);
+
+    if (error) {
+        return c.json({ error: "Erreur lors de la suppression" }, 500);
+    }
+
+    return c.json({ success: true });
+});
+
 /** DELETE /products/:id */
 productsRoutes.delete("/:id", async (c) => {
     const id = c.req.param("id");

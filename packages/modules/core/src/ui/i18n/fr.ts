@@ -67,6 +67,7 @@ export const fr = {
         reservations: "Reservations",
         customers: "Clients",
         reviews: "Avis clients",
+        messages: "Messages",
         finances: "Finances",
         marketing: "Marketing",
         reports: "Rapports",
@@ -75,6 +76,7 @@ export const fr = {
         team: "Equipe",
         drivers: "Flotte de Livreurs",
         marketplace: "Marketplace",
+        showcase: "Vitrine",
         backToSite: "Retour au site",
     },
 

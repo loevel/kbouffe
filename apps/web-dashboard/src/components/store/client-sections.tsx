@@ -26,6 +26,7 @@ import { ProfilePanelReal }   from "./ProfilePanelReal";
 import { AddressesPanelReal } from "./AddressesPanelReal";
 import { PreferencesPanelReal } from "./PreferencesPanelReal";
 import { ClientNotificationsPanel } from "./ClientNotificationsPanel";
+import { SupportPanelReal } from "./SupportPanelReal";
 
 function PanelShell({
     title,
@@ -279,23 +280,7 @@ export function PromotionsPanel() {
 
 
 export function SupportPanel() {
-    return (
-        <PanelShell title="Aide & support" subtitle="Besoin d’aide sur une commande ou votre compte ?">
-            <div className="space-y-3">
-                <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700">
-                    <p className="font-semibold text-surface-900 dark:text-white">Centre d’aide</p>
-                    <p className="text-sm text-surface-500 dark:text-surface-400">FAQ, remboursements, suivi des livraisons.</p>
-                </div>
-                <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700">
-                    <p className="font-semibold text-surface-900 dark:text-white">Contacter le support</p>
-                    <p className="text-sm text-surface-500 dark:text-surface-400">Disponible 7j/7 de 8h à 22h.</p>
-                </div>
-                <button className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors">
-                    Ouvrir une demande
-                </button>
-            </div>
-        </PanelShell>
-    );
+    return <SupportPanelReal />;
 }
 
 

@@ -4,6 +4,7 @@ import { Hero } from "@/components/landing/Hero";
 import { MarketSegments } from "@/components/landing/MarketSegments";
 import { ForWho } from "@/components/landing/ForWho";
 import { Features } from "@/components/landing/Features";
+import { RemoteDineIn } from "@/components/landing/RemoteDineIn";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { PricingTeaser } from "@/components/landing/PricingTeaser";
 import { Restaurants } from "@/components/landing/Restaurants";
@@ -20,6 +21,7 @@ export default function Home() {
         <MarketSegments />
         <ForWho />
         <Features />
+        <RemoteDineIn />
         <HowItWorks />
         <PricingTeaser />
         <Restaurants />

@@ -126,6 +126,7 @@ export interface MobileProduct {
     category_id: string | null;
     category?: string;
     image?: string;
+    images?: string[];
     sort_order: number;
     // Health and dietary info
     allergens?: string | null;
@@ -144,7 +145,9 @@ export interface MobileReview {
     id: string;
     rating: number;
     comment: string | null;
+    response: string | null;
     created_at: string;
+    customerName?: string;
 }
 
 // ── /api/stores ───────────────────────────────────────────────────────────────
@@ -296,6 +299,7 @@ export async function getStore(slug: string): Promise<StoreDetail> {
             ...p,
             category: data.categories.find((c) => c.id === p.category_id)?.name,
             image: p.image_url ?? undefined,
+            images: p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []),
         })),
         reviews: data.reviews ?? [],
     };
@@ -554,6 +558,34 @@ export async function getProductReviews(productId: string): Promise<{ reviews: P
 
 export async function submitProductReview(params: { productId: string; restaurantId: string; rating: number; comment?: string }): Promise<{ success: boolean }> {
     return apiFetch<{ success: boolean }>('/api/reviews/product', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+
+// ── Restaurant Reviews ──────────────────────────────────────────────
+
+export interface RestaurantReview {
+    id: string;
+    rating: number;
+    comment: string | null;
+    response: string | null;
+    customerName: string;
+    created_at: string;
+}
+
+export interface RestaurantReviewStats {
+    count: number;
+    average: number;
+    distribution: Record<number, number>;
+}
+
+export async function getRestaurantReviews(restaurantId: string): Promise<{ reviews: RestaurantReview[]; stats: RestaurantReviewStats }> {
+    return apiFetch<{ reviews: RestaurantReview[]; stats: RestaurantReviewStats }>(`/api/store/restaurants/${encodeURIComponent(restaurantId)}/reviews`);
+}
+
+export async function submitRestaurantReview(params: { restaurantId: string; rating: number; comment?: string }): Promise<{ success: boolean; review: MobileReview }> {
+    return apiFetch<{ success: boolean; review: MobileReview }>('/api/reviews', {
         method: 'POST',
         body: JSON.stringify(params),
     });

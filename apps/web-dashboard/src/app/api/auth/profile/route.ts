@@ -14,9 +14,9 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { name, phone } = body;
+        const { name, phone, avatarUrl } = body;
 
-        if (!name && !phone) {
+        if (!name && !phone && !avatarUrl) {
             return NextResponse.json({ error: "Aucune donnée à mettre à jour" }, { status: 400 });
         }
 
@@ -25,7 +25,8 @@ export async function PATCH(request: NextRequest) {
             data: { 
                 full_name: name || user.user_metadata.full_name,
                 name: name || user.user_metadata.name,
-                phone: phone || user.user_metadata.phone
+                phone: phone || user.user_metadata.phone,
+                avatar_url: avatarUrl || user.user_metadata.avatar_url
             }
         });
 
@@ -40,6 +41,7 @@ export async function PATCH(request: NextRequest) {
             .update({
                 full_name: name || user.user_metadata.full_name,
                 phone: phone || user.user_metadata.phone,
+                avatar_url: avatarUrl || user.user_metadata.avatar_url,
                 updated_at: new Date().toISOString()
             })
             .eq("id", user.id);

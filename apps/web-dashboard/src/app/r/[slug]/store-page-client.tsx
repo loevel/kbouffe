@@ -22,6 +22,10 @@ import {
     Minus,
     Send,
     MessageSquare,
+    ChevronLeft,
+    ChevronRight,
+    ImagePlus,
+    Maximize2,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
@@ -68,6 +72,7 @@ interface Product {
     price: number;
     compare_at_price: number | null;
     image_url: string | null;
+    images?: string[];
     is_available: boolean;
     category_id: string | null;
     sort_order: number;
@@ -186,6 +191,12 @@ function ProductCard({
                         </div>
                     )}
                 </div>
+                {(product.images?.length ?? 0) > 1 && (
+                    <div className="absolute bottom-1 right-1 flex items-center gap-0.5 px-1.5 py-0.5 bg-black/60 text-white text-[10px] font-bold rounded-full">
+                        <ImagePlus size={10} />
+                        {product.images!.length}
+                    </div>
+                )}
             </div>
         </motion.div>
     );
@@ -227,6 +238,13 @@ function ProductDetailModal({
     const [submitted, setSubmitted] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
 
+    // Image carousel
+    const allImages = product.images && product.images.length > 0
+        ? product.images
+        : product.image_url ? [product.image_url] : [];
+    const [activeImg, setActiveImg] = useState(0);
+    const [fullscreen, setFullscreen] = useState(false);
+
     useEffect(() => {
         fetch(`/api/store/products/${product.id}/reviews`)
             .then((r) => r.json())
@@ -238,12 +256,18 @@ function ProductDetailModal({
             .finally(() => setLoadingReviews(false));
     }, [product.id]);
 
-    // Close on Escape
+    // Close on Escape + arrow key navigation
     useEffect(() => {
-        const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "Escape") { if (fullscreen) setFullscreen(false); else onClose(); }
+            if (allImages.length > 1) {
+                if (e.key === "ArrowLeft") setActiveImg((prev) => (prev - 1 + allImages.length) % allImages.length);
+                if (e.key === "ArrowRight") setActiveImg((prev) => (prev + 1) % allImages.length);
+            }
+        };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [onClose]);
+    }, [onClose, fullscreen, allImages.length]);
 
     const handleSubmitReview = async () => {
         if (rating < 1) return;
@@ -303,10 +327,51 @@ function ProductDetailModal({
                     onClick={(e) => e.stopPropagation()}
                     className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
                 >
-                    {/* Header image */}
-                    <div className="relative h-48 sm:h-56 bg-surface-100 dark:bg-surface-800 shrink-0">
-                        {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    {/* Header image carousel */}
+                    <div className="relative h-56 sm:h-72 bg-surface-100 dark:bg-surface-800 shrink-0 overflow-hidden">
+                        {allImages.length > 0 ? (
+                            <>
+                                <AnimatePresence mode="wait">
+                                    <motion.img
+                                        key={activeImg}
+                                        initial={{ opacity: 0, scale: 1.02 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.25 }}
+                                        src={allImages[activeImg]}
+                                        alt={`${product.name} — photo ${activeImg + 1}`}
+                                        className="w-full h-full object-cover cursor-zoom-in"
+                                        onClick={() => setFullscreen(true)}
+                                    />
+                                </AnimatePresence>
+                                {allImages.length > 1 && (
+                                    <>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setActiveImg((activeImg - 1 + allImages.length) % allImages.length); }}
+                                            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors backdrop-blur-sm"
+                                        >
+                                            <ChevronLeft size={20} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setActiveImg((activeImg + 1) % allImages.length); }}
+                                            className="absolute right-12 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors backdrop-blur-sm"
+                                        >
+                                            <ChevronRight size={20} />
+                                        </button>
+                                        <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-bold rounded-full">
+                                            {activeImg + 1} / {allImages.length}
+                                        </div>
+                                    </>
+                                )}
+                                {/* Fullscreen button */}
+                                <button
+                                    onClick={() => setFullscreen(true)}
+                                    className="absolute bottom-3 right-3 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors backdrop-blur-sm"
+                                    title="Plein écran"
+                                >
+                                    <Maximize2 size={16} />
+                                </button>
+                            </>
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
                                 <ChefHat size={48} className="text-surface-300 dark:text-surface-600" />
@@ -327,6 +392,25 @@ function ProductDetailModal({
                             </div>
                         )}
                     </div>
+
+                    {/* Thumbnail strip */}
+                    {allImages.length > 1 && (
+                        <div className="flex gap-1.5 px-4 py-2.5 bg-surface-50 dark:bg-surface-800/60 border-b border-surface-100 dark:border-surface-800 overflow-x-auto shrink-0">
+                            {allImages.map((src, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setActiveImg(i)}
+                                    className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                                        i === activeImg
+                                            ? "border-brand-500 shadow-md ring-1 ring-brand-500/30"
+                                            : "border-transparent opacity-60 hover:opacity-100"
+                                    }`}
+                                >
+                                    <img src={src} alt="" className="w-full h-full object-cover" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Scrollable content */}
                     <div className="flex-1 overflow-y-auto">
@@ -469,6 +553,84 @@ function ProductDetailModal({
                     </div>
                 </motion.div>
             </motion.div>
+
+            {/* ── Fullscreen lightbox ── */}
+            {fullscreen && allImages.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
+                    onClick={() => setFullscreen(false)}
+                >
+                    {/* Close */}
+                    <button
+                        onClick={() => setFullscreen(false)}
+                        className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-10"
+                    >
+                        <X size={24} />
+                    </button>
+
+                    {/* Counter */}
+                    {allImages.length > 1 && (
+                        <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/10 backdrop-blur-sm text-white text-sm font-bold rounded-full">
+                            {activeImg + 1} / {allImages.length}
+                        </div>
+                    )}
+
+                    {/* Main image */}
+                    <AnimatePresence mode="wait">
+                        <motion.img
+                            key={activeImg}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.2 }}
+                            src={allImages[activeImg]}
+                            alt={`${product.name} — photo ${activeImg + 1}`}
+                            className="max-w-[90vw] max-h-[80vh] object-contain select-none"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </AnimatePresence>
+
+                    {/* Prev / Next */}
+                    {allImages.length > 1 && (
+                        <>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setActiveImg((activeImg - 1 + allImages.length) % allImages.length); }}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
+                            >
+                                <ChevronLeft size={28} />
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setActiveImg((activeImg + 1) % allImages.length); }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
+                            >
+                                <ChevronRight size={28} />
+                            </button>
+                        </>
+                    )}
+
+                    {/* Thumbnail strip */}
+                    {allImages.length > 1 && (
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-xl" onClick={(e) => e.stopPropagation()}>
+                            {allImages.map((src, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setActiveImg(i)}
+                                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                                        i === activeImg
+                                            ? "border-white shadow-lg scale-105"
+                                            : "border-transparent opacity-50 hover:opacity-80"
+                                    }`}
+                                >
+                                    <img src={src} alt="" className="w-full h-full object-cover" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </motion.div>
+            )}
         </AnimatePresence>
     );
 }
@@ -516,7 +678,7 @@ export function StorePageClient({ slug }: { slug: string }) {
     }, [slug]);
 
     useEffect(() => {
-        if (!data?.categories.length) return;
+        if (!data?.categories?.length) return;
         const observers: IntersectionObserver[] = [];
         data.categories.forEach((cat) => {
             const el = sectionRefs.current[cat.id];

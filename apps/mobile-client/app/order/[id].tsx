@@ -7,13 +7,38 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSupport } from '@/contexts/support-context';
 
-const statusSteps: { status: MobileOrderStatus; label: string; icon: string }[] = [
+type StatusStepDef = { status: MobileOrderStatus; label: string; icon: string };
+
+const deliverySteps: StatusStepDef[] = [
     { status: 'pending', label: 'En attente', icon: 'hourglass-outline' },
     { status: 'accepted', label: 'Acceptée', icon: 'checkmark-circle-outline' },
     { status: 'preparing', label: 'En préparation', icon: 'flame-outline' },
     { status: 'ready', label: 'Prête', icon: 'bag-check-outline' },
+    { status: 'delivering', label: 'En livraison', icon: 'bicycle-outline' },
     { status: 'completed', label: 'Livrée', icon: 'home-outline' },
 ];
+
+const pickupSteps: StatusStepDef[] = [
+    { status: 'pending', label: 'En attente', icon: 'hourglass-outline' },
+    { status: 'accepted', label: 'Acceptée', icon: 'checkmark-circle-outline' },
+    { status: 'preparing', label: 'En préparation', icon: 'flame-outline' },
+    { status: 'ready', label: 'Prête à retirer', icon: 'bag-check-outline' },
+    { status: 'completed', label: 'Récupérée', icon: 'checkmark-done-outline' },
+];
+
+const dineInSteps: StatusStepDef[] = [
+    { status: 'pending', label: 'En attente', icon: 'hourglass-outline' },
+    { status: 'accepted', label: 'Acceptée', icon: 'checkmark-circle-outline' },
+    { status: 'preparing', label: 'En préparation', icon: 'flame-outline' },
+    { status: 'ready', label: 'Prête', icon: 'bag-check-outline' },
+    { status: 'completed', label: 'Servie', icon: 'restaurant-outline' },
+];
+
+function getStepsForType(deliveryType: string): StatusStepDef[] {
+    if (deliveryType === 'pickup') return pickupSteps;
+    if (deliveryType === 'dine_in') return dineInSteps;
+    return deliverySteps;
+}
 
 const supportStatusLabel = {
     open: 'Ouvert',
@@ -29,13 +54,24 @@ const supportTypeLabel = {
     refund: 'Remboursement',
 } as const;
 
-const statusIndex: Partial<Record<MobileOrderStatus, number>> = {
+const deliveryStatusIndex: Partial<Record<MobileOrderStatus, number>> = {
     pending: 0,
     confirmed: 0,
     accepted: 1,
     preparing: 2,
     ready: 3,
     delivering: 4,
+    delivered: 5,
+    completed: 5,
+    cancelled: -1,
+};
+
+const shortStatusIndex: Partial<Record<MobileOrderStatus, number>> = {
+    pending: 0,
+    confirmed: 0,
+    accepted: 1,
+    preparing: 2,
+    ready: 3,
     delivered: 4,
     completed: 4,
     cancelled: -1,
@@ -64,7 +100,9 @@ export default function OrderTrackingScreen() {
         );
     }
 
-    const currentStepIndex = statusIndex[order.status] ?? 0;
+    const activeSteps = getStepsForType(order.deliveryType);
+    const idxMap = order.deliveryType === 'delivery' ? deliveryStatusIndex : shortStatusIndex;
+    const currentStepIndex = idxMap[order.status] ?? 0;
     const isCancelled = order.status === 'cancelled';
     const relatedTickets = getTicketsByOrderId(order.id);
 
@@ -98,7 +136,7 @@ export default function OrderTrackingScreen() {
                     </View>
                 ) : (
                     <View style={styles.timeline}>
-                        {statusSteps.map((step, index) => {
+                        {activeSteps.map((step, index) => {
                             const isDone = index <= currentStepIndex;
                             const isCurrent = index === currentStepIndex;
                             const color = isDone ? theme.primary : theme.border;
@@ -113,7 +151,7 @@ export default function OrderTrackingScreen() {
                                         ]}>
                                             {isDone && <Ionicons name="checkmark" size={14} color="#fff" />}
                                         </View>
-                                        {index < statusSteps.length - 1 && (
+                                        {index < activeSteps.length - 1 && (
                                             <View style={[styles.timelineLine, { backgroundColor: index < currentStepIndex ? theme.primary : theme.border }]} />
                                         )}
                                     </View>
@@ -127,7 +165,7 @@ export default function OrderTrackingScreen() {
                                     </View>
                                 </View>
                             );
-                        })}
+                        })}}
                     </View>
                 )}
 
