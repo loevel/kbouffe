@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { StyleSheet, View, Text, Image, ScrollView, Pressable } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, Text, Image, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '@/contexts/cart-context';
@@ -8,6 +8,7 @@ import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoyalty } from '@/contexts/loyalty-context';
+import { getProductReviews, submitProductReview, type ProductReview, type ProductReviewStats } from '@/lib/api';
 
 export default function ProductModal() {
     const { productId, restaurantId } = useLocalSearchParams<{ productId: string; restaurantId: string }>();
@@ -24,6 +25,51 @@ export default function ProductModal() {
 
     const [quantity, setQuantity] = useState(1);
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+
+    // Product reviews state
+    const [reviews, setReviews] = useState<ProductReview[]>([]);
+    const [reviewStats, setReviewStats] = useState<ProductReviewStats>({ count: 0, average: 0 });
+    const [loadingReviews, setLoadingReviews] = useState(true);
+    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewComment, setReviewComment] = useState('');
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [reviewSubmitted, setReviewSubmitted] = useState(false);
+
+    const loadReviews = useCallback(async () => {
+        if (!productId) return;
+        try {
+            const data = await getProductReviews(productId);
+            setReviews(data.reviews ?? []);
+            setReviewStats(data.stats ?? { count: 0, average: 0 });
+        } catch {
+            // ignore
+        } finally {
+            setLoadingReviews(false);
+        }
+    }, [productId]);
+
+    useEffect(() => { loadReviews(); }, [loadReviews]);
+
+    const handleSubmitReview = async () => {
+        if (!productId || !restaurantId || reviewRating < 1) return;
+        setSubmittingReview(true);
+        try {
+            const res = await submitProductReview({
+                productId,
+                restaurantId,
+                rating: reviewRating,
+                comment: reviewComment.trim() || undefined,
+            });
+            if (res.success) {
+                setReviewSubmitted(true);
+                loadReviews();
+            }
+        } catch (err: any) {
+            Alert.alert('Erreur', err?.message ?? "Impossible d'envoyer votre avis. Vérifiez votre connexion.");
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
 
     if (!product || !restaurant) {
         return (
@@ -189,6 +235,102 @@ export default function ProductModal() {
                             Les informations sur les allergènes et les régimes alimentaires sont fournies par le restaurant. Kbouffe décline toute responsabilité en cas d'imprécision.
                         </Text>
                     </View>
+
+                    {/* Product Reviews */}
+                    <View style={[styles.reviewsSection, { borderTopColor: theme.border }]}>
+                        <View style={styles.reviewsHeader}>
+                            <Text style={[styles.optionTitle, { color: theme.text }]}>
+                                Avis ({reviewStats.count})
+                            </Text>
+                            {reviewStats.count > 0 && (
+                                <View style={styles.ratingBadge}>
+                                    <Ionicons name="star" size={14} color="#f59e0b" />
+                                    <Text style={styles.ratingBadgeText}>{reviewStats.average.toFixed(1)}</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Submit review */}
+                        {!reviewSubmitted ? (
+                            <View style={[styles.reviewForm, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                                <Text style={[styles.reviewFormLabel, { color: theme.text }]}>Donner votre avis</Text>
+                                <View style={styles.starsRow}>
+                                    {[1, 2, 3, 4, 5].map((s) => (
+                                        <Pressable key={s} onPress={() => setReviewRating(s)} hitSlop={4}>
+                                            <Ionicons
+                                                name={s <= reviewRating ? 'star' : 'star-outline'}
+                                                size={28}
+                                                color={s <= reviewRating ? '#f59e0b' : theme.icon}
+                                            />
+                                        </Pressable>
+                                    ))}
+                                </View>
+                                <TextInput
+                                    value={reviewComment}
+                                    onChangeText={setReviewComment}
+                                    placeholder="Partagez votre expérience (optionnel)..."
+                                    placeholderTextColor={theme.icon}
+                                    multiline
+                                    style={[styles.reviewInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                                />
+                                <Pressable
+                                    style={[styles.reviewSubmitButton, { backgroundColor: theme.primary, opacity: submittingReview ? 0.6 : 1 }]}
+                                    onPress={handleSubmitReview}
+                                    disabled={submittingReview}
+                                >
+                                    <Ionicons name="send" size={16} color="#fff" />
+                                    <Text style={styles.reviewSubmitText}>{submittingReview ? 'Envoi...' : 'Envoyer'}</Text>
+                                </Pressable>
+                            </View>
+                        ) : (
+                            <View style={[styles.reviewSuccessBox, { borderColor: '#86efac' }]}>
+                                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                                <Text style={styles.reviewSuccessText}>Merci pour votre avis !</Text>
+                            </View>
+                        )}
+
+                        {/* Reviews list */}
+                        {loadingReviews ? (
+                            <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: Spacing.lg }} />
+                        ) : reviews.length === 0 ? (
+                            <Text style={[styles.noReviewsText, { color: theme.icon }]}>
+                                Aucun avis pour ce produit. Soyez le premier !
+                            </Text>
+                        ) : (
+                            <View style={styles.reviewsList}>
+                                {reviews.map((review) => (
+                                    <View key={review.id} style={[styles.reviewCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                                        <View style={styles.reviewCardHeader}>
+                                            <View style={[styles.reviewAvatar, { backgroundColor: theme.primary + '20' }]}>
+                                                <Text style={[styles.reviewAvatarText, { color: theme.primary }]}>
+                                                    {review.customerName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.reviewName, { color: theme.text }]}>{review.customerName}</Text>
+                                                <View style={styles.reviewStarsRow}>
+                                                    {Array.from({ length: 5 }).map((_, i) => (
+                                                        <Ionicons
+                                                            key={i}
+                                                            name={i < review.rating ? 'star' : 'star-outline'}
+                                                            size={12}
+                                                            color={i < review.rating ? '#f59e0b' : theme.icon}
+                                                        />
+                                                    ))}
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.reviewDate, { color: theme.icon }]}>
+                                                {new Date(review.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                            </Text>
+                                        </View>
+                                        {review.comment && (
+                                            <Text style={[styles.reviewComment, { color: theme.text }]}>{review.comment}</Text>
+                                        )}
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
                 </View>
             </ScrollView>
 
@@ -338,5 +480,134 @@ const styles = StyleSheet.create({
         ...Typography.small,
         flex: 1,
         lineHeight: 18,
+    },
+    // Reviews styles
+    reviewsSection: {
+        marginTop: Spacing.lg,
+        paddingTop: Spacing.lg,
+        borderTopWidth: 1,
+    },
+    reviewsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.md,
+    },
+    ratingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#fef3c7',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 4,
+        borderRadius: Radii.full,
+    },
+    ratingBadgeText: {
+        ...Typography.caption,
+        fontWeight: '700',
+        color: '#92400e',
+    },
+    reviewForm: {
+        padding: Spacing.md,
+        borderRadius: Radii.md,
+        borderWidth: 1,
+        marginBottom: Spacing.md,
+    },
+    reviewFormLabel: {
+        ...Typography.caption,
+        fontWeight: '600',
+        marginBottom: Spacing.sm,
+    },
+    starsRow: {
+        flexDirection: 'row',
+        gap: Spacing.xs,
+        marginBottom: Spacing.md,
+    },
+    reviewInput: {
+        minHeight: 80,
+        borderWidth: 1,
+        borderRadius: Radii.md,
+        padding: Spacing.md,
+        ...Typography.body,
+        textAlignVertical: 'top',
+        marginBottom: Spacing.sm,
+    },
+    reviewSubmitButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.xs,
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.md,
+        borderRadius: Radii.full,
+        alignSelf: 'flex-start',
+    },
+    reviewSubmitText: {
+        color: '#fff',
+        ...Typography.caption,
+        fontWeight: '700',
+    },
+    reviewSuccessBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        padding: Spacing.md,
+        borderRadius: Radii.md,
+        borderWidth: 1,
+        backgroundColor: '#f0fdf4',
+        marginBottom: Spacing.md,
+    },
+    reviewSuccessText: {
+        ...Typography.caption,
+        fontWeight: '600',
+        color: '#16a34a',
+    },
+    noReviewsText: {
+        ...Typography.caption,
+        textAlign: 'center',
+        paddingVertical: Spacing.lg,
+    },
+    reviewsList: {
+        gap: Spacing.sm,
+    },
+    reviewCard: {
+        padding: Spacing.md,
+        borderRadius: Radii.md,
+        borderWidth: 1,
+        marginBottom: Spacing.sm,
+    },
+    reviewCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginBottom: Spacing.xs,
+    },
+    reviewAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reviewAvatarText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    reviewName: {
+        ...Typography.caption,
+        fontWeight: '600',
+    },
+    reviewStarsRow: {
+        flexDirection: 'row',
+        gap: 2,
+        marginTop: 2,
+    },
+    reviewDate: {
+        ...Typography.small,
+    },
+    reviewComment: {
+        ...Typography.caption,
+        lineHeight: 20,
+        marginTop: Spacing.xs,
     },
 });

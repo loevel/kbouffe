@@ -99,6 +99,49 @@ adminRestaurantsRoutes.get("/:id", async (c) => {
 
     if (error || !restaurant) return c.json({ error: "Restaurant introuvable" }, 404);
 
+    // Compute live stats from source tables
+    const [ordersResult, reviewsResult, favoritesResult] = await Promise.all([
+        supabase
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("restaurant_id", id)
+            .not("status", "eq", "cancelled"),
+        supabase
+            .from("reviews")
+            .select("rating")
+            .eq("restaurant_id", id),
+        supabase
+            .from("restaurant_favorites")
+            .select("id", { count: "exact", head: true })
+            .eq("restaurant_id", id),
+    ]);
+
+    const orderCount = ordersResult.count ?? 0;
+    const reviews = reviewsResult.data ?? [];
+    const reviewCount = reviews.length;
+    const rating = reviewCount > 0
+        ? Math.round((reviews.reduce((sum, r) => sum + (r.rating ?? 0), 0) / reviewCount) * 10) / 10
+        : 0;
+    const favoritesCount = favoritesResult.count ?? 0;
+
+    // Fetch owner info
+    let owner = null;
+    if (restaurant.owner_id) {
+        const { data: ownerData } = await supabase
+            .from("users")
+            .select("id, email, full_name, phone")
+            .eq("id", restaurant.owner_id)
+            .maybeSingle();
+        if (ownerData) {
+            owner = {
+                id: ownerData.id,
+                email: ownerData.email,
+                fullName: ownerData.full_name,
+                phone: ownerData.phone,
+            };
+        }
+    }
+
     return c.json({
         id: restaurant.id,
         name: restaurant.name,
@@ -123,11 +166,16 @@ adminRestaurantsRoutes.get("/:id", async (c) => {
         kycRejectionReason: restaurant.kyc_rejection_reason,
         kycSubmittedAt: restaurant.kyc_submitted_at,
         cuisineType: restaurant.cuisine_type,
-        rating: restaurant.rating,
-        reviewCount: restaurant.review_count,
-        orderCount: restaurant.order_count,
+        rating,
+        reviewCount,
+        orderCount,
+        favoritesCount,
+        owner,
         createdAt: restaurant.created_at,
         updatedAt: restaurant.updated_at,
+        lat: restaurant.lat,
+        lng: restaurant.lng,
+        priceRange: restaurant.price_range,
     });
 });
 

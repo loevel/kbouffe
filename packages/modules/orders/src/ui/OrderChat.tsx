@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Send, Image as ImageIcon, Loader2, User, UserCheck } from "lucide-react";
+import { Send, Image as ImageIcon, Loader2, User, Store } from "lucide-react";
 import { Card, Button, Input, Badge, toast } from "@kbouffe/module-core/ui";
 import { useChat, type Message } from "../hooks/use-chat";
 import { formatDateTime } from "@kbouffe/module-core/ui";
@@ -16,7 +16,7 @@ interface OrderChatProps {
 export function OrderChat({ orderId, customerName }: OrderChatProps) {
     const { t } = useLocale();
     const { user } = useDashboard();
-    const { messages, isLoading, isSending, sendMessage, uploadImage, scrollRef } = useChat(orderId);
+    const { messages, isLoading, isSending, sendMessage, uploadImage, scrollRef } = useChat(orderId, user?.id);
     const [input, setInput] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,7 +72,7 @@ export function OrderChat({ orderId, customerName }: OrderChatProps) {
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-6">
                         <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-surface-400 mb-3">
-                            <UserCheck size={24} />
+                            <User size={24} />
                         </div>
                         <p className="text-sm text-surface-500">Commencez la discussion avec le client.</p>
                     </div>
@@ -81,23 +81,45 @@ export function OrderChat({ orderId, customerName }: OrderChatProps) {
                         const isMe = message.senderId === user?.id; 
                         return (
                             <div key={message.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                                    isMe 
-                                        ? "bg-brand-600 text-white rounded-tr-none" 
-                                        : "bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-100 rounded-tl-none"
-                                }`}>
-                                    {message.type === "image" ? (
-                                        <div className="space-y-1">
-                                            <img src={message.attachmentUrl} alt="Chat attachment" className="rounded-lg max-w-full h-auto" />
-                                            <p className="text-xs opacity-70 italic">Image</p>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                    )}
-                                    <p className={`text-[10px] mt-1 ${isMe ? "text-brand-100 text-right" : "text-surface-500"}`}>
-                                        {formatDateTime(message.createdAt)}
+                                {/* Client avatar */}
+                                {!isMe && (
+                                    <div className="w-7 h-7 rounded-full bg-surface-200 dark:bg-surface-700 flex items-center justify-center shrink-0 mr-2 mt-1">
+                                        <User size={13} className="text-surface-500" />
+                                    </div>
+                                )}
+                                <div className={`max-w-[75%] ${isMe ? "items-end" : "items-start"}`}>
+                                    {/* Sender label */}
+                                    <p className={`text-[10px] font-semibold mb-0.5 px-1 ${
+                                        isMe 
+                                            ? "text-right text-brand-600 dark:text-brand-400" 
+                                            : "text-surface-400 dark:text-surface-500"
+                                    }`}>
+                                        {isMe ? "Vous (Restaurant)" : customerName}
                                     </p>
+                                    <div className={`rounded-2xl px-4 py-2 ${
+                                        isMe 
+                                            ? "bg-brand-600 text-white rounded-tr-sm" 
+                                            : "bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-100 rounded-tl-sm"
+                                    }`}>
+                                        {message.type === "image" ? (
+                                            <div className="space-y-1">
+                                                <img src={message.attachmentUrl} alt="Chat attachment" className="rounded-lg max-w-full h-auto" />
+                                                <p className="text-xs opacity-70 italic">Image</p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm whitespace-pre-wrap leading-snug">{message.content}</p>
+                                        )}
+                                        <p className={`text-[10px] mt-1 ${isMe ? "text-brand-200 text-right" : "text-surface-400"}`}>
+                                            {formatDateTime(message.createdAt)}
+                                        </p>
+                                    </div>
                                 </div>
+                                {/* Restaurant avatar */}
+                                {isMe && (
+                                    <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center shrink-0 ml-2 mt-1">
+                                        <Store size={13} className="text-brand-600 dark:text-brand-400" />
+                                    </div>
+                                )}
                             </div>
                         );
                     })

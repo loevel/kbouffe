@@ -1,40 +1,75 @@
-import { useMemo, useState } from 'react';
-import { StyleSheet, View, Text, Pressable, TextInput, ScrollView, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, Pressable, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MOCK_ORDERS, MOCK_RESTAURANTS, MOCK_REVIEWS } from '@/data/mocks';
+import { submitReview, trackOrder, type OrderTracking } from '@/lib/api';
 
 export default function ReviewOrderScreen() {
     const router = useRouter();
-    const { orderId, restaurantId } = useLocalSearchParams<{ orderId: string; restaurantId?: string }>();
+    const { orderId, restaurantId, restaurantName } = useLocalSearchParams<{
+        orderId: string;
+        restaurantId?: string;
+        restaurantName?: string;
+    }>();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
 
-    const order = useMemo(() => MOCK_ORDERS.find(o => o.id === orderId), [orderId]);
-    const restId = restaurantId ?? order?.restaurantId;
-    const restaurant = useMemo(() => MOCK_RESTAURANTS.find(r => r.id === restId), [restId]);
-    const existing = useMemo(() => MOCK_REVIEWS.find(r => r.orderId === orderId), [orderId]);
-
-    const [rating, setRating] = useState(existing?.rating ?? 5);
-    const [comment, setComment] = useState(existing?.comment ?? '');
+    const [order, setOrder] = useState<OrderTracking | null>(null);
+    const [loadingOrder, setLoadingOrder] = useState(!!orderId);
+    const [rating, setRating] = useState(5);
+    const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const resolvedRestaurantId = restaurantId ?? order?.restaurant_id;
+    const resolvedRestaurantName = restaurantName ?? order?.restaurant_name ?? 'Restaurant';
+
+    useEffect(() => {
+        if (orderId) {
+            trackOrder(orderId)
+                .then(setOrder)
+                .catch(() => {})
+                .finally(() => setLoadingOrder(false));
+        }
+    }, [orderId]);
 
     const handleSubmit = async () => {
         if (rating < 1) {
             Alert.alert('Avis incomplet', 'Veuillez sélectionner une note.');
             return;
         }
+        if (!resolvedRestaurantId) {
+            Alert.alert('Erreur', 'Restaurant introuvable.');
+            return;
+        }
         setLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setLoading(false);
-        Alert.alert('Merci ✨', 'Votre avis a bien été envoyé.', [
-            { text: 'OK', onPress: () => router.back() },
-        ]);
+        try {
+            await submitReview({
+                orderId: orderId || undefined,
+                restaurantId: resolvedRestaurantId,
+                rating,
+                comment: comment.trim() || undefined,
+            });
+            Alert.alert('Merci ✨', 'Votre avis a bien été envoyé.', [
+                { text: 'OK', onPress: () => router.back() },
+            ]);
+        } catch (err: any) {
+            Alert.alert('Erreur', err?.message ?? 'Impossible d\'envoyer votre avis.');
+        } finally {
+            setLoading(false);
+        }
     };
+
+    if (loadingOrder) {
+        return (
+            <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={theme.primary} />
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
@@ -49,9 +84,9 @@ export default function ReviewOrderScreen() {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={[styles.card, { borderColor: theme.border }]}> 
                     <Text style={[styles.restaurantName, { color: theme.text }]}>
-                        {restaurant?.name ?? 'Restaurant'}
+                        {resolvedRestaurantName}
                     </Text>
-                    <Text style={[styles.meta, { color: theme.icon }]}>Commande #{order?.id?.slice(-4) ?? '----'}</Text>
+                    <Text style={[styles.meta, { color: theme.icon }]}>Commande #{orderId?.slice(-4) ?? '----'}</Text>
                 </View>
 
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>Votre note</Text>

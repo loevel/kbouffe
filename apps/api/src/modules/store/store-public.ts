@@ -207,7 +207,7 @@ storePublicRoutes.get("/:slug", async (c) => {
                 .order("sort_order"),
             supabase
                 .from("reviews")
-                .select("id, rating, comment, created_at")
+                .select("id, rating, comment, response, created_at")
                 .eq("restaurant_id", rest.id)
                 .eq("is_visible", true)
                 .order("created_at", { ascending: false })

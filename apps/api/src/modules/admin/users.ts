@@ -163,16 +163,59 @@ adminUsersRoutes.get("/:id", async (c) => {
     
     // Fetch from Supabase (Source of Truth)
     const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    
+    // Fetch user separately, then restaurant if needed
     const { data: user, error } = await supabase
         .from("users")
-        .select(`
-            *,
-            restaurant:restaurants(*)
-        `)
+        .select("*")
         .eq("id", id)
         .maybeSingle();
 
-    if (error || !user) return c.json({ error: "Utilisateur introuvable" }, 404);
+    if (error) {
+        console.error("Admin GET user error:", error);
+        return c.json({ error: "Erreur lors de la récupération de l'utilisateur" }, 500);
+    }
+    if (!user) return c.json({ error: "Utilisateur introuvable" }, 404);
+
+    // Fetch restaurant separately if user has one
+    let restaurant = null;
+    if (user.restaurant_id) {
+        const { data: rest } = await supabase
+            .from("restaurants")
+            .select("id, name, slug, city, is_published, is_verified")
+            .eq("id", user.restaurant_id)
+            .maybeSingle();
+        if (rest) {
+            restaurant = {
+                id: rest.id,
+                name: rest.name,
+                slug: rest.slug,
+                city: rest.city,
+                isActive: rest.is_published,
+                isVerified: rest.is_verified,
+            };
+        }
+    }
+
+    // Fetch driver info if applicable
+    let driver = null;
+    if (user.role === "driver" || user.role === "livreur") {
+        const { data: driverData } = await supabase
+            .from("drivers")
+            .select("id, vehicle_type, status, is_verified, total_deliveries, rating")
+            .eq("user_id", id)
+            .maybeSingle();
+        if (driverData) {
+            driver = {
+                id: driverData.id,
+                vehicleType: driverData.vehicle_type,
+                status: driverData.status,
+                isVerified: driverData.is_verified,
+                totalDeliveries: driverData.total_deliveries,
+                rating: driverData.rating,
+            };
+        }
+    }
 
     return c.json({
         id: user.id,
@@ -183,18 +226,12 @@ adminUsersRoutes.get("/:id", async (c) => {
         role: user.role,
         adminRole: user.admin_role,
         restaurantId: user.restaurant_id,
-        restaurant: user.restaurant ? {
-            id: user.restaurant.id,
-            name: user.restaurant.name,
-            slug: user.restaurant.slug,
-            city: user.restaurant.city,
-            isActive: user.restaurant.is_published,
-            isVerified: user.restaurant.is_verified
-        } : null,
+        restaurant,
+        driver,
         preferredLang: user.preferred_lang,
+        notificationsEnabled: user.notifications_enabled,
         createdAt: user.created_at,
         updatedAt: user.updated_at,
-        lastLoginAt: user.last_login_at
     });
 });
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Truck, Check, Loader2 } from "lucide-react";
-import { Button, Select, toast } from "@kbouffe/module-core/ui";
+import { Button, Select, toast, authFetch } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 
 interface AssignDriverProps {
@@ -21,7 +21,7 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
     useEffect(() => {
         const fetchDrivers = async () => {
             try {
-                const res = await fetch("/api/team");
+                const res = await authFetch("/api/team");
                 if (!res.ok) return;
                 const data = await res.json();
                 const allMembers = data.members || [];
@@ -45,7 +45,7 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
     const handleAssign = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`/api/orders/${orderId}`, {
+            const res = await authFetch(`/api/orders/${orderId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ driver_id: selectedDriver || null }),
@@ -97,7 +97,7 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
                         options={[
                             { value: "", label: "-- Non assigné --" },
                             ...drivers.map((d) => ({
-                                value: d.id, // we save the restaurantMember id
+                                value: d.userId,
                                 label: d.fullName || d.email,
                             })),
                         ]}

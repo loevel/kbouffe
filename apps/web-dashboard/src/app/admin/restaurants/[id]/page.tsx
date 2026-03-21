@@ -60,6 +60,7 @@ interface RestaurantDetail {
     rating: number;
     reviewCount: number;
     orderCount: number;
+    favoritesCount: number;
     isActive: boolean;
     isVerified: boolean;
     isPremium: boolean;
@@ -478,9 +479,13 @@ export default function AdminRestaurantDetailPage() {
                                 <p className="text-xl font-bold text-surface-900 dark:text-white">{r.rating?.toFixed(1) || "—"}</p>
                                 <p className="text-[10px] uppercase tracking-wider text-surface-400 font-bold">Rating</p>
                             </div>
-                            <div className="px-4 py-2 text-center">
+                            <div className="px-4 py-2 text-center border-r border-surface-200 dark:border-surface-700">
                                 <p className="text-xl font-bold text-surface-900 dark:text-white text-brand-500">{r.orderCount || 0}</p>
                                 <p className="text-[10px] uppercase tracking-wider text-surface-400 font-bold">Ventes</p>
+                            </div>
+                            <div className="px-4 py-2 text-center">
+                                <p className="text-xl font-bold text-surface-900 dark:text-white text-red-500">{r.favoritesCount || 0}</p>
+                                <p className="text-[10px] uppercase tracking-wider text-surface-400 font-bold">Favoris</p>
                             </div>
                         </div>
                     </div>

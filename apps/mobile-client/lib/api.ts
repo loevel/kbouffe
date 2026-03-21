@@ -512,6 +512,53 @@ export async function createSupportTicket(params: Partial<SupportTicket>): Promi
     });
 }
 
+// ── Reviews ──────────────────────────────────────────────────────────────────
+
+export interface SubmitReviewParams {
+    orderId?: string;
+    restaurantId: string;
+    rating: number;
+    comment?: string;
+}
+
+export async function submitReview(params: SubmitReviewParams): Promise<{ success: boolean; review: MobileReview }> {
+    return apiFetch<{ success: boolean; review: MobileReview }>('/api/reviews', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+
+export async function getMyReviews(): Promise<(MobileReview & { restaurantName: string | null; order_id: string | null; restaurant_id: string })[]> {
+    const data = await apiFetch<{ reviews: any[] }>('/api/reviews/mine');
+    return data.reviews ?? [];
+}
+
+// ── Product Reviews ──────────────────────────────────────────────────────────
+
+export interface ProductReview {
+    id: string;
+    rating: number;
+    comment: string | null;
+    customerName: string;
+    created_at: string;
+}
+
+export interface ProductReviewStats {
+    count: number;
+    average: number;
+}
+
+export async function getProductReviews(productId: string): Promise<{ reviews: ProductReview[]; stats: ProductReviewStats }> {
+    return apiFetch<{ reviews: ProductReview[]; stats: ProductReviewStats }>(`/api/store/products/${encodeURIComponent(productId)}/reviews`);
+}
+
+export async function submitProductReview(params: { productId: string; restaurantId: string; rating: number; comment?: string }): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>('/api/reviews/product', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    });
+}
+
 // ── Account Orders ───────────────────────────────────────────────────────────
 
 export async function getAccountOrders(): Promise<OrderTracking[]> {

@@ -18,11 +18,16 @@ import {
     CalendarClock,
     Users,
     CheckCircle2,
+    X,
+    Minus,
+    Send,
+    MessageSquare,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/store/CartDrawer";
 import { RestaurantGallery } from "@/components/store/RestaurantGallery";
+import { createClient } from "@/lib/supabase/client";
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Restaurant {
@@ -72,6 +77,7 @@ interface Review {
     id: string;
     rating: number;
     comment: string | null;
+    response: string | null;
     created_at: string;
 }
 
@@ -106,9 +112,11 @@ import { motion, AnimatePresence } from "framer-motion";
 function ProductCard({
     product,
     onAdd,
+    onClick,
 }: {
     product: Product;
     onAdd: () => void;
+    onClick: () => void;
 }) {
     return (
         <motion.div
@@ -116,7 +124,8 @@ function ProductCard({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             whileHover={{ y: -2 }}
-            className={`group relative flex gap-5 p-5 border-b border-surface-100 dark:border-surface-800/40 last:border-0 hover:bg-surface-50/50 dark:hover:bg-surface-800/20 transition-all duration-300 ${
+            onClick={onClick}
+            className={`group relative flex gap-5 p-5 border-b border-surface-100 dark:border-surface-800/40 last:border-0 hover:bg-surface-50/50 dark:hover:bg-surface-800/20 transition-all duration-300 cursor-pointer ${
                 !product.is_available ? "opacity-50 grayscale" : ""
             }`}
         >
@@ -182,6 +191,288 @@ function ProductCard({
     );
 }
 
+// ── Product Review type ──────────────────────────────────────────────
+interface ProductReview {
+    id: string;
+    rating: number;
+    comment: string | null;
+    created_at: string;
+    customerName: string;
+}
+
+interface ProductReviewStats {
+    count: number;
+    average: number;
+}
+
+// ── Product Detail Modal ───────────────────────────────────────────────
+function ProductDetailModal({
+    product,
+    restaurant,
+    onClose,
+    onAdd,
+}: {
+    product: Product;
+    restaurant: { id: string; name: string; slug: string };
+    onClose: () => void;
+    onAdd: () => void;
+}) {
+    const [quantity, setQuantity] = useState(1);
+    const [reviews, setReviews] = useState<ProductReview[]>([]);
+    const [stats, setStats] = useState<ProductReviewStats>({ count: 0, average: 0 });
+    const [loadingReviews, setLoadingReviews] = useState(true);
+    const [comment, setComment] = useState("");
+    const [rating, setRating] = useState(5);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+
+    useEffect(() => {
+        fetch(`/api/store/products/${product.id}/reviews`)
+            .then((r) => r.json())
+            .then((data: any) => {
+                setReviews(data.reviews ?? []);
+                setStats(data.stats ?? { count: 0, average: 0 });
+            })
+            .catch(() => {})
+            .finally(() => setLoadingReviews(false));
+    }, [product.id]);
+
+    // Close on Escape
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [onClose]);
+
+    const handleSubmitReview = async () => {
+        if (rating < 1) return;
+        setSubmitError(null);
+        setSubmitting(true);
+        try {
+            // Get auth token from Supabase session
+            const supabase = createClient();
+            const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
+            if (!token) {
+                setSubmitError("Connectez-vous pour laisser un avis.");
+                return;
+            }
+            const res = await fetch("/api/reviews/product", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    productId: product.id,
+                    restaurantId: restaurant.id,
+                    rating,
+                    comment: comment.trim() || undefined,
+                }),
+            });
+            if (res.ok) {
+                setSubmitted(true);
+                const updated = await fetch(`/api/store/products/${product.id}/reviews`).then(r => r.json()) as any;
+                setReviews(updated.reviews ?? []);
+                setStats(updated.stats ?? stats);
+            } else {
+                const json = await res.json().catch(() => ({})) as any;
+                setSubmitError(json.error ?? "Erreur lors de l'envoi de l'avis.");
+            }
+        } catch {
+            setSubmitError("Erreur lors de l'envoi de l'avis.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <AnimatePresence>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                onClick={onClose}
+            >
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                    transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+                >
+                    {/* Header image */}
+                    <div className="relative h-48 sm:h-56 bg-surface-100 dark:bg-surface-800 shrink-0">
+                        {product.image_url ? (
+                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <ChefHat size={48} className="text-surface-300 dark:text-surface-600" />
+                            </div>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-3 right-3 p-2 bg-white/90 dark:bg-surface-900/90 rounded-full shadow-lg hover:bg-white dark:hover:bg-surface-800 transition-colors"
+                        >
+                            <X size={18} className="text-surface-700 dark:text-surface-300" />
+                        </button>
+                        {/* Rating badge */}
+                        {stats.count > 0 && (
+                            <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/90 dark:bg-surface-900/90 rounded-full shadow-lg">
+                                <Star size={14} className="text-amber-500 fill-amber-500" />
+                                <span className="text-sm font-bold text-surface-900 dark:text-white">{stats.average.toFixed(1)}</span>
+                                <span className="text-xs text-surface-400">({stats.count})</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Scrollable content */}
+                    <div className="flex-1 overflow-y-auto">
+                        <div className="p-5 sm:p-6">
+                            {/* Name + Price */}
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                                <div>
+                                    <h2 className="text-xl font-extrabold text-surface-900 dark:text-white">{product.name}</h2>
+                                    {!product.is_available && (
+                                        <span className="text-xs px-2 py-0.5 bg-surface-100 dark:bg-surface-800 text-surface-500 rounded-full font-bold uppercase mt-1 inline-block">
+                                            Épuisé
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <p className="text-lg font-extrabold text-brand-600 dark:text-brand-400">{formatCFA(product.price)}</p>
+                                    {product.compare_at_price && product.compare_at_price > product.price && (
+                                        <p className="text-xs text-surface-400 line-through">{formatCFA(product.compare_at_price)}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {product.description && (
+                                <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed mb-4">{product.description}</p>
+                            )}
+
+                            {/* Quantity + Add to cart */}
+                            {product.is_available && (
+                                <div className="flex items-center gap-3 mb-6 p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                            className="w-8 h-8 rounded-lg border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+                                        >
+                                            <Minus size={14} />
+                                        </button>
+                                        <span className="w-8 text-center font-bold text-surface-900 dark:text-white">{quantity}</span>
+                                        <button
+                                            onClick={() => setQuantity(quantity + 1)}
+                                            className="w-8 h-8 rounded-lg border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+                                        >
+                                            <Plus size={14} />
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            for (let i = 0; i < quantity; i++) onAdd();
+                                            onClose();
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-sm transition-colors"
+                                    >
+                                        <ShoppingBag size={16} />
+                                        <span>Ajouter — {formatCFA(product.price * quantity)}</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Reviews section */}
+                            <div className="border-t border-surface-100 dark:border-surface-800 pt-5">
+                                <h3 className="text-base font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <MessageSquare size={18} />
+                                    Avis ({stats.count})
+                                </h3>
+
+                                {/* Submit a review */}
+                                {!submitted ? (
+                                    <div className="mb-5 p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
+                                        <p className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-2">Donner votre avis</p>
+                                        <div className="flex gap-1 mb-3">
+                                            {[1, 2, 3, 4, 5].map((s) => (
+                                                <button key={s} onClick={() => setRating(s)} className="p-0.5 transition-transform hover:scale-110">
+                                                    <Star
+                                                        size={22}
+                                                        className={s <= rating ? "text-amber-500 fill-amber-500" : "text-surface-300 dark:text-surface-600"}
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <textarea
+                                            value={comment}
+                                            onChange={(e) => setComment(e.target.value)}
+                                            placeholder="Partagez votre expérience (optionnel)..."
+                                            className="w-full min-h-[80px] rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none mb-2"
+                                        />
+                                        {submitError && (
+                                            <p className="text-xs text-red-500 mb-2">{submitError}</p>
+                                        )}
+                                        <button
+                                            onClick={handleSubmitReview}
+                                            disabled={submitting}
+                                            className="flex items-center gap-2 px-4 py-2 bg-surface-900 dark:bg-white text-white dark:text-surface-900 rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all"
+                                        >
+                                            <Send size={14} />
+                                            {submitting ? "Envoi..." : "Envoyer"}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="mb-5 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl flex items-center gap-2">
+                                        <CheckCircle2 size={18} className="text-green-600 dark:text-green-400" />
+                                        <p className="text-sm font-medium text-green-700 dark:text-green-300">Merci pour votre avis !</p>
+                                    </div>
+                                )}
+
+                                {/* Reviews list */}
+                                {loadingReviews ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 size={20} className="animate-spin text-surface-400" />
+                                    </div>
+                                ) : reviews.length === 0 ? (
+                                    <p className="text-sm text-surface-400 text-center py-6">Aucun avis pour ce produit. Soyez le premier !</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {reviews.map((review) => (
+                                            <div key={review.id} className="p-3 bg-white dark:bg-surface-800/50 rounded-xl border border-surface-100 dark:border-surface-800">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-brand-600 dark:text-brand-400 text-[10px] font-bold">
+                                                            {review.customerName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                                                        </div>
+                                                        <span className="text-sm font-semibold text-surface-900 dark:text-white">{review.customerName}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        {Array.from({ length: 5 }).map((_, i) => (
+                                                            <Star key={i} size={12} className={i < review.rating ? "text-amber-500 fill-amber-500" : "text-surface-200 dark:text-surface-700"} />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                {review.comment && (
+                                                    <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">{review.comment}</p>
+                                                )}
+                                                <p className="text-[11px] text-surface-400 mt-1.5">
+                                                    {new Date(review.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+}
+
 // ── Main component ─────────────────────────────────────────────────────
 export function StorePageClient({ slug }: { slug: string }) {
     const [data, setData] = useState<StoreData | null>(null);
@@ -189,6 +480,7 @@ export function StorePageClient({ slug }: { slug: string }) {
     const [error, setError] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [cartOpen, setCartOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [reservationOpen, setReservationOpen] = useState(false);
     const [resSubmitting, setResSubmitting] = useState(false);
     const [resError, setResError] = useState<string | null>(null);
@@ -701,6 +993,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                                             <ProductCard
                                                 key={product.id}
                                                 product={product}
+                                                onClick={() => setSelectedProduct(product)}
                                                 onAdd={() => {
                                                     addItem(
                                                         { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
@@ -721,6 +1014,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                                             <ProductCard
                                                 key={product.id}
                                                 product={product}
+                                                onClick={() => setSelectedProduct(product)}
                                                 onAdd={() => {
                                                     addItem(
                                                         { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
@@ -768,6 +1062,12 @@ export function StorePageClient({ slug }: { slug: string }) {
                                         {review.comment && (
                                             <p className="text-sm text-surface-700 dark:text-surface-300 leading-relaxed">{review.comment}</p>
                                         )}
+                                        {review.response && (
+                                            <div className="mt-3 pl-3 border-l-2 border-brand-500">
+                                                <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-0.5">Réponse du restaurant</p>
+                                                <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">{review.response}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -793,6 +1093,21 @@ export function StorePageClient({ slug }: { slug: string }) {
             )}
 
             <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+
+            {selectedProduct && (
+                <ProductDetailModal
+                    product={selectedProduct}
+                    restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
+                    onClose={() => setSelectedProduct(null)}
+                    onAdd={() => {
+                        addItem(
+                            { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
+                            { id: selectedProduct.id, name: selectedProduct.name, price: selectedProduct.price, imageUrl: selectedProduct.image_url },
+                        );
+                        setCartOpen(true);
+                    }}
+                />
+            )}
 
             <footer className="border-t border-surface-100 dark:border-surface-800 bg-white dark:bg-surface-950 py-8">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
