@@ -207,6 +207,7 @@ interface ProductReview {
     id: string;
     rating: number;
     comment: string | null;
+    response: string | null;
     created_at: string;
     customerName: string;
 }
@@ -541,6 +542,12 @@ function ProductDetailModal({
                                                 {review.comment && (
                                                     <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">{review.comment}</p>
                                                 )}
+                                                {review.response && (
+                                                    <div className="mt-2 pl-3 border-l-2 border-brand-500">
+                                                        <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-0.5">Réponse du restaurant</p>
+                                                        <p className="text-sm text-surface-600 dark:text-surface-400">{review.response}</p>
+                                                    </div>
+                                                )}
                                                 <p className="text-[11px] text-surface-400 mt-1.5">
                                                     {new Date(review.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
                                                 </p>
@@ -654,6 +661,24 @@ export function StorePageClient({ slug }: { slug: string }) {
     const [resTime, setResTime] = useState("");
     const [resPartySize, setResPartySize] = useState(2);
     const [resSpecial, setResSpecial] = useState("");
+    const [resOccasion, setResOccasion] = useState<string>("");
+    const [resSelectedZone, setResSelectedZone] = useState<string | null>(null);
+    const [resStep, setResStep] = useState<1 | 2 | 3>(1);
+    const [resAutoFilled, setResAutoFilled] = useState(false);
+    // Zone image lightbox
+    const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
+    const [availability, setAvailability] = useState<{
+        date: string;
+        slot_duration: number;
+        zones: Array<{
+            zone: { id: string; name: string; type: string; description: string | null; image_url: string | null; image_urls: string[]; color: string; capacity: number; min_party_size: number; amenities: string[]; pricing_note: string | null };
+            tables_count: number;
+            total_capacity: number;
+            slots: Array<{ time: string; available: boolean; available_count: number; reserved_until: string | null }>;
+        }>;
+        unzoned_slots: Array<{ time: string; available: boolean; available_count: number; reserved_until: string | null }> | null;
+    } | null>(null);
+    const [availLoading, setAvailLoading] = useState(false);
     const { addItem, itemCount } = useCart();
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
     const isScrollingRef = useRef(false);
@@ -708,6 +733,50 @@ export function StorePageClient({ slug }: { slug: string }) {
 
     const minReservationDate = new Date().toISOString().split("T")[0];
 
+    // Pre-fill reservation form with user's profile when the panel first opens
+    useEffect(() => {
+        if (!reservationOpen || resAutoFilled) return;
+        (async () => {
+            const supabase = createClient();
+            if (!supabase) return;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            // Pull display name + phone from public.users profile
+            const { data: profile } = await supabase
+                .from("users")
+                .select("full_name, phone")
+                .eq("id", user.id)
+                .maybeSingle();
+            setResName((prev) => prev || profile?.full_name || "");
+            setResPhone((prev) => prev || profile?.phone || user.phone || "");
+            setResEmail((prev) => prev || user.email || "");
+            setResAutoFilled(true);
+        })();
+    }, [reservationOpen, resAutoFilled]);
+
+    // Fetch availability when date or party size changes
+    useEffect(() => {
+        if (!resDate || !reservationOpen) return;
+        let cancelled = false;
+        (async () => {
+            setAvailLoading(true);
+            try {
+                const res = await fetch(`/api/store/${slug}/availability?date=${resDate}&partySize=${resPartySize}`);
+                if (!res.ok) return;
+                const json = await res.json();
+                if (!cancelled) {
+                    setAvailability(json);
+                    // Reset zone & time when date changes
+                    setResSelectedZone(null);
+                    setResTime("");
+                }
+            } catch { /* ignore */ } finally {
+                if (!cancelled) setAvailLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [resDate, resPartySize, reservationOpen, slug]);
+
     const submitReservation = useCallback(async (restaurantSlug: string) => {
         setResError(null);
         setResSuccess(null);
@@ -727,6 +796,12 @@ export function StorePageClient({ slug }: { slug: string }) {
 
         setResSubmitting(true);
         try {
+            // Get authenticated user ID if logged in
+            const supabase = createClient();
+            const currentUser = supabase
+                ? (await supabase.auth.getUser()).data.user
+                : null;
+
             const response = await fetch(`/api/store/${restaurantSlug}/reservations`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -734,9 +809,12 @@ export function StorePageClient({ slug }: { slug: string }) {
                     customerName: resName.trim(),
                     customerPhone: resPhone.trim() || undefined,
                     customerEmail: resEmail.trim() || undefined,
+                    customerId: currentUser?.id ?? undefined,
                     partySize: resPartySize,
                     date: resDate,
                     time: resTime,
+                    zoneId: resSelectedZone || undefined,
+                    occasion: resOccasion || undefined,
                     specialRequests: resSpecial.trim() || undefined,
                 }),
             });
@@ -749,12 +827,15 @@ export function StorePageClient({ slug }: { slug: string }) {
 
             setResSuccess(`Réservation confirmée (ref: ${payload.reservation?.id?.slice(-6) ?? "N/A"}).`);
             setResSpecial("");
+            setResOccasion("");
+            setResSelectedZone(null);
+            setResStep(1);
         } catch {
             setResError("Erreur réseau pendant la réservation.");
         } finally {
             setResSubmitting(false);
         }
-    }, [resName, resPhone, resEmail, resPartySize, resDate, resTime, resSpecial]);
+    }, [resName, resPhone, resEmail, resPartySize, resDate, resTime, resSpecial, resSelectedZone, resOccasion]);
 
     if (loading) {
         return (
@@ -987,6 +1068,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                                             className="border-t border-surface-200 dark:border-surface-800 overflow-hidden"
                                         >
                                             <div className="p-5 sm:p-6 space-y-4">
+                                                {/* Cancellation policy */}
                                                 <div className="flex items-center gap-3 p-3 bg-brand-500/5 rounded-2xl border border-brand-500/10">
                                                     <Info size={14} className="text-brand-500" />
                                                     <p className="text-[11px] text-surface-600 dark:text-surface-400 leading-tight font-medium">
@@ -995,74 +1077,413 @@ export function StorePageClient({ slug }: { slug: string }) {
                                                     </p>
                                                 </div>
 
-                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                    <input
-                                                        value={resName}
-                                                        onChange={(e) => setResName(e.target.value)}
-                                                        placeholder="Votre nom"
-                                                        className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
-                                                    />
-                                                    <input
-                                                        value={resPhone}
-                                                        onChange={(e) => setResPhone(e.target.value)}
-                                                        placeholder="Téléphone"
-                                                        className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
-                                                    />
-                                                    <label className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm flex items-center gap-3">
-                                                        <Users size={16} className="text-surface-400" />
-                                                        <input
-                                                            type="number"
-                                                            min={1}
-                                                            max={20}
-                                                            value={resPartySize}
-                                                            onChange={(e) => setResPartySize(Math.max(1, Number(e.target.value) || 1))}
-                                                            className="flex-1 bg-transparent outline-none font-bold text-surface-900 dark:text-white"
+                                                {/* Step indicator */}
+                                                <div className="flex items-center gap-2">
+                                                    {[1, 2, 3].map((s) => (
+                                                        <div key={s} className="flex items-center gap-2 flex-1">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
+                                                                resStep >= s
+                                                                    ? "bg-brand-500 text-white shadow-md shadow-brand-500/20"
+                                                                    : "bg-surface-100 dark:bg-surface-800 text-surface-400"
+                                                            }`}>
+                                                                {resStep > s ? <CheckCircle2 size={14} /> : s}
+                                                            </div>
+                                                            {s < 3 && <div className={`flex-1 h-0.5 rounded-full transition-all ${resStep > s ? "bg-brand-500" : "bg-surface-200 dark:bg-surface-700"}`} />}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* ── Step 1: Date, Party Size, Name, Phone ── */}
+                                                {resStep === 1 && (
+                                                    <div className="space-y-3">
+                                                        <p className="text-sm font-bold text-surface-900 dark:text-white">Quand et combien ?</p>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <input
+                                                                type="date"
+                                                                min={minReservationDate}
+                                                                value={resDate}
+                                                                onChange={(e) => setResDate(e.target.value)}
+                                                                className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
+                                                            />
+                                                            <label className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm flex items-center gap-3">
+                                                                <Users size={16} className="text-surface-400" />
+                                                                <input
+                                                                    type="number"
+                                                                    min={1}
+                                                                    max={20}
+                                                                    value={resPartySize}
+                                                                    onChange={(e) => setResPartySize(Math.max(1, Number(e.target.value) || 1))}
+                                                                    className="flex-1 bg-transparent outline-none font-bold text-surface-900 dark:text-white"
+                                                                />
+                                                                <span className="text-surface-400 font-medium">pers.</span>
+                                                            </label>
+                                                        </div>
+                                                        <div className="space-y-3">
+                                                            {resAutoFilled && (
+                                                                <p className="text-[11px] text-brand-500 font-medium flex items-center gap-1.5">
+                                                                    <CheckCircle2 size={12} />
+                                                                    Pré-rempli depuis votre compte · modifiable
+                                                                </p>
+                                                            )}
+                                                            <input
+                                                                value={resName}
+                                                                onChange={(e) => setResName(e.target.value)}
+                                                                placeholder="Nom du réservant *"
+                                                                className="w-full h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
+                                                            />
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                <input
+                                                                    value={resPhone}
+                                                                    onChange={(e) => setResPhone(e.target.value)}
+                                                                    placeholder="Téléphone"
+                                                                    type="tel"
+                                                                    className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
+                                                                />
+                                                                <input
+                                                                    value={resEmail}
+                                                                    onChange={(e) => setResEmail(e.target.value)}
+                                                                    placeholder="Email"
+                                                                    type="email"
+                                                                    className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (!resName.trim()) { setResError("Nom requis pour la réservation."); return; }
+                                                                if (!resDate) { setResError("Sélectionnez une date."); return; }
+                                                                setResError(null);
+                                                                setResStep(2);
+                                                            }}
+                                                            className="w-full h-11 rounded-2xl bg-surface-900 dark:bg-white text-white dark:text-surface-900 text-sm font-bold transition-all hover:shadow-xl hover:-translate-y-0.5"
+                                                        >
+                                                            Choisir un créneau →
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* ── Step 2: Zone picker + Time slots ── */}
+                                                {resStep === 2 && (
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <p className="text-sm font-bold text-surface-900 dark:text-white">Choisir un espace & créneau</p>
+                                                            <button onClick={() => setResStep(1)} className="text-xs text-brand-500 font-bold hover:underline">← Retour</button>
+                                                        </div>
+
+                                                        {availLoading ? (
+                                                            <div className="flex items-center justify-center py-8">
+                                                                <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+                                                                <span className="ml-2 text-sm text-surface-500">Chargement des disponibilités...</span>
+                                                            </div>
+                                                        ) : availability && availability.zones.length > 0 ? (
+                                                            <>
+                                                                {/* Zone cards */}
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                    {availability.zones.map(({ zone, tables_count, slots: zoneSlots }) => {
+                                                                        const anyAvailable = zoneSlots.some((s) => s.available);
+                                                                        const tooSmall = zone.min_party_size > 0 && resPartySize < zone.min_party_size;
+                                                                        const selected = resSelectedZone === zone.id;
+                                                                        const zoneTypeLabels: Record<string, string> = {
+                                                                            indoor: "Intérieur", outdoor: "Extérieur", terrace: "Terrasse",
+                                                                            vip: "VIP", air_conditioned: "Climatisé",
+                                                                        };
+                                                                        const amenityIcons: Record<string, string> = {
+                                                                            wifi: "📶", ac: "❄️", view: "🌅", private: "🔒",
+                                                                            music: "🎵", tv: "📺", outdoor: "🌿", parking: "🅿️",
+                                                                        };
+
+                                                                        return (
+                                                                            <button
+                                                                                key={zone.id}
+                                                                                onClick={() => {
+                                                                                    if (tooSmall || !anyAvailable) return;
+                                                                                    setResSelectedZone(selected ? null : zone.id);
+                                                                                    setResTime("");
+                                                                                }}
+                                                                                disabled={tooSmall || !anyAvailable}
+                                                                                className={`text-left rounded-2xl border-2 transition-all overflow-hidden ${
+                                                                                    selected
+                                                                                        ? "border-brand-500 bg-brand-500/5 shadow-md shadow-brand-500/10"
+                                                                                        : tooSmall || !anyAvailable
+                                                                                        ? "border-surface-200 dark:border-surface-700 opacity-50 cursor-not-allowed"
+                                                                                        : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-600"
+                                                                                }`}
+                                                                            >
+                                                                                {/* Image strip — click individual thumbnails to zoom */}
+                                                                                {(() => {
+                                                                                    const imgs = zone.image_urls?.filter(Boolean).length
+                                                                                        ? zone.image_urls.filter(Boolean)
+                                                                                        : zone.image_url ? [zone.image_url] : [];
+                                                                                    if (imgs.length === 0) return (
+                                                                                        <div className="w-full h-28 flex items-center justify-center shrink-0" style={{ backgroundColor: zone.color ?? "#6366f1" }}>
+                                                                                            <span className="text-white text-3xl">{zone.type === "vip" ? "👑" : zone.type === "terrace" ? "🌿" : "🍽️"}</span>
+                                                                                        </div>
+                                                                                    );
+                                                                                    if (imgs.length === 1) return (
+                                                                                        <div className="relative group w-full h-28">
+                                                                                            <img src={imgs[0]} alt={zone.name} className="w-full h-full object-cover" />
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={(e) => { e.stopPropagation(); setLightbox({ images: imgs, index: 0 }); }}
+                                                                                                className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-all"
+                                                                                            >
+                                                                                                <Maximize2 size={22} className="text-white opacity-0 group-hover:opacity-100 drop-shadow transition-opacity" />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    );
+                                                                                    return (
+                                                                                        <div className="flex gap-0.5 w-full h-28">
+                                                                                            {imgs.slice(0, 5).map((src, i) => (
+                                                                                                <button
+                                                                                                    key={i}
+                                                                                                    type="button"
+                                                                                                    onClick={(e) => { e.stopPropagation(); setLightbox({ images: imgs, index: i }); }}
+                                                                                                    className={`relative group flex-1 min-w-0 overflow-hidden ${i === 0 ? "rounded-l-none" : ""} ${i === imgs.slice(0, 5).length - 1 ? "rounded-r-none" : ""}`}
+                                                                                                >
+                                                                                                    <img src={src} alt={`${zone.name} ${i + 1}`} className="w-full h-full object-cover" />
+                                                                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all">
+                                                                                                        <Maximize2 size={16} className="text-white opacity-0 group-hover:opacity-100 drop-shadow transition-opacity" />
+                                                                                                    </div>
+                                                                                                    {i === 4 && imgs.length > 5 && (
+                                                                                                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                                                                                            <span className="text-white font-bold text-sm">+{imgs.length - 5}</span>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </button>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    );
+                                                                                })()}
+
+                                                                                {/* Card body */}
+                                                                                <div className="p-3">
+                                                                                    <div className="flex items-start gap-2">
+                                                                                        <div className="flex-1 min-w-0">
+                                                                                            <p className="font-bold text-sm text-surface-900 dark:text-white truncate">{zone.name}</p>
+                                                                                            <p className="text-[11px] text-surface-500 font-medium">
+                                                                                                {zoneTypeLabels[zone.type] ?? zone.type}
+                                                                                                {tables_count > 0 && ` · ${tables_count} tables`}
+                                                                                            </p>
+                                                                                            {zone.description && (
+                                                                                                <p className="text-[11px] text-surface-400 mt-0.5 line-clamp-1">{zone.description}</p>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    {/* Amenities */}
+                                                                                    {zone.amenities && zone.amenities.length > 0 && (
+                                                                                        <div className="flex gap-1.5 mt-2 flex-wrap">
+                                                                                            {zone.amenities.map((a) => (
+                                                                                                <span key={a} className="text-xs" title={a}>{amenityIcons[a] ?? "✨"}</span>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    )}
+
+                                                                                    {/* Status */}
+                                                                                    {tooSmall && (
+                                                                                        <p className="text-[10px] text-amber-600 font-bold mt-2">Min. {zone.min_party_size} personnes</p>
+                                                                                    )}
+                                                                                    {!anyAvailable && !tooSmall && (
+                                                                                        <p className="text-[10px] text-red-500 font-bold mt-2">Complet pour cette date</p>
+                                                                                    )}
+                                                                                    {zone.pricing_note && (
+                                                                                        <p className="text-[10px] text-surface-400 mt-1 italic">{zone.pricing_note}</p>
+                                                                                    )}
+                                                                                </div>
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+
+                                                                {/* Time slots for selected zone */}
+                                                                {resSelectedZone && (() => {
+                                                                    const zoneData = availability.zones.find((z) => z.zone.id === resSelectedZone);
+                                                                    if (!zoneData) return null;
+                                                                    const { slots: zoneSlots } = zoneData;
+                                                                    return (
+                                                                        <div className="space-y-2">
+                                                                            <p className="text-xs font-bold text-surface-700 dark:text-surface-300">Créneaux disponibles — {zoneData.zone.name}</p>
+                                                                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                                                                                {zoneSlots.map((slot) => (
+                                                                                    <button
+                                                                                        key={slot.time}
+                                                                                        onClick={() => slot.available && setResTime(slot.time)}
+                                                                                        disabled={!slot.available}
+                                                                                        className={`relative py-2 px-1 rounded-xl text-xs font-bold text-center transition-all ${
+                                                                                            resTime === slot.time
+                                                                                                ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 scale-105"
+                                                                                                : slot.available
+                                                                                                ? "bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white hover:border-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20"
+                                                                                                : "bg-surface-100 dark:bg-surface-800/50 text-surface-300 dark:text-surface-600 cursor-not-allowed line-through"
+                                                                                        }`}
+                                                                                    >
+                                                                                        {slot.time}
+                                                                                        {!slot.available && slot.reserved_until && (
+                                                                                            <span className="block text-[9px] font-medium text-surface-400 no-underline" style={{ textDecoration: "none" }}>
+                                                                                                → {slot.reserved_until}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })()}
+
+                                                                {/* Also show unzoned slots if available */}
+                                                                {availability.unzoned_slots && !resSelectedZone && (
+                                                                    <div className="space-y-2">
+                                                                        <p className="text-xs font-bold text-surface-700 dark:text-surface-300">Créneaux — Sans zone spécifique</p>
+                                                                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                                                                            {availability.unzoned_slots.map((slot) => (
+                                                                                <button
+                                                                                    key={slot.time}
+                                                                                    onClick={() => slot.available && setResTime(slot.time)}
+                                                                                    disabled={!slot.available}
+                                                                                    className={`relative py-2 px-1 rounded-xl text-xs font-bold text-center transition-all ${
+                                                                                        resTime === slot.time
+                                                                                            ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 scale-105"
+                                                                                            : slot.available
+                                                                                            ? "bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white hover:border-brand-400"
+                                                                                            : "bg-surface-100 dark:bg-surface-800/50 text-surface-300 dark:text-surface-600 cursor-not-allowed line-through"
+                                                                                    }`}
+                                                                                >
+                                                                                    {slot.time}
+                                                                                    {!slot.available && slot.reserved_until && (
+                                                                                        <span className="block text-[9px] font-medium text-surface-400 no-underline" style={{ textDecoration: "none" }}>
+                                                                                            → {slot.reserved_until}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : availability && availability.zones.length === 0 && availability.unzoned_slots ? (
+                                                            /* No zones, show unzoned time slots directly */
+                                                            <div className="space-y-2">
+                                                                <p className="text-xs font-bold text-surface-700 dark:text-surface-300">Créneaux disponibles</p>
+                                                                <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                                                                    {availability.unzoned_slots.map((slot) => (
+                                                                        <button
+                                                                            key={slot.time}
+                                                                            onClick={() => slot.available && setResTime(slot.time)}
+                                                                            disabled={!slot.available}
+                                                                            className={`relative py-2 px-1 rounded-xl text-xs font-bold text-center transition-all ${
+                                                                                resTime === slot.time
+                                                                                    ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 scale-105"
+                                                                                    : slot.available
+                                                                                    ? "bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white hover:border-brand-400"
+                                                                                    : "bg-surface-100 dark:bg-surface-800/50 text-surface-300 dark:text-surface-600 cursor-not-allowed line-through"
+                                                                            }`}
+                                                                        >
+                                                                            {slot.time}
+                                                                            {!slot.available && slot.reserved_until && (
+                                                                                <span className="block text-[9px] font-medium text-surface-400 no-underline" style={{ textDecoration: "none" }}>
+                                                                                    → {slot.reserved_until}
+                                                                                </span>
+                                                                            )}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : !availLoading && resDate ? (
+                                                            <div className="text-center py-6">
+                                                                <p className="text-sm text-surface-500">Aucune disponibilité trouvée pour cette date.</p>
+                                                            </div>
+                                                        ) : !resDate ? (
+                                                            <p className="text-xs text-surface-400 text-center py-4">Sélectionnez d&apos;abord une date à l&apos;étape précédente.</p>
+                                                        ) : null}
+
+                                                        {/* Next button */}
+                                                        {resTime && (
+                                                            <button
+                                                                onClick={() => { setResError(null); setResStep(3); }}
+                                                                className="w-full h-11 rounded-2xl bg-surface-900 dark:bg-white text-white dark:text-surface-900 text-sm font-bold transition-all hover:shadow-xl hover:-translate-y-0.5"
+                                                            >
+                                                                Finaliser ma réservation →
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* ── Step 3: Occasion + Special requests + Confirm ── */}
+                                                {resStep === 3 && (
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <p className="text-sm font-bold text-surface-900 dark:text-white">Détails de votre réservation</p>
+                                                            <button onClick={() => setResStep(2)} className="text-xs text-brand-500 font-bold hover:underline">← Retour</button>
+                                                        </div>
+
+                                                        {/* Summary */}
+                                                        <div className="p-3 rounded-2xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700 text-sm space-y-1">
+                                                            <p className="font-bold text-surface-900 dark:text-white">{resName} · {resPartySize} pers.</p>
+                                                            <p className="text-surface-500">{resDate} à {resTime}</p>
+                                                            {resSelectedZone && availability && (() => {
+                                                                const z = availability.zones.find((z) => z.zone.id === resSelectedZone);
+                                                                return z ? <p className="text-xs text-brand-500 font-medium">📍 {z.zone.name}</p> : null;
+                                                            })()}
+                                                        </div>
+
+                                                        {/* Occasion picker */}
+                                                        <div className="space-y-2">
+                                                            <p className="text-xs font-bold text-surface-700 dark:text-surface-300">Occasion (optionnel)</p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {([
+                                                                    { key: "birthday", icon: "🎂", label: "Anniversaire" },
+                                                                    { key: "dinner", icon: "🍽️", label: "Dîner" },
+                                                                    { key: "surprise", icon: "🎁", label: "Surprise" },
+                                                                    { key: "business", icon: "💼", label: "Business" },
+                                                                    { key: "anniversary", icon: "💍", label: "Célébration" },
+                                                                    { key: "date", icon: "❤️", label: "Rendez-vous" },
+                                                                    { key: "family", icon: "👨‍👩‍👧‍👦", label: "Famille" },
+                                                                    { key: "other", icon: "📌", label: "Autre" },
+                                                                ] as const).map((occ) => (
+                                                                    <button
+                                                                        key={occ.key}
+                                                                        onClick={() => setResOccasion(resOccasion === occ.key ? "" : occ.key)}
+                                                                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                                                            resOccasion === occ.key
+                                                                                ? "bg-brand-500 text-white shadow-md"
+                                                                                : "bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-700"
+                                                                        }`}
+                                                                    >
+                                                                        <span>{occ.icon}</span>
+                                                                        {occ.label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Special requests */}
+                                                        <textarea
+                                                            value={resSpecial}
+                                                            onChange={(e) => setResSpecial(e.target.value)}
+                                                            rows={2}
+                                                            placeholder="Demandes spéciales (allergies, chaise haute, etc.)"
+                                                            className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm resize-none focus:ring-2 ring-brand-500/20 outline-none transition-all"
                                                         />
-                                                        <span className="text-surface-400 font-medium">pers.</span>
-                                                    </label>
-                                                </div>
 
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <input
-                                                        type="date"
-                                                        min={minReservationDate}
-                                                        value={resDate}
-                                                        onChange={(e) => setResDate(e.target.value)}
-                                                        className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
-                                                    />
-                                                    <input
-                                                        type="time"
-                                                        value={resTime}
-                                                        onChange={(e) => setResTime(e.target.value)}
-                                                        className="h-11 px-4 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm focus:ring-2 ring-brand-500/20 outline-none transition-all"
-                                                    />
-                                                </div>
+                                                        {resError && (
+                                                            <p className="text-xs text-red-500 font-bold px-1">{resError}</p>
+                                                        )}
+                                                        {resSuccess && (
+                                                            <p className="text-[13px] text-emerald-600 dark:text-emerald-400 flex items-center gap-2 font-bold px-1">
+                                                                <CheckCircle2 size={16} />
+                                                                {resSuccess}
+                                                            </p>
+                                                        )}
 
-                                                <textarea
-                                                    value={resSpecial}
-                                                    onChange={(e) => setResSpecial(e.target.value)}
-                                                    rows={2}
-                                                    placeholder="Demandes spéciales (allergies, occasion...)"
-                                                    className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm resize-none focus:ring-2 ring-brand-500/20 outline-none transition-all"
-                                                />
-
-                                                {resError && (
-                                                    <p className="text-xs text-red-500 font-bold px-1">{resError}</p>
+                                                        <button
+                                                            onClick={() => submitReservation(restaurant.slug)}
+                                                            disabled={resSubmitting}
+                                                            className="w-full h-11 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold transition-all shadow-lg shadow-brand-500/20 disabled:opacity-60"
+                                                        >
+                                                            {resSubmitting ? "Traitement..." : "Confirmer ma réservation ✓"}
+                                                        </button>
+                                                    </div>
                                                 )}
-                                                {resSuccess && (
-                                                    <p className="text-[13px] text-emerald-600 dark:text-emerald-400 flex items-center gap-2 font-bold px-1">
-                                                        <CheckCircle2 size={16} />
-                                                        {resSuccess}
-                                                    </p>
-                                                )}
-
-                                                <button
-                                                    onClick={() => submitReservation(restaurant.slug)}
-                                                    disabled={resSubmitting}
-                                                    className="w-full h-11 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold transition-all shadow-lg shadow-brand-500/20 disabled:opacity-60"
-                                                >
-                                                    {resSubmitting ? "Traitement..." : "Confirmer ma venue"}
-                                                </button>
                                             </div>
                                         </motion.div>
                                     )}
@@ -1082,9 +1503,9 @@ export function StorePageClient({ slug }: { slug: string }) {
             <div className="max-w-6xl mx-auto px-4 sm:px-6 flex gap-0 sm:gap-12 pb-32">
                 {categoriesWithProducts.length > 1 && (
                     <aside className="hidden lg:block w-64 shrink-0">
-                        <div className="sticky top-24 pt-4">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-surface-400 mb-6 px-1">Menu</p>
-                            <nav className="space-y-1.5">
+                        <div className="sticky top-20 pt-4 max-h-[calc(100vh-6rem)] flex flex-col">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-surface-400 mb-6 px-1 shrink-0">Menu</p>
+                            <nav className="space-y-1.5 overflow-y-auto custom-scrollbar flex-1">
                                 {categoriesWithProducts.map(({ cat }) => (
                                     <button
                                         key={cat.id}
@@ -1280,6 +1701,68 @@ export function StorePageClient({ slug }: { slug: string }) {
                     <p className="text-xs text-surface-400">© {new Date().getFullYear()} Kbouffe. Tous droits réservés.</p>
                 </div>
             </footer>
+
+            {/* Zone image lightbox */}
+            {lightbox && (
+                <div
+                    className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"
+                    onClick={() => setLightbox(null)}
+                >
+                    {/* Close */}
+                    <button
+                        className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        onClick={() => setLightbox(null)}
+                    >
+                        <X size={22} />
+                    </button>
+
+                    {/* Prev */}
+                    {lightbox.images.length > 1 && (
+                        <button
+                            className="absolute left-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setLightbox((lb) => lb ? { ...lb, index: (lb.index - 1 + lb.images.length) % lb.images.length } : null); }}
+                        >
+                            <ChevronLeft size={26} />
+                        </button>
+                    )}
+
+                    {/* Image */}
+                    <div className="max-w-[90vw] max-h-[85vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                        <img
+                            src={lightbox.images[lightbox.index]}
+                            alt={`Photo ${lightbox.index + 1}`}
+                            className="max-w-full max-h-[75vh] rounded-2xl object-contain shadow-2xl"
+                        />
+                        {lightbox.images.length > 1 && (
+                            <>
+                                <p className="text-white/60 text-sm">{lightbox.index + 1} / {lightbox.images.length}</p>
+                                {/* Thumbnail strip */}
+                                <div className="flex gap-2">
+                                    {lightbox.images.map((src, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setLightbox((lb) => lb ? { ...lb, index: i } : null)}
+                                            className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === lightbox.index ? "border-white scale-110" : "border-white/20 hover:border-white/60"}`}
+                                        >
+                                            <img src={src} alt="" className="w-full h-full object-cover" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Next */}
+                    {lightbox.images.length > 1 && (
+                        <button
+                            className="absolute right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setLightbox((lb) => lb ? { ...lb, index: (lb.index + 1) % lb.images.length } : null); }}
+                        >
+                            <ChevronRight size={26} />
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

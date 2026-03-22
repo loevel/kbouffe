@@ -138,6 +138,7 @@ export async function deleteReservation(
 
 interface TablesResponse {
   tables: RestaurantTable[];
+  zones: TableZone[];
 }
 
 export function useTables() {
@@ -148,6 +149,7 @@ export function useTables() {
 
   return {
     tables: data?.tables ?? [],
+    zones: data?.zones ?? [],
     isLoading,
     error,
     mutate,

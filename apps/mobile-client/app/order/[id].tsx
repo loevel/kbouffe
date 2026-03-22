@@ -225,6 +225,24 @@ export default function OrderTrackingScreen() {
                         <Text style={[styles.refundNotice, { color: theme.icon }]}>Note: Les remboursements et la livraison sont traités directement par le restaurant. Kbouffe n'est pas responsable du transport.</Text>
                     </View>
                 </View>
+
+                {/* Review CTA — only when order is done */}
+                {['completed', 'delivered'].includes(order.status) && (
+                    <Pressable
+                        style={[styles.reviewCta, { borderColor: '#f59e0b' + '50', backgroundColor: '#f59e0b' + '10' }]}
+                        onPress={() => router.push({
+                            pathname: '/review/[orderId]' as any,
+                            params: { orderId: order.id, restaurantId: order.restaurantId, restaurantName: order.restaurantName },
+                        })}
+                    >
+                        <Ionicons name="star" size={22} color="#f59e0b" />
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.reviewCtaTitle, { color: '#92400e' }]}>Votre avis compte !</Text>
+                            <Text style={[styles.reviewCtaBody, { color: '#b45309' }]}>Évaluez votre expérience chez {order.restaurantName}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#f59e0b" />
+                    </Pressable>
+                )}
             </ScrollView>
         </View>
     );
@@ -319,4 +337,15 @@ const styles = StyleSheet.create({
     },
     supportButtonText: { ...Typography.small, fontWeight: '700' },
     refundNotice: { ...Typography.small, fontSize: 11, marginTop: Spacing.xs, fontStyle: 'italic' },
+    reviewCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.md,
+        borderWidth: 1,
+        borderRadius: Radii.lg,
+        padding: Spacing.md,
+        marginTop: Spacing.md,
+    },
+    reviewCtaTitle: { ...Typography.body, fontWeight: '700' },
+    reviewCtaBody: { ...Typography.small, marginTop: 2 },
 });

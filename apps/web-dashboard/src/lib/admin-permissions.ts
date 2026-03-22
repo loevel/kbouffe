@@ -119,6 +119,7 @@ export const ADMIN_NAV_PERMISSIONS: Record<string, AdminPermission> = {
     "/admin/audits": "admin:settings:manage", // Let's restrict audits to super admin via settings:manage
     "/admin/marketing": "admin:marketing:read",
     "/admin/marketplace": "admin:marketplace:manage",
+    "/admin/cuisine-categories": "admin:settings:manage",
     "/admin/reviews": "admin:reviews:manage",
     "/admin/support": "admin:support:manage",
     "/admin/settings": "admin:settings:manage",

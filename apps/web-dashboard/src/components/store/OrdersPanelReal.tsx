@@ -10,6 +10,7 @@ import {
     Package,
     RotateCcw,
     ShoppingBag,
+    Star,
     Truck,
     X,
 } from "lucide-react";
@@ -23,7 +24,7 @@ const STATUS_MAP: Record<
     { label: string; color: string; icon: React.ReactNode }
 > = {
     pending:    { label: "En attente",     color: "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-300 border-yellow-100 dark:border-yellow-500/20",   icon: <Clock size={12} /> },
-    confirmed:  { label: "Confirmée",      color: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border-blue-100 dark:border-blue-500/20",               icon: <CheckCircle2 size={12} /> },
+    accepted:   { label: "Confirmée",      color: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border-blue-100 dark:border-blue-500/20",               icon: <CheckCircle2 size={12} /> },
     preparing:  { label: "En préparation", color: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300 border-brand-100 dark:border-brand-500/20",        icon: <Loader2 size={12} className="animate-spin" /> },
     ready:      { label: "Prête",          color: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300 border-green-100 dark:border-green-500/20",         icon: <CheckCircle2 size={12} /> },
     delivering: { label: "En livraison",   color: "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300 border-purple-100 dark:border-purple-500/20",  icon: <Truck size={12} /> },
@@ -78,6 +79,15 @@ function OrderCard({
                     >
                         {isCancelling ? <Loader2 size={12} className="animate-spin mx-auto" /> : "Annuler"}
                     </button>
+                )}
+                {order.status === "delivered" && (
+                    <Link
+                        href={`/stores/orders/${order.id}#review`}
+                        className="flex-1 text-center py-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300 transition-colors inline-flex items-center justify-center gap-1"
+                    >
+                        <Star size={12} />
+                        Laisser un avis
+                    </Link>
                 )}
                 <Link
                     href={`/stores/orders/${order.id}`}
@@ -184,7 +194,7 @@ export function OrdersPanelReal() {
         );
     }
 
-    const active = orders.filter((o) => ["pending", "confirmed", "preparing", "ready", "delivering"].includes(o.status));
+    const active = orders.filter((o) => ["pending", "accepted", "preparing", "ready", "delivering"].includes(o.status));
     const past = orders.filter((o) => ["delivered", "cancelled"].includes(o.status));
 
     return (

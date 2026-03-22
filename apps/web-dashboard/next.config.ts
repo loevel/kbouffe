@@ -9,9 +9,8 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "boissonsducameroun.com" },
-      { protocol: "https", hostname: "www.sa-ucb.com" },
+      { protocol: "https", hostname: "**" },
+      { protocol: "http", hostname: "localhost" },
     ],
   },
   async rewrites() {

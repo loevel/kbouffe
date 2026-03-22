@@ -1,14 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save } from "lucide-react";
-import { Modal, Button, Input, Textarea, Select, toast } from "@kbouffe/module-core/ui";
+import { Save, Store, MapPin, Phone, UtensilsCrossed, Wallet } from "lucide-react";
+import { Modal, ModalFooter, Button, Input, Textarea, Select, toast } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 
 interface EditStoreProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
+}
+
+const PRICE_RANGES = [
+    { value: "1", label: "XAF (Économique)", sub: "Moins de 3 000 FCFA" },
+    { value: "2", label: "XAF XAF (Abordable)", sub: "3 000 – 8 000 FCFA" },
+    { value: "3", label: "XAF XAF XAF (Intermédiaire)", sub: "8 000 – 20 000 FCFA" },
+    { value: "4", label: "XAF XAF XAF XAF (Haut de gamme)", sub: "+ 20 000 FCFA" },
+];
+
+function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
+    return (
+        <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center text-brand-500">
+                {icon}
+            </div>
+            <p className="text-xs font-bold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{label}</p>
+        </div>
+    );
 }
 
 export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModalProps) {
@@ -19,12 +37,10 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
         description: "",
         address: "",
         city: "",
-        postalCode: "",
-        country: "Cameroun",
         phone: "",
         email: "",
         cuisineType: "",
-        priceRange: "1",
+        priceRange: "2",
     });
     const [loading, setLoading] = useState(false);
 
@@ -35,131 +51,153 @@ export function EditStoreProfileModal({ isOpen, onClose }: EditStoreProfileModal
                 description: restaurant.description ?? "",
                 address: restaurant.address ?? "",
                 city: restaurant.city ?? "",
-                postalCode: (restaurant as any).postal_code ?? "",
-                country: (restaurant as any).country ?? "Cameroun",
                 phone: restaurant.phone ?? "",
                 email: restaurant.email ?? "",
                 cuisineType: (restaurant as any).cuisine_type ?? "",
-                priceRange: (restaurant as any).price_range?.toString() ?? "1",
+                priceRange: (restaurant as any).price_range?.toString() ?? "2",
             });
         }
     }, [restaurant, isOpen]);
 
-    const updateField = (field: string, value: string) => {
-        setForm(prev => ({ ...prev, [field]: value }));
-    };
+    const set = (field: string, value: string) =>
+        setForm((prev) => ({ ...prev, [field]: value }));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.name.trim()) {
-            toast.error(t.settings?.nameRequired || "Le nom est requis");
+            toast.error("Le nom du restaurant est requis");
             return;
         }
         setLoading(true);
 
-        const payload: any = {
+        const { error } = await updateRestaurant({
             name: form.name,
             description: form.description || null,
             address: form.address || null,
             city: form.city || null,
-            postalCode: form.postalCode || null,
-            country: form.country || null,
             phone: form.phone || null,
             email: form.email || null,
-            cuisineType: form.cuisineType || null,
-            priceRange: parseInt(form.priceRange) || null,
-        };
-
-        const { error } = await updateRestaurant(payload);
+            cuisine_type: form.cuisineType || null,
+            price_range: parseInt(form.priceRange) || null,
+        } as any);
 
         if (error) {
-            toast.error(`${t.settings?.errorPrefix || "Erreur: "}${error}`);
+            toast.error(error);
         } else {
-            toast.success(t.settings?.infoUpdated || "Informations mises à jour");
+            toast.success("Profil mis à jour ✓");
             onClose();
         }
         setLoading(false);
     };
 
     return (
-        <Modal 
-            isOpen={isOpen} 
-            onClose={onClose} 
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
             title="Modifier le profil"
             size="lg"
         >
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                        <Input 
-                            label={t.settings?.restaurantName || "Nom du restaurant"} 
-                            value={form.name} 
-                            onChange={(e) => updateField("name", e.target.value)} 
-                            required
-                        />
+            <form onSubmit={handleSubmit}>
+                <div className="space-y-6">
+                    {/* ── Identité ── */}
+                    <div>
+                        <SectionHeader icon={<Store size={14} />} label="Identité" />
+                        <div className="space-y-3">
+                            <Input
+                                label="Nom du restaurant"
+                                value={form.name}
+                                onChange={(e) => set("name", e.target.value)}
+                                placeholder="Ex: Le Saveur d'Akwa"
+                                required
+                            />
+                            <Textarea
+                                label="Description"
+                                value={form.description}
+                                onChange={(e) => set("description", e.target.value)}
+                                placeholder="Décrivez votre restaurant en quelques mots…"
+                                rows={3}
+                            />
+                        </div>
                     </div>
-                    <div className="md:col-span-2">
-                        <Textarea 
-                            label={t.settings?.description || "Description"} 
-                            value={form.description} 
-                            onChange={(e) => updateField("description", e.target.value)}
-                            rows={3}
-                        />
+
+                    {/* ── Localisation ── */}
+                    <div>
+                        <SectionHeader icon={<MapPin size={14} />} label="Localisation" />
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2">
+                                <Input
+                                    label="Adresse"
+                                    value={form.address}
+                                    onChange={(e) => set("address", e.target.value)}
+                                    placeholder="Ex: Rue de la joie, face Total, Akwa"
+                                />
+                            </div>
+                            <Input
+                                label="Ville"
+                                value={form.city}
+                                onChange={(e) => set("city", e.target.value)}
+                                placeholder="Ex: Douala"
+                            />
+                        </div>
                     </div>
-                    <div className="md:col-span-2">
-                        <Input 
-                            label={t.settings?.address || "Adresse"} 
-                            value={form.address} 
-                            onChange={(e) => updateField("address", e.target.value)} 
-                        />
+
+                    {/* ── Contact ── */}
+                    <div>
+                        <SectionHeader icon={<Phone size={14} />} label="Contact" />
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input
+                                label="Téléphone"
+                                value={form.phone}
+                                onChange={(e) => set("phone", e.target.value)}
+                                placeholder="6XX XXX XXX"
+                                type="tel"
+                            />
+                            <Input
+                                label="Email"
+                                value={form.email}
+                                onChange={(e) => set("email", e.target.value)}
+                                placeholder="contact@restaurant.cm"
+                                type="email"
+                            />
+                        </div>
                     </div>
-                    <Input 
-                        label={t.settings?.city || "Ville"} 
-                        value={form.city} 
-                        onChange={(e) => updateField("city", e.target.value)} 
-                    />
-                    <Input 
-                        label="Code postal" 
-                        value={form.postalCode} 
-                        onChange={(e) => updateField("postalCode", e.target.value)} 
-                    />
-                    <Input 
-                        label={t.settings?.phone || "Téléphone"} 
-                        value={form.phone} 
-                        onChange={(e) => updateField("phone", e.target.value)} 
-                    />
-                    <Input 
-                        label={t.settings?.email || "Email"} 
-                        type="email" 
-                        value={form.email} 
-                        onChange={(e) => updateField("email", e.target.value)} 
-                    />
-                    <Input 
-                        label="Type de cuisine" 
-                        value={form.cuisineType} 
-                        onChange={(e) => updateField("cuisineType", e.target.value)} 
-                    />
-                    <Select 
-                        label="Gamme de prix" 
-                        value={form.priceRange} 
-                        onChange={(e) => updateField("priceRange", e.target.value)}
-                        options={[
-                            { value: "1", label: "€ (Économique)" },
-                            { value: "2", label: "€€ (Moyen)" },
-                            { value: "3", label: "€€€ (Cher)" },
-                            { value: "4", label: "€€€€ (Très cher)" }
-                        ]}
-                    />
+
+                    {/* ── Restauration ── */}
+                    <div>
+                        <SectionHeader icon={<UtensilsCrossed size={14} />} label="Cuisine" />
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input
+                                label="Type de cuisine"
+                                value={form.cuisineType}
+                                onChange={(e) => set("cuisineType", e.target.value)}
+                                placeholder="Ex: Africaine, Créole…"
+                            />
+                            <div>
+                                <Select
+                                    label="Gamme de prix"
+                                    value={form.priceRange}
+                                    onChange={(e) => set("priceRange", e.target.value)}
+                                    options={PRICE_RANGES.map((p) => ({ value: p.value, label: p.label }))}
+                                />
+                                {(() => {
+                                    const selected = PRICE_RANGES.find((p) => p.value === form.priceRange);
+                                    return selected ? (
+                                        <p className="text-[11px] text-surface-400 mt-1">{selected.sub}</p>
+                                    ) : null;
+                                })()}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
-                <div className="flex justify-end gap-3 mt-6">
-                    <Button variant="ghost" onClick={onClose} type="button">
-                        {t.common?.cancel || "Annuler"}
+
+                <ModalFooter>
+                    <Button variant="outline" type="button" onClick={onClose}>
+                        Annuler
                     </Button>
-                    <Button type="submit" leftIcon={<Save size={18} />} isLoading={loading}>
-                        {t.common?.save || "Enregistrer"}
+                    <Button type="submit" leftIcon={<Save size={16} />} isLoading={loading}>
+                        Enregistrer
                     </Button>
-                </div>
+                </ModalFooter>
             </form>
         </Modal>
     );

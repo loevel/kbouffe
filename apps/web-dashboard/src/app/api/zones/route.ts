@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     try {
         const { data: zones, error: fetchError } = await ctx.supabase
             .from("table_zones")
-            .select("id, name, type, description, sort_order, is_active")
+            .select("id, name, type, description, sort_order, is_active, image_url, image_urls, color, capacity, min_party_size, amenities, pricing_note")
             .eq("restaurant_id", ctx.restaurantId)
             .order("sort_order", { ascending: true });
 
@@ -67,6 +67,14 @@ export async function POST(request: NextRequest) {
                 type: type.trim(),
                 is_active: true,
                 sort_order: 0,
+                description: body.description ?? null,
+                image_url: body.image_url ?? null,
+                image_urls: body.image_urls ?? [],
+                color: body.color ?? "#6366f1",
+                capacity: body.capacity ?? 0,
+                min_party_size: body.min_party_size ?? 1,
+                amenities: body.amenities ?? [],
+                pricing_note: body.pricing_note ?? null,
             })
             .select()
             .single();

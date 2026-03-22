@@ -36,6 +36,10 @@ function mapRestaurantUpdateForApi(data: RestaurantUpdate): Record<string, unkno
     if (data.corkage_fee_amount !== undefined) mapped.corkageFeeAmount = data.corkage_fee_amount;
     if (data.dine_in_service_fee !== undefined) mapped.dineInServiceFee = data.dine_in_service_fee;
     if (data.total_tables !== undefined) mapped.totalTables = data.total_tables;
+    if ((data as any).reservation_slot_duration !== undefined) mapped.reservationSlotDuration = (data as any).reservation_slot_duration;
+    if ((data as any).reservation_open_time !== undefined) mapped.reservationOpenTime = (data as any).reservation_open_time;
+    if ((data as any).reservation_close_time !== undefined) mapped.reservationCloseTime = (data as any).reservation_close_time;
+    if ((data as any).reservation_slot_interval !== undefined) mapped.reservationSlotInterval = (data as any).reservation_slot_interval;
     if (data.reservation_cancel_policy !== undefined) mapped.reservationCancelPolicy = data.reservation_cancel_policy;
     if (data.reservation_cancel_notice_minutes !== undefined) mapped.reservationCancelNoticeMinutes = data.reservation_cancel_notice_minutes;
     if (data.reservation_cancellation_fee_amount !== undefined) mapped.reservationCancellationFeeAmount = data.reservation_cancellation_fee_amount;
@@ -46,6 +50,9 @@ function mapRestaurantUpdateForApi(data: RestaurantUpdate): Record<string, unkno
     if (data.banner_url !== undefined) mapped.coverUrl = data.banner_url;
     if (data.min_order_amount !== undefined) mapped.minOrderAmount = data.min_order_amount;
     if (data.opening_hours !== undefined) mapped.openingHours = data.opening_hours;
+    if (data.is_published !== undefined) mapped.isActive = data.is_published;
+    if ((data as any).cuisine_type !== undefined) mapped.cuisineType = (data as any).cuisine_type;
+    if ((data as any).price_range !== undefined) mapped.priceRange = (data as any).price_range;
 
     return mapped;
 }

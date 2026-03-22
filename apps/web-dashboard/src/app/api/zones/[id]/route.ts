@@ -2,6 +2,60 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, apiError } from "@/lib/api/helpers";
 
 /**
+ * PATCH /api/zones/[id]
+ * Update a table zone
+ */
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { ctx, error } = await withAuth();
+    if (error) return error;
+
+    try {
+        const { id } = await params;
+        const body = await request.json();
+
+        // Build update payload — only include fields that were sent
+        const updateData: Record<string, unknown> = {};
+        if (body.name !== undefined) updateData.name = body.name.trim();
+        if (body.type !== undefined) updateData.type = body.type;
+        if (body.description !== undefined) updateData.description = body.description;
+        if (body.image_url !== undefined) updateData.image_url = body.image_url;
+        if (body.image_urls !== undefined) updateData.image_urls = body.image_urls;
+        if (body.color !== undefined) updateData.color = body.color;
+        if (body.capacity !== undefined) updateData.capacity = body.capacity;
+        if (body.min_party_size !== undefined) updateData.min_party_size = body.min_party_size;
+        if (body.amenities !== undefined) updateData.amenities = body.amenities;
+        if (body.pricing_note !== undefined) updateData.pricing_note = body.pricing_note;
+        if (body.is_active !== undefined) updateData.is_active = body.is_active;
+        if (body.sort_order !== undefined) updateData.sort_order = body.sort_order;
+
+        if (Object.keys(updateData).length === 0) {
+            return apiError("Aucune donnée à mettre à jour", 400);
+        }
+
+        const { data: zone, error: updateError } = await ctx.supabase
+            .from("table_zones")
+            .update(updateData)
+            .eq("id", id)
+            .eq("restaurant_id", ctx.restaurantId)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error("Error updating zone:", updateError);
+            return apiError("Erreur lors de la mise à jour de la zone");
+        }
+
+        return NextResponse.json({ success: true, zone });
+    } catch (err) {
+        console.error("PATCH /api/zones/[id] error:", err);
+        return apiError("Erreur interne du serveur");
+    }
+}
+
+/**
  * DELETE /api/zones/[id]
  * Delete a table zone
  */

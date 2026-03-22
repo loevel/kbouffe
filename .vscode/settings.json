@@ -4,7 +4,8 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "./node_modules/.bin/tsc": true
+        "./node_modules/.bin/tsc": true,
+        "mkdir": true
     },
     "claudeCode.useTerminal": true
 }

@@ -369,3 +369,107 @@ adminCatalogRoutes.post("/categories/import-pack", async (c) => {
         return c.json({ error: "Erreur serveur" }, 500);
     }
 });
+
+// ── Cuisine Categories (platform-level filters) ──────────────────
+adminCatalogRoutes.get("/cuisine-categories", async (c) => {
+    const denied = requireDomain(c, "catalog:read");
+    if (denied) return denied;
+
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const { data, error } = await supabase
+        .from("cuisine_categories")
+        .select("*")
+        .order("sort_order", { ascending: true });
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    return c.json({ data: data ?? [] });
+});
+
+adminCatalogRoutes.post("/cuisine-categories", async (c) => {
+    const denied = requireDomain(c, "catalog:write");
+    if (denied) return denied;
+
+    const body = await c.req.json();
+    const { label, value, icon, sort_order, is_active } = body;
+
+    if (!label || !value || !icon) {
+        return c.json({ error: "label, value et icon sont requis" }, 400);
+    }
+
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const { data, error } = await supabase
+        .from("cuisine_categories")
+        .insert({
+            label,
+            value,
+            icon,
+            sort_order: sort_order ?? 0,
+            is_active: is_active ?? true,
+        })
+        .select()
+        .single();
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    await logAdminAction(c, {
+        action: "create_cuisine_category",
+        targetType: "cuisine_category",
+        targetId: data.id,
+        details: { label, value, icon },
+    });
+
+    return c.json({ success: true, data });
+});
+
+adminCatalogRoutes.patch("/cuisine-categories/:id", async (c) => {
+    const denied = requireDomain(c, "catalog:write");
+    if (denied) return denied;
+
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const { data, error } = await supabase
+        .from("cuisine_categories")
+        .update({ ...body, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    await logAdminAction(c, {
+        action: "update_cuisine_category",
+        targetType: "cuisine_category",
+        targetId: id,
+        details: body,
+    });
+
+    return c.json({ success: true, data });
+});
+
+adminCatalogRoutes.delete("/cuisine-categories/:id", async (c) => {
+    const denied = requireDomain(c, "catalog:write");
+    if (denied) return denied;
+
+    const id = c.req.param("id");
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const { error } = await supabase
+        .from("cuisine_categories")
+        .delete()
+        .eq("id", id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    await logAdminAction(c, {
+        action: "delete_cuisine_category",
+        targetType: "cuisine_category",
+        targetId: id,
+    });
+
+    return c.json({ success: true });
+});

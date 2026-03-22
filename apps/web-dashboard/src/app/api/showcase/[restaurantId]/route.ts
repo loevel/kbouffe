@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { createClient } from "@/lib/supabase/server";
+import { withAuth } from "@/lib/api/helpers";
 
 /**
  * GET /api/showcase/[restaurantId]
@@ -43,24 +43,15 @@ export async function POST(
 ) {
     try {
         const { restaurantId } = await params;
-        const supabase = await createClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+        const auth = await withAuth();
+        if (auth.error) return auth.error;
+        const { ctx } = auth;
+
+        if (ctx.restaurantId !== restaurantId) {
+            return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
         }
 
         const admin = await createAdminClient();
-
-        // Verify ownership
-        const { data: restaurant } = await admin
-            .from("restaurants")
-            .select("owner_id")
-            .eq("id", restaurantId)
-            .single();
-
-        if (!restaurant || restaurant.owner_id !== user.id) {
-            return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-        }
 
         const body = await request.json();
         const { section_type, title, subtitle, content, display_order, settings } = body;

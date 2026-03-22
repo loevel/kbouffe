@@ -618,7 +618,14 @@ export default function MessagesPage() {
     const fetchConversations = useCallback(async () => {
         try {
             const res = await fetch("/api/dashboard/messages");
-            if (!res.ok) throw new Error("Erreur API");
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                if (res.status === 401) {
+                    console.warn("[Messages] Non authentifié — session expirée ?");
+                    return;
+                }
+                throw new Error(err.error || `Erreur API (${res.status})`);
+            }
             const data = await res.json();
             setConversations(data);
         } catch (err) {

@@ -35,14 +35,13 @@ interface RestaurantItem {
     orderCount?: number | null;
 }
 
-const CUISINE_FILTERS = [
-    { label: "Burgers", value: "fast-food", icon: "🍔" },
-    { label: "Pizza", value: "pizza", icon: "🍕" },
-    { label: "Africain", value: "african", icon: "🥘" },
-    { label: "Poulet", value: "poulet", icon: "🍗" },
-    { label: "Grillades", value: "grillades", icon: "🔥" },
-    { label: "Desserts", value: "patisserie", icon: "🍰" },
-];
+interface CuisineCategory {
+    id: string;
+    label: string;
+    value: string;
+    icon: string;
+    sort_order: number;
+}
 
 const WEB_PROMOS = [
     {
@@ -319,11 +318,20 @@ export function ClientDiscovery() {
     const reduceMotion = useReducedMotion();
     
     const [restaurants, setRestaurants] = useState<RestaurantItem[]>([]);
+    const [cuisineCategories, setCuisineCategories] = useState<CuisineCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchInput, setSearchInput] = useState("");
 
     const selectedCuisine = filters.cuisineTypes?.[0] ?? "";
+
+    // Fetch cuisine categories from the database
+    useEffect(() => {
+        fetch("/api/cuisine-categories")
+            .then((res) => res.json())
+            .then((json) => setCuisineCategories(json.data ?? []))
+            .catch(() => {});
+    }, []);
 
     const fetchRestaurants = useCallback(async () => {
         setLoading(true);
@@ -441,33 +449,33 @@ export function ClientDiscovery() {
             </div>
 
             <div className="mb-20">
-                <div className="flex items-center justify-between mb-12 px-3">
+                <div className="flex items-center justify-between mb-8 px-3">
                     <h2 className="text-4xl font-black tracking-tight text-surface-900 dark:text-white uppercase italic">EXPLORER PAR CUISINE</h2>
                 </div>
-                <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide pb-8 -mx-1 px-1">
-                    <div className="hidden sm:block text-xs uppercase tracking-widest text-surface-400 font-bold mr-2">Glisser →</div>
+                <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide pb-6 -mx-1 px-1">
+                    <div className="hidden sm:block text-xs uppercase tracking-widest text-surface-400 font-bold mr-1 shrink-0">Glisser →</div>
                     <button
                         onClick={() => updateFilters({ cuisineTypes: [] })}
-                        className={`shrink-0 flex flex-col items-center justify-center gap-5 w-40 h-40 rounded-[3rem] border-3 transition-all duration-500 font-black text-xs uppercase tracking-widest ${
+                        className={`shrink-0 flex flex-col items-center justify-center gap-2.5 w-24 h-24 rounded-2xl border-2 transition-all duration-300 font-bold text-[10px] uppercase tracking-wider ${
                             selectedCuisine === ""
-                                ? "bg-brand-500 border-brand-500 text-white shadow-2xl shadow-brand-500/40 scale-110"
-                                : "bg-white dark:bg-surface-900 border-surface-100 dark:border-surface-800 text-surface-500 hover:border-brand-500/30 hover:shadow-2xl"
+                                ? "bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/30 scale-105"
+                                : "bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700 text-surface-500 hover:border-brand-400 hover:shadow-md"
                         }`}
                     >
-                        <div className="text-5xl">🥙</div>
-                        TOUTE LA CARTE
+                        <div className="text-2xl">🥙</div>
+                        Tout
                     </button>
-                    {CUISINE_FILTERS.map((c) => (
+                    {cuisineCategories.map((c) => (
                         <button
                             key={c.value}
                             onClick={() => updateFilters({ cuisineTypes: selectedCuisine === c.value ? [] : [c.value] })}
-                            className={`shrink-0 flex flex-col items-center justify-center gap-3 w-28 h-28 rounded-[2rem] border-2 transition-all duration-300 font-black text-xs uppercase tracking-widest ${
+                            className={`shrink-0 flex flex-col items-center justify-center gap-2.5 w-24 h-24 rounded-2xl border-2 transition-all duration-300 font-bold text-[10px] uppercase tracking-wider ${
                                 selectedCuisine === c.value
-                                    ? "bg-brand-500 border-brand-500 text-white shadow-xl shadow-brand-500/30 scale-105"
-                                    : "bg-white dark:bg-surface-900 border-surface-100 dark:border-surface-800 text-surface-500 hover:border-brand-500/30"
+                                    ? "bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/30 scale-105"
+                                    : "bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700 text-surface-500 hover:border-brand-400 hover:shadow-md"
                             }`}
                         >
-                            <div className="text-3xl">{c.icon}</div>
+                            <div className="text-2xl">{c.icon}</div>
                             {c.label}
                         </button>
                     ))}

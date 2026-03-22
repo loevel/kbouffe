@@ -16,6 +16,12 @@ interface TableZone {
     description: string | null;
     sort_order: number;
     is_active: boolean;
+    image_url: string | null;
+    color: string | null;
+    capacity: number;
+    min_party_size: number;
+    amenities: string[];
+    pricing_note: string | null;
 }
 
 interface RestaurantTable {
@@ -159,12 +165,76 @@ export function TablesManager() {
                 </Card>
             </div>
 
+            {/* Zone overview cards */}
+            {zones.length > 0 && (
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <MapPin size={16} className="text-brand-500" />
+                        <h3 className="text-sm font-bold text-surface-900 dark:text-white">Zones du restaurant</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {zones.map((zone) => {
+                            const zoneTables = tables.filter((t) => t.zone_id === zone.id);
+                            const availCount = zoneTables.filter((t) => t.status === "available").length;
+                            return (
+                                <button
+                                    key={zone.id}
+                                    onClick={() => setFilterZone(filterZone === zone.id ? "all" : zone.id)}
+                                    className={`text-left rounded-xl border-2 overflow-hidden transition-all hover:shadow-md ${
+                                        filterZone === zone.id
+                                            ? "border-brand-500 shadow-md"
+                                            : "border-surface-200 dark:border-surface-700"
+                                    }`}
+                                >
+                                    {/* Zone image or color header */}
+                                    <div
+                                        className="h-16 relative"
+                                        style={{ backgroundColor: zone.color ?? "#6366f1" }}
+                                    >
+                                        {zone.image_url && (
+                                            <img src={zone.image_url} alt={zone.name} className="w-full h-full object-cover absolute inset-0" />
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                                        <div className="absolute bottom-2 left-3 right-3">
+                                            <p className="text-sm font-bold text-white truncate">{zone.name}</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-3 bg-white dark:bg-surface-900">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-surface-500">
+                                                {zoneTables.length} table{zoneTables.length !== 1 ? "s" : ""}
+                                            </span>
+                                            <span className={`font-bold ${availCount > 0 ? "text-green-500" : "text-red-500"}`}>
+                                                {availCount} dispo.
+                                            </span>
+                                        </div>
+                                        {zone.amenities?.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1.5">
+                                                {zone.amenities.slice(0, 4).map((a) => (
+                                                    <span key={a} className="text-[10px] px-1.5 py-0.5 bg-surface-100 dark:bg-surface-800 rounded-full text-surface-500">
+                                                        {a === "wifi" ? "📶" : a === "ac" ? "❄️" : a === "view" ? "🌅" : a === "private" ? "🔒" : a === "music" ? "🎵" : a === "tv" ? "📺" : a === "outdoor" ? "🌿" : a === "parking" ? "🅿️" : a}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {zone.pricing_note && (
+                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-medium truncate">{zone.pricing_note}</p>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
                 <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700 w-full md:w-auto">
                     <Search size={16} className="text-surface-400" />
                     <input
                         value={query}
+                        onChange={(e) => setQuery(e.target.value)}
                         placeholder="Rechercher une table ou zone"
                         className="bg-transparent w-full outline-none text-sm"
                     />

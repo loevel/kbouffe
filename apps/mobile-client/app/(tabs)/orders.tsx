@@ -103,14 +103,29 @@ export default function OrdersScreen() {
                             <Ionicons name="chevron-forward" size={16} color={theme.primary} />
                         </View>
                     )}
-                    {!isActive && order.status === 'completed' && (
+                    {!isActive && ['completed', 'delivered'].includes(order.status) && (
                         <View style={styles.completedActions}>
+                            {order.status === 'completed' && (
+                                <Pressable
+                                    style={[styles.reorderButton, { backgroundColor: theme.primary + '15' }]}
+                                    onPress={() => handleReorder(order)}
+                                >
+                                    <Ionicons name="refresh" size={14} color={theme.primary} />
+                                    <Text style={[styles.reorderText, { color: theme.primary }]}>Recommander</Text>
+                                </Pressable>
+                            )}
                             <Pressable
-                                style={[styles.reorderButton, { backgroundColor: theme.primary + '15' }]}
-                                onPress={() => handleReorder(order)}
+                                style={[styles.reorderButton, { backgroundColor: '#f59e0b' + '18' }]}
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    router.push({
+                                        pathname: '/review/[orderId]' as any,
+                                        params: { orderId: order.id, restaurantId: order.restaurantId, restaurantName: order.restaurantName },
+                                    });
+                                }}
                             >
-                                <Ionicons name="refresh" size={14} color={theme.primary} />
-                                <Text style={[styles.reorderText, { color: theme.primary }]}>Recommander</Text>
+                                <Ionicons name="star-outline" size={14} color="#f59e0b" />
+                                <Text style={[styles.reorderText, { color: '#f59e0b' }]}>Laisser un avis</Text>
                             </Pressable>
                         </View>
                     )}
