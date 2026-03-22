@@ -27,6 +27,7 @@ import { AddressesPanelReal } from "./AddressesPanelReal";
 import { PreferencesPanelReal } from "./PreferencesPanelReal";
 import { ClientNotificationsPanel } from "./ClientNotificationsPanel";
 import { SupportPanelReal } from "./SupportPanelReal";
+import { ReservationsPanelReal } from "./ReservationsPanelReal";
 
 function PanelShell({
     title,
@@ -287,6 +288,7 @@ export function SupportPanel() {
 export type ClientSectionId =
     | "restaurants"
     | "orders"
+    | "reservations"
     | "promotions"
     | "favorites"
     | "addresses"
@@ -300,6 +302,7 @@ export type ClientSectionId =
 export type ClientSectionIcon =
     | "home"
     | "orders"
+    | "reservations"
     | "promotions"
     | "favorites"
     | "addresses"
@@ -324,6 +327,7 @@ export interface ClientSectionGroup {
 export const clientSectionPath: Record<ClientSectionId, string> = {
     restaurants: "/stores",
     orders: "/stores/orders",
+    reservations: "/stores/reservations",
     promotions: "/stores/promotions",
     favorites: "/stores/favorites",
     addresses: "/stores/addresses",
@@ -341,6 +345,7 @@ export const sectionGroups: ClientSectionGroup[] = [
         items: [
             { id: "restaurants", label: "Accueil client", icon: "home" },
             { id: "orders", label: "Mes commandes", icon: "orders" },
+            { id: "reservations", label: "Mes réservations", icon: "reservations" },
             { id: "promotions", label: "Offres & promos", icon: "promotions" },
         ],
     },
@@ -368,6 +373,8 @@ export function renderSectionPanel(section: ClientSectionId) {
     switch (section) {
         case "orders":
             return <OrdersPanelReal />;
+        case "reservations":
+            return <ReservationsPanelReal />;
         case "promotions":
             return <PromotionsPanel />;
         case "favorites":

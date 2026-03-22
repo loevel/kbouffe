@@ -473,7 +473,7 @@ export interface RecentOrder {
     restaurantSlug: string;
     total: number;
     itemCount: number;
-    status: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
+    status: "pending" | "accepted" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
     deliveryType: "delivery" | "pickup" | "dine_in";
     createdAt: string; // ISO
 }

@@ -12,6 +12,8 @@
  * Merchant-facing (authMiddleware with restaurantId):
  *   GET    /restaurant/reviews          — List reviews for the merchant's restaurant
  *   PATCH  /restaurant/reviews/:id      — Respond to a review
+ *   GET    /restaurant/product-reviews     — List product reviews for the merchant's restaurant
+ *   PATCH  /restaurant/product-reviews/:id — Respond to a product review
  */
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
@@ -187,6 +189,7 @@ customerReviewRoutes.get("/mine", async (c) => {
 //  Merchant routes — uses authMiddleware (sets restaurantId)
 // ═══════════════════════════════════════════════════════════════════════
 export const merchantReviewRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const merchantProductReviewRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
  * GET /restaurant/reviews — List reviews for the merchant's restaurant
@@ -283,6 +286,118 @@ merchantReviewRoutes.patch("/:id", async (c) => {
         return c.json({ success: true });
     } catch (error) {
         console.error("[PATCH /restaurant/reviews/:id] Unexpected error:", error);
+        return c.json({ error: "Erreur serveur" }, 500);
+    }
+});
+
+/**
+ * GET /restaurant/product-reviews — List product reviews for the merchant's restaurant
+ */
+merchantProductReviewRoutes.get("/", async (c) => {
+    try {
+        const restaurantId = c.var.restaurantId;
+        const supabase = getAdminClient(c.env);
+        const page = parseInt(c.req.query("page") ?? "1");
+        const limit = 20;
+        const offset = (page - 1) * limit;
+
+        const { data: reviews, error, count } = await supabase
+            .from("product_reviews")
+            .select("id, product_id, customer_id, rating, comment, response, is_visible, created_at, updated_at", { count: "exact" })
+            .eq("restaurant_id", restaurantId)
+            .order("created_at", { ascending: false })
+            .range(offset, offset + limit - 1);
+
+        if (error) {
+            console.error("[GET /restaurant/product-reviews] error:", error);
+            return c.json({ error: "Erreur serveur" }, 500);
+        }
+
+        const customerIds = [...new Set((reviews ?? []).map((r) => r.customer_id))];
+        const productIds = [...new Set((reviews ?? []).map((r) => r.product_id))];
+
+        let customerMap: Record<string, string> = {};
+        let productMap: Record<string, string> = {};
+
+        if (customerIds.length > 0) {
+            const { data: customers } = await supabase
+                .from("users")
+                .select("id, full_name")
+                .in("id", customerIds);
+            for (const user of customers ?? []) {
+                customerMap[user.id] = user.full_name ?? "Client";
+            }
+        }
+
+        if (productIds.length > 0) {
+            const { data: products } = await supabase
+                .from("products")
+                .select("id, name")
+                .in("id", productIds);
+            for (const product of products ?? []) {
+                productMap[product.id] = product.name ?? "Produit";
+            }
+        }
+
+        return c.json({
+            reviews: (reviews ?? []).map((review) => ({
+                ...review,
+                customerName: customerMap[review.customer_id] ?? "Client",
+                productName: productMap[review.product_id] ?? "Produit",
+            })),
+            total: count ?? 0,
+            page,
+            totalPages: Math.ceil((count ?? 0) / limit),
+        });
+    } catch (error) {
+        console.error("[GET /restaurant/product-reviews] Unexpected error:", error);
+        return c.json({ error: "Erreur serveur" }, 500);
+    }
+});
+
+/**
+ * PATCH /restaurant/product-reviews/:id — Respond to a product review
+ * Body: { response: string }
+ */
+merchantProductReviewRoutes.patch("/:id", async (c) => {
+    try {
+        const restaurantId = c.var.restaurantId;
+        const reviewId = c.req.param("id");
+        const body = await c.req.json<{ response: string }>();
+
+        if (!body.response?.trim()) {
+            return c.json({ error: "La réponse ne peut pas être vide" }, 400);
+        }
+
+        const supabase = getAdminClient(c.env);
+
+        const { data: review } = await supabase
+            .from("product_reviews")
+            .select("id, restaurant_id")
+            .eq("id", reviewId)
+            .single();
+
+        if (!review) return c.json({ error: "Avis introuvable" }, 404);
+        if (review.restaurant_id !== restaurantId) {
+            return c.json({ error: "Cet avis ne concerne pas votre restaurant" }, 403);
+        }
+
+        const { error: updateError } = await supabase
+            .from("product_reviews")
+            .update({
+                response: body.response.trim(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", reviewId);
+
+        if (updateError) {
+            console.error("[PATCH /restaurant/product-reviews/:id] error:", updateError);
+            return c.json({ error: "Erreur lors de la mise à jour" }, 500);
+        }
+
+        return c.json({ success: true });
+    } catch (error) {
+        console.error("[PATCH /restaurant/product-reviews/:id] Unexpected error:", error);
         return c.json({ error: "Erreur serveur" }, 500);
     }
 });
@@ -444,7 +559,7 @@ publicProductReviewRoutes.get("/products/:productId/reviews", async (c) => {
         // Fetch visible reviews with customer names
         const { data: reviews, error } = await supabase
             .from("product_reviews")
-            .select("id, rating, comment, created_at, customer_id")
+            .select("id, rating, comment, response, created_at, customer_id")
             .eq("product_id", productId)
             .eq("is_visible", true)
             .order("created_at", { ascending: false })
@@ -477,6 +592,7 @@ publicProductReviewRoutes.get("/products/:productId/reviews", async (c) => {
                 id: r.id,
                 rating: r.rating,
                 comment: r.comment,
+                response: r.response,
                 created_at: r.created_at,
                 customerName: customerMap[r.customer_id] ?? "Client",
             })),

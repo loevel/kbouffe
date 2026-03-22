@@ -1,5 +1,12 @@
 import { Hono } from "hono";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { CoreEnv, CoreVariables } from "./types";
+
+function adminDb(c: { env: CoreEnv }) {
+    return createSupabaseClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    });
+}
 
 export const usersRoutes = new Hono<{ Bindings: CoreEnv; Variables: CoreVariables }>();
 export const securityRoutes = new Hono<{ Bindings: CoreEnv; Variables: CoreVariables }>();
@@ -324,43 +331,126 @@ usersRoutes.get("/support/tickets", async (c) => {
     return c.json({ tickets: data || [] });
 });
 
-/** POST /account/support/tickets — Create ticket */
+/** POST /account/support/tickets — Create ticket + conversation linked to restaurant */
 usersRoutes.post("/support/tickets", async (c) => {
     const body = await c.req.json();
-    const { data, error } = await c.var.supabase
+    const userId = c.var.userId;
+    const db = adminDb(c);
+
+    // Resolve restaurant_id: prefer explicit, else look it up from the order
+    let restaurantId: string | null = body.restaurantId || null;
+    if (!restaurantId && body.orderId) {
+        const { data: order } = await db
+            .from("orders")
+            .select("restaurant_id, customer_id")
+            .eq("id", body.orderId)
+            .maybeSingle();
+        if (order?.customer_id === userId) {
+            restaurantId = order.restaurant_id;
+        }
+    }
+
+    // Insert support ticket
+    const { data: ticket, error } = await db
         .from("support_tickets")
         .insert({
-            reporter_id: c.var.userId,
+            reporter_id: userId,
             reporter_type: body.reporterType || "client",
             subject: body.subject,
             description: body.description,
             priority: body.priority || "medium",
-            restaurant_id: body.restaurantId,
-            order_id: body.orderId
+            restaurant_id: restaurantId,
+            order_id: body.orderId || null,
         })
         .select()
         .single();
 
     if (error) return c.json({ error: error.message }, 500);
-    return c.json({ success: true, ticket: data });
+
+    // If we have a restaurant, create the linked conversation so it appears in
+    // the restaurant dashboard's messages view.
+    if (restaurantId) {
+        // Fetch customer name for conversation metadata
+        const { data: userProfile } = await db
+            .from("users")
+            .select("full_name, phone")
+            .eq("id", userId)
+            .maybeSingle();
+
+        const { data: conversation, error: convError } = await db
+            .from("conversations")
+            .insert({
+                restaurant_id: restaurantId,
+                metadata: {
+                    type: "support",
+                    ticket_id: ticket.id,
+                    customer_id: userId,
+                    customer_name: userProfile?.full_name || userProfile?.phone || "Client",
+                    subject: body.subject,
+                },
+            })
+            .select()
+            .single();
+
+        if (!convError && conversation && body.description) {
+            // Insert the description as the opening message
+            await db.from("messages").insert({
+                conversation_id: conversation.id,
+                sender_id: userId,
+                content: body.description,
+                content_type: "text",
+                is_read: false,
+            });
+        }
+    }
+
+    return c.json({ success: true, ticket });
 });
 
 /** GET /account/orders — User order history */
 usersRoutes.get("/orders", async (c) => {
     const { data, error } = await c.var.supabase
         .from("orders")
-        .select("*, restaurant:restaurants(name)")
+        .select("*, restaurant:restaurants(name, slug)")
         .eq("customer_id", c.var.userId)
         .order("created_at", { ascending: false })
         .limit(100);
 
     if (error) return c.json({ error: error.message }, 500);
     return c.json({
-        orders: (data || []).map((order: Record<string, unknown> & { restaurant?: { name?: string | null } | null }) => ({
+        orders: (data || []).map((order: Record<string, unknown> & { restaurant?: { name?: string | null; slug?: string | null } | null; items?: unknown[] | null }) => ({
             ...order,
             restaurant_name: order.restaurant?.name ?? null,
+            restaurant_slug: order.restaurant?.slug ?? null,
+            item_count: Array.isArray(order.items) ? order.items.length : 0,
         })),
     });
+});
+
+/** POST /account/orders/:id/cancel — Client cancels own pending order */
+usersRoutes.post("/orders/:id/cancel", async (c) => {
+    const orderId = c.req.param("id");
+
+    // Verify order belongs to this user and is still pending
+    const { data: order, error: fetchErr } = await c.var.supabase
+        .from("orders")
+        .select("id, status, customer_id")
+        .eq("id", orderId)
+        .eq("customer_id", c.var.userId)
+        .single();
+
+    if (fetchErr || !order) return c.json({ error: "Commande introuvable" }, 404);
+    if (order.status !== "pending") {
+        return c.json({ error: "Seules les commandes en attente peuvent être annulées" }, 400);
+    }
+
+    const { error: updateErr } = await c.var.supabase
+        .from("orders")
+        .update({ status: "cancelled" })
+        .eq("id", orderId);
+
+    if (updateErr) return c.json({ error: updateErr.message }, 500);
+    return c.json({ success: true });
 });
 
 // ── Security ─────────────────────────────────────────────────────────

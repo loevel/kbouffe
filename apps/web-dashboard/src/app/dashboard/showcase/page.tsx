@@ -45,6 +45,15 @@ interface ShowcaseSection {
     updated_at: string;
 }
 
+interface DashboardTeamMember {
+    id: string;
+    userId: string;
+    role: string;
+    status: string;
+    name: string;
+    imageUrl: string | null;
+}
+
 const SECTION_TYPE_META: Record<string, { label: string; icon: any; description: string; editable: boolean }> = {
     hero: { label: "Bannière principale", icon: LayoutTemplate, description: "Logo, nom et couverture du restaurant (données automatiques)", editable: false },
     about: { label: "À propos", icon: Type, description: "Présentez votre restaurant (texte + image optionnelle)", editable: true },
@@ -55,7 +64,7 @@ const SECTION_TYPE_META: Record<string, { label: string; icon: any; description:
     hours_location: { label: "Horaires & Contact", icon: Clock, description: "Horaires d'ouverture, adresse et contact (données automatiques)", editable: false },
     team: { label: "Notre équipe", icon: Users, description: "Présentez les membres de votre équipe", editable: true },
     specials: { label: "Offres spéciales", icon: Megaphone, description: "Promotions, menus du jour, offres limitées", editable: true },
-    custom: { label: "Section libre", icon: Type, description: "Contenu personnalisé (texte + image)", editable: true },
+    custom: { label: "Section libre", icon: Type, description: "Texte, image, galerie, boutons, mini-tableau", editable: true },
     cta: { label: "Appel à l'action", icon: ArrowRight, description: "Bouton \"Commander maintenant\"", editable: true },
 };
 
@@ -72,18 +81,25 @@ export default function ShowcaseEditorPage() {
     const [editingSection, setEditingSection] = useState<string | null>(null);
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [products, setProducts] = useState<Array<{ id: string; name: string; image_url: string | null; price: number }>>([]);
+    const [teamMembers, setTeamMembers] = useState<DashboardTeamMember[]>([]);
 
     // Fetch showcase sections
     useEffect(() => {
-        fetch("/api/dashboard/showcase")
+        if (!restaurant?.id) {
+            setLoading(false);
+            return;
+        }
+
+        fetch(`/api/dashboard/showcase?restaurantId=${restaurant.id}`)
             .then(r => r.json())
             .then((data: any) => {
                 setSections(data.sections ?? []);
                 setRestaurantId(data.restaurantId ?? "");
+                setTeamMembers(Array.isArray(data.teamMembers) ? data.teamMembers : []);
             })
             .catch(() => {})
             .finally(() => setLoading(false));
-    }, []);
+    }, [restaurant?.id]);
 
     // Fetch products for menu_highlights picker
     useEffect(() => {
@@ -161,7 +177,7 @@ export default function ShowcaseEditorPage() {
                     : sectionType === "about"
                         ? { text: "" }
                         : sectionType === "team"
-                            ? { members: [] }
+                            ? { text: "", memberOverrides: {} }
                             : sectionType === "specials"
                                 ? { items: [] }
                                 : { text: "" },
@@ -324,6 +340,7 @@ export default function ShowcaseEditorPage() {
                                 <SectionEditor
                                     section={section}
                                     products={products}
+                                    teamMembers={teamMembers}
                                     onSave={(updates) => {
                                         saveSection(section.id, updates);
                                         setEditingSection(null);
@@ -388,6 +405,7 @@ export default function ShowcaseEditorPage() {
                     <li>• Utilisez <strong>Plats vedettes</strong> pour mettre en avant vos spécialités.</li>
                     <li>• Réorganisez les sections en utilisant les flèches haut/bas.</li>
                     <li>• Masquez une section avec l&apos;icône œil sans la supprimer.</li>
+                    <li>• Dans <strong>Section libre</strong>, vous pouvez ajouter une galerie, des boutons et un mini-tableau.</li>
                 </ul>
             </div>
         </div>
@@ -399,11 +417,13 @@ export default function ShowcaseEditorPage() {
 function SectionEditor({
     section,
     products,
+    teamMembers,
     onSave,
     onCancel,
 }: {
     section: ShowcaseSection;
     products: Array<{ id: string; name: string; image_url: string | null; price: number }>;
+    teamMembers: DashboardTeamMember[];
     onSave: (updates: Partial<ShowcaseSection>) => void;
     onCancel: () => void;
 }) {
@@ -447,7 +467,7 @@ function SectionEditor({
                 <MenuHighlightsEditor content={content} products={products} onChange={setContent} />
             )}
             {section.section_type === "team" && (
-                <TeamEditor content={content} onChange={setContent} />
+                <TeamEditor content={content} teamMembers={teamMembers} onChange={setContent} />
             )}
             {section.section_type === "specials" && (
                 <SpecialsEditor content={content} onChange={setContent} />
@@ -570,21 +590,30 @@ function MenuHighlightsEditor({
 
 // ── Team Editor ────────────────────────────────────────────────────────
 
-function TeamEditor({ content, onChange }: { content: Record<string, any>; onChange: (c: Record<string, any>) => void }) {
-    const members: Array<{ name: string; role: string; imageUrl?: string; bio?: string }> = content.members ?? [];
+function TeamEditor({
+    content,
+    teamMembers,
+    onChange,
+}: {
+    content: Record<string, any>;
+    teamMembers: DashboardTeamMember[];
+    onChange: (c: Record<string, any>) => void;
+}) {
+    const memberOverrides = content.memberOverrides && typeof content.memberOverrides === "object"
+        ? content.memberOverrides
+        : {};
 
-    const updateMember = (index: number, field: string, value: string) => {
-        const updated = [...members];
-        updated[index] = { ...updated[index], [field]: value };
-        onChange({ ...content, members: updated });
-    };
-
-    const addMember = () => {
-        onChange({ ...content, members: [...members, { name: "", role: "" }] });
-    };
-
-    const removeMember = (index: number) => {
-        onChange({ ...content, members: members.filter((_, i) => i !== index) });
+    const updateMemberOverride = (userId: string, field: string, value: string | boolean | number) => {
+        onChange({
+            ...content,
+            memberOverrides: {
+                ...memberOverrides,
+                [userId]: {
+                    ...(memberOverrides[userId] ?? {}),
+                    [field]: value,
+                },
+            },
+        });
     };
 
     return (
@@ -600,40 +629,71 @@ function TeamEditor({ content, onChange }: { content: Record<string, any>; onCha
                 />
             </div>
 
-            {members.map((member, index) => (
-                <div key={index} className="flex items-start gap-2 p-3 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg">
-                    <div className="flex-1 grid grid-cols-2 gap-2">
-                        <input
-                            value={member.name}
-                            onChange={e => updateMember(index, "name", e.target.value)}
-                            className="h-8 px-2 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs"
-                            placeholder="Nom"
-                        />
-                        <input
-                            value={member.role}
-                            onChange={e => updateMember(index, "role", e.target.value)}
-                            className="h-8 px-2 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs"
-                            placeholder="Poste (ex: Chef cuisinier)"
-                        />
-                        <input
-                            value={member.imageUrl ?? ""}
-                            onChange={e => updateMember(index, "imageUrl", e.target.value)}
-                            className="h-8 px-2 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs col-span-2"
-                            placeholder="Photo (URL optionnelle)"
-                        />
-                    </div>
-                    <button onClick={() => removeMember(index)} className="p-1 text-surface-400 hover:text-red-500">
-                        <X size={14} />
-                    </button>
-                </div>
-            ))}
+            <p className="text-[11px] text-surface-400">
+                Les membres sont chargés automatiquement depuis votre équipe restaurant. Vous pouvez personnaliser l&apos;affichage ci-dessous.
+            </p>
 
-            <button
-                onClick={addMember}
-                className="flex items-center gap-1.5 text-xs text-brand-500 font-medium hover:text-brand-600"
-            >
-                <Plus size={14} /> Ajouter un membre
-            </button>
+            {teamMembers.map((member, index) => {
+                const override = memberOverrides[member.userId] ?? {};
+                return (
+                    <div key={member.userId} className="p-3 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold text-surface-900 dark:text-white truncate">{member.name}</p>
+                                <p className="text-[11px] text-surface-400 truncate">{member.role}</p>
+                            </div>
+                            <label className="inline-flex items-center gap-1.5 text-xs text-surface-500">
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(override.hidden)}
+                                    onChange={e => updateMemberOverride(member.userId, "hidden", e.target.checked)}
+                                />
+                                Masquer
+                            </label>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                                value={override.displayName ?? ""}
+                                onChange={e => updateMemberOverride(member.userId, "displayName", e.target.value)}
+                                className="h-8 px-2 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs"
+                                placeholder="Nom affiché (optionnel)"
+                            />
+                            <input
+                                value={override.displayRole ?? ""}
+                                onChange={e => updateMemberOverride(member.userId, "displayRole", e.target.value)}
+                                className="h-8 px-2 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs"
+                                placeholder="Poste affiché (optionnel)"
+                            />
+                            <input
+                                value={override.imageUrl ?? ""}
+                                onChange={e => updateMemberOverride(member.userId, "imageUrl", e.target.value)}
+                                className="h-8 px-2 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs"
+                                placeholder="Photo personnalisée (URL)"
+                            />
+                            <input
+                                type="number"
+                                value={override.sortOrder ?? index}
+                                onChange={e => updateMemberOverride(member.userId, "sortOrder", e.target.value ? Number(e.target.value) : index)}
+                                className="h-8 px-2 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs"
+                                placeholder="Ordre"
+                            />
+                            <textarea
+                                value={override.bio ?? ""}
+                                onChange={e => updateMemberOverride(member.userId, "bio", e.target.value)}
+                                rows={2}
+                                className="px-2 py-1.5 rounded border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-xs col-span-1 sm:col-span-2"
+                                placeholder="Bio (optionnel)"
+                            />
+                        </div>
+                    </div>
+                );
+            })}
+
+            {teamMembers.length === 0 && (
+                <p className="text-xs text-surface-500">
+                    Aucun membre actif trouvé pour ce restaurant. Invitez des membres dans l&apos;espace équipe pour les afficher ici.
+                </p>
+            )}
         </div>
     );
 }
@@ -715,6 +775,22 @@ function SpecialsEditor({ content, onChange }: { content: Record<string, any>; o
 // ── Custom Editor ──────────────────────────────────────────────────────
 
 function CustomEditor({ content, onChange }: { content: Record<string, any>; onChange: (c: Record<string, any>) => void }) {
+    const buttons: Array<{ label: string; url: string }> = Array.isArray(content.buttons) ? content.buttons : [];
+
+    const updateButton = (index: number, field: "label" | "url", value: string) => {
+        const updated = [...buttons];
+        updated[index] = { ...updated[index], [field]: value };
+        onChange({ ...content, buttons: updated });
+    };
+
+    const addButton = () => {
+        onChange({ ...content, buttons: [...buttons, { label: "", url: "" }] });
+    };
+
+    const removeButton = (index: number) => {
+        onChange({ ...content, buttons: buttons.filter((_, i) => i !== index) });
+    };
+
     return (
         <div className="space-y-3">
             <div>
@@ -734,6 +810,93 @@ function CustomEditor({ content, onChange }: { content: Record<string, any>; onC
                     onChange={e => onChange({ ...content, imageUrl: e.target.value })}
                     className="w-full h-9 px-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm text-surface-900 dark:text-white focus:ring-2 ring-brand-500/20 outline-none"
                     placeholder="https://..."
+                />
+            </div>
+
+            <div>
+                <label className="text-xs font-medium text-surface-500 mb-1 block">Galerie photos (1 URL par ligne)</label>
+                <textarea
+                    value={Array.isArray(content.galleryImages) ? content.galleryImages.join("\n") : ""}
+                    onChange={e => onChange({
+                        ...content,
+                        galleryImages: e.target.value
+                            .split("\n")
+                            .map(line => line.trim())
+                            .filter(Boolean),
+                    })}
+                    rows={4}
+                    className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm text-surface-900 dark:text-white focus:ring-2 ring-brand-500/20 outline-none resize-none"
+                    placeholder={"https://...\nhttps://..."}
+                />
+            </div>
+
+            <div className="space-y-2">
+                <label className="text-xs font-medium text-surface-500 block">Boutons d&apos;action</label>
+                {buttons.map((button, index) => (
+                    <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_1.5fr_auto] gap-2 items-center">
+                        <input
+                            value={button.label ?? ""}
+                            onChange={e => updateButton(index, "label", e.target.value)}
+                            className="h-9 px-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm text-surface-900 dark:text-white"
+                            placeholder="Texte du bouton"
+                        />
+                        <input
+                            value={button.url ?? ""}
+                            onChange={e => updateButton(index, "url", e.target.value)}
+                            className="h-9 px-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm text-surface-900 dark:text-white"
+                            placeholder="https://..."
+                        />
+                        <button
+                            onClick={() => removeButton(index)}
+                            className="p-2 text-surface-400 hover:text-red-500"
+                            title="Supprimer"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                ))}
+                <button
+                    onClick={addButton}
+                    className="inline-flex items-center gap-1.5 text-xs text-brand-500 font-medium hover:text-brand-600"
+                >
+                    <Plus size={14} /> Ajouter un bouton
+                </button>
+            </div>
+
+            <div className="space-y-2">
+                <label className="text-xs font-medium text-surface-500 block">Mini-tableau</label>
+                <input
+                    value={Array.isArray(content.table?.headers) ? content.table.headers.join(";") : ""}
+                    onChange={e => onChange({
+                        ...content,
+                        table: {
+                            ...(content.table ?? {}),
+                            headers: e.target.value
+                                .split(";")
+                                .map((h: string) => h.trim())
+                                .filter(Boolean),
+                        },
+                    })}
+                    className="w-full h-9 px-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm text-surface-900 dark:text-white"
+                    placeholder="Colonnes (ex: Service;Délai;Prix)"
+                />
+                <textarea
+                    value={Array.isArray(content.table?.rows)
+                        ? content.table.rows.map((row: string[]) => row.join(";")).join("\n")
+                        : ""}
+                    onChange={e => onChange({
+                        ...content,
+                        table: {
+                            ...(content.table ?? {}),
+                            rows: e.target.value
+                                .split("\n")
+                                .map(line => line.split(";").map(cell => cell.trim()).filter(Boolean))
+                                .filter(row => row.length > 0),
+                        },
+                    })}
+                    rows={4}
+                    className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm text-surface-900 dark:text-white focus:ring-2 ring-brand-500/20 outline-none resize-none"
+                    placeholder={"Ligne 1 (ex: Livraison;30 min;1500 FCFA)\nLigne 2 (...)"}
                 />
             </div>
         </div>

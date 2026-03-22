@@ -25,6 +25,7 @@ const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute:
 import { storePublicRoutes } from "./modules/store/store-public";
 import { dashboardRoutes } from "./modules/store/dashboard";
 import { restaurantRoutes } from "./modules/store/restaurant";
+import { cuisineCategoriesPublicRoutes } from "./modules/cuisine-categories";
 
 // ── Authenticated routes ─────────────────────────────────────────────
 import { ordersApi } from "@kbouffe/module-orders";
@@ -47,7 +48,13 @@ const { teamRoutes, payoutsRoutes } = hrApi;
 import { chatApi } from "@kbouffe/module-chat";
 const { chatRoutes } = chatApi;
 import { notificationsRoutes } from "./modules/core/notifications";
-import { customerReviewRoutes, merchantReviewRoutes, publicProductReviewRoutes, publicRestaurantReviewRoutes } from "./modules/reviews";
+import {
+    customerReviewRoutes,
+    merchantReviewRoutes,
+    merchantProductReviewRoutes,
+    publicProductReviewRoutes,
+    publicRestaurantReviewRoutes,
+} from "./modules/reviews";
 
 // ── Admin routes ─────────────────────────────────────────────────────
 import { adminRoutes } from "./modules/admin";
@@ -104,6 +111,7 @@ api.route("/store", publicReservationsRoutes);             // public reservation
 api.route("/store", publicProductReviewRoutes);            // public product reviews
 api.route("/store", publicRestaurantReviewRoutes);          // public restaurant reviews
 api.route("/coupons/validate", couponValidateRoutes);
+api.route("/cuisine-categories", cuisineCategoriesPublicRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
 api.route("/sms", smsRoutes);
 api.route("/auth", authRoutes);
@@ -181,6 +189,7 @@ api.route("/reviews", customerReviewRoutes);
 
 // ── Merchant review management (uses authMiddleware via /restaurant path) ──
 api.route("/restaurant/reviews", merchantReviewRoutes);
+api.route("/restaurant/product-reviews", merchantProductReviewRoutes);
 
 // ── Admin routes ─────────────────────────────────────────────────────
 api.route("/admin", adminRoutes);

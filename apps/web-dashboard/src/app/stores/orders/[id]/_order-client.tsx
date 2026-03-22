@@ -14,6 +14,7 @@ import {
     Package,
     Phone,
     RotateCcw,
+    Star,
     Smartphone,
     Store,
     Truck,
@@ -64,7 +65,7 @@ type StatusStep = { id: string; label: string; desc: string };
 
 const DELIVERY_STEPS: StatusStep[] = [
     { id: "pending",    label: "Commande reçue",       desc: "Votre commande a été enregistrée" },
-    { id: "confirmed",  label: "Confirmée",             desc: "Le restaurant a confirmé votre commande" },
+    { id: "accepted",   label: "Confirmée",             desc: "Le restaurant a confirmé votre commande" },
     { id: "preparing",  label: "En préparation",        desc: "Le restaurant prépare vos plats" },
     { id: "ready",      label: "Prête",                 desc: "Votre commande est prête" },
     { id: "delivering", label: "En cours de livraison", desc: "Un livreur est en route" },
@@ -73,7 +74,7 @@ const DELIVERY_STEPS: StatusStep[] = [
 
 const PICKUP_STEPS: StatusStep[] = [
     { id: "pending",   label: "Commande reçue",  desc: "Votre commande a été enregistrée" },
-    { id: "confirmed", label: "Confirmée",        desc: "Le restaurant a confirmé votre commande" },
+    { id: "accepted",  label: "Confirmée",        desc: "Le restaurant a confirmé votre commande" },
     { id: "preparing", label: "En préparation",   desc: "Le restaurant prépare vos plats" },
     { id: "ready",     label: "Prête à retirer",  desc: "Vous pouvez venir récupérer votre commande" },
     { id: "delivered", label: "Récupérée",        desc: "Commande récupérée avec succès" },
@@ -81,7 +82,7 @@ const PICKUP_STEPS: StatusStep[] = [
 
 const DINE_IN_STEPS: StatusStep[] = [
     { id: "pending",   label: "Commande reçue",  desc: "Votre commande a été enregistrée" },
-    { id: "confirmed", label: "Confirmée",        desc: "Le restaurant a confirmé votre commande" },
+    { id: "accepted",  label: "Confirmée",        desc: "Le restaurant a confirmé votre commande" },
     { id: "preparing", label: "En préparation",   desc: "La cuisine prépare vos plats" },
     { id: "ready",     label: "Prête",            desc: "Votre commande est prête" },
     { id: "delivered", label: "Servie",           desc: "Vos plats ont été servis à votre table" },
@@ -231,6 +232,11 @@ export function OrderTrackingClient() {
     const [order,   setOrder]   = useState<OrderDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error,   setError]   = useState<string | null>(null);
+    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewComment, setReviewComment] = useState("");
+    const [reviewSubmitting, setReviewSubmitting] = useState(false);
+    const [reviewSubmitted, setReviewSubmitted] = useState(false);
+    const [reviewError, setReviewError] = useState<string | null>(null);
 
     const fetchOrder = useCallback(async () => {
         try {
@@ -265,6 +271,38 @@ export function OrderTrackingClient() {
 
     const shortRef  = id ? `#KB-${id.slice(-6).toUpperCase()}` : "…";
     const isActive  = order && !["delivered", "cancelled"].includes(order.status);
+
+    const handleSubmitReview = useCallback(async () => {
+        if (!order || !order.restaurants?.id || reviewSubmitting) return;
+        setReviewError(null);
+        setReviewSubmitting(true);
+
+        try {
+            const res = await fetch("/api/reviews", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orderId: order.id,
+                    restaurantId: order.restaurants.id,
+                    rating: reviewRating,
+                    comment: reviewComment.trim() || undefined,
+                }),
+            });
+
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setReviewError(payload?.error ?? "Erreur lors de l'envoi de l'avis.");
+                return;
+            }
+
+            setReviewSubmitted(true);
+            setReviewComment("");
+        } catch {
+            setReviewError("Erreur lors de l'envoi de l'avis.");
+        } finally {
+            setReviewSubmitting(false);
+        }
+    }, [order, reviewComment, reviewRating, reviewSubmitting]);
 
     return (
         <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
@@ -494,6 +532,65 @@ export function OrderTrackingClient() {
                             orderId={order.id}
                             restaurantName={order.restaurants?.name ?? "Restaurant"}
                         />
+
+                        {/* Review */}
+                        {["delivered", "completed"].includes(order.status) && order.restaurants?.id && (
+                            <section id="review" className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
+                                <h2 className="font-bold text-surface-900 dark:text-white mb-2 flex items-center gap-2">
+                                    <Star size={16} className="text-amber-500" />
+                                    Donner votre avis
+                                </h2>
+                                <p className="text-sm text-surface-500 dark:text-surface-400 mb-4">
+                                    Évaluez votre expérience chez {order.restaurants.name}.
+                                </p>
+
+                                {reviewSubmitted ? (
+                                    <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-sm text-green-700 dark:text-green-300 font-medium">
+                                        Merci ! Votre avis a bien été envoyé.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-1">
+                                            {[1, 2, 3, 4, 5].map((value) => (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    onClick={() => setReviewRating(value)}
+                                                    className="p-1"
+                                                    aria-label={`Noter ${value} sur 5`}
+                                                >
+                                                    <Star
+                                                        size={20}
+                                                        className={value <= reviewRating ? "text-amber-500 fill-amber-500" : "text-surface-300 dark:text-surface-700"}
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <textarea
+                                            value={reviewComment}
+                                            onChange={(e) => setReviewComment(e.target.value)}
+                                            placeholder="Partagez votre expérience (optionnel)"
+                                            className="w-full min-h-[90px] rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                                        />
+
+                                        {reviewError && (
+                                            <p className="text-sm text-red-500">{reviewError}</p>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleSubmitReview()}
+                                            disabled={reviewSubmitting}
+                                            className="inline-flex items-center justify-center gap-2 px-4 h-10 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                                        >
+                                            {reviewSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
+                                            {reviewSubmitting ? "Envoi..." : "Envoyer mon avis"}
+                                        </button>
+                                    </div>
+                                )}
+                            </section>
+                        )}
 
                         {/* CTAs */}
                         <div className="space-y-2">

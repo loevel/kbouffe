@@ -22,7 +22,7 @@ export function ReservationsList() {
 
     const [activeTab, setActiveTab] = useState("all");
     const [search, setSearch] = useState("");
-    const [dateFilter, setDateFilter] = useState(new Date().toISOString().split("T")[0]);
+    const [dateFilter, setDateFilter] = useState("");  // empty = show all upcoming
     const [page, setPage] = useState(1);
     const [sort, setSort] = useState<"time" | "party" | "status">("time");
     const [minParty, setMinParty] = useState<number | null>(null);
@@ -41,16 +41,16 @@ export function ReservationsList() {
         date: dateFilter
     });
 
-    // For stats, we fetch all reservations for that day (within limits)
+    // Stats are aligned with current date filter.
+    // If no date is selected, backend default is upcoming reservations.
     const { 
         reservations: allForStats,
         mutate: mutateStats
     } = useReservations({
-        date: dateFilter
-        // No status or search here to get the full picture for stats
+        date: dateFilter || undefined
     });
 
-    const { tables, mutate: mutateTables } = useTables();
+    const { tables, zones, mutate: mutateTables } = useTables();
 
     const refreshData = () => {
         mutateReservations();
@@ -169,6 +169,7 @@ export function ReservationsList() {
                 isOpen={showAddModal}
                 onClose={() => setShowAddModal(false)}
                 tables={tables}
+                zones={zones}
                 onCreated={refreshData}
             />
         </div>

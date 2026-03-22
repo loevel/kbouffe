@@ -6,6 +6,16 @@ export type ReservationStatus =
   | "no_show"
   | "cancelled";
 
+export type ReservationOccasion =
+  | "birthday"
+  | "dinner"
+  | "surprise"
+  | "business"
+  | "anniversary"
+  | "date"
+  | "family"
+  | "other";
+
 export interface Reservation {
   id: string;
   restaurant_id: string;
@@ -17,7 +27,9 @@ export interface Reservation {
   date: string;
   time: string;
   table_id: string | null;
+  zone_id: string | null;
   status: ReservationStatus;
+  occasion: ReservationOccasion | null;
   special_requests: string | null;
   confirmed_at: string | null;
   seated_at: string | null;
@@ -29,6 +41,9 @@ export interface Reservation {
   cancellation_reason: string | null;
   created_at: string;
   updated_at: string;
+  // Joined data
+  restaurant_tables?: RestaurantTable;
+  table_zones?: TableZone;
 }
 
 export interface RestaurantTable {
@@ -54,4 +69,24 @@ export interface TableZone {
   type: string | null;
   is_active: boolean;
   sort_order: number | null;
+  image_url: string | null;
+  color: string | null;
+  capacity: number;
+  min_party_size: number;
+  amenities: string[];
+  pricing_note: string | null;
+}
+
+export interface TimeSlot {
+  time: string;
+  available: boolean;
+  reserved_until?: string | null;
+}
+
+export interface ZoneAvailability {
+  zone: TableZone;
+  tables: RestaurantTable[];
+  total_capacity: number;
+  available_tables: number;
+  slots: TimeSlot[];
 }

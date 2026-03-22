@@ -5,12 +5,25 @@ import {
     Button, Input, Modal, ModalFooter, Select, Textarea, toast, useLocale 
 } from "@kbouffe/module-core/ui";
 import { createReservation } from "../../hooks/use-reservations";
-import { RestaurantTable } from "../../lib/types";
+import type { RestaurantTable, TableZone, ReservationOccasion } from "../../lib/types";
+
+const OCCASION_OPTIONS = [
+    { value: "", labelKey: "noOccasion", icon: "" },
+    { value: "birthday", labelKey: "occasionBirthday", icon: "🎂" },
+    { value: "dinner", labelKey: "occasionDinner", icon: "🍽️" },
+    { value: "surprise", labelKey: "occasionSurprise", icon: "🎁" },
+    { value: "business", labelKey: "occasionBusiness", icon: "💼" },
+    { value: "anniversary", labelKey: "occasionAnniversary", icon: "💍" },
+    { value: "date", labelKey: "occasionDate", icon: "❤️" },
+    { value: "family", labelKey: "occasionFamily", icon: "👨‍👩‍👧‍👦" },
+    { value: "other", labelKey: "occasionOther", icon: "📌" },
+] as const;
 
 interface AddReservationModalProps {
     isOpen: boolean;
     onClose: () => void;
     tables: RestaurantTable[];
+    zones?: TableZone[];
     onCreated: () => void;
 }
 
@@ -18,6 +31,7 @@ export function AddReservationModal({
     isOpen,
     onClose,
     tables,
+    zones = [],
     onCreated,
 }: AddReservationModalProps) {
     const { t } = useLocale();
@@ -32,6 +46,8 @@ export function AddReservationModal({
     const [time, setTime] = useState("12:00");
     const [duration, setDuration] = useState(90);
     const [tableId, setTableId] = useState("");
+    const [zoneId, setZoneId] = useState("");
+    const [occasion, setOccasion] = useState<ReservationOccasion | "">("");
     const [specialRequests, setSpecialRequests] = useState("");
 
     const reset = () => {
@@ -43,6 +59,8 @@ export function AddReservationModal({
         setTime("12:00");
         setDuration(90);
         setTableId("");
+        setZoneId("");
+        setOccasion("");
         setSpecialRequests("");
     };
 
@@ -66,6 +84,8 @@ export function AddReservationModal({
                 time,
                 duration,
                 table_id: tableId || null,
+                zone_id: zoneId || null,
+                occasion: occasion || null,
                 special_requests: specialRequests.trim() || null,
                 status: "pending"
             });
@@ -164,6 +184,36 @@ export function AddReservationModal({
                         onChange={(e) => setTableId(e.target.value)}
                         options={tableOptions}
                     />
+                </div>
+                {zones.length > 0 && (
+                    <Select
+                        label={t.reservations.zone}
+                        value={zoneId}
+                        onChange={(e) => setZoneId(e.target.value)}
+                        options={[
+                            { value: "", label: t.reservations.noZonePreference },
+                            ...zones.map((z) => ({ value: z.id, label: z.name })),
+                        ]}
+                    />
+                )}
+                <div>
+                    <p className="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">{t.reservations.occasion}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {OCCASION_OPTIONS.map((opt) => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setOccasion(opt.value)}
+                                className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all font-medium ${
+                                    occasion === opt.value
+                                        ? "bg-brand-500 text-white border-brand-500"
+                                        : "bg-surface-50 dark:bg-surface-800 text-surface-600 dark:text-surface-300 border-surface-200 dark:border-surface-700 hover:border-brand-300"
+                                }`}
+                            >
+                                {"icon" in opt ? `${opt.icon} ` : ""}{t.reservations[opt.labelKey as keyof typeof t.reservations] ?? opt.value}
+                            </button>
+                        ))}
+                    </div>
                 </div>
                 <Textarea
                     label={t.reservations.specialRequests}

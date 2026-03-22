@@ -70,6 +70,15 @@ export interface ShowcaseCategory {
     description: string | null;
 }
 
+export interface ShowcaseTeamMember {
+    id: string;
+    userId: string;
+    role: string;
+    status: string;
+    name: string;
+    imageUrl: string | null;
+}
+
 const cuisineLabels: Record<string, string> = {
     african: "Cuisine Africaine",
     camerounaise: "Cuisine Camerounaise",
@@ -158,18 +167,18 @@ export function HeroSection({ restaurant, section }: { restaurant: ShowcaseResta
                         {/* Quick stats */}
                         <div className="flex flex-wrap items-center gap-4 mt-4">
                             {restaurant.rating > 0 && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full">
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded-full border border-white/20">
                                     <Star size={14} className="text-amber-400 fill-amber-400" />
                                     <span className="text-white text-sm font-bold">{restaurant.rating.toFixed(1)}</span>
-                                    <span className="text-white/60 text-xs">({restaurant.reviewCount})</span>
+                                    <span className="text-white/70 text-xs">({restaurant.reviewCount})</span>
                                 </div>
                             )}
                             {restaurant.hasDineIn && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full text-white/80 text-xs font-medium">
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded-full border border-white/20 text-white text-xs font-semibold">
                                     <Users size={12} /> Sur place
                                 </div>
                             )}
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full text-white/80 text-xs font-medium">
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded-full border border-white/20 text-white text-xs font-semibold">
                                 <Bike size={12} /> Livraison
                             </div>
                         </div>
@@ -186,7 +195,7 @@ export function AboutSection({ restaurant, section }: { restaurant: ShowcaseRest
     const text = section.content?.text || restaurant.description || "";
     const imageUrl = section.content?.imageUrl;
 
-    if (!text && !imageUrl) return null;
+    if (!text && !imageUrl && !section.title && !section.subtitle) return null;
 
     return (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -500,6 +509,59 @@ export function ReviewsSection({
 
 export function HoursLocationSection({ restaurant, section }: { restaurant: ShowcaseRestaurant; section: ShowcaseSection }) {
     const hours = restaurant.openingHours;
+    const dayOrder = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
+
+    const normalizedHours = (() => {
+        if (!hours) return null;
+
+        if (Array.isArray(hours)) {
+            const mapByDay: Record<string, { isOpen: boolean; from: string | null; to: string | null }> = {};
+            for (const row of hours as any[]) {
+                const dayOfWeek = Number(row?.dayOfWeek ?? row?.day_of_week);
+                const dayKey = Number.isFinite(dayOfWeek)
+                    ? ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][dayOfWeek]
+                    : null;
+                if (!dayKey) continue;
+
+                const isClosed = Boolean(row?.isClosed ?? row?.is_closed);
+                const openTime = row?.openTime ?? row?.open_time ?? null;
+                const closeTime = row?.closeTime ?? row?.close_time ?? null;
+                mapByDay[dayKey] = {
+                    isOpen: !isClosed,
+                    from: openTime,
+                    to: closeTime,
+                };
+            }
+            return mapByDay;
+        }
+
+        if (typeof hours === "object") {
+            const result: Record<string, { isOpen: boolean; from: string | null; to: string | null }> = {};
+            for (const day of dayOrder) {
+                const raw = (hours as any)?.[day];
+                if (!raw || typeof raw !== "object") {
+                    result[day] = { isOpen: false, from: null, to: null };
+                    continue;
+                }
+
+                const isOpen =
+                    typeof raw.isOpen === "boolean"
+                        ? raw.isOpen
+                        : typeof raw.open === "boolean"
+                            ? raw.open
+                            : Boolean(raw.from ?? raw.open ?? raw.openTime);
+
+                result[day] = {
+                    isOpen,
+                    from: raw.open ?? raw.from ?? raw.openTime ?? raw.open_time ?? null,
+                    to: raw.close ?? raw.to ?? raw.closeTime ?? raw.close_time ?? null,
+                };
+            }
+            return result;
+        }
+
+        return null;
+    })();
 
     return (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -566,18 +628,18 @@ export function HoursLocationSection({ restaurant, section }: { restaurant: Show
                     <h3 className="text-base font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
                         <Clock size={18} /> Horaires d&apos;ouverture
                     </h3>
-                    {hours && typeof hours === "object" ? (
+                    {normalizedHours ? (
                         <div className="space-y-2">
-                            {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(day => {
-                                const dayData = (hours as any)[day];
-                                const isOpen = dayData?.open;
+                            {dayOrder.map(day => {
+                                const dayData = normalizedHours[day];
+                                const isOpen = Boolean(dayData?.isOpen);
                                 return (
                                     <div key={day} className="flex items-center justify-between py-1.5 border-b border-surface-50 dark:border-surface-800/50 last:border-0">
                                         <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
                                             {dayLabels[day]}
                                         </span>
                                         <span className={`text-sm font-bold ${isOpen ? "text-surface-900 dark:text-white" : "text-surface-400"}`}>
-                                            {isOpen ? `${dayData.from || "—"} — ${dayData.to || "—"}` : "Fermé"}
+                                            {isOpen ? `${dayData?.from || "—"} — ${dayData?.to || "—"}` : "Fermé"}
                                         </span>
                                     </div>
                                 );
@@ -594,10 +656,40 @@ export function HoursLocationSection({ restaurant, section }: { restaurant: Show
 
 // ── Team Section ───────────────────────────────────────────────────────
 
-export function TeamSection({ section }: { section: ShowcaseSection }) {
-    const members: Array<{ name: string; role: string; imageUrl?: string; bio?: string }> = section.content?.members ?? [];
+export function TeamSection({ section, teamMembers }: { section: ShowcaseSection; teamMembers: ShowcaseTeamMember[] }) {
+    const legacyMembers: Array<{ name: string; role: string; imageUrl?: string; bio?: string }> = section.content?.members ?? [];
+    const memberOverrides = section.content?.memberOverrides && typeof section.content.memberOverrides === "object"
+        ? section.content.memberOverrides
+        : {};
 
-    if (members.length === 0 && !section.content?.text) return null;
+    const autoMembers = (teamMembers ?? []).map((member, index) => {
+        const override = memberOverrides[member.userId] ?? {};
+        return {
+            id: member.userId,
+            name: (override.displayName || member.name || "Membre").trim(),
+            role: (override.displayRole || member.role || "").trim(),
+            imageUrl: (override.imageUrl || member.imageUrl || "").trim(),
+            bio: (override.bio || "").trim(),
+            hidden: Boolean(override.hidden),
+            sortOrder: typeof override.sortOrder === "number" ? override.sortOrder : index,
+        };
+    });
+
+    const normalizedAutoMembers = autoMembers
+        .filter(member => !member.hidden)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const members = normalizedAutoMembers.length > 0
+        ? normalizedAutoMembers
+        : legacyMembers.map((member, index) => ({
+            id: `legacy-${index}`,
+            name: (member.name || "Membre").trim(),
+            role: (member.role || "").trim(),
+            imageUrl: (member.imageUrl || "").trim(),
+            bio: (member.bio || "").trim(),
+        }));
+
+    if (members.length === 0 && !section.content?.text && !section.title && !section.subtitle) return null;
 
     return (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -614,8 +706,8 @@ export function TeamSection({ section }: { section: ShowcaseSection }) {
 
             {members.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {members.map((member, i) => (
-                        <div key={i} className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5 text-center">
+                    {members.map((member) => (
+                        <div key={member.id} className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5 text-center">
                             <div className="w-20 h-20 rounded-full mx-auto mb-3 bg-surface-100 dark:bg-surface-800 overflow-hidden">
                                 {member.imageUrl ? (
                                     <img src={member.imageUrl} alt={member.name} className="w-full h-full object-cover" />
@@ -645,7 +737,7 @@ export function TeamSection({ section }: { section: ShowcaseSection }) {
 export function SpecialsSection({ restaurant, section }: { restaurant: ShowcaseRestaurant; section: ShowcaseSection }) {
     const specials: Array<{ title: string; description?: string; imageUrl?: string; price?: number; badge?: string }> = section.content?.items ?? [];
 
-    if (specials.length === 0) return null;
+    if (specials.length === 0 && !section.title && !section.subtitle) return null;
 
     return (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -697,8 +789,13 @@ export function SpecialsSection({ restaurant, section }: { restaurant: ShowcaseR
 export function CustomSection({ section }: { section: ShowcaseSection }) {
     const text = section.content?.text;
     const imageUrl = section.content?.imageUrl;
+    const galleryImages: string[] = Array.isArray(section.content?.galleryImages) ? section.content.galleryImages : [];
+    const buttons: Array<{ label: string; url: string }> = Array.isArray(section.content?.buttons) ? section.content.buttons : [];
+    const tableHeaders: string[] = Array.isArray(section.content?.table?.headers) ? section.content.table.headers : [];
+    const tableRows: string[][] = Array.isArray(section.content?.table?.rows) ? section.content.table.rows : [];
 
-    if (!text && !imageUrl) return null;
+    const hasContent = Boolean(text) || Boolean(imageUrl) || galleryImages.length > 0 || buttons.length > 0 || tableRows.length > 0;
+    if (!hasContent && !section.title && !section.subtitle) return null;
 
     return (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -713,6 +810,61 @@ export function CustomSection({ section }: { section: ShowcaseSection }) {
             )}
             {text && (
                 <div className="text-surface-600 dark:text-surface-400 leading-relaxed whitespace-pre-line">{text}</div>
+            )}
+
+            {galleryImages.length > 0 && (
+                <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {galleryImages.map((url, index) => (
+                        <div key={`${url}-${index}`} className="aspect-square rounded-xl overflow-hidden bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {buttons.length > 0 && (
+                <div className="mt-6 flex flex-wrap gap-3">
+                    {buttons
+                        .filter(button => button?.label && button?.url)
+                        .map((button, index) => (
+                            <a
+                                key={`${button.url}-${index}`}
+                                href={button.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm font-semibold text-surface-700 dark:text-surface-300 hover:border-brand-500 hover:text-brand-600 transition-colors"
+                            >
+                                {button.label} <ExternalLink size={14} />
+                            </a>
+                        ))}
+                </div>
+            )}
+
+            {tableHeaders.length > 0 && tableRows.length > 0 && (
+                <div className="mt-6 overflow-x-auto rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900">
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-surface-50 dark:bg-surface-800/60">
+                            <tr>
+                                {tableHeaders.map((header, index) => (
+                                    <th key={`${header}-${index}`} className="text-left px-4 py-2.5 text-xs font-bold text-surface-600 dark:text-surface-300 uppercase tracking-wider">
+                                        {header}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {tableRows.map((row, rowIndex) => (
+                                <tr key={rowIndex} className="border-t border-surface-100 dark:border-surface-800">
+                                    {tableHeaders.map((_, colIndex) => (
+                                        <td key={colIndex} className="px-4 py-2.5 text-surface-700 dark:text-surface-300">
+                                            {row[colIndex] ?? "—"}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
         </section>
     );
@@ -751,6 +903,7 @@ export function ShowcaseSectionRenderer({
     products,
     categories,
     reviews,
+    teamMembers,
     onOrder,
 }: {
     section: ShowcaseSection;
@@ -758,6 +911,7 @@ export function ShowcaseSectionRenderer({
     products: ShowcaseProduct[];
     categories: ShowcaseCategory[];
     reviews: ShowcaseReview[];
+    teamMembers: ShowcaseTeamMember[];
     onOrder: () => void;
 }) {
     switch (section.section_type) {
@@ -776,7 +930,7 @@ export function ShowcaseSectionRenderer({
         case "hours_location":
             return <HoursLocationSection restaurant={restaurant} section={section} />;
         case "team":
-            return <TeamSection section={section} />;
+            return <TeamSection section={section} teamMembers={teamMembers} />;
         case "specials":
             return <SpecialsSection restaurant={restaurant} section={section} />;
         case "custom":

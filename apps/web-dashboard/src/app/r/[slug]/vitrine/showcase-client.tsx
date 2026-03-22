@@ -11,6 +11,7 @@ import {
     type ShowcaseProduct,
     type ShowcaseCategory,
     type ShowcaseReview,
+    type ShowcaseTeamMember,
 } from "@/components/showcase/ShowcaseSections";
 
 interface StoreData {
@@ -19,6 +20,43 @@ interface StoreData {
     products: ShowcaseProduct[];
     reviews: ShowcaseReview[];
     showcaseSections: ShowcaseSection[];
+    teamMembers?: ShowcaseTeamMember[];
+}
+
+function normalizeStoreData(payload: StoreData): StoreData {
+    const restaurant = payload.restaurant ?? ({} as ShowcaseRestaurant);
+
+    return {
+        ...payload,
+        restaurant: {
+            ...restaurant,
+            description: restaurant.description ?? null,
+            logoUrl: restaurant.logoUrl ?? null,
+            coverUrl: restaurant.coverUrl ?? null,
+            address: restaurant.address ?? "",
+            city: restaurant.city ?? "",
+            phone: restaurant.phone ?? null,
+            email: restaurant.email ?? null,
+            cuisineType: restaurant.cuisineType ?? "african",
+            primaryColor: restaurant.primaryColor ?? null,
+            openingHours: restaurant.openingHours ?? null,
+            rating: Number(restaurant.rating ?? 0),
+            reviewCount: Number(restaurant.reviewCount ?? 0),
+            orderCount: Number(restaurant.orderCount ?? 0),
+            isVerified: Boolean(restaurant.isVerified),
+            isPremium: Boolean(restaurant.isPremium),
+            hasDineIn: Boolean(restaurant.hasDineIn),
+            hasReservations: Boolean(restaurant.hasReservations),
+            totalTables: Number(restaurant.totalTables ?? 0),
+            deliveryFee: Number(restaurant.deliveryFee ?? 0),
+            minOrderAmount: Number(restaurant.minOrderAmount ?? 0),
+        },
+        categories: Array.isArray(payload.categories) ? payload.categories : [],
+        products: Array.isArray(payload.products) ? payload.products : [],
+        reviews: Array.isArray(payload.reviews) ? payload.reviews : [],
+        showcaseSections: Array.isArray(payload.showcaseSections) ? payload.showcaseSections : [],
+        teamMembers: Array.isArray(payload.teamMembers) ? payload.teamMembers : [],
+    };
 }
 
 export function ShowcasePageClient({ slug }: { slug: string }) {
@@ -35,7 +73,7 @@ export function ShowcasePageClient({ slug }: { slug: string }) {
                 if (!r.ok) throw new Error("Restaurant non trouvé");
                 return r.json();
             })
-            .then((d: StoreData) => setData(d))
+            .then((d: StoreData) => setData(normalizeStoreData(d)))
             .catch(e => setError(e.message))
             .finally(() => setLoading(false));
     }, [slug]);
@@ -77,7 +115,7 @@ export function ShowcasePageClient({ slug }: { slug: string }) {
         );
     }
 
-    const { restaurant, products, categories, reviews, showcaseSections } = data;
+    const { restaurant, products, categories, reviews, showcaseSections, teamMembers } = data;
     const sections = showcaseSections?.length > 0 ? showcaseSections : [];
 
     return (
@@ -104,6 +142,7 @@ export function ShowcasePageClient({ slug }: { slug: string }) {
                     products={products}
                     categories={categories}
                     reviews={reviews}
+                    teamMembers={teamMembers ?? []}
                     onOrder={handleOrder}
                 />
             ))}

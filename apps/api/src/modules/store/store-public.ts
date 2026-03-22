@@ -33,6 +33,7 @@ storePublicRoutes.post("/order", async (c) => {
     try {
         const body = await c.req.json<{
             restaurantId: string;
+            customerId?: string;
             items: Array<{
                 productId: string;
                 name: string;
@@ -56,6 +57,7 @@ storePublicRoutes.post("/order", async (c) => {
             deliveryFee: number;
             total: number;
             notes?: string;
+            externalDrinksCount?: number;
         }>();
 
         // ── Validation ────────────────────────────────────────────
@@ -68,19 +70,42 @@ storePublicRoutes.post("/order", async (c) => {
 
         const supabase = getAdminClient(c.env);
 
+        // Fetch restaurant settings to compute server-side fees + loyalty
+        const { data: restSettings } = await supabase
+            .from("restaurants")
+            .select("dine_in_service_fee, corkage_fee_amount, min_order_amount, loyalty_enabled, loyalty_points_per_order, loyalty_point_value")
+            .eq("id", body.restaurantId)
+            .single();
+
+        const dineInServiceFee = restSettings?.dine_in_service_fee ?? 0;
+        const corkageFeeAmount = restSettings?.corkage_fee_amount ?? 0;
+
+        // Compute server-side fees
+        const serviceFee = body.deliveryType === "dine_in"
+            ? Math.round(body.subtotal * dineInServiceFee / 100)
+            : 0;
+        const externalDrinksCount = Math.max(0, Number(body.externalDrinksCount ?? 0));
+        const corkageFee = externalDrinksCount > 0
+            ? corkageFeeAmount * externalDrinksCount
+            : 0;
+        const computedTotal = body.subtotal + (body.deliveryFee ?? 0) + serviceFee + corkageFee;
+
         // 1. Create the Order
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .insert({
                 restaurant_id: body.restaurantId,
-                customer_id: null, // guest order
+                customer_id: body.customerId ?? null,
                 customer_name: body.customerName.trim(),
                 customer_phone: body.customerPhone.trim(),
                 items: body.items, // Keep JSON for backward compatibility / quick view
                 subtotal: body.subtotal,
-                delivery_fee: body.deliveryFee,
-                service_fee: 0,
-                total: body.total,
+                delivery_fee: body.deliveryFee ?? 0,
+                service_fee: serviceFee,
+                corkage_fee: corkageFee,
+                external_drinks_count: externalDrinksCount,
+                total: computedTotal,
+                loyalty_points_earned: 0,
                 status: "pending",
                 delivery_type: body.deliveryType,
                 delivery_address: body.deliveryAddress ?? null,
@@ -140,7 +165,48 @@ storePublicRoutes.post("/order", async (c) => {
             }
         }
 
-        return c.json({ success: true, orderId }, 201);
+        // 3. Award loyalty points if program is enabled and customer is identified
+        let loyaltyPointsEarned = 0;
+        if (
+            restSettings?.loyalty_enabled &&
+            body.customerId &&
+            (restSettings?.loyalty_points_per_order ?? 0) > 0
+        ) {
+            const pointsPerOrder = restSettings.loyalty_points_per_order ?? 10;
+            const pointValue = restSettings.loyalty_point_value ?? 1;
+            loyaltyPointsEarned = pointsPerOrder;
+            const creditAmount = pointsPerOrder * pointValue;
+
+            // Record wallet movement
+            const { error: walletErr } = await supabase
+                .from("wallet_movements")
+                .insert({
+                    user_id: body.customerId,
+                    type: "credit",
+                    amount: creditAmount,
+                    reason: "loyalty",
+                    description: `${pointsPerOrder} points de fidélité`,
+                    order_id: orderId,
+                } as any);
+
+            if (!walletErr) {
+                // Increment user wallet balance
+                await supabase.rpc("increment_wallet_balance", {
+                    input_user_id: body.customerId,
+                    amount: creditAmount,
+                });
+
+                // Update order with earned points
+                await supabase
+                    .from("orders")
+                    .update({ loyalty_points_earned: loyaltyPointsEarned } as any)
+                    .eq("id", orderId);
+            } else {
+                console.error("[POST /store/order] Loyalty wallet error:", walletErr);
+            }
+        }
+
+        return c.json({ success: true, orderId, serviceFee, corkageFee, total: computedTotal, loyaltyPointsEarned }, 201);
     } catch (error) {
         console.error("[POST /store/order] Unexpected error:", error);
         return c.json({ error: "Erreur serveur" }, 500);
@@ -192,8 +258,8 @@ storePublicRoutes.get("/:slug", async (c) => {
 
         const rest = results[0];
 
-        // 2. Get categories + products + reviews + showcase sections from Supabase in parallel
-        const [categoriesRes, productsRes, reviewsRes, showcaseRes] = await Promise.all([
+        // 2. Get categories + products + reviews + showcase sections + team members from Supabase in parallel
+        const [categoriesRes, productsRes, reviewsRes, showcaseRes, membersRes] = await Promise.all([
             supabase
                 .from("categories")
                 .select("id, name, description, sort_order")
@@ -218,6 +284,11 @@ storePublicRoutes.get("/:slug", async (c) => {
                 .eq("restaurant_id", rest.id)
                 .eq("is_visible", true)
                 .order("display_order"),
+            supabase
+                .from("restaurant_members")
+                .select("id, user_id, role, status")
+                .eq("restaurant_id", rest.id)
+                .eq("status", "active"),
         ]);
 
         // Resolve customer names for reviews
@@ -231,6 +302,23 @@ storePublicRoutes.get("/:slug", async (c) => {
                 .in("id", customerIds);
             for (const u of users ?? []) {
                 customerMap[u.id] = u.full_name ?? "Client";
+            }
+        }
+
+        const memberRows = membersRes.data ?? [];
+        const memberUserIds = [...new Set(memberRows.map(m => m.user_id).filter(Boolean))] as string[];
+        let memberUsersMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
+        if (memberUserIds.length > 0) {
+            const { data: memberUsers } = await supabase
+                .from("users")
+                .select("id, full_name, avatar_url")
+                .in("id", memberUserIds);
+
+            for (const user of memberUsers ?? []) {
+                memberUsersMap[user.id] = {
+                    full_name: user.full_name ?? null,
+                    avatar_url: user.avatar_url ?? null,
+                };
             }
         }
 
@@ -259,6 +347,27 @@ storePublicRoutes.get("/:slug", async (c) => {
                 totalTables: rest.total_tables,
                 deliveryFee: rest.delivery_fee,
                 minOrderAmount: rest.min_order_amount,
+                // Dine-in fees (needed by client to compute order totals)
+                dineInServiceFee: rest.dine_in_service_fee ?? 0,
+                corkageFeeAmount: rest.corkage_fee_amount ?? 0,
+                // Reservation slot config
+                reservationSlotDuration: rest.reservation_slot_duration ?? 90,
+                reservationOpenTime: rest.reservation_open_time ?? "10:00",
+                reservationCloseTime: rest.reservation_close_time ?? "22:00",
+                reservationSlotInterval: rest.reservation_slot_interval ?? 30,
+                // Cancellation policies (shown to customers before booking/ordering)
+                orderCancelPolicy: rest.order_cancel_policy ?? "flexible",
+                orderCancelNoticeMinutes: rest.order_cancel_notice_minutes ?? 30,
+                orderCancellationFeeAmount: rest.order_cancellation_fee_amount ?? 0,
+                reservationCancelPolicy: rest.reservation_cancel_policy ?? "flexible",
+                reservationCancelNoticeMinutes: rest.reservation_cancel_notice_minutes ?? 120,
+                reservationCancellationFeeAmount: rest.reservation_cancellation_fee_amount ?? 0,
+                // Loyalty program
+                loyaltyEnabled: rest.loyalty_enabled ?? false,
+                loyaltyPointsPerOrder: rest.loyalty_points_per_order ?? 10,
+                loyaltyPointValue: rest.loyalty_point_value ?? 1,
+                loyaltyMinRedeemPoints: rest.loyalty_min_redeem_points ?? 100,
+                loyaltyRewardTiers: rest.loyalty_reward_tiers ?? [],
             },
             categories: categoriesRes.data ?? [],
             products: (productsRes.data ?? []).map((p: any) => {
@@ -280,6 +389,17 @@ storePublicRoutes.get("/:slug", async (c) => {
                 customerName: customerMap[r.customer_id] ?? "Client",
             })),
             showcaseSections: showcaseRes.data ?? [],
+            teamMembers: memberRows.map((member: any) => {
+                const profile = memberUsersMap[member.user_id];
+                return {
+                    id: member.id,
+                    userId: member.user_id,
+                    role: member.role,
+                    status: member.status,
+                    name: profile?.full_name ?? "Membre",
+                    imageUrl: profile?.avatar_url ?? null,
+                };
+            }),
         });
     } catch (error) {
         console.error("[GET /store/:slug] error:", error);
