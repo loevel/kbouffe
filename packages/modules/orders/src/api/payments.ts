@@ -1,18 +1,21 @@
 /**
- * MTN MoMo payment routes — migrated from web-dashboard/src/app/api/payments/mtn/
+ * Mobile Money payment routes (multi-provider)
  *
- * POST   /payments/mtn/request-to-pay      — initiate a collection
- * GET    /payments/mtn/status/:referenceId  — check collection status
- * POST   /payments/mtn/webhook             — collection webhook (public)
- * POST   /payments/mtn/transfer            — initiate a disbursement
- * GET    /payments/mtn/transfer/:referenceId — check disbursement status
- * POST   /payments/mtn/disbursement-webhook — disbursement webhook (public)
+ * Mounted on /payments/mtn for backward compatibility.
+ * A provider abstraction is used under the hood to support future operators.
  */
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
+import {
+    getMobileMoneyProvider,
+    listMobileMoneyProviders,
+    type MobileMoneyProviderCode,
+} from "./mobile-money-providers";
 
 export const paymentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+const DEFAULT_PROVIDER: MobileMoneyProviderCode = "mtn_momo";
 
 // ── Helper: get Supabase admin client ─────────────────────────────
 function getAdminClient(env: Env) {
@@ -20,67 +23,6 @@ function getAdminClient(env: Env) {
     return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
         auth: { autoRefreshToken: false, persistSession: false },
     });
-}
-
-// ── Helper: MTN Collection API ────────────────────────────────────
-async function getMtnToken(env: Env): Promise<string> {
-    const credentials = btoa(`${env.MTN_COLLECTION_API_USER}:${env.MTN_COLLECTION_API_KEY}`);
-    const baseUrl = env.MTN_BASE_URL ?? "https://sandbox.momodeveloper.mtn.com";
-    const res = await fetch(`${baseUrl}/collection/token/`, {
-        method: "POST",
-        headers: {
-            Authorization: `Basic ${credentials}`,
-            "Ocp-Apim-Subscription-Key": env.MTN_COLLECTION_SUBSCRIPTION_KEY ?? "",
-        },
-    });
-    if (!res.ok) throw new Error(`MTN token error: ${res.status}`);
-    const data = (await res.json()) as { access_token: string };
-    return data.access_token;
-}
-
-async function requestToPay(env: Env, params: {
-    referenceId: string; amount: number; currency: string;
-    externalId: string; payerMsisdn: string; payerMessage: string; payeeNote: string;
-}) {
-    const token = await getMtnToken(env);
-    const baseUrl = env.MTN_BASE_URL ?? "https://sandbox.momodeveloper.mtn.com";
-    const res = await fetch(`${baseUrl}/collection/v1_0/requesttopay`, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "X-Reference-Id": params.referenceId,
-            "X-Target-Environment": env.MTN_TARGET_ENVIRONMENT ?? "sandbox",
-            "Ocp-Apim-Subscription-Key": env.MTN_COLLECTION_SUBSCRIPTION_KEY ?? "",
-            "Content-Type": "application/json",
-            ...(env.MTN_COLLECTION_CALLBACK_URL ? { "X-Callback-Url": env.MTN_COLLECTION_CALLBACK_URL } : {}),
-        },
-        body: JSON.stringify({
-            amount: String(params.amount),
-            currency: params.currency,
-            externalId: params.externalId,
-            payer: { partyIdType: "MSISDN", partyId: params.payerMsisdn },
-            payerMessage: params.payerMessage,
-            payeeNote: params.payeeNote,
-        }),
-    });
-    if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`MTN requestToPay error: ${res.status} — ${text}`);
-    }
-}
-
-async function getRequestToPayStatus(env: Env, referenceId: string) {
-    const token = await getMtnToken(env);
-    const baseUrl = env.MTN_BASE_URL ?? "https://sandbox.momodeveloper.mtn.com";
-    const res = await fetch(`${baseUrl}/collection/v1_0/requesttopay/${referenceId}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "X-Target-Environment": env.MTN_TARGET_ENVIRONMENT ?? "sandbox",
-            "Ocp-Apim-Subscription-Key": env.MTN_COLLECTION_SUBSCRIPTION_KEY ?? "",
-        },
-    });
-    if (!res.ok) throw new Error(`MTN status error: ${res.status}`);
-    return (await res.json()) as Record<string, any>;
 }
 
 function mapMtnStatusToPaymentStatus(mtnStatus: string): string {
@@ -91,66 +33,6 @@ function mapMtnStatusToPaymentStatus(mtnStatus: string): string {
         case "TIMEOUT": return "failed";
         default: return "pending";
     }
-}
-
-// ── Helper: MTN Disbursement API ──────────────────────────────────
-async function getDisbursementToken(env: Env): Promise<string> {
-    const credentials = btoa(`${env.MTN_DISBURSEMENT_API_USER}:${env.MTN_DISBURSEMENT_API_KEY}`);
-    const baseUrl = env.MTN_BASE_URL ?? "https://sandbox.momodeveloper.mtn.com";
-    const res = await fetch(`${baseUrl}/disbursement/token/`, {
-        method: "POST",
-        headers: {
-            Authorization: `Basic ${credentials}`,
-            "Ocp-Apim-Subscription-Key": env.MTN_DISBURSEMENT_SUBSCRIPTION_KEY ?? "",
-        },
-    });
-    if (!res.ok) throw new Error(`MTN disbursement token error: ${res.status}`);
-    const data = (await res.json()) as { access_token: string };
-    return data.access_token;
-}
-
-async function transfer(env: Env, params: {
-    referenceId: string; amount: number; currency: string;
-    externalId: string; payeeMsisdn: string; payerMessage: string; payeeNote: string;
-}) {
-    const token = await getDisbursementToken(env);
-    const baseUrl = env.MTN_BASE_URL ?? "https://sandbox.momodeveloper.mtn.com";
-    const res = await fetch(`${baseUrl}/disbursement/v1_0/transfer`, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "X-Reference-Id": params.referenceId,
-            "X-Target-Environment": env.MTN_TARGET_ENVIRONMENT ?? "sandbox",
-            "Ocp-Apim-Subscription-Key": env.MTN_DISBURSEMENT_SUBSCRIPTION_KEY ?? "",
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            amount: String(params.amount),
-            currency: params.currency,
-            externalId: params.externalId,
-            payee: { partyIdType: "MSISDN", partyId: params.payeeMsisdn },
-            payerMessage: params.payerMessage,
-            payeeNote: params.payeeNote,
-        }),
-    });
-    if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`MTN transfer error: ${res.status} — ${text}`);
-    }
-}
-
-async function getTransferStatus(env: Env, referenceId: string) {
-    const token = await getDisbursementToken(env);
-    const baseUrl = env.MTN_BASE_URL ?? "https://sandbox.momodeveloper.mtn.com";
-    const res = await fetch(`${baseUrl}/disbursement/v1_0/transfer/${referenceId}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "X-Target-Environment": env.MTN_TARGET_ENVIRONMENT ?? "sandbox",
-            "Ocp-Apim-Subscription-Key": env.MTN_DISBURSEMENT_SUBSCRIPTION_KEY ?? "",
-        },
-    });
-    if (!res.ok) throw new Error(`MTN transfer status error: ${res.status}`);
-    return (await res.json()) as Record<string, any>;
 }
 
 function mapTransferStatus(mtnStatus: string): string {
@@ -164,11 +46,25 @@ function mapTransferStatus(mtnStatus: string): string {
 
 // ═══════════════════════ ROUTES ═══════════════════════════════════
 
+paymentRoutes.get("/providers", async (c) => {
+    return c.json({ success: true, providers: listMobileMoneyProviders(c.env), defaultProvider: DEFAULT_PROVIDER });
+});
+
 // ── POST /request-to-pay ─────────────────────────────────────────
 paymentRoutes.post("/request-to-pay", async (c) => {
-    const body = await c.req.json<{ orderId: string; payerMsisdn: string; payerMessage?: string; payeeNote?: string }>();
+    const body = await c.req.json<{ orderId: string; payerMsisdn: string; payerMessage?: string; payeeNote?: string; provider?: MobileMoneyProviderCode }>();
     if (!body.orderId || !body.payerMsisdn?.trim()) {
         return c.json({ error: "orderId et payerMsisdn sont requis" }, 400);
+    }
+
+    const providerCode = body.provider ?? DEFAULT_PROVIDER;
+    const provider = getMobileMoneyProvider(providerCode);
+    if (!provider) return c.json({ error: "Provider de paiement non supporté" }, 400);
+    if (!provider.requestToPay || !provider.getRequestToPayStatus) {
+        return c.json({ error: `Le provider ${providerCode} ne supporte pas la collection` }, 400);
+    }
+    if (!provider.isConfigured(c.env)) {
+        return c.json({ error: `Le provider ${providerCode} n'est pas configuré` }, 400);
     }
 
     const admin = getAdminClient(c.env);
@@ -183,7 +79,7 @@ paymentRoutes.post("/request-to-pay", async (c) => {
 
     const { data: tx, error: txError } = await admin.from("payment_transactions")
         .insert({
-            restaurant_id: c.var.restaurantId, order_id: order.id, provider: "mtn_momo",
+            restaurant_id: c.var.restaurantId, order_id: order.id, provider: providerCode,
             reference_id: referenceId, external_id: externalId,
             payer_msisdn: body.payerMsisdn.trim(), amount: order.total,
             currency: "XAF", status: "pending", provider_status: "PENDING",
@@ -192,7 +88,7 @@ paymentRoutes.post("/request-to-pay", async (c) => {
     if (txError || !tx) return c.json({ error: "Impossible de créer la transaction" }, 500);
 
     try {
-        await requestToPay(c.env, {
+        await provider.requestToPay(c.env, {
             referenceId, amount: order.total, currency: "XAF", externalId,
             payerMsisdn: body.payerMsisdn.trim(),
             payerMessage: body.payerMessage ?? "Paiement commande Kbouffe",
@@ -207,7 +103,7 @@ paymentRoutes.post("/request-to-pay", async (c) => {
         return c.json({ error: message }, 502);
     }
 
-    return c.json({ success: true, payment: { referenceId: (tx as any).reference_id, status: "pending" } });
+    return c.json({ success: true, payment: { referenceId: (tx as any).reference_id, status: "pending", provider: providerCode } });
 });
 
 // ── GET /status/:referenceId ─────────────────────────────────────
@@ -216,12 +112,21 @@ paymentRoutes.get("/status/:referenceId", async (c) => {
     const admin = getAdminClient(c.env);
 
     const { data: tx, error: txError } = await admin.from("payment_transactions")
-        .select("id, order_id, restaurant_id, reference_id, status")
+        .select("id, order_id, restaurant_id, reference_id, status, provider")
         .eq("reference_id", referenceId).eq("restaurant_id", c.var.restaurantId).single();
 
     if (txError || !tx) return c.json({ error: "Transaction introuvable" }, 404);
 
-    const providerPayload = await getRequestToPayStatus(c.env, referenceId);
+    const providerCode = String((tx as any).provider ?? DEFAULT_PROVIDER) as MobileMoneyProviderCode;
+    const provider = getMobileMoneyProvider(providerCode);
+    if (!provider?.getRequestToPayStatus) {
+        return c.json({ error: `Le provider ${providerCode} ne supporte pas le statut collection` }, 400);
+    }
+    if (!provider.isConfigured(c.env)) {
+        return c.json({ error: `Le provider ${providerCode} n'est pas configuré` }, 400);
+    }
+
+    const providerPayload = await provider.getRequestToPayStatus(c.env, referenceId);
     const providerStatus = String(providerPayload.status ?? "PENDING");
     const mappedStatus = mapMtnStatusToPaymentStatus(providerStatus);
 
@@ -243,11 +148,21 @@ paymentRoutes.get("/status/:referenceId", async (c) => {
 
 // ── POST /transfer ───────────────────────────────────────────────
 paymentRoutes.post("/transfer", async (c) => {
-    const body = await c.req.json<{ payoutId: string; payeeMsisdn: string; amount: number; payeeNote?: string }>();
+    const body = await c.req.json<{ payoutId: string; payeeMsisdn: string; amount: number; payeeNote?: string; provider?: MobileMoneyProviderCode }>();
     if (!body.payoutId || !body.payeeMsisdn?.trim() || !body.amount) {
         return c.json({ error: "payoutId, payeeMsisdn et amount sont requis" }, 400);
     }
     if (body.amount <= 0) return c.json({ error: "Le montant doit etre positif" }, 400);
+
+    const providerCode = body.provider ?? DEFAULT_PROVIDER;
+    const provider = getMobileMoneyProvider(providerCode);
+    if (!provider) return c.json({ error: "Provider de paiement non supporté" }, 400);
+    if (!provider.transfer || !provider.getTransferStatus) {
+        return c.json({ error: `Le provider ${providerCode} ne supporte pas le transfert` }, 400);
+    }
+    if (!provider.isConfigured(c.env)) {
+        return c.json({ error: `Le provider ${providerCode} n'est pas configuré` }, 400);
+    }
 
     const admin = getAdminClient(c.env);
     const { data: payout, error: payoutError } = await admin.from("payouts")
@@ -264,12 +179,12 @@ paymentRoutes.post("/transfer", async (c) => {
         .eq("id", (payout as any).id);
 
     try {
-        await transfer(c.env, {
+        await provider.transfer(c.env, {
             referenceId, amount: body.amount, currency: "XAF", externalId,
             payeeMsisdn: body.payeeMsisdn.trim(), payerMessage: "Versement Kbouffe",
             payeeNote: body.payeeNote ?? `Versement restaurant - ${(payout as any).id}`,
         });
-        return c.json({ success: true, transfer: { referenceId, payoutId: (payout as any).id, amount: body.amount, status: "pending" } });
+        return c.json({ success: true, transfer: { referenceId, payoutId: (payout as any).id, amount: body.amount, status: "pending", provider: providerCode } });
     } catch (providerError) {
         const message = providerError instanceof Error ? providerError.message : "Erreur fournisseur MTN Disbursement";
         await admin.from("payouts").update({ status: "failed", updated_at: new Date().toISOString() } as never).eq("id", (payout as any).id);
@@ -280,7 +195,16 @@ paymentRoutes.post("/transfer", async (c) => {
 // ── GET /transfer/:referenceId ───────────────────────────────────
 paymentRoutes.get("/transfer/:referenceId", async (c) => {
     const referenceId = c.req.param("referenceId");
-    const providerPayload = await getTransferStatus(c.env, referenceId);
+    const providerCode = (c.req.query("provider") as MobileMoneyProviderCode | null) ?? DEFAULT_PROVIDER;
+    const provider = getMobileMoneyProvider(providerCode);
+    if (!provider?.getTransferStatus) {
+        return c.json({ error: `Le provider ${providerCode} ne supporte pas le statut transfert` }, 400);
+    }
+    if (!provider.isConfigured(c.env)) {
+        return c.json({ error: `Le provider ${providerCode} n'est pas configuré` }, 400);
+    }
+
+    const providerPayload = await provider.getTransferStatus(c.env, referenceId);
     const providerStatus = String(providerPayload.status ?? "PENDING");
     const mappedStatus = mapTransferStatus(providerStatus);
 
@@ -296,7 +220,7 @@ paymentRoutes.get("/transfer/:referenceId", async (c) => {
 
     return c.json({
         success: true,
-        transfer: { referenceId, status: mappedStatus, providerStatus, financialTransactionId: providerPayload.financialTransactionId },
+        transfer: { referenceId, status: mappedStatus, providerStatus, provider: providerCode, financialTransactionId: providerPayload.financialTransactionId },
     });
 });
 
@@ -315,13 +239,23 @@ paymentWebhookRoutes.post("/webhook", async (c) => {
     const referenceId = body.referenceId || c.req.query("referenceId") || c.req.header("x-reference-id");
     if (!referenceId) return c.json({ error: "referenceId manquant" }, 400);
 
-    const providerPayload = await getRequestToPayStatus(c.env, referenceId);
+    const admin = getAdminClient(c.env);
+    const { data: tx } = await admin
+        .from("payment_transactions")
+        .select("id, order_id, restaurant_id, provider")
+        .eq("reference_id", referenceId)
+        .single();
+    if (!tx) return c.json({ success: true, ignored: true });
+
+    const providerCode = String((tx as any).provider ?? DEFAULT_PROVIDER) as MobileMoneyProviderCode;
+    const provider = getMobileMoneyProvider(providerCode);
+    if (!provider?.getRequestToPayStatus) {
+        return c.json({ error: `Le provider ${providerCode} ne supporte pas le webhook collection` }, 400);
+    }
+
+    const providerPayload = await provider.getRequestToPayStatus(c.env, referenceId);
     const providerStatus = String(providerPayload.status ?? "PENDING");
     const mappedStatus = mapMtnStatusToPaymentStatus(providerStatus);
-
-    const admin = getAdminClient(c.env);
-    const { data: tx } = await admin.from("payment_transactions").select("id, order_id, restaurant_id").eq("reference_id", referenceId).single();
-    if (!tx) return c.json({ success: true, ignored: true });
 
     await admin.from("payment_transactions").update({
         status: mappedStatus, provider_status: providerStatus, provider_response: providerPayload,
@@ -350,7 +284,13 @@ paymentWebhookRoutes.post("/disbursement-webhook", async (c) => {
     const referenceId = body.referenceId || c.req.query("referenceId") || c.req.header("x-reference-id");
     if (!referenceId) return c.json({ error: "referenceId manquant" }, 400);
 
-    const providerPayload = await getTransferStatus(c.env, referenceId);
+    const providerCode = (c.req.query("provider") as MobileMoneyProviderCode | null) ?? DEFAULT_PROVIDER;
+    const provider = getMobileMoneyProvider(providerCode);
+    if (!provider?.getTransferStatus) {
+        return c.json({ error: `Le provider ${providerCode} ne supporte pas le webhook transfert` }, 400);
+    }
+
+    const providerPayload = await provider.getTransferStatus(c.env, referenceId);
     const providerStatus = String(providerPayload.status ?? "PENDING");
     const mappedStatus = mapTransferStatus(providerStatus);
 

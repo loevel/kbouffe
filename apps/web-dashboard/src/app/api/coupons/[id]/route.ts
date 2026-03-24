@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         if (!existing) return apiError("Code promo introuvable", 404);
 
         const allowed = [
-            "name", "description", "type", "value", "min_order", "max_discount",
+            "name", "description", "value", "max_discount",
             "max_uses", "max_uses_per_customer", "is_active", "starts_at", "expires_at",
             "applies_to",
         ];
@@ -37,6 +37,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         for (const key of allowed) {
             if (key in body) updates[key] = body[key];
         }
+        // Mapper type→kind et min_order→min_order_amount
+        if ("type" in body) updates["kind"] = body["type"];
+        if ("min_order" in body) { updates["min_order"] = body["min_order"]; updates["min_order_amount"] = body["min_order"]; }
 
         const { data, error } = await (ctx.supabase.from("coupons") as any)
             .update(updates)

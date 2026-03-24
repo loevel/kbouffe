@@ -9,6 +9,7 @@ import {
     ChefHat,
     Clock,
     CreditCard,
+    KeyRound,
     Loader2,
     MapPin,
     Package,
@@ -55,6 +56,7 @@ interface OrderDetail {
     scheduled_for: string | null;
     delivered_at: string | null;
     delivery_note: string | null;
+    delivery_code: string | null;
     notes: string | null;
     table_number: string | null;
     restaurants: { id: string; name: string; slug: string } | null;
@@ -363,6 +365,27 @@ export function OrderTrackingClient() {
                             preparationTimeMinutes={order.preparation_time_minutes}
                             scheduledFor={order.scheduled_for}
                         />
+
+                        {/* Delivery confirmation code — affiché dès que le livreur est assigné */}
+                        {order.delivery_type === "delivery" &&
+                            order.delivery_code &&
+                            !["delivered", "cancelled"].includes(order.status) && (
+                            <div className="rounded-2xl border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/40 px-5 py-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <KeyRound size={16} className="text-orange-500 shrink-0" />
+                                    <p className="text-sm font-bold text-orange-700 dark:text-orange-300">
+                                        Code de confirmation de livraison
+                                    </p>
+                                </div>
+                                <p className="text-4xl font-mono font-black tracking-[0.45em] text-orange-600 dark:text-orange-400 text-center py-2">
+                                    {order.delivery_code}
+                                </p>
+                                <p className="text-xs text-orange-600/80 dark:text-orange-400/70 text-center leading-relaxed mt-1">
+                                    Communiquez ce code au livreur lors de la remise de votre commande.<br />
+                                    Il est nécessaire pour finaliser la livraison.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Proof of delivery */}
                         {order.status === "delivered" && order.delivered_at && (

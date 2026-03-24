@@ -16,50 +16,66 @@ export function LandingFaq() {
 
     const copy = locale === "fr"
         ? {
-            tag: "Objections levees",
+            tag: "Questions frequentes",
             title: "Les questions qu'un gerant se pose avant de se lancer",
-            description: "Si ton client ideal hesite, ce n'est pas toujours par manque d'interet. C'est souvent parce qu'il veut savoir si l'outil reste simple, rentable et adapte a sa facon de travailler.",
-            ctaText: "Voir les tarifs complets",
+            description: "Tout ce que vous devez savoir pour demarrer sereinement avec Kbouffe.",
+            ctaText: "Creer ma vitrine gratuite",
             faqItems: [
                 {
                     question: "Est-ce que j'ai besoin d'un ordinateur ou d'un caissier dedie ?",
                     answer: "Non. Kbouffe est pense pour les etablissements qui tournent deja depuis un smartphone Android. Le gerant peut publier le menu, suivre les commandes et verifier les paiements depuis son telephone.",
                 },
                 {
-                    question: "Pourquoi un abonnement et pas une commission sur mes ventes ?",
-                    answer: "Parce que ce marche a besoin de marges simples a comprendre. Une commission penalise les etablissements qui vendent bien. Un abonnement fixe garde vos ventes intactes et rend le cout previsible.",
+                    question: "Comment Kbouffe gagne de l'argent si la plateforme est gratuite ?",
+                    answer: "Kbouffe prend 5% sur chaque paiement Mobile Money effectue via la plateforme. C'est 6 fois moins que Glovo qui prend 30%. Vous gardez 95% de vos ventes. En plus, vous pouvez acheter des packs de visibilite optionnels pour booster vos ventes.",
+                },
+                {
+                    question: "C'est quoi les packs de boost ?",
+                    answer: "Ce sont des outils optionnels que vous achetez quand vous en avez besoin : visibilite en tete des resultats, SMS promotionnels a vos clients, banniere publicitaire sur la page d'accueil, statistiques avancees. Vous ne payez que ce qui vous est utile, quand vous le voulez.",
                 },
                 {
                     question: "Mes clients utilisent surtout WhatsApp. Est-ce que ca suffit ?",
-                    answer: "Oui, c'est meme un point fort. Le lien Kbouffe est fait pour etre partage dans les statuts, les groupes, les messages directs et via QR code sur place.",
+                    answer: "Oui, c'est meme un point fort. Le lien Kbouffe est fait pour etre partage dans les statuts, les groupes, les messages directs et via QR code sur place. Vos clients n'ont rien a installer.",
                 },
                 {
                     question: "Et si mon etablissement est petit ou encore tres informel ?",
-                    answer: "C'est justement la cible la plus interessante si vous avez deja un smartphone, Mobile Money et un probleme de desorganisation des commandes. Vous n'avez pas besoin d'etre grand pour gagner du temps et vendre plus proprement.",
+                    answer: "C'est justement la cible ideale. Si vous avez un smartphone et Mobile Money, vous pouvez demarrer en 2 minutes. Pas besoin d'etre grand — un tourne-dos ou un snack gagne autant en organisation qu'un grand restaurant.",
+                },
+                {
+                    question: "Est-ce que je suis engage avec un contrat ?",
+                    answer: "Aucun engagement. La vitrine est gratuite pour toujours. Les packs de boost sont achetes a l'unite, sans abonnement obligatoire. Vous arretez quand vous voulez.",
                 },
             ] as FaqItem[],
         }
         : {
-            tag: "Objections handled",
+            tag: "FAQ",
             title: "The questions an operator asks before starting",
-            description: "If your ideal customer hesitates, it is not always lack of interest. They usually want to know whether the tool stays simple, profitable and adapted to how they already work.",
-            ctaText: "See full pricing",
+            description: "Everything you need to know to get started with Kbouffe.",
+            ctaText: "Create my free storefront",
             faqItems: [
                 {
                     question: "Do I need a computer or a dedicated cashier?",
                     answer: "No. Kbouffe is built for businesses already run from an Android smartphone. The owner can publish the menu, track orders and verify payments directly from the phone.",
                 },
                 {
-                    question: "Why a subscription instead of commission on sales?",
-                    answer: "Because this market needs margins that stay easy to understand. Commission punishes the businesses that sell well. A fixed subscription keeps sales intact and makes cost predictable.",
+                    question: "How does Kbouffe make money if the platform is free?",
+                    answer: "Kbouffe takes 5% on each Mobile Money payment made through the platform. That's 6 times less than Glovo which takes 30%. You keep 95% of your sales. Plus, you can buy optional visibility packs to boost your business.",
+                },
+                {
+                    question: "What are boost packs?",
+                    answer: "Optional tools you buy when needed: top search results placement, SMS promotions to your customers, homepage banner ads, advanced analytics. You only pay for what you need, when you need it.",
                 },
                 {
                     question: "My customers mainly use WhatsApp. Is that enough?",
-                    answer: "Yes, and it is actually a strength. The Kbouffe link is designed to be shared in statuses, groups, direct messages and via QR code on-site.",
+                    answer: "Yes, and it is actually a strength. The Kbouffe link is designed to be shared in statuses, groups, direct messages and via QR code on-site. Your customers don't need to install anything.",
                 },
                 {
                     question: "What if my business is small or still very informal?",
-                    answer: "That is often the best early fit if you already have a smartphone, Mobile Money and a messy ordering process. You do not need to be large to gain time and sell more cleanly.",
+                    answer: "That's actually the ideal fit. If you have a smartphone and Mobile Money, you can start in 2 minutes. Small eateries and snack bars gain just as much in organization as large restaurants.",
+                },
+                {
+                    question: "Am I locked into a contract?",
+                    answer: "No commitment whatsoever. The storefront is free forever. Boost packs are purchased individually, no mandatory subscription. You stop whenever you want.",
                 },
             ] as FaqItem[],
         };
@@ -119,7 +135,7 @@ export function LandingFaq() {
 
                 <div className="flex justify-center">
                     <Link
-                        href="/pricing"
+                        href="/register/restaurant"
                         className="inline-flex items-center gap-2 px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold transition-all hover:-translate-y-0.5 shadow-lg shadow-brand-500/25"
                     >
                         {copy.ctaText}

@@ -130,7 +130,7 @@ export default function CheckoutScreen() {
                 ? `${selectedAddress.label} — ${selectedAddress.address}, ${selectedAddress.city}`
                 : undefined;
  
-             const res = await placeOrder({
+                const res = await placeOrder({
                 restaurantId: restaurantId ?? '',
                 items: orderItems,
                 deliveryType,
@@ -144,6 +144,14 @@ export default function CheckoutScreen() {
                 total: subtotal + actualDeliveryFee - (appliedPromo?.discount ?? 0),
                 notes: notes.trim() || undefined,
             });
+
+            if (paymentMethod === 'momo_mtn') {
+                if (res.payment?.status === 'failed') {
+                    Alert.alert('Paiement MTN non initié', res.payment.error ?? 'La commande est créée mais le paiement MTN a échoué.');
+                } else {
+                    Alert.alert('Paiement MTN initié', 'Validez la demande de paiement sur votre téléphone.');
+                }
+            }
 
             await refreshOrders();
 

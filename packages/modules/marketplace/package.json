@@ -23,8 +23,8 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@kbouffe/module-core": "workspace:*",
-    "@kbouffe/shared-types": "workspace:*",
+    "@kbouffe/module-core": "*",
+    "@kbouffe/shared-types": "*",
     "hono": "^4.2.0"
   },
   "devDependencies": {

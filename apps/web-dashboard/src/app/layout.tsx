@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider, LocaleProvider, ToastProvider } from "@kbouffe/module-core/ui";
 import { CartProvider } from "@/contexts/cart-context";
 import { ClientAppProvider } from "@/components/providers/ClientAppProvider";
+import { PushNotificationProvider } from "@/components/providers/PushNotificationProvider";
+import { PwaInstallPrompt } from "@/components/shared/PwaInstallPrompt";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -50,10 +52,22 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     creator: "@kbouffe",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Kbouffe",
+  },
   other: {
-    "theme-color": "#f97316",
     "msapplication-TileColor": "#f97316",
   },
+};
+
+export const viewport = {
+  themeColor: "#f97316",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -76,10 +90,13 @@ export default function RootLayout({
         <ThemeProvider>
           <LocaleProvider>
             <ClientAppProvider>
-              <CartProvider>
-                {children}
-                <ToastProvider />
-              </CartProvider>
+              <PushNotificationProvider>
+                <CartProvider>
+                  {children}
+                  <PwaInstallPrompt />
+                  <ToastProvider />
+                </CartProvider>
+              </PushNotificationProvider>
             </ClientAppProvider>
           </LocaleProvider>
         </ThemeProvider>

@@ -212,7 +212,7 @@ function OrderCard({ order, nextStatus, actionKey, t, urgentThreshold = 15 }: {
                 {(order.items as unknown as OrderItemData[] ?? []).slice(0, 5).map((item, i) => (
                     <li key={i} className="flex items-center gap-2 text-xs text-surface-700 dark:text-surface-300">
                         <span className="font-bold text-brand-500 w-4 text-center">{item.quantity}×</span>
-                        <span className="truncate">{item.productName}</span>
+                        <span className="truncate">{item.productName || (item as any).name || "—"}</span>
                     </li>
                 ))}
                 {(order.items as unknown as OrderItemData[] ?? []).length > 5 && (

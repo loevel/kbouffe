@@ -391,6 +391,17 @@ teamRoutes.post("/create", async (c) => {
             }
         }
 
+        // Si le rôle est driver, mettre à jour user_metadata pour la redirection
+        if (role === "driver") {
+            await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+                user_metadata: { role: "livreur" },
+            });
+            await supabaseAdmin.from("drivers").upsert({
+                user_id: targetUserId,
+                restaurant_id: restaurantId,
+            }, { onConflict: "user_id" });
+        }
+
         return c.json({ success: true, memberId: existingMembership?.id ?? memberId });
     } catch (error) {
         console.error("POST /team/create error:", error);
@@ -493,18 +504,20 @@ teamRoutes.patch("/:memberId", async (c) => {
             .update({ role })
             .eq("id", memberId);
 
-        // Handle driver table sync
+        // Sync driver table et user_metadata
         if (role === "driver") {
-            await adminDb
-                .from("drivers")
-                .update({ restaurant_id: restaurantId })
-                .eq("user_id", target.user_id);
+            await adminDb.from("drivers").upsert(
+                { user_id: target.user_id, restaurant_id: restaurantId },
+                { onConflict: "user_id" }
+            );
+            await adminDb.auth.admin.updateUserById(target.user_id, {
+                user_metadata: { role: "livreur" },
+            });
         } else if (oldRole === "driver") {
-            // If they were a driver and now something else, unlink from restaurant
-            await adminDb
-                .from("drivers")
-                .update({ restaurant_id: null })
-                .eq("user_id", target.user_id);
+            await adminDb.from("drivers").update({ restaurant_id: null }).eq("user_id", target.user_id);
+            await adminDb.auth.admin.updateUserById(target.user_id, {
+                user_metadata: { role: "user" },
+            });
         }
 
         return c.json({ success: true });
@@ -551,12 +564,12 @@ teamRoutes.delete("/:memberId", async (c) => {
             .update({ status: "revoked" })
             .eq("id", memberId);
 
-        // If they were a driver, unlink from restaurant
+        // Si c'était un driver, dissocier du restaurant et réinitialiser le rôle
         if (target.role === "driver") {
-            await adminDb
-                .from("drivers")
-                .update({ restaurant_id: null })
-                .eq("user_id", target.user_id);
+            await adminDb.from("drivers").update({ restaurant_id: null, is_online: false }).eq("user_id", target.user_id);
+            await adminDb.auth.admin.updateUserById(target.user_id, {
+                user_metadata: { role: "user" },
+            });
         }
 
         return c.json({ success: true });

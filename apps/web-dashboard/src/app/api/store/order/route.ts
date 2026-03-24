@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
+import { pushOrderStatusChange } from "@/lib/firebase/order-push";
 
 const ALLOWED_DELIVERY_TYPES = ["delivery", "pickup", "dine_in"] as const;
 const ALLOWED_PAYMENT_METHODS = ["cash", "mobile_money_mtn", "mobile_money_orange"] as const;
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
                 covers: null,
                 external_drinks_count: 0,
             } as any)
-            .select("id")
+            .select("id, delivery_code")
             .single();
 
         if (orderError) {
@@ -99,7 +100,34 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        return NextResponse.json({ success: true, orderId: (order as { id: string }).id }, { status: 201 });
+        const createdOrder = order as unknown as { id: string; delivery_code: string | null };
+
+        // ── Push notification to restaurant (fire-and-forget) ──────────
+        // Fetch restaurant name for push message
+        const { data: restInfo } = await supabase
+            .from("restaurants")
+            .select("name")
+            .eq("id", body.restaurantId)
+            .single();
+
+        pushOrderStatusChange(supabase, "pending", {
+            orderId: createdOrder.id,
+            orderRef: "",
+            restaurantId: body.restaurantId,
+            restaurantName: String((restInfo as any)?.name ?? "Restaurant"),
+            customerId: body.customerId ?? null,
+            total: body.total,
+            deliveryType: body.deliveryType,
+        }).catch(() => {});
+
+        return NextResponse.json(
+            {
+                success: true,
+                orderId: createdOrder.id,
+                deliveryCode: body.deliveryType === "delivery" ? (createdOrder.delivery_code ?? null) : null,
+            },
+            { status: 201 },
+        );
     } catch (error) {
         console.error("[POST /api/store/order] Unexpected error:", error);
         return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

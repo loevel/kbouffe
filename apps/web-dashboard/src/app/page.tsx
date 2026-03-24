@@ -6,6 +6,7 @@ import { ForWho } from "@/components/landing/ForWho";
 import { Features } from "@/components/landing/Features";
 import { RemoteDineIn } from "@/components/landing/RemoteDineIn";
 import { HowItWorks } from "@/components/landing/HowItWorks";
+import { MarketplacePacks } from "@/components/landing/MarketplacePacks";
 import { PricingTeaser } from "@/components/landing/PricingTeaser";
 import { Restaurants } from "@/components/landing/Restaurants";
 import { Testimonials } from "@/components/landing/Testimonials";
@@ -21,6 +22,7 @@ export default function Home() {
         <MarketSegments />
         <ForWho />
         <Features />
+        <MarketplacePacks />
         <RemoteDineIn />
         <HowItWorks />
         <PricingTeaser />

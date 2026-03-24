@@ -34,6 +34,10 @@ interface DeliveryTrackerProps {
   isDeliverer?: boolean;
   /** Client address pre-loaded from order */
   clientAddress?: string;
+  /** Client name shown in the map popup */
+  clientName?: string;
+  /** Client phone shown in the map popup */
+  clientPhone?: string;
   /** Called when session is loaded */
   onSessionLoaded?: (session: TrackingSession) => void;
 }
@@ -44,6 +48,8 @@ export function DeliveryTracker({
   orderId,
   delivererName = "Livreur",
   isDeliverer = false,
+  clientName,
+  clientPhone,
   onSessionLoaded,
 }: DeliveryTrackerProps) {
   const [session, setSession] = useState<TrackingSession | null>(null);
@@ -175,7 +181,7 @@ export function DeliveryTracker({
   }, []);
 
   const clientPos: MapPosition | null = session?.client_lat && session.client_lng
-    ? { lat: session.client_lat, lng: session.client_lng, label: session.client_address ?? "Client" }
+    ? { lat: session.client_lat, lng: session.client_lng, label: session.client_address ?? "Client", name: clientName, phone: clientPhone }
     : null;
 
   const delivererPos: MapPosition | null = session?.deliverer_lat && session.deliverer_lng

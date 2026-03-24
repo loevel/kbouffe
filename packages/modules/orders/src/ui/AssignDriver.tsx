@@ -1,9 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Truck, Check, Loader2 } from "lucide-react";
-import { Button, Select, toast, authFetch } from "@kbouffe/module-core/ui";
+import { Truck, Loader2 } from "lucide-react";
+import { Select, toast, authFetch } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
+
+interface DriverMember {
+    id: string;
+    userId: string;
+    role: string;
+    status: string;
+    email: string;
+    fullName: string | null;
+    phone: string | null;
+}
 
 interface AssignDriverProps {
     orderId: string;
@@ -13,10 +23,11 @@ interface AssignDriverProps {
 
 export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDriverProps) {
     const { t } = useLocale();
-    const [drivers, setDrivers] = useState<any[]>([]);
+    const [drivers, setDrivers] = useState<DriverMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [selectedDriver, setSelectedDriver] = useState<string>(currentDriverId || "");
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchDrivers = async () => {
@@ -24,8 +35,14 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
                 const res = await authFetch("/api/team");
                 if (!res.ok) return;
                 const data = await res.json();
-                const allMembers = data.members || [];
-                const driverMembers = allMembers.filter((m: any) => m.role === "driver" && m.status === "active");
+                const allMembers = Array.isArray(data.members) ? (data.members as DriverMember[]) : [];
+                const driverMembers = allMembers
+                    .filter((member) => member.role === "driver" && member.status === "active")
+                    .sort((left, right) => {
+                        const leftLabel = left.fullName || left.email || left.userId;
+                        const rightLabel = right.fullName || right.email || right.userId;
+                        return leftLabel.localeCompare(rightLabel, "fr", { sensitivity: "base" });
+                    });
                 setDrivers(driverMembers);
             } catch (error) {
                 console.error("Error fetching drivers", error);
@@ -42,23 +59,30 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
         setSelectedDriver(currentDriverId || "");
     }, [currentDriverId]);
 
-    const handleAssign = async () => {
+    const handleAssign = async (nextDriverId: string) => {
         setSaving(true);
+        setError(null);
         try {
             const res = await authFetch(`/api/orders/${orderId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ driver_id: selectedDriver || null }),
+                body: JSON.stringify({ driver_id: nextDriverId || null }),
             });
 
             if (!res.ok) {
-                toast.error(t.common.error);
+                const body = (await res.json().catch(() => ({}))) as { error?: string };
+                const message = body.error ?? t.common.error;
+                setError(message);
+                setSelectedDriver(currentDriverId || "");
+                toast.error(message);
                 return;
             }
 
-            toast.success("Livreur assigné avec succès");
+            toast.success(nextDriverId ? "Livreur assigné avec succès" : "Livreur désassigné avec succès");
             if (onAssigned) onAssigned();
         } catch (error) {
+            setError(t.common.error);
+            setSelectedDriver(currentDriverId || "");
             toast.error(t.common.error);
         } finally {
             setSaving(false);
@@ -81,7 +105,7 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
         );
     }
 
-    const hasChanged = selectedDriver !== (currentDriverId || "");
+    const currentDriver = drivers.find((driver) => driver.userId === (currentDriverId || ""));
 
     return (
         <div className="space-y-3 mt-4 border-t border-surface-100 dark:border-surface-800 pt-4">
@@ -89,25 +113,38 @@ export function AssignDriver({ orderId, currentDriverId, onAssigned }: AssignDri
                 <Truck size={16} className="text-brand-500" />
                 Assigner un Livreur
             </label>
-            <div className="flex items-center gap-2">
-                <div className="flex-1">
-                    <Select
-                        value={selectedDriver}
-                        onChange={(e) => setSelectedDriver(e.target.value)}
-                        options={[
-                            { value: "", label: "-- Non assigné --" },
-                            ...drivers.map((d) => ({
-                                value: d.userId,
-                                label: d.fullName || d.email,
-                            })),
-                        ]}
-                    />
+            <div className="space-y-2">
+                <Select
+                    value={selectedDriver}
+                    onChange={(e) => {
+                        const nextDriverId = e.target.value;
+                        setSelectedDriver(nextDriverId);
+                        void handleAssign(nextDriverId);
+                    }}
+                    disabled={saving}
+                    options={[
+                        { value: "", label: "-- Non assigné --" },
+                        ...drivers.map((driver) => ({
+                            value: driver.userId,
+                            label: driver.fullName || driver.email || driver.userId,
+                        })),
+                    ]}
+                />
+                <div className="min-h-5">
+                    {saving ? (
+                        <div className="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
+                            <Loader2 size={12} className="animate-spin" /> Enregistrement de l'assignation...
+                        </div>
+                    ) : error ? (
+                        <p className="text-xs text-red-500">{error}</p>
+                    ) : currentDriver ? (
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                            Livreur actuel: <span className="font-medium text-surface-700 dark:text-surface-200">{currentDriver.fullName || currentDriver.email}</span>
+                        </p>
+                    ) : (
+                        <p className="text-xs text-surface-500 dark:text-surface-400">Aucun livreur assigné à cette commande.</p>
+                    )}
                 </div>
-                {hasChanged && (
-                    <Button size="sm" onClick={handleAssign} isLoading={saving} leftIcon={<Check size={16} />}>
-                        Sauver
-                    </Button>
-                )}
             </div>
             <p className="text-[10px] text-surface-400 italic leading-tight">
                 {(t.orders as any).deliveryDisclaimer}

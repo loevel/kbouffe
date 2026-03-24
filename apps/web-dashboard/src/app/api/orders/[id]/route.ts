@@ -3,8 +3,11 @@
  * PATCH  /api/orders/[id] — Update order status / notes
  */
 import { NextRequest, NextResponse } from "next/server";
+import { createClient as createRawClient } from "@supabase/supabase-js";
 import { withAuth, apiError } from "@/lib/api/helpers";
 import { notifyOrderStatusChange, type NotifiableStatus, type RestaurantSmsSettings } from "@/lib/sms/service";
+import { pushOrderStatusChange, pushDriverAssigned } from "@/lib/firebase/order-push";
+import { evaluateBadges } from "@/lib/badges/evaluate";
 
 export async function GET(
   _request: NextRequest,
@@ -52,6 +55,39 @@ export async function PATCH(
     if (body.payment_status !== undefined)
       updateData.payment_status = body.payment_status;
     if (body.notes !== undefined) updateData.notes = body.notes;
+
+    // ── Driver assignment ──────────────────────────────────────────────
+    if (body.driver_id !== undefined) {
+      if (body.driver_id === null || body.driver_id === "") {
+        updateData.driver_id = null;
+      } else {
+        const driverId = String(body.driver_id);
+        // Use raw Supabase client with service_role key to bypass RLS
+        // (restaurant_members has RLS enabled with no policies)
+        const adminDb = createRawClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { auth: { autoRefreshToken: false, persistSession: false } }
+        );
+        const { data: driverMember, error: driverError } = await adminDb
+          .from("restaurant_members")
+          .select("user_id")
+          .eq("restaurant_id", ctx.restaurantId)
+          .eq("user_id", driverId)
+          .eq("role", "driver")
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (driverError) {
+          console.error("Driver validation error:", driverError);
+          return apiError("Erreur lors de la vérification du livreur", 500);
+        }
+        if (!driverMember) {
+          return apiError("Livreur invalide ou inactif pour ce restaurant", 400);
+        }
+        updateData.driver_id = driverId;
+      }
+    }
 
     if (body.preparation_time_minutes !== undefined) {
       const preparationTimeMinutes = Number(body.preparation_time_minutes);
@@ -173,6 +209,49 @@ export async function PATCH(
             // Silently ignore — logged inside the service
           });
         }
+      }
+    }
+
+    // ── Push notifications (fire-and-forget) ────────────────────────
+    if (data) {
+      const order = data as Record<string, unknown>;
+      const adminDb = createRawClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
+
+      // Fetch restaurant name for push messages
+      const { data: restData } = await ctx.supabase
+        .from("restaurants")
+        .select("name")
+        .eq("id", ctx.restaurantId)
+        .single();
+
+      const pushCtx = {
+        orderId: id,
+        orderRef: "",
+        restaurantId: ctx.restaurantId,
+        restaurantName: String((restData as any)?.name ?? "Restaurant"),
+        customerId: (order.customer_id as string) ?? null,
+        driverId: (order.driver_id as string) ?? null,
+        total: Number(order.total ?? 0),
+        deliveryType: String(order.delivery_type ?? ""),
+      };
+
+      // Push on status change
+      if (body.status) {
+        pushOrderStatusChange(adminDb, body.status, pushCtx).catch(() => {});
+      }
+
+      // Push when driver is newly assigned
+      if (body.driver_id && body.driver_id !== null) {
+        pushDriverAssigned(adminDb, String(body.driver_id), pushCtx).catch(() => {});
+      }
+
+      // Badge evaluation on order completion (fire-and-forget)
+      if (body.status === "delivered" || body.status === "completed") {
+        evaluateBadges(adminDb, ctx.restaurantId).catch(() => {});
       }
     }
 
