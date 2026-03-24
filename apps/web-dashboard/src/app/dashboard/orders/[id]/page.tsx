@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Phone, User, Truck, Store, StickyNote } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, User, Truck, Store, StickyNote, KeyRound } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const DeliveryTracker = dynamic(
@@ -91,7 +91,7 @@ export default function OrderDetailPage() {
                                             {item.quantity}x
                                         </div>
                                         <div>
-                                            <p className="font-medium text-surface-900 dark:text-white">{item.productName || "Produit"}</p>
+                                            <p className="font-medium text-surface-900 dark:text-white">{item.productName || (item as any).name || "Produit"}</p>
                                             {item.selectedOptions && (
                                                 <p className="text-xs text-surface-500 mt-0.5">
                                                     {Object.entries(item.selectedOptions).map(([k, v]) => `${k}: ${v}`).join(" · ")}
@@ -163,6 +163,22 @@ export default function OrderDetailPage() {
                             </div>
                         )}
                         
+                        {order.delivery_type === "delivery" && (order as any).delivery_code && (
+                            <div className="mt-3 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 px-4 py-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <KeyRound size={13} className="text-orange-500" />
+                                    <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">
+                                        Code de confirmation livraison
+                                    </p>
+                                </div>
+                                <p className="text-xl font-mono font-black tracking-[0.3em] text-orange-600 dark:text-orange-400">
+                                    {(order as any).delivery_code}
+                                </p>
+                                <p className="text-[11px] text-orange-500/70 dark:text-orange-400/60 mt-1">
+                                    Le client doit communiquer ce code au livreur.
+                                </p>
+                            </div>
+                        )}
                         {order.delivery_type === "delivery" && (
                             <AssignDriver
                                 orderId={orderId}
@@ -183,6 +199,8 @@ export default function OrderDetailPage() {
                                 orderId={orderId}
                                 delivererName={(order as any).delivered_by ?? "Livreur"}
                                 isDeliverer={true}
+                                clientName={(order as any).customer_name}
+                                clientPhone={(order as any).customer_phone}
                             />
                         </Card>
                     )}

@@ -5,6 +5,7 @@ import {
   getRequestToPayStatus,
   mapMtnStatusToPaymentStatus,
 } from "@/lib/payments/mtn";
+import { sendPushToUser } from "@/lib/firebase/send-push";
 
 type WebhookPayload = {
   referenceId?: string;
@@ -89,14 +90,39 @@ export async function POST(request: NextRequest) {
           ? "failed"
           : "pending";
 
-      await admin
+      const { data: orderData } = await admin
         .from("orders")
         .update({
           payment_status: orderPaymentStatus,
           updated_at: new Date().toISOString(),
         } as never)
         .eq("id", tx.order_id)
-        .eq("restaurant_id", tx.restaurant_id);
+        .eq("restaurant_id", tx.restaurant_id)
+        .select("customer_id, total, restaurant_id")
+        .single();
+
+      // Push au client sur confirmation / échec paiement
+      if (orderData) {
+        const order = orderData as any;
+        const shortRef = `#KB-${String(tx.order_id).slice(-4).toUpperCase()}`;
+
+        if (mappedStatus === "paid" && order.customer_id) {
+          const total = new Intl.NumberFormat("fr-FR").format(Number(order.total ?? 0));
+          sendPushToUser(admin, order.customer_id, {
+            title: `✅ Paiement confirmé`,
+            body: `Votre paiement MTN de ${total} FCFA a été accepté. Commande ${shortRef} en cours !`,
+            data: { orderId: tx.order_id, type: "payment_confirmed" },
+            link: `/stores/orders/${tx.order_id}`,
+          }).catch(() => {});
+        } else if (mappedStatus === "failed" && order.customer_id) {
+          sendPushToUser(admin, order.customer_id, {
+            title: `❌ Paiement échoué`,
+            body: `Votre paiement MTN pour la commande ${shortRef} a échoué. Veuillez réessayer.`,
+            data: { orderId: tx.order_id, type: "payment_failed" },
+            link: `/stores/orders/${tx.order_id}`,
+          }).catch(() => {});
+        }
+      }
     }
 
     return NextResponse.json({ success: true });

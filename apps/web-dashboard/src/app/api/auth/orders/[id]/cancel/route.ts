@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { pushOrderStatusChange } from "@/lib/firebase/order-push";
 
 export async function POST(
     _request: NextRequest,
@@ -20,7 +21,7 @@ export async function POST(
         // Check if order exists, belongs to user, and is cancellable
         const { data: order, error: fetchError } = await supabase
             .from("orders")
-            .select("id, status, customer_id")
+            .select("id, status, customer_id, restaurant_id, total")
             .eq("id", id)
             .single();
 
@@ -54,6 +55,23 @@ export async function POST(
             console.error("Erreur annulation commande:", updateError);
             throw updateError;
         }
+
+        // Push restaurant + client (fire-and-forget)
+        const adminDb = await createAdminClient();
+        const { data: restInfo } = await adminDb
+            .from("restaurants")
+            .select("name")
+            .eq("id", typedOrder.restaurant_id)
+            .maybeSingle();
+
+        pushOrderStatusChange(adminDb, "cancelled", {
+            orderId: id,
+            orderRef: "",
+            restaurantId: typedOrder.restaurant_id,
+            restaurantName: String((restInfo as any)?.name ?? "Restaurant"),
+            customerId: user.id,
+            total: Number(typedOrder.total ?? 0),
+        }).catch(() => {});
 
         return NextResponse.json({ success: true, message: "Commande annulée" });
     } catch (error) {

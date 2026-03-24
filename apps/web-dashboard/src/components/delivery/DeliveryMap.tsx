@@ -6,6 +6,8 @@ export interface MapPosition {
   lat: number;
   lng: number;
   label?: string;
+  name?: string;
+  phone?: string;
 }
 
 export interface DeliveryMapProps {
@@ -123,6 +125,13 @@ export function DeliveryMap({
     if (typeof window === "undefined" || !mapRef.current) return;
     if (mapInstanceRef.current) return;
 
+    // Guard against re-init on a container Leaflet already touched (React reuses the DOM node)
+    const container = mapRef.current;
+    if ((container as any)._leaflet_id) {
+      delete (container as any)._leaflet_id;
+      container.innerHTML = "";
+    }
+
     async function initMap() {
       const L = (await import("leaflet")).default;
 
@@ -205,14 +214,21 @@ export function DeliveryMap({
       if (clientMarkerRef.current) {
         clientMarkerRef.current.setLatLng(latlng);
       } else {
+        const clientNameRow = clientPosition.name
+          ? `<div style="font-weight:700;color:#1e293b;font-size:13px;margin-bottom:2px">👤 ${clientPosition.name}</div>`
+          : "";
+        const clientPhoneRow = clientPosition.phone
+          ? `<a href="tel:${clientPosition.phone}" style="display:flex;align-items:center;gap:4px;font-size:12px;color:#2563eb;text-decoration:none;margin-top:3px">📞 ${clientPosition.phone}</a>`
+          : "";
         clientMarkerRef.current = L.marker(latlng, { icon: getClientIcon(L), zIndexOffset: 100 })
           .addTo(map)
           .bindPopup(
-            `<div style="font-size:13px;font-weight:600;color:#1e293b;min-width:140px">
-               🏠 <strong>Client</strong><br/>
-               <span style="font-weight:400;font-size:12px;color:#64748b">${label}</span>
+            `<div style="font-size:12px;color:#1e293b;min-width:150px;line-height:1.5">
+               ${clientNameRow}
+               <div style="color:#64748b;font-size:11px">📍 ${label}</div>
+               ${clientPhoneRow}
              </div>`,
-            { maxWidth: 220 }
+            { maxWidth: 240 }
           );
       }
     } else if (clientMarkerRef.current) {
@@ -234,14 +250,18 @@ export function DeliveryMap({
       if (delivererMarkerRef.current) {
         delivererMarkerRef.current.setLatLng(latlng);
       } else {
+        const delivererPhoneRow = delivererPosition.phone
+          ? `<a href="tel:${delivererPosition.phone}" style="display:flex;align-items:center;gap:4px;font-size:12px;color:#ea580c;text-decoration:none;margin-top:3px">📞 ${delivererPosition.phone}</a>`
+          : "";
         delivererMarkerRef.current = L.marker(latlng, { icon: getDelivererIcon(L), zIndexOffset: 200 })
           .addTo(map)
           .bindPopup(
-            `<div style="font-size:13px;font-weight:600;color:#1e293b;min-width:140px">
-               🛵 <strong>Livreur</strong><br/>
-               <span style="font-weight:400;font-size:12px;color:#64748b">${label}</span>
+            `<div style="font-size:12px;color:#1e293b;min-width:150px;line-height:1.5">
+               <div style="font-weight:700;font-size:13px;margin-bottom:2px">🛵 ${label}</div>
+               <div style="color:#64748b;font-size:11px">Livreur en route</div>
+               ${delivererPhoneRow}
              </div>`,
-            { maxWidth: 220 }
+            { maxWidth: 240 }
           );
       }
     } else if (delivererMarkerRef.current) {
@@ -263,6 +283,9 @@ export function DeliveryMap({
         const url = `https://router.project-osrm.org/route/v1/driving/${delivererPosition!.lng},${delivererPosition!.lat};${clientPosition!.lng},${clientPosition!.lat}?overview=full&geometries=geojson`;
         const res = await fetch(url);
         const data = await res.json();
+
+        // Guard: component may have unmounted while the request was in-flight
+        if (mapInstanceRef.current !== map) return;
 
         if (data.routes?.[0]?.geometry?.coordinates) {
           const coords = data.routes[0].geometry.coordinates.map(
@@ -288,6 +311,8 @@ export function DeliveryMap({
           map.fitBounds(bounds, { padding: [60, 60] });
         }
       } catch {
+        // Guard: component may have unmounted while the request was in-flight
+        if (mapInstanceRef.current !== map) return;
         if (clientPosition && delivererPosition) {
           const bounds = L.latLngBounds([
             [clientPosition.lat, clientPosition.lng],

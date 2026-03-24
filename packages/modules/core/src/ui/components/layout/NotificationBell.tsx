@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, ShoppingBag, AlertCircle, Clock, X } from "lucide-react";
+import { Bell, ShoppingBag, AlertCircle, Clock, X, BarChart3, Trophy, UserMinus } from "lucide-react";
 import { authFetch } from "../../lib/auth-fetch";
 import { createClient } from "../../lib/supabase-client";
 import { useDashboard } from "../../contexts/DashboardContext";
@@ -39,12 +39,20 @@ function getNotificationIcon(type: string) {
             return <AlertCircle size={16} className="text-red-500" />;
         case "status_changed":
             return <Clock size={16} className="text-blue-500" />;
+        case "daily_summary":
+            return <BarChart3 size={16} className="text-blue-400" />;
+        case "badge_earned":
+            return <Trophy size={16} className="text-amber-400" />;
+        case "inactive_customer":
+            return <UserMinus size={16} className="text-orange-400" />;
         default:
             return <Bell size={16} className="text-surface-400" />;
     }
 }
 
 function getNotificationTitle(notif: KdsNotification): string {
+    // Engagement notifications carry title/body in payload
+    if (notif.payload?.title) return String(notif.payload.title);
     switch (notif.event_type) {
         case "new_order":
             return `Nouvelle commande${notif.payload?.customer_name ? ` de ${notif.payload.customer_name}` : ""}`;
@@ -66,6 +74,12 @@ function getNotificationBg(type: string, processed: boolean) {
             return "bg-red-50/50 dark:bg-red-500/5";
         case "status_changed":
             return "bg-blue-50/50 dark:bg-blue-500/5";
+        case "daily_summary":
+            return "bg-blue-50/50 dark:bg-blue-500/5";
+        case "badge_earned":
+            return "bg-amber-50/50 dark:bg-amber-500/5";
+        case "inactive_customer":
+            return "bg-orange-50/50 dark:bg-orange-500/5";
         default:
             return "bg-surface-50 dark:bg-surface-800/50";
     }
@@ -110,7 +124,7 @@ export function NotificationBell() {
         const supabase = createClient();
         if (!supabase) return;
 
-        const channel = supabase
+        const kdsChannel = supabase
             .channel(`kds-notifications-${restaurantId}`)
             .on(
                 "postgres_changes",
@@ -128,8 +142,36 @@ export function NotificationBell() {
             )
             .subscribe();
 
+        const engagementChannel = supabase
+            .channel(`engagement-notifications-${restaurantId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "restaurant_notifications",
+                    filter: `restaurant_id=eq.${restaurantId}`,
+                },
+                (payload) => {
+                    const n = payload.new as any;
+                    const mapped: KdsNotification = {
+                        id: n.id,
+                        restaurant_id: n.restaurant_id,
+                        order_id: "",
+                        event_type: n.type,
+                        payload: { ...(n.payload ?? {}), title: n.title, body: n.body },
+                        processed: n.is_read,
+                        created_at: n.created_at,
+                    };
+                    setNotifications((prev) => [mapped, ...prev].slice(0, 20));
+                    setUnreadCount((prev) => prev + 1);
+                }
+            )
+            .subscribe();
+
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(kdsChannel);
+            supabase.removeChannel(engagementChannel);
         };
     }, [restaurantId]);
 
@@ -231,11 +273,15 @@ export function NotificationBell() {
                                         <p className="text-sm font-medium text-surface-900 dark:text-white">
                                             {getNotificationTitle(notif)}
                                         </p>
-                                        {notif.payload?.order_number && (
+                                        {notif.payload?.body ? (
+                                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 line-clamp-2">
+                                                {String(notif.payload.body)}
+                                            </p>
+                                        ) : notif.payload?.order_number ? (
                                             <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                                                 Commande #{notif.payload.order_number}
                                             </p>
-                                        )}
+                                        ) : null}
                                         <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">
                                             {timeAgo(notif.created_at)}
                                         </p>

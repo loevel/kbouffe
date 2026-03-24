@@ -5,7 +5,7 @@ import type { Database } from "@/lib/supabase/types";
 function resolveRoleHomePath(role: string | undefined) {
     if (role === "admin") return "/admin";
     if (role === "merchant") return "/dashboard";
-    if (role === "livreur") return "/livreurs";
+    if (role === "livreur") return "/driver";
     return "/stores";
 }
 
@@ -62,10 +62,9 @@ export async function updateSession(request: NextRequest) {
 
     // Routes protégées → rediriger vers /admin/login si non connecté sur /admin
     // ou vers /login pour les autres routes protégées
-    if (pathname.startsWith("/admin") || pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding") || pathname.startsWith("/stores")) {
+    if (pathname.startsWith("/admin") || pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding") || pathname.startsWith("/stores") || pathname.startsWith("/driver")) {
         if (!user) {
             const url = request.nextUrl.clone();
-            // Rediriger vers la bonne page de login selon la route
             url.pathname = pathname.startsWith("/admin") ? "/admin/login" : "/login";
             url.searchParams.set("redirectTo", pathname);
             return NextResponse.redirect(url);
@@ -80,6 +79,13 @@ export async function updateSession(request: NextRequest) {
 
         // Dashboard / onboarding réservés aux restaurateurs
         if ((pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")) && role !== "merchant") {
+            const url = request.nextUrl.clone();
+            url.pathname = homePath;
+            return NextResponse.redirect(url);
+        }
+
+        // /driver réservé aux livreurs
+        if (pathname.startsWith("/driver") && role !== "livreur") {
             const url = request.nextUrl.clone();
             url.pathname = homePath;
             return NextResponse.redirect(url);

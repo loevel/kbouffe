@@ -336,15 +336,27 @@ export interface PlaceOrderParams {
 export interface PlaceOrderResponse {
     success: boolean;
     orderId: string;
+    payment?: {
+        provider: 'mtn_momo';
+        referenceId: string;
+        status: 'pending' | 'failed';
+        error?: string;
+    } | null;
 }
 
 export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResponse> {
-    const data = await apiFetch<{ success: boolean; orderId?: string; id?: string; order?: { id: string } }>(
+    const data = await apiFetch<{
+        success: boolean;
+        orderId?: string;
+        id?: string;
+        order?: { id: string };
+        payment?: PlaceOrderResponse['payment'];
+    }>(
         '/api/store/order',
         { method: 'POST', body: JSON.stringify(params) }
     );
     const orderId = data.orderId ?? data.id ?? data.order?.id ?? '';
-    return { success: data.success ?? true, orderId };
+    return { success: data.success ?? true, orderId, payment: data.payment ?? null };
 }
 
 // ── /api/store/orders/[id] ────────────────────────────────────────────────────

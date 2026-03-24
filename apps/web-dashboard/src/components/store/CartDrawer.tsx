@@ -15,6 +15,7 @@ import {
     MapPin,
     Package,
     Utensils,
+    KeyRound,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
@@ -60,7 +61,11 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [orderId, setOrderId] = useState<string | null>(null);
+    const [deliveryCode, setDeliveryCode] = useState<string | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
+    const [paymentReferenceId, setPaymentReferenceId] = useState<string | null>(null);
+    const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid" | "failed" | null>(null);
+    const [paymentError, setPaymentError] = useState<string | null>(null);
 
     useEffect(() => {
         const supabase = createClient();
@@ -89,6 +94,9 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
         }
 
         setSubmitting(true);
+        setPaymentReferenceId(null);
+        setPaymentStatus(null);
+        setPaymentError(null);
         try {
             const res = await fetch("/api/store/order", {
                 method: "POST",
@@ -97,7 +105,9 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     restaurantId: restaurant!.id,
                     items: items.map((i) => ({
                         productId: i.id,
+                        productName: i.name,
                         name: i.name,
+                        unitPrice: i.price,
                         price: i.price,
                         quantity: i.quantity,
                     })),
@@ -117,7 +127,48 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
             const json = await res.json();
             if (!res.ok) throw new Error(json.error ?? "Erreur inconnue");
 
-            setOrderId(json.orderId);
+            const createdOrderId = json.orderId as string;
+            setOrderId(createdOrderId);
+            setDeliveryCode((json.deliveryCode as string | null) ?? null);
+
+            if (paymentMethod === "mobile_money_mtn") {
+                const paymentRes = await fetch("/api/store/payment/mtn/request-to-pay", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        orderId: createdOrderId,
+                        payerMsisdn: customerPhone,
+                        payerMessage: "Paiement commande Kbouffe",
+                        payeeNote: `Commande ${createdOrderId}`,
+                    }),
+                });
+
+                const paymentJson = await paymentRes.json().catch(() => ({}));
+                const referenceId = paymentJson?.payment?.referenceId as string | undefined;
+
+                if (!paymentRes.ok) {
+                    setPaymentStatus("failed");
+                    setPaymentError(paymentJson?.error ?? "Paiement MTN non initié.");
+                } else {
+                    setPaymentStatus("pending");
+                    if (referenceId) setPaymentReferenceId(referenceId);
+
+                    if (referenceId) {
+                        for (let i = 0; i < 6; i += 1) {
+                            await new Promise((resolve) => setTimeout(resolve, 4000));
+                            const statusRes = await fetch(`/api/store/payment/mtn/status/${referenceId}`);
+                            const statusJson = await statusRes.json().catch(() => ({}));
+                            if (!statusRes.ok) break;
+
+                            const status = statusJson?.payment?.status as "pending" | "paid" | "failed" | undefined;
+                            if (!status) continue;
+                            setPaymentStatus(status);
+                            if (status === "paid" || status === "failed") break;
+                        }
+                    }
+                }
+            }
+
             clear();
             setStep("success");
         } catch (e: unknown) {
@@ -397,6 +448,36 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                                     Votre commande a été transmise au restaurant.
                                     Vous serez contacté dès confirmation.
                                 </p>
+                                {paymentMethod === "mobile_money_mtn" && (
+                                    <p className="text-xs mt-2 text-surface-500 dark:text-surface-400">
+                                        {paymentStatus === "paid"
+                                            ? "Paiement MTN confirmé. Merci !"
+                                            : paymentStatus === "failed"
+                                            ? `Paiement MTN échoué${paymentError ? `: ${paymentError}` : "."}`
+                                            : "Paiement MTN initié. Validez sur votre téléphone."}
+                                    </p>
+                                )}
+                                {paymentReferenceId && (
+                                    <p className="text-[11px] text-surface-400 mt-1">
+                                        Réf paiement : {paymentReferenceId.slice(0, 8).toUpperCase()}
+                                    </p>
+                                )}
+                                {deliveryCode && (
+                                    <div className="mt-4 rounded-2xl border-2 border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 px-5 py-4">
+                                        <div className="flex items-center justify-center gap-2 mb-1">
+                                            <KeyRound size={15} className="text-orange-500" />
+                                            <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">
+                                                Code de livraison
+                                            </p>
+                                        </div>
+                                        <p className="text-3xl font-mono font-black tracking-[0.4em] text-orange-600 dark:text-orange-400 text-center mt-1">
+                                            {deliveryCode}
+                                        </p>
+                                        <p className="text-xs text-orange-500/80 dark:text-orange-400/70 text-center mt-2 leading-relaxed">
+                                            Communiquez ce code au livreur<br />lors de la remise de votre commande.
+                                        </p>
+                                    </div>
+                                )}
                                 {orderId && (
                                     <p className="text-xs text-surface-400 mt-2 font-mono">
                                         Réf : #{orderId.slice(0, 8).toUpperCase()}

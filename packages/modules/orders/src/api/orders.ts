@@ -7,7 +7,14 @@
  * PATCH /orders/:id     — Update order status
  */
 import { Hono } from "hono";
+import { createClient } from "@supabase/supabase-js";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
+
+function getAdminClient(c: any) {
+    return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    });
+}
 
 export const ordersRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -137,7 +144,8 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
     pending: ["accepted", "cancelled"],
     accepted: ["preparing", "cancelled"],
     preparing: ["ready", "cancelled"],
-    ready: ["delivered", "cancelled"],
+    ready: ["out_for_delivery", "delivered", "cancelled"],
+    out_for_delivery: ["delivered", "cancelled"],
     delivered: [],
     cancelled: [],
 };
@@ -174,7 +182,28 @@ ordersRoutes.patch("/:id", async (c) => {
     }
     if (body.payment_status !== undefined) updateData.payment_status = body.payment_status;
     if (body.notes !== undefined) updateData.notes = body.notes;
-    if (body.driver_id !== undefined) updateData.driver_id = body.driver_id;
+    if (body.driver_id !== undefined) {
+        if (body.driver_id === null || body.driver_id === "") {
+            updateData.driver_id = null;
+        } else {
+            const driverId = String(body.driver_id);
+            const adminDb = getAdminClient(c);
+            const { data: driverMember, error: driverError } = await adminDb
+                .from("restaurant_members")
+                .select("user_id")
+                .eq("restaurant_id", restaurantId)
+                .eq("user_id", driverId)
+                .eq("role", "driver")
+                .eq("status", "active")
+                .maybeSingle();
+
+            if (driverError || !driverMember) {
+                return c.json({ error: "Livreur invalide ou inactif pour ce restaurant" }, 400);
+            }
+
+            updateData.driver_id = driverId;
+        }
+    }
 
     if (body.preparation_time_minutes !== undefined) {
         const mins = Number(body.preparation_time_minutes);

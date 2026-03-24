@@ -17,19 +17,18 @@ export async function POST(request: NextRequest) {
         { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    let query = db
-        .from("kds_notifications")
-        .update({ processed: true })
-        .eq("restaurant_id", restaurantId);
+    // Mark both kds_notifications and restaurant_notifications as read
+    const kdsQuery = ids && ids.length > 0
+        ? db.from("kds_notifications").update({ processed: true }).eq("restaurant_id", restaurantId).in("id", ids)
+        : db.from("kds_notifications").update({ processed: true }).eq("restaurant_id", restaurantId).eq("processed", false);
 
-    if (ids && ids.length > 0) {
-        query = query.in("id", ids);
-    } else {
-        query = query.eq("processed", false);
-    }
+    const engagementQuery = ids && ids.length > 0
+        ? db.from("restaurant_notifications").update({ is_read: true }).eq("restaurant_id", restaurantId).in("id", ids)
+        : db.from("restaurant_notifications").update({ is_read: true }).eq("restaurant_id", restaurantId).eq("is_read", false);
 
-    const { error } = await query;
+    const [kdsResult, engagementResult] = await Promise.all([kdsQuery, engagementQuery]);
 
+    const error = kdsResult.error || engagementResult.error;
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

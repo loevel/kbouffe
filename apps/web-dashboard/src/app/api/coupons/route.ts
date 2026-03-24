@@ -22,7 +22,14 @@ export async function GET(_request: NextRequest) {
             return apiError("Erreur lors de la récupération des codes promo");
         }
 
-        return NextResponse.json({ coupons: data ?? [], total: data?.length ?? 0 });
+        // Normalise kind→type et min_order_amount→min_order pour le front
+        const coupons = (data ?? []).map((c: any) => ({
+            ...c,
+            type: c.type ?? c.kind,
+            min_order: c.min_order ?? c.min_order_amount ?? 0,
+        }));
+
+        return NextResponse.json({ coupons, total: coupons.length });
     } catch (error) {
         console.error("GET /api/coupons error:", error);
         return apiError("Erreur serveur");
@@ -45,13 +52,13 @@ export async function POST(request: NextRequest) {
         if (body.type === "percent" && body.value > 100) return apiError("Le pourcentage ne peut dépasser 100%", 400);
 
         const couponData = {
-            id: crypto.randomUUID(),
             restaurant_id: ctx.restaurantId,
             code: (body.code as string).toUpperCase().trim(),
             name: body.name.trim(),
             description: body.description ?? null,
-            type: body.type,
+            kind: body.type,           // colonne DB = kind
             value: body.value,
+            min_order_amount: body.min_order ?? 0,   // colonne DB = min_order_amount
             min_order: body.min_order ?? 0,
             max_discount: body.max_discount ?? null,
             max_uses: body.max_uses ?? null,

@@ -85,7 +85,7 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                 redirectPath = "/dashboard";
                 setRedirectMessage(t.auth.redirectingDashboard);
             } else if (userRole === "livreur") {
-                redirectPath = "/deliveries";
+                redirectPath = "/driver";
                 setRedirectMessage(t.auth.redirectingDeliveries);
             } else {
                 setRedirectMessage(t.auth.redirectingStores);

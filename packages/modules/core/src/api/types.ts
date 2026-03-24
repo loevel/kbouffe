@@ -22,6 +22,16 @@ export interface CoreEnv {
     MTN_DISBURSEMENT_SUBSCRIPTION_KEY?: string;
     MTN_TARGET_ENVIRONMENT?: string;
     MTN_WEBHOOK_SECRET?: string;
+    ORANGE_BASE_URL?: string;
+    ORANGE_TARGET_ENVIRONMENT?: string;
+    ORANGE_COLLECTION_API_USER?: string;
+    ORANGE_COLLECTION_API_KEY?: string;
+    ORANGE_COLLECTION_SUBSCRIPTION_KEY?: string;
+    ORANGE_COLLECTION_CALLBACK_URL?: string;
+    ORANGE_DISBURSEMENT_API_USER?: string;
+    ORANGE_DISBURSEMENT_API_KEY?: string;
+    ORANGE_DISBURSEMENT_SUBSCRIPTION_KEY?: string;
+    ORANGE_WEBHOOK_SECRET?: string;
 }
 
 export type AdminRole = "super_admin" | "support" | "sales" | "moderator";

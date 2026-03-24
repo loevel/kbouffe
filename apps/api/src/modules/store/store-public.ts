@@ -28,6 +28,73 @@ function getAdminClient(env: Env) {
     });
 }
 
+function getMtnBaseUrl(env: Env) {
+    return env.MTN_BASE_URL ?? "https://sandbox.momodeveloper.mtn.com";
+}
+
+function isMtnCollectionConfigured(env: Env) {
+    return Boolean(
+        env.MTN_COLLECTION_API_USER &&
+        env.MTN_COLLECTION_API_KEY &&
+        env.MTN_COLLECTION_SUBSCRIPTION_KEY,
+    );
+}
+
+async function getMtnCollectionToken(env: Env): Promise<string> {
+    const credentials = btoa(`${env.MTN_COLLECTION_API_USER}:${env.MTN_COLLECTION_API_KEY}`);
+    const response = await fetch(`${getMtnBaseUrl(env)}/collection/token/`, {
+        method: "POST",
+        headers: {
+            Authorization: `Basic ${credentials}`,
+            "Ocp-Apim-Subscription-Key": env.MTN_COLLECTION_SUBSCRIPTION_KEY ?? "",
+        },
+    });
+
+    const payload = await response.json().catch(() => ({} as { access_token?: string; message?: string; error?: string }));
+    if (!response.ok || !payload.access_token) {
+        throw new Error(payload.message ?? payload.error ?? `MTN token error: ${response.status}`);
+    }
+    return payload.access_token;
+}
+
+async function requestMtnToPay(
+    env: Env,
+    params: {
+        referenceId: string;
+        amount: number;
+        externalId: string;
+        payerMsisdn: string;
+        payerMessage: string;
+        payeeNote: string;
+    },
+) {
+    const token = await getMtnCollectionToken(env);
+    const response = await fetch(`${getMtnBaseUrl(env)}/collection/v1_0/requesttopay`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "X-Reference-Id": params.referenceId,
+            "X-Target-Environment": env.MTN_TARGET_ENVIRONMENT ?? "sandbox",
+            "Ocp-Apim-Subscription-Key": env.MTN_COLLECTION_SUBSCRIPTION_KEY ?? "",
+            "Content-Type": "application/json",
+            ...(env.MTN_COLLECTION_CALLBACK_URL ? { "X-Callback-Url": env.MTN_COLLECTION_CALLBACK_URL } : {}),
+        },
+        body: JSON.stringify({
+            amount: String(params.amount),
+            currency: "XAF",
+            externalId: params.externalId,
+            payer: { partyIdType: "MSISDN", partyId: params.payerMsisdn },
+            payerMessage: params.payerMessage,
+            payeeNote: params.payeeNote,
+        }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`MTN request-to-pay error: ${response.status}${text ? ` — ${text}` : ""}`);
+    }
+}
+
 // ── POST /order — create a guest order ────────────────────────────
 storePublicRoutes.post("/order", async (c) => {
     try {
@@ -206,7 +273,96 @@ storePublicRoutes.post("/order", async (c) => {
             }
         }
 
-        return c.json({ success: true, orderId, serviceFee, corkageFee, total: computedTotal, loyaltyPointsEarned }, 201);
+        let payment: {
+            provider: "mtn_momo";
+            referenceId: string;
+            status: "pending" | "failed";
+            error?: string;
+        } | null = null;
+
+        if (body.paymentMethod === "mobile_money_mtn") {
+            if (!isMtnCollectionConfigured(c.env)) {
+                payment = {
+                    provider: "mtn_momo",
+                    referenceId: "",
+                    status: "failed",
+                    error: "Configuration MTN manquante",
+                };
+            } else {
+                const referenceId = crypto.randomUUID();
+                const externalId = `order-${orderId}`;
+                const payerMsisdn = body.customerPhone.trim();
+
+                const { data: tx, error: txError } = await supabase
+                    .from("payment_transactions")
+                    .insert({
+                        restaurant_id: body.restaurantId,
+                        order_id: orderId,
+                        provider: "mtn_momo",
+                        reference_id: referenceId,
+                        external_id: externalId,
+                        payer_msisdn: payerMsisdn,
+                        amount: computedTotal,
+                        currency: "XAF",
+                        status: "pending",
+                        provider_status: "PENDING",
+                    } as any)
+                    .select("id")
+                    .single();
+
+                if (txError || !tx) {
+                    payment = {
+                        provider: "mtn_momo",
+                        referenceId,
+                        status: "failed",
+                        error: "Impossible de créer la transaction MTN",
+                    };
+                } else {
+                    try {
+                        await requestMtnToPay(c.env, {
+                            referenceId,
+                            amount: computedTotal,
+                            externalId,
+                            payerMsisdn,
+                            payerMessage: "Paiement commande Kbouffe",
+                            payeeNote: `Commande ${orderId}`,
+                        });
+
+                        payment = {
+                            provider: "mtn_momo",
+                            referenceId,
+                            status: "pending",
+                        };
+                    } catch (paymentError) {
+                        const errorMessage = paymentError instanceof Error ? paymentError.message : "Erreur paiement MTN";
+                        await supabase
+                            .from("payment_transactions")
+                            .update({
+                                status: "failed",
+                                provider_status: "FAILED",
+                                failed_reason: errorMessage,
+                                provider_response: { error: errorMessage },
+                                updated_at: new Date().toISOString(),
+                            } as any)
+                            .eq("id", tx.id);
+
+                        await supabase
+                            .from("orders")
+                            .update({ payment_status: "failed", updated_at: new Date().toISOString() } as any)
+                            .eq("id", orderId);
+
+                        payment = {
+                            provider: "mtn_momo",
+                            referenceId,
+                            status: "failed",
+                            error: errorMessage,
+                        };
+                    }
+                }
+            }
+        }
+
+        return c.json({ success: true, orderId, serviceFee, corkageFee, total: computedTotal, loyaltyPointsEarned, payment }, 201);
     } catch (error) {
         console.error("[POST /store/order] Unexpected error:", error);
         return c.json({ error: "Erreur serveur" }, 500);

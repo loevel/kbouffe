@@ -126,7 +126,7 @@ customersRoutes.get("/:id", async (c) => {
         const items = o.items || [];
         items.forEach((item: any) => {
             if (!productCounts[item.productId]) {
-                productCounts[item.productId] = { name: item.productName, count: 0 };
+                productCounts[item.productId] = { name: item.productName || item.name || "Produit", count: 0 };
             }
             productCounts[item.productId].count += item.quantity;
         });

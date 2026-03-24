@@ -70,7 +70,12 @@ export function OrderTrackingMap({ orderId, orderStatus }: OrderTrackingMapProps
     return () => { supabase.removeChannel(channel); };
   }, [orderId]);
 
-  // Only show for orders in delivery
+  // Fermer la carte si la livraison est terminée
+  if (orderStatus === "delivered" || tracking?.status === "completed") {
+    return null;
+  }
+
+  // Ne pas afficher si pas encore en livraison et pas de session de tracking
   if (!["out_for_delivery", "delivering"].includes(orderStatus) && !tracking) {
     return null;
   }
