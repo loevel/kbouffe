@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { User, Store, ArrowRight, ChevronLeft } from "lucide-react";
+import { User, Store, Wheat, ArrowRight, ChevronLeft } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 
 export default function RegisterHubPage() {
@@ -112,6 +112,37 @@ export default function RegisterHubPage() {
                             </Link>
                         </motion.div>
                     </div>
+
+                    {/* Supplier/Farmer Card — full width below */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="mt-8"
+                    >
+                        <Link href="/register/fournisseur" className="group block">
+                            <div className="relative flex flex-col md:flex-row items-center gap-6 bg-white dark:bg-surface-900 rounded-3xl overflow-hidden border border-emerald-200/50 dark:border-emerald-500/20 shadow-xl transition-all duration-500 hover:shadow-emerald-500/10 hover:border-emerald-500/40 hover:-translate-y-1 p-8">
+                                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                                    <Wheat className="text-emerald-500" size={28} />
+                                </div>
+                                <div className="flex-1 text-center md:text-left">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+                                        Agriculteur / Fournisseur
+                                    </div>
+                                    <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">
+                                        Je vends mes produits aux restaurants
+                                    </h2>
+                                    <p className="text-surface-500 dark:text-surface-400 text-sm">
+                                        Agriculteur individuel, coopérative ou grossiste — proposez vos produits frais directement aux restaurants de votre région.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2 text-emerald-500 font-bold group-hover:gap-4 transition-all whitespace-nowrap">
+                                    Inscrire mon exploitation
+                                    <ArrowRight size={18} />
+                                </div>
+                            </div>
+                        </Link>
+                    </motion.div>
 
                     <motion.div 
                         initial={{ opacity: 0 }}
