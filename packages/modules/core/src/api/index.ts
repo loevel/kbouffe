@@ -6,6 +6,9 @@ import { authRoutes } from "./auth";
 import { uploadRoutes } from "./upload";
 import { usersRoutes, securityRoutes } from "./users";
 import { storesRoutes } from "./stores";
+import { brandsRoutes, restaurantKycRoutes, brandsAdminRoutes } from "./brands";
+
+export { brandsRoutes, restaurantKycRoutes, brandsAdminRoutes };
 
 export const coreApi = {
     authRoutes,
@@ -13,4 +16,7 @@ export const coreApi = {
     usersRoutes,
     securityRoutes,
     storesRoutes,
+    brandsRoutes,
+    restaurantKycRoutes,
+    brandsAdminRoutes,
 };

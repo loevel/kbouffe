@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@kbouffe/module-catalog": "*",
+        "@kbouffe/module-capital": "*",
         "@kbouffe/module-chat": "*",
         "@kbouffe/module-core": "*",
         "@kbouffe/module-crm": "*",

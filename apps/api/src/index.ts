@@ -19,7 +19,10 @@ import { requireModule } from "./middleware/module";
 
 // ── Public routes ────────────────────────────────────────────────────
 import { coreApi } from "@kbouffe/module-core";
-const { storesRoutes, uploadRoutes, authRoutes, usersRoutes, securityRoutes } = coreApi;
+const { storesRoutes, uploadRoutes, authRoutes, usersRoutes, securityRoutes, brandsRoutes, restaurantKycRoutes, brandsAdminRoutes } = coreApi;
+
+import { capitalApi } from "@kbouffe/module-capital";
+const { capitalRoutes, capitalAdminRoutes } = capitalApi;
 import { catalogApi } from "@kbouffe/module-catalog";
 const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute: productsRoutes } = catalogApi;
 import { storePublicRoutes } from "./modules/store/store-public";
@@ -139,7 +142,9 @@ const merchantPaths = [
     "/dashboard", "/coupons", "/tables", "/restaurant",
     "/customers", "/account", "/security", "/register-restaurant",
     "/marketing", "/notifications", "/payouts",
-    "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload"
+    "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
+    "/capital", "/restaurant/brands", "/restaurant/kyc",
+    "/payouts/payroll-report",
 ] as const;
 
 // Marketplace merchant routes (trace + product management) require auth
@@ -216,6 +221,13 @@ api.route("/reviews", customerReviewRoutes);
 api.route("/restaurant/reviews", merchantReviewRoutes);
 api.route("/restaurant/product-reviews", merchantProductReviewRoutes);
 
+// ── Dark Kitchens / Multi-Marques + KYC ─────────────────────────────
+api.route("/restaurant/brands", brandsRoutes);
+api.route("/restaurant/kyc", restaurantKycRoutes);   // PATCH /restaurant/kyc
+
+// ── KBouffe Capital (broker scoring) ────────────────────────────────
+api.route("/capital", capitalRoutes);
+
 // ── Marketplace — routes marchands ──────────────────────────────────
 api.route("/marketplace", marketplaceMerchantRoutes);      // packs + souscriptions
 api.route("/marketplace/trace", traceRoutes);              // traçabilité fournisseurs
@@ -224,6 +236,8 @@ api.route("/marketplace/trace", traceRoutes);              // traçabilité four
 api.route("/admin", adminRoutes);
 api.route("/admin/marketplace", marketplaceAdminPureRoutes);      // admin packs
 api.route("/admin/marketplace/suppliers", supplierAdminRoutes);   // admin KYC fournisseurs
+api.route("/admin/capital/applications", capitalAdminRoutes);     // admin dossiers financement
+api.route("/admin/brands", brandsAdminRoutes);                    // admin KYC restaurants + marques
 
 // ── Mount /api/* on root ─────────────────────────────────────────────
 app.route("/api", api);
