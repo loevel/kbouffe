@@ -20,6 +20,7 @@
  *   Linked from the Navbar audience dropdown
  */
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import {
@@ -35,6 +36,12 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { KbouffeLogo } from "@/components/brand/Logo";
+
+// ── Unsplash image helpers ─────────────────────────────────────────────────
+
+function unsplash(id: string, w = 600) {
+    return `https://images.unsplash.com/photo-${id}?w=${w}&q=80&auto=format&fit=crop`;
+}
 
 // ── Animation variants ─────────────────────────────────────────────────────
 
@@ -120,17 +127,87 @@ const BENEFITS = [
     },
 ] as const;
 
+// Photos for the hero mosaic (right panel, desktop)
+const HERO_PHOTOS = [
+    { id: "1546069901-ba9599a7e63c", label: "Tomates fraîches", span: "row-span-2" },
+    { id: "1601472544851-484b0f09c8da", label: "Maïs",            span: "" },
+    { id: "1571091718767-18b5b1457add", label: "Plantain",         span: "" },
+    { id: "1548460818-3a8bf4d4c0a3",   label: "Piments rouges",   span: "" },
+] as const;
+
 const PRODUCT_CATEGORIES = [
-    { label: "Légumes & Fruits", emoji: "🥬" },
-    { label: "Céréales & Grains", emoji: "🌾" },
-    { label: "Viande & Poisson", emoji: "🥩" },
-    { label: "Produits laitiers", emoji: "🥛" },
-    { label: "Épices & Condiments", emoji: "🌶️" },
-    { label: "Huile & Graisses", emoji: "🫙" },
-    { label: "Tubercules", emoji: "🥔" },
-    { label: "Légumineuses", emoji: "🫘" },
-    { label: "Champignons", emoji: "🍄" },
-    { label: "Fruits tropicaux", emoji: "🍍" },
+    {
+        label: "Tomates & Légumes",
+        emoji: "🍅",
+        imgId: "1546069901-ba9599a7e63c",
+        fallback: "bg-red-950",
+    },
+    {
+        label: "Céréales & Riz",
+        emoji: "🌾",
+        imgId: "1536304993881-ff86e0c9b1dc",
+        fallback: "bg-amber-950",
+    },
+    {
+        label: "Poisson & Fruits de mer",
+        emoji: "🐟",
+        imgId: "1544551763-46a013bb70d5",
+        fallback: "bg-blue-950",
+    },
+    {
+        label: "Piments & Épices",
+        emoji: "🌶️",
+        imgId: "1548460818-3a8bf4d4c0a3",
+        fallback: "bg-red-950",
+    },
+    {
+        label: "Plantain & Banane",
+        emoji: "🍌",
+        imgId: "1571091718767-18b5b1457add",
+        fallback: "bg-yellow-950",
+    },
+    {
+        label: "Maïs & Igname",
+        emoji: "🌽",
+        imgId: "1601472544851-484b0f09c8da",
+        fallback: "bg-yellow-950",
+    },
+    {
+        label: "Avocat & Fruits tropicaux",
+        emoji: "🥑",
+        imgId: "1519162808019-7de1683fa2ad",
+        fallback: "bg-green-950",
+    },
+    {
+        label: "Légumes feuilles",
+        emoji: "🥬",
+        imgId: "1540420773420-3bd31e8c5b40",
+        fallback: "bg-emerald-950",
+    },
+    {
+        label: "Tubercules & Manioc",
+        emoji: "🍠",
+        imgId: "1589927986089-35812388d1f4",
+        fallback: "bg-orange-950",
+    },
+    {
+        label: "Huile de palme",
+        emoji: "🫙",
+        imgId: "1474979078598-b7e8ebcab25f",
+        fallback: "bg-orange-950",
+    },
+    {
+        label: "Arachides & Légumineuses",
+        emoji: "🫘",
+        imgId: "1563636619-e9143da7973b",
+        fallback: "bg-amber-950",
+    },
+    {
+        label: "Viande & Volaille",
+        emoji: "🥩",
+        imgId: "1603048588665-791ca8aea617",
+        fallback: "bg-rose-950",
+    },
 ] as const;
 
 const REGIONS = [
@@ -192,61 +269,115 @@ export default function PourLesAgricultureursPage() {
 
                     {/* ── Hero content ── */}
                     <div className="container mx-auto px-4 md:px-6 relative z-10 pt-16 md:pt-20">
-                        <motion.div
-                            className="max-w-2xl"
-                            variants={staggerContainer}
-                            initial="hidden"
-                            animate="visible"
-                        >
-                            {/* Badge */}
-                            <motion.div variants={fadeIn} className="mb-5">
-                                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-white text-xs font-semibold uppercase tracking-widest backdrop-blur-sm">
-                                    <Wheat size={13} />
-                                    Marché B2B · Cameroun
-                                </span>
+                        <div className="flex items-center gap-8 xl:gap-16">
+
+                            {/* Left: text + CTAs */}
+                            <motion.div
+                                className="flex-1 max-w-xl"
+                                variants={staggerContainer}
+                                initial="hidden"
+                                animate="visible"
+                            >
+                                {/* Badge */}
+                                <motion.div variants={fadeIn} className="mb-5">
+                                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-white text-xs font-semibold uppercase tracking-widest backdrop-blur-sm">
+                                        <Wheat size={13} />
+                                        Marché B2B · Cameroun
+                                    </span>
+                                </motion.div>
+
+                                {/* Headline */}
+                                <motion.h1
+                                    id="hero-heading"
+                                    variants={fadeIn}
+                                    className="text-4xl sm:text-5xl md:text-[3.5rem] font-extrabold text-white leading-[1.1] tracking-tight mb-5"
+                                >
+                                    Vendez vos récoltes{" "}
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-lime-300">
+                                        directement aux restaurants
+                                    </span>
+                                </motion.h1>
+
+                                {/* Subtitle */}
+                                <motion.p
+                                    variants={fadeIn}
+                                    className="text-emerald-100/80 text-base md:text-lg leading-relaxed mb-8 max-w-xl"
+                                >
+                                    Rejoignez le marché B2B de Kbouffe. Plus besoin d'attendre le marché
+                                    du mardi — vos produits partent directement aux restaurants de votre région,
+                                    payés par MTN MoMo.
+                                </motion.p>
+
+                                {/* CTA */}
+                                <motion.div variants={fadeIn} className="flex flex-col sm:flex-row gap-4">
+                                    <Link
+                                        href="/register/fournisseur"
+                                        className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-emerald-500 to-lime-500 hover:from-emerald-400 hover:to-lime-400 text-white font-bold rounded-xl text-base transition-all duration-200 hover:-translate-y-0.5 shadow-xl shadow-emerald-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
+                                        aria-label="Inscrire mon exploitation agricole sur Kbouffe"
+                                    >
+                                        Inscrire mon exploitation
+                                        <ArrowRight size={18} />
+                                    </Link>
+                                    <a
+                                        href="#how-it-works"
+                                        className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl text-base border border-white/20 transition-all duration-200 hover:-translate-y-0.5 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                                        aria-label="En savoir plus sur le fonctionnement"
+                                    >
+                                        Comment ça marche ?
+                                    </a>
+                                </motion.div>
                             </motion.div>
 
-                            {/* Headline */}
-                            <motion.h1
-                                id="hero-heading"
-                                variants={fadeIn}
-                                className="text-4xl sm:text-5xl md:text-[3.5rem] font-extrabold text-white leading-[1.1] tracking-tight mb-5"
+                            {/* Right: floating product image mosaic (desktop only) */}
+                            <motion.div
+                                className="hidden lg:grid flex-shrink-0 w-72 xl:w-80 grid-cols-2 gap-3"
+                                initial={{ opacity: 0, x: 40 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
+                                aria-hidden="true"
                             >
-                                Vendez vos récoltes{" "}
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-lime-300">
-                                    directement aux restaurants
-                                </span>
-                            </motion.h1>
-
-                            {/* Subtitle */}
-                            <motion.p
-                                variants={fadeIn}
-                                className="text-emerald-100/80 text-base md:text-lg leading-relaxed mb-8 max-w-xl"
-                            >
-                                Rejoignez le marché B2B de Kbouffe. Plus besoin d'attendre le marché
-                                du mardi — vos produits partent directement aux restaurants de votre région,
-                                payés par MTN MoMo.
-                            </motion.p>
-
-                            {/* CTA */}
-                            <motion.div variants={fadeIn} className="flex flex-col sm:flex-row gap-4">
-                                <Link
-                                    href="/register/fournisseur"
-                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-emerald-500 to-lime-500 hover:from-emerald-400 hover:to-lime-400 text-white font-bold rounded-xl text-base transition-all duration-200 hover:-translate-y-0.5 shadow-xl shadow-emerald-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
-                                    aria-label="Inscrire mon exploitation agricole sur Kbouffe"
-                                >
-                                    Inscrire mon exploitation
-                                    <ArrowRight size={18} />
-                                </Link>
-                                <a
-                                    href="#how-it-works"
-                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl text-base border border-white/20 transition-all duration-200 hover:-translate-y-0.5 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                                    aria-label="En savoir plus sur le fonctionnement"
-                                >
-                                    Comment ça marche ?
-                                </a>
+                                {/* Tall left photo (tomatoes) */}
+                                <div className="row-span-2 relative rounded-2xl overflow-hidden border border-white/15 shadow-2xl shadow-black/40" style={{ minHeight: "260px" }}>
+                                    <Image
+                                        src={unsplash("1546069901-ba9599a7e63c", 400)}
+                                        alt="Tomates fraîches camerounaises"
+                                        fill
+                                        className="object-cover"
+                                        sizes="160px"
+                                        unoptimized
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                                    <span className="absolute bottom-3 left-3 text-white text-xs font-semibold bg-black/30 backdrop-blur-sm rounded-lg px-2 py-1">Tomates fraîches</span>
+                                </div>
+                                {/* Top right photo (maïs) */}
+                                <div className="relative rounded-2xl overflow-hidden border border-white/15 shadow-2xl shadow-black/40 aspect-square">
+                                    <Image
+                                        src={unsplash("1601472544851-484b0f09c8da", 300)}
+                                        alt="Maïs"
+                                        fill
+                                        className="object-cover"
+                                        sizes="120px"
+                                        unoptimized
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                                    <span className="absolute bottom-2 left-2 text-white text-xs font-semibold">🌽 Maïs</span>
+                                </div>
+                                {/* Bottom right photo (piments) */}
+                                <div className="relative rounded-2xl overflow-hidden border border-white/15 shadow-2xl shadow-black/40 aspect-square">
+                                    <Image
+                                        src={unsplash("1548460818-3a8bf4d4c0a3", 300)}
+                                        alt="Piments rouges"
+                                        fill
+                                        className="object-cover"
+                                        sizes="120px"
+                                        unoptimized
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                                    <span className="absolute bottom-2 left-2 text-white text-xs font-semibold">🌶️ Piments</span>
+                                </div>
                             </motion.div>
-                        </motion.div>
+
+                        </div>
                     </div>
                 </header>
 
@@ -420,48 +551,68 @@ export default function PourLesAgricultureursPage() {
                 >
                     <div className="container mx-auto px-4 md:px-6">
                         <motion.div
-                            className="max-w-3xl mx-auto text-center"
                             initial="hidden"
                             whileInView="visible"
                             viewport={{ once: true, margin: "-80px" }}
                             variants={staggerContainer}
                         >
-                            <motion.p variants={fadeIn} className="text-emerald-400 text-sm font-semibold uppercase tracking-widest mb-3">
-                                Catalogue ouvert
-                            </motion.p>
-                            <motion.h2
-                                id="products-heading"
-                                variants={fadeIn}
-                                className="text-2xl md:text-3xl font-extrabold text-white tracking-tight mb-4"
-                            >
-                                Tous types de produits agricoles acceptés
-                            </motion.h2>
-                            <motion.p variants={fadeIn} className="text-surface-400 text-sm mb-10">
-                                Aucune restriction — si un restaurant peut le cuisiner, vous pouvez le vendre.
-                            </motion.p>
+                            <div className="text-center mb-10">
+                                <motion.p variants={fadeIn} className="text-emerald-400 text-sm font-semibold uppercase tracking-widest mb-3">
+                                    Catalogue ouvert
+                                </motion.p>
+                                <motion.h2
+                                    id="products-heading"
+                                    variants={fadeIn}
+                                    className="text-2xl md:text-3xl font-extrabold text-white tracking-tight mb-4"
+                                >
+                                    Tous types de produits agricoles acceptés
+                                </motion.h2>
+                                <motion.p variants={fadeIn} className="text-surface-400 text-sm max-w-lg mx-auto">
+                                    Aucune restriction — si un restaurant peut le cuisiner, vous pouvez le vendre.
+                                </motion.p>
+                            </div>
 
-                            {/* Category tags */}
+                            {/* Product image cards grid */}
                             <motion.ul
-                                className="flex flex-wrap justify-center gap-3"
+                                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
                                 role="list"
                                 variants={staggerContainer}
                             >
-                                {PRODUCT_CATEGORIES.map(({ label, emoji }) => (
+                                {PRODUCT_CATEGORIES.map(({ label, emoji, imgId, fallback }) => (
                                     <motion.li
                                         key={label}
                                         variants={fadeIn}
-                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 hover:border-emerald-500/35 transition-colors duration-200 cursor-default"
+                                        className={`group relative rounded-2xl overflow-hidden border border-emerald-500/15 hover:border-emerald-400/40 transition-all duration-300 hover:-translate-y-1 cursor-default ${fallback}`}
+                                        style={{ aspectRatio: "4/3" }}
                                     >
-                                        <span aria-hidden="true">{emoji}</span>
-                                        <span className="text-emerald-300 text-sm font-medium">{label}</span>
+                                        {/* Product photo */}
+                                        <Image
+                                            src={unsplash(imgId, 400)}
+                                            alt={label}
+                                            fill
+                                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                            unoptimized
+                                        />
+                                        {/* Gradient overlay */}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                                        {/* Label */}
+                                        <div className="absolute bottom-0 left-0 right-0 p-3">
+                                            <span className="text-2xl leading-none" aria-hidden="true">{emoji}</span>
+                                            <p className="text-white font-semibold text-xs leading-snug mt-1">{label}</p>
+                                        </div>
+                                        {/* Hover shimmer */}
+                                        <div className="absolute inset-0 bg-emerald-400/0 group-hover:bg-emerald-400/5 transition-colors duration-300" />
                                     </motion.li>
                                 ))}
-                                {/* "et plus..." pill */}
+                                {/* "et plus…" tile */}
                                 <motion.li
                                     variants={fadeIn}
-                                    className="inline-flex items-center px-4 py-2 rounded-full bg-surface-800/60 border border-surface-700/40"
+                                    className="relative rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-500/5 flex flex-col items-center justify-center p-4 cursor-default"
+                                    style={{ aspectRatio: "4/3" }}
                                 >
-                                    <span className="text-surface-400 text-sm font-medium">et plus encore…</span>
+                                    <span className="text-3xl mb-2">✨</span>
+                                    <p className="text-emerald-400 text-xs font-semibold text-center">Et bien d&apos;autres produits…</p>
                                 </motion.li>
                             </motion.ul>
                         </motion.div>
@@ -524,56 +675,62 @@ export default function PourLesAgricultureursPage() {
                     aria-label="Témoignage agriculteur"
                 >
                     <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-2xl mx-auto">
-                            {/* Card */}
-                            <div className="rounded-2xl bg-gradient-to-br from-emerald-950/60 via-surface-900/80 to-surface-900/60 border border-emerald-500/15 p-8 md:p-10 relative overflow-hidden">
-                                {/* Decorative quote */}
-                                <div className="absolute top-4 left-6 text-emerald-500/15 text-9xl font-serif leading-none pointer-events-none select-none" aria-hidden="true">&ldquo;</div>
+                        <div className="max-w-4xl mx-auto">
+                            {/* Card with farm background photo */}
+                            <div className="rounded-3xl border border-emerald-500/20 relative overflow-hidden">
+                                {/* Background farm photo */}
+                                <div className="absolute inset-0">
+                                    <Image
+                                        src={unsplash("1523741543316-beb7fc7023d8", 1200)}
+                                        alt=""
+                                        fill
+                                        className="object-cover object-center"
+                                        sizes="900px"
+                                        unoptimized
+                                        aria-hidden="true"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/95 via-emerald-950/80 to-emerald-900/60" />
+                                </div>
 
-                                {/* Decorative blob */}
-                                <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-emerald-500/6 blur-2xl pointer-events-none" aria-hidden="true" />
-
-                                <div className="relative z-10">
-                                    <blockquote>
-                                        <p className="text-white text-base md:text-lg italic leading-relaxed mb-7">
-                                            &ldquo;Depuis que je suis sur Kbouffe, mes tomates partent
-                                            directement aux restaurants de Bafoussam. Plus besoin
-                                            d&apos;attendre le marché du mardi.&rdquo;
-                                        </p>
-                                        <footer className="flex items-center gap-4">
-                                            {/* Avatar */}
-                                            <div
-                                                className="w-11 h-11 rounded-full bg-emerald-500/25 border border-emerald-400/30 flex items-center justify-center text-base font-extrabold text-emerald-300 shrink-0"
-                                                aria-hidden="true"
-                                            >
-                                                M
-                                            </div>
-                                            <div>
-                                                <cite className="not-italic text-white font-bold text-sm">Mama Nkeng</cite>
-                                                <p className="text-emerald-400/70 text-xs mt-0.5">Maraîchère · Bafoussam</p>
-                                            </div>
-                                            {/* Verified badge */}
-                                            <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                                                <ShieldCheck size={13} className="text-emerald-400" aria-hidden="true" />
-                                                <span className="text-emerald-400 text-xs font-semibold">Fournisseur vérifié</span>
-                                            </div>
-                                        </footer>
-                                    </blockquote>
-
-                                    {/* Divider */}
-                                    <div className="mt-8 pt-6 border-t border-surface-800/50">
-                                        <div className="grid grid-cols-3 gap-4 text-center">
-                                            {[
-                                                { value: "2 ans", label: "sur Kbouffe" },
-                                                { value: "+8 restaurants", label: "clients réguliers" },
-                                                { value: "MTN MoMo", label: "paiements reçus" },
-                                            ].map(({ value, label }) => (
-                                                <div key={label}>
-                                                    <p className="text-emerald-300 font-bold text-sm">{value}</p>
-                                                    <p className="text-surface-500 text-xs mt-0.5">{label}</p>
+                                <div className="relative z-10 flex flex-col md:flex-row gap-8 p-8 md:p-12">
+                                    {/* Quote */}
+                                    <div className="flex-1">
+                                        <div className="text-emerald-400/30 text-8xl font-serif leading-none mb-2 select-none" aria-hidden="true">&ldquo;</div>
+                                        <blockquote>
+                                            <p className="text-white text-lg md:text-xl italic leading-relaxed mb-6">
+                                                &ldquo;Depuis que je suis sur Kbouffe, mes tomates partent
+                                                directement aux restaurants de Bafoussam. Plus besoin
+                                                d&apos;attendre le marché du mardi. Je gagne 40 % de plus
+                                                qu&apos;avant.&rdquo;
+                                            </p>
+                                            <footer className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-emerald-500/30 border-2 border-emerald-400/40 flex items-center justify-center text-lg font-extrabold text-emerald-300 shrink-0">
+                                                    M
                                                 </div>
-                                            ))}
-                                        </div>
+                                                <div>
+                                                    <cite className="not-italic text-white font-bold">Mama Nkeng</cite>
+                                                    <p className="text-emerald-300/70 text-sm mt-0.5">Maraîchère · Bafoussam · Ouest Cameroun</p>
+                                                </div>
+                                                <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30">
+                                                    <ShieldCheck size={13} className="text-emerald-400" aria-hidden="true" />
+                                                    <span className="text-emerald-400 text-xs font-semibold">Vérifiée</span>
+                                                </div>
+                                            </footer>
+                                        </blockquote>
+                                    </div>
+
+                                    {/* Stats */}
+                                    <div className="flex-shrink-0 md:w-48 grid grid-cols-3 md:grid-cols-1 gap-3 self-center">
+                                        {[
+                                            { value: "2 ans", label: "sur Kbouffe" },
+                                            { value: "+8", label: "restaurants clients" },
+                                            { value: "+40 %", label: "de revenus" },
+                                        ].map(({ value, label }) => (
+                                            <div key={label} className="text-center md:text-left p-3 rounded-xl bg-white/5 border border-white/10">
+                                                <p className="text-emerald-300 font-extrabold text-lg leading-none">{value}</p>
+                                                <p className="text-surface-400 text-xs mt-1">{label}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
@@ -581,7 +738,7 @@ export default function PourLesAgricultureursPage() {
                     </div>
                 </motion.section>
 
-                {/* ════════════════════════════════════════════════════════
+                                {/* ════════════════════════════════════════════════════════
                     CTA SECTION
                 ════════════════════════════════════════════════════════ */}
                 <section
