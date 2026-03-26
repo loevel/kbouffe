@@ -23,7 +23,7 @@ const { storesRoutes, uploadRoutes, authRoutes, usersRoutes, securityRoutes, bra
 
 import { capitalApi } from "@kbouffe/module-capital";
 const { capitalRoutes, capitalAdminRoutes } = capitalApi;
-import { catalogApi } from "@kbouffe/module-catalog";
+import { catalogApi } from "@kbouffe/module-catalog/api";
 const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute: productsRoutes } = catalogApi;
 import { storePublicRoutes } from "./modules/store/store-public";
 import { dashboardRoutes } from "./modules/store/dashboard";
