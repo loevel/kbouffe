@@ -1,2 +1,3 @@
-// UI placeholder — composants React à implémenter
-export {};
+export * from "./CapitalScoreCard";
+export * from "./CapitalApplicationForm";
+export * from "./CapitalApplicationsList";
