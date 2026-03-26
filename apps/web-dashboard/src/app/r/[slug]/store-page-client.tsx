@@ -32,8 +32,22 @@ import { useCart } from "@/contexts/cart-context";
 import { CartDrawer } from "@/components/store/CartDrawer";
 import { RestaurantGallery } from "@/components/store/RestaurantGallery";
 import { createClient } from "@/lib/supabase/client";
+import { TrackingPixels } from "@/components/store/TrackingPixels";
+import { AnnouncementBanner } from "@/components/store/AnnouncementBanner";
+import { GridTheme } from "@/components/store/themes/GridTheme";
+import { LuxuryTheme } from "@/components/store/themes/LuxuryTheme";
+import { StoryTheme } from "@/components/store/themes/StoryTheme";
+import { trackEvent } from "@/lib/tracking";
+import type { ThemeProps } from "@/components/store/themes/types";
 
 // ── Types ──────────────────────────────────────────────────────────────
+interface Announcement {
+    id: string;
+    message: string;
+    type: "info" | "warning" | "urgent";
+    color: string | null;
+}
+
 interface Restaurant {
     id: string;
     name: string;
@@ -56,6 +70,10 @@ interface Restaurant {
     reservationCancelPolicy: "flexible" | "moderate" | "strict";
     reservationCancelNoticeMinutes: number;
     reservationCancellationFeeAmount: number;
+    metaPixelId: string | null;
+    googleAnalyticsId: string | null;
+    themeLayout: "grid" | "luxury" | "story";
+    primaryColor?: string;
 }
 
 interface Category {
@@ -91,6 +109,7 @@ interface StoreData {
     categories: Category[];
     products: Product[];
     reviews: Review[];
+    announcements?: Announcement[];
 }
 
 const cuisineLabels: Record<string, string> = {
@@ -777,6 +796,19 @@ export function StorePageClient({ slug }: { slug: string }) {
         return () => { cancelled = true; };
     }, [resDate, resPartySize, reservationOpen, slug]);
 
+    // ── PWA White-Label: dynamic theme-color meta ──
+    useEffect(() => {
+        if (data?.restaurant?.primaryColor) {
+            let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+            if (!meta) {
+                meta = document.createElement("meta");
+                meta.setAttribute("name", "theme-color");
+                document.head.appendChild(meta);
+            }
+            meta.setAttribute("content", data.restaurant.primaryColor);
+        }
+    }, [data?.restaurant?.primaryColor]);
+
     const submitReservation = useCallback(async (restaurantSlug: string) => {
         setResError(null);
         setResSuccess(null);
@@ -865,7 +897,7 @@ export function StorePageClient({ slug }: { slug: string }) {
         );
     }
 
-    const { restaurant, categories, products, reviews } = data;
+    const { restaurant, categories, products, reviews, announcements } = data;
     const avgRating = restaurant.rating?.toFixed(1) ?? "—";
 
     const categoriesWithProducts = categories
@@ -876,8 +908,54 @@ export function StorePageClient({ slug }: { slug: string }) {
         (p) => !p.category_id || !categories.find((c) => c.id === p.category_id),
     );
 
+    // ── Theme engine ──
+    const ThemeComponent = {
+        grid: GridTheme,
+        luxury: LuxuryTheme,
+        story: StoryTheme,
+    }[restaurant.themeLayout ?? "grid"] ?? GridTheme;
+
+    const handleAddToCart = (product: { id: string; name: string; price: number; image_url: string | null }) => {
+        addItem(
+            { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
+            { id: product.id, name: product.name, price: product.price, imageUrl: product.image_url },
+        );
+        setCartOpen(true);
+        trackEvent("AddToCart", {
+            content_name: product.name,
+            content_ids: [product.id],
+            content_type: "product",
+            value: product.price,
+            currency: "XAF",
+        });
+    };
+
+    const handleProductClick = (product: Product) => {
+        setSelectedProduct(product);
+        trackEvent("ViewContent", {
+            content_name: product.name,
+            content_ids: [product.id],
+            content_type: "product",
+            value: product.price,
+            currency: "XAF",
+        });
+    };
+
     return (
         <div className="min-h-screen bg-white dark:bg-surface-950 font-sans">
+            {/* Tracking Pixels */}
+            <TrackingPixels
+                metaPixelId={restaurant.metaPixelId}
+                googleAnalyticsId={restaurant.googleAnalyticsId}
+            />
+
+            {/* Announcement Banners */}
+            {announcements && announcements.length > 0 && (
+                <AnnouncementBanner
+                    announcements={announcements}
+                    restaurantId={restaurant.id}
+                />
+            )}
             {/* Nav */}
             <nav className="sticky top-0 z-50 bg-white/80 dark:bg-surface-950/80 backdrop-blur-xl border-b border-surface-200/50 dark:border-surface-800/50 transition-all">
                 <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
@@ -1531,7 +1609,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                 )}
 
                 <div className="flex-1 min-w-0 pt-6">
-                    {/* Horizontal scroll for mobile/tablet */}
+                    {/* Horizontal scroll for mobile/tablet (kept for all themes) */}
                     {categoriesWithProducts.length > 1 && (
                         <div className="flex lg:hidden gap-3 overflow-x-auto pb-6 mb-8 scrollbar-hide -mx-4 px-4 sticky top-[64px] z-30 bg-white/80 dark:bg-surface-950/80 backdrop-blur-md pt-2">
                             {categoriesWithProducts.map(({ cat }) => (
@@ -1550,68 +1628,18 @@ export function StorePageClient({ slug }: { slug: string }) {
                         </div>
                     )}
 
-                    {categoriesWithProducts.length === 0 && uncategorised.length === 0 ? (
-                        <div className="text-center py-24">
-                            <ChefHat size={48} className="mx-auto text-surface-200 dark:text-surface-700 mb-4" />
-                            <p className="text-surface-500 dark:text-surface-400">Aucun plat disponible pour le moment.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-10">
-                            {categoriesWithProducts.map(({ cat, items }) => (
-                                <section
-                                    key={cat.id}
-                                    ref={(el) => { sectionRefs.current[cat.id] = el; }}
-                                    className="scroll-mt-20"
-                                >
-                                    <h2 className="text-lg font-extrabold text-surface-900 dark:text-white mb-0.5">
-                                        {cat.name}
-                                    </h2>
-                                    {cat.description && (
-                                        <p className="text-xs text-surface-500 dark:text-surface-400 mb-3 flex items-center gap-1.5">
-                                            <Info size={12} />{cat.description}
-                                        </p>
-                                    )}
-                                    <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
-                                        {items.map((product) => (
-                                            <ProductCard
-                                                key={product.id}
-                                                product={product}
-                                                onClick={() => setSelectedProduct(product)}
-                                                onAdd={() => {
-                                                    addItem(
-                                                        { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
-                                                        { id: product.id, name: product.name, price: product.price, imageUrl: product.image_url },
-                                                    );
-                                                    setCartOpen(true);
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </section>
-                            ))}
-                            {uncategorised.length > 0 && (
-                                <section className="scroll-mt-20">
-                                    <h2 className="text-lg font-extrabold text-surface-900 dark:text-white mb-1">Autres plats</h2>
-                                    <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
-                                        {uncategorised.map((product) => (
-                                            <ProductCard
-                                                key={product.id}
-                                                product={product}
-                                                onClick={() => setSelectedProduct(product)}
-                                                onAdd={() => {
-                                                    addItem(
-                                                        { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
-                                                        { id: product.id, name: product.name, price: product.price, imageUrl: product.image_url },
-                                                    );
-                                                    setCartOpen(true);
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
-                        </div>
-                    )}
+                    {/* Theme-driven menu rendering */}
+                    <ThemeComponent
+                        restaurant={restaurant}
+                        categories={categories}
+                        products={products}
+                        activeCategory={activeCategory ?? ""}
+                        onCategoryChange={scrollToCategory}
+                        onAddToCart={handleAddToCart}
+                        onProductClick={handleProductClick}
+                        formatPrice={formatCFA}
+                        sectionRefs={sectionRefs}
+                    />
 
                     {reviews.length > 0 && (
                         <section className="mt-12 pt-8 border-t border-surface-100 dark:border-surface-800">
@@ -1682,13 +1710,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                     product={selectedProduct}
                     restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
                     onClose={() => setSelectedProduct(null)}
-                    onAdd={() => {
-                        addItem(
-                            { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
-                            { id: selectedProduct.id, name: selectedProduct.name, price: selectedProduct.price, imageUrl: selectedProduct.image_url },
-                        );
-                        setCartOpen(true);
-                    }}
+                    onAdd={() => handleAddToCart(selectedProduct)}
                 />
             )}
 

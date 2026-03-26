@@ -1222,8 +1222,11 @@ export type Database = {
           sms_notifications_enabled: boolean | null
           sponsored_rank: number | null
           sponsored_until: string | null
+          theme_layout: string
           total_tables: number | null
           updated_at: string
+          meta_pixel_id: string | null
+          google_analytics_id: string | null
         }
         Insert: {
           address?: string | null
@@ -1280,8 +1283,11 @@ export type Database = {
           sms_notifications_enabled?: boolean | null
           sponsored_rank?: number | null
           sponsored_until?: string | null
+          theme_layout?: string
           total_tables?: number | null
           updated_at?: string
+          meta_pixel_id?: string | null
+          google_analytics_id?: string | null
         }
         Update: {
           address?: string | null
@@ -1337,8 +1343,11 @@ export type Database = {
           sms_notifications_enabled?: boolean | null
           sponsored_rank?: number | null
           sponsored_until?: string | null
+          theme_layout?: string
           total_tables?: number | null
           updated_at?: string
+          meta_pixel_id?: string | null
+          google_analytics_id?: string | null
         }
         Relationships: [
           {

@@ -32,6 +32,9 @@ const fieldMapping: Record<string, string> = {
   deliveryPerKmFee: "delivery_per_km_fee",
   maxDeliveryRadiusKm: "max_delivery_radius_km",
   notificationInfo: "notification_info",
+  metaPixelId: "meta_pixel_id",
+  googleAnalyticsId: "google_analytics_id",
+  themeLayout: "theme_layout",
 };
 
 /**
@@ -83,7 +86,10 @@ export async function PATCH(request: NextRequest) {
       "delivery_zones", "deliveryZones",
       "delivery_base_fee", "deliveryBaseFee",
       "delivery_per_km_fee", "deliveryPerKmFee",
-      "max_delivery_radius_km", "maxDeliveryRadiusKm"
+      "max_delivery_radius_km", "maxDeliveryRadiusKm",
+      "metaPixelId", "meta_pixel_id",
+      "googleAnalyticsId", "google_analytics_id",
+      "themeLayout", "theme_layout"
     ];
 
     // Mapper les champs pour Supabase

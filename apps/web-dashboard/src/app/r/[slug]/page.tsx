@@ -10,6 +10,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
         title: `${slug} — Kbouffe`,
         description: `Commandez en ligne chez ${slug} sur Kbouffe`,
+        manifest: `/api/store/${slug}/manifest.json`,
     };
 }
 

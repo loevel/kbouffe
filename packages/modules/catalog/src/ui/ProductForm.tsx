@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ImagePlus, Upload, Trash2, PlusCircle, Link2 } from "lucide-react";
+import { Save, ImagePlus, Upload, Trash2, PlusCircle, Link2, Wand2, Loader2, Flame, Clock, Sparkles } from "lucide-react";
 import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale, useDashboard, authFetch } from "@kbouffe/module-core/ui";
 
 import { ProductOptionEditor } from "./ProductOptionEditor";
@@ -34,7 +34,13 @@ export function ProductForm({ product }: ProductFormProps) {
         isVegan: (product as any)?.is_vegan ?? false,
         isGlutenFree: (product as any)?.is_gluten_free ?? false,
         healthAccepted: false,
+        // Scarcity / Limited edition
+        isLimitedEdition: (product as any)?.is_limited_edition ?? false,
+        stockQuantity: (product as any)?.stock_quantity?.toString() ?? "",
+        availableUntil: (product as any)?.available_until ?? "",
     });
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
     const [options, setOptions] = useState<ProductOption[]>(
         (product?.options as unknown as ProductOption[]) ?? []
     );
@@ -106,6 +112,76 @@ export function ProductForm({ product }: ProductFormProps) {
 
     const updateField = (field: string, value: unknown) => {
         setForm(prev => ({ ...prev, [field]: value }));
+    };
+
+    // ── AI Copywriter ────────────────────────────────────────────────────
+    const handleAiCopywrite = async () => {
+        if (!form.name.trim()) {
+            toast.error("Entrez d'abord le nom du plat");
+            return;
+        }
+        setAiLoading(true);
+        setAiSuggestions([]);
+        try {
+            const categoryName = categories.find((c: any) => c.id === form.categoryId)?.name;
+            const res = await fetch("/api/ai/copywrite", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: form.name,
+                    price: form.price ? Number(form.price) : undefined,
+                    category: categoryName ?? undefined,
+                    ingredients: form.allergens || undefined,
+                }),
+            });
+            const data = await res.json();
+            if (data.descriptions?.length) {
+                setAiSuggestions(data.descriptions);
+            } else {
+                toast.error(data.error ?? "Aucune suggestion générée");
+            }
+        } catch {
+            toast.error("Erreur de connexion au service IA");
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    // ── AI Photo Generation ─────────────────────────────────────────────
+    const [aiPhotoLoading, setAiPhotoLoading] = useState(false);
+    const [aiPhotoStyle, setAiPhotoStyle] = useState("rustic");
+
+    const handleAiPhotoGenerate = async () => {
+        if (!form.name.trim()) {
+            toast.error("Entrez d'abord le nom du plat");
+            return;
+        }
+        setAiPhotoLoading(true);
+        try {
+            const res = await fetch("/api/ai/enhance-photo", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    mode: "generate",
+                    productName: form.name,
+                    style: aiPhotoStyle,
+                }),
+            });
+            const data = await res.json();
+            if (data.imageUrl) {
+                setImageUrl(data.imageUrl);
+                toast.success("Photo IA générée !");
+            } else if (data.fallback && data.prompt) {
+                toast.error("Génération indisponible. Prompt copié !");
+                navigator.clipboard?.writeText(data.prompt);
+            } else {
+                toast.error(data.error ?? "Erreur de génération");
+            }
+        } catch {
+            toast.error("Erreur de connexion au service IA");
+        } finally {
+            setAiPhotoLoading(false);
+        }
     };
 
     const categoryOptions = categories.filter((c: any) => c.is_active).map((c: any) => ({
@@ -183,6 +259,10 @@ export function ProductForm({ product }: ProductFormProps) {
             is_vegan: form.isVegan,
             is_gluten_free: form.isGlutenFree,
             options: (options.length > 0 ? options : null) as unknown as undefined,
+            // Scarcity
+            is_limited_edition: form.isLimitedEdition,
+            stock_quantity: form.stockQuantity ? Number(form.stockQuantity) : null,
+            available_until: form.availableUntil || null,
         };
 
         if (isEditing && product) {
@@ -212,13 +292,68 @@ export function ProductForm({ product }: ProductFormProps) {
                                 value={form.name}
                                 onChange={(e) => updateField("name", e.target.value)}
                             />
-                            <Textarea
-                                label={t.menu.productDescription}
-                                placeholder={t.menu.productDescPlaceholder}
-                                value={form.description}
-                                onChange={(e) => updateField("description", e.target.value)}
-                                rows={4}
-                            />
+                            {/* Description + AI Wand */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">
+                                        {t.menu.productDescription}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={handleAiCopywrite}
+                                        disabled={aiLoading || !form.name.trim()}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title="Générer une description avec l'IA"
+                                    >
+                                        {aiLoading ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                        ) : (
+                                            <Wand2 size={14} />
+                                        )}
+                                        {aiLoading ? "Génération..." : "Baguette Magique"}
+                                    </button>
+                                </div>
+                                <Textarea
+                                    placeholder={t.menu.productDescPlaceholder}
+                                    value={form.description}
+                                    onChange={(e) => updateField("description", e.target.value)}
+                                    rows={4}
+                                />
+
+                                {/* AI Suggestions */}
+                                {aiSuggestions.length > 0 && (
+                                    <div className="mt-3 space-y-2">
+                                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                                            <Wand2 size={12} />
+                                            Choisissez une suggestion :
+                                        </p>
+                                        {aiSuggestions.map((suggestion, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => {
+                                                    updateField("description", suggestion);
+                                                    setAiSuggestions([]);
+                                                    toast.success("Description appliquée !");
+                                                }}
+                                                className="w-full text-left p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-100 dark:hover:bg-amber-500/15 text-sm text-surface-700 dark:text-surface-300 transition-colors"
+                                            >
+                                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block mb-1">
+                                                    {idx === 0 ? "Courte" : idx === 1 ? "Moyenne" : "Storytelling"}
+                                                </span>
+                                                {suggestion}
+                                            </button>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => setAiSuggestions([])}
+                                            className="text-xs text-surface-400 hover:text-surface-600 transition-colors"
+                                        >
+                                            Fermer les suggestions
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </Card>
 
@@ -309,6 +444,43 @@ export function ProductForm({ product }: ProductFormProps) {
                                 </button>
                             </div>
                         )}
+
+                        {/* AI Photo Generation */}
+                        <div className="mt-4 p-4 rounded-xl border border-purple-200 dark:border-purple-500/20 bg-purple-50/50 dark:bg-purple-500/5">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Sparkles size={16} className="text-purple-500" />
+                                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Photo IA</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold">BETA</span>
+                            </div>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mb-3">
+                                Générez une photo professionnelle de votre plat avec l'IA Gemini Imagen.
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={aiPhotoStyle}
+                                    onChange={(e) => setAiPhotoStyle(e.target.value)}
+                                    className="flex-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                    <option value="rustic">Rustique</option>
+                                    <option value="modern">Moderne</option>
+                                    <option value="vibrant">Vibrant</option>
+                                    <option value="street">Street Food</option>
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={handleAiPhotoGenerate}
+                                    disabled={aiPhotoLoading || !form.name.trim()}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                                >
+                                    {aiPhotoLoading ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                        <Sparkles size={14} />
+                                    )}
+                                    {aiPhotoLoading ? "Génération..." : "Générer"}
+                                </button>
+                            </div>
+                        </div>
                     </Card>
 
                     <Card>
@@ -447,6 +619,46 @@ export function ProductForm({ product }: ProductFormProps) {
                                 label={t.menu.productAvailable}
                                 description={t.menu.productAvailableHint}
                             />
+                        </div>
+                    </Card>
+
+                    {/* Scarcity / Limited Edition */}
+                    <Card>
+                        <h3 className="font-semibold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Flame size={16} className="text-orange-500" />
+                            Édition Limitée
+                        </h3>
+                        <div className="space-y-4">
+                            <Toggle
+                                checked={form.isLimitedEdition}
+                                onChange={(val) => updateField("isLimitedEdition", val)}
+                                label="Produit en édition limitée"
+                                description="Affiche un badge et un compteur de stock sur la vitrine"
+                            />
+                            {form.isLimitedEdition && (
+                                <>
+                                    <Input
+                                        label="Quantité disponible"
+                                        type="number"
+                                        placeholder="Ex: 30 portions"
+                                        value={form.stockQuantity}
+                                        onChange={(e) => updateField("stockQuantity", e.target.value)}
+                                        hint="Laisser vide = pas de limite de stock"
+                                    />
+                                    <div>
+                                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                                            <span className="flex items-center gap-1.5"><Clock size={14} /> Disponible jusqu&apos;à</span>
+                                        </label>
+                                        <input
+                                            type="datetime-local"
+                                            value={form.availableUntil ? form.availableUntil.slice(0, 16) : ""}
+                                            onChange={(e) => updateField("availableUntil", e.target.value ? new Date(e.target.value).toISOString() : "")}
+                                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                        />
+                                        <p className="mt-1 text-xs text-surface-400">Optionnel — le produit sera masqué après cette date</p>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </Card>
 

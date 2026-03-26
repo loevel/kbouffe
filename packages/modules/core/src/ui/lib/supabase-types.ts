@@ -114,6 +114,9 @@ export interface Tables {
             is_sponsored: boolean;
             sponsored_until: string | null;
             sponsored_rank: number;
+            meta_pixel_id: string | null;
+            google_analytics_id: string | null;
+            theme_layout: string;
             created_at: string;
             updated_at: string;
         };
@@ -151,6 +154,9 @@ export interface Tables {
             is_sponsored?: boolean;
             sponsored_until?: string | null;
             sponsored_rank?: number;
+            meta_pixel_id?: string | null;
+            google_analytics_id?: string | null;
+            theme_layout?: string;
             created_at?: string;
             updated_at?: string;
         };
@@ -186,6 +192,9 @@ export interface Tables {
             is_sponsored?: boolean;
             sponsored_until?: string | null;
             sponsored_rank?: number;
+            meta_pixel_id?: string | null;
+            google_analytics_id?: string | null;
+            theme_layout?: string;
             updated_at?: string;
         };
         Relationships: [
