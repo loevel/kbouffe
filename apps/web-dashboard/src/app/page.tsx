@@ -4,6 +4,7 @@ import { Hero } from "@/components/landing/Hero";
 import { MarketSegments } from "@/components/landing/MarketSegments";
 import { ForWho } from "@/components/landing/ForWho";
 import { Features } from "@/components/landing/Features";
+import { ProFeatures } from "@/components/landing/ProFeatures";
 import { RemoteDineIn } from "@/components/landing/RemoteDineIn";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { MarketplacePacks } from "@/components/landing/MarketplacePacks";
@@ -22,6 +23,7 @@ export default function Home() {
         <MarketSegments />
         <ForWho />
         <Features />
+        <ProFeatures />
         <MarketplacePacks />
         <RemoteDineIn />
         <HowItWorks />
