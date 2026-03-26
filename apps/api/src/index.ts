@@ -59,6 +59,17 @@ import {
 // ── Admin routes ─────────────────────────────────────────────────────
 import { adminRoutes } from "./modules/admin";
 
+// ── Marketplace B2B Fournisseurs ────────────────────────────────────
+import {
+    marketplacePublicRoutes,
+    marketplaceMerchantRoutes,
+    marketplaceAdminRoutes as marketplaceAdminPureRoutes,
+    marketplaceWebhookRoutes,
+    suppliersRoutes,
+    traceRoutes,
+    supplierAdminRoutes,
+} from "@kbouffe/module-marketplace";
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Root app — health check lives at / (outside the /api scope)
 // ═══════════════════════════════════════════════════════════════════════
@@ -118,6 +129,10 @@ api.route("/auth", authRoutes);
 api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
 api.route("/sync-user", authRoutes);       // Combined in authRoutes
 
+// ── Marketplace — routes publiques (annuaire fournisseurs, inscription) ─
+api.route("/marketplace", marketplacePublicRoutes);        // packs visibles
+api.route("/marketplace/suppliers", suppliersRoutes);      // annuaire + inscription
+
 // ── Auth middleware for merchant routes ───────────────────────────────
 const merchantPaths = [
     "/orders", "/categories", "/products", "/reservations",
@@ -126,6 +141,16 @@ const merchantPaths = [
     "/marketing", "/notifications", "/payouts",
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload"
 ] as const;
+
+// Marketplace merchant routes (trace + product management) require auth
+api.use("/marketplace/trace/*", authMiddleware);
+api.use("/marketplace/trace", authMiddleware);
+api.use("/marketplace/my-packs/*", authMiddleware);
+api.use("/marketplace/my-packs", authMiddleware);
+api.use("/marketplace/subscriptions/*", authMiddleware);
+api.use("/marketplace/subscriptions", authMiddleware);
+api.use("/marketplace/purchase/*", authMiddleware);
+api.use("/marketplace/purchase", authMiddleware);
 
 // Chat uses userAuthMiddleware (works for clients + merchants, no restaurant required)
 api.use("/chat/*", userAuthMiddleware);
@@ -191,8 +216,14 @@ api.route("/reviews", customerReviewRoutes);
 api.route("/restaurant/reviews", merchantReviewRoutes);
 api.route("/restaurant/product-reviews", merchantProductReviewRoutes);
 
+// ── Marketplace — routes marchands ──────────────────────────────────
+api.route("/marketplace", marketplaceMerchantRoutes);      // packs + souscriptions
+api.route("/marketplace/trace", traceRoutes);              // traçabilité fournisseurs
+
 // ── Admin routes ─────────────────────────────────────────────────────
 api.route("/admin", adminRoutes);
+api.route("/admin/marketplace", marketplaceAdminPureRoutes);      // admin packs
+api.route("/admin/marketplace/suppliers", supplierAdminRoutes);   // admin KYC fournisseurs
 
 // ── Mount /api/* on root ─────────────────────────────────────────────
 app.route("/api", api);

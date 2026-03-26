@@ -1,22 +1,15 @@
 {
   "name": "@kbouffe/module-marketplace",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./index.ts",
+  "types": "./index.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./api": {
-      "import": "./dist/api/index.js",
-      "types": "./dist/api/index.d.ts"
-    },
-    "./lib": {
-      "import": "./dist/lib/index.js",
-      "types": "./dist/lib/index.d.ts"
-    }
+    ".": "./index.ts",
+    "./api": "./src/api/index.ts",
+    "./lib": "./src/lib/index.ts",
+    "./ui": "./src/ui/index.ts"
   },
   "scripts": {
     "build": "tsc",
@@ -25,10 +18,17 @@
   "dependencies": {
     "@kbouffe/module-core": "*",
     "@kbouffe/shared-types": "*",
-    "hono": "^4.2.0"
+    "hono": "^4.7.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "lucide-react": "^0.575.0",
+    "swr": "^2.3.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250621.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "@types/node": "^20.10.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5"
   }
 }
