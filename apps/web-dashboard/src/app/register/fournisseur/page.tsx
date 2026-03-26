@@ -283,12 +283,126 @@ export default function FournisseurRegisterPage() {
     // ── Render ───────────────────────────────────────────────────────────
 
     return (
-        <div className="min-h-screen bg-surface-950 flex flex-col">
+        <div className="min-h-screen bg-surface-950 flex flex-col lg:flex-row">
+
+            {/* ══════════════════════════════════════════════════════════
+                LEFT PANEL — Visual / branding (desktop only)
+            ══════════════════════════════════════════════════════════ */}
+            <aside className="hidden lg:flex flex-col sticky top-0 h-screen w-[480px] xl:w-[520px] shrink-0 overflow-hidden">
+                {/* Base gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-950 via-emerald-800 to-lime-700" />
+                {/* Ambient blobs */}
+                <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full bg-lime-400/20 blur-3xl pointer-events-none" />
+                <div className="absolute bottom-0 -left-20 w-80 h-80 rounded-full bg-emerald-950/80 blur-2xl pointer-events-none" />
+                <div className="absolute top-1/2 right-0 w-60 h-60 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
+
+                {/* Field SVG illustration — bottom third */}
+                <svg
+                    className="absolute bottom-0 left-0 right-0 w-full"
+                    viewBox="0 0 520 320"
+                    preserveAspectRatio="xMidYMax slice"
+                    aria-hidden="true"
+                >
+                    {/* Rolling hills */}
+                    <path d="M0 220 Q130 175 260 200 Q390 225 520 185 L520 320 L0 320 Z" fill="#14532d" opacity="0.6" />
+                    <path d="M0 250 Q130 220 260 238 Q390 256 520 225 L520 320 L0 320 Z" fill="#052e16" opacity="0.8" />
+                    {/* Wheat stalks */}
+                    {([40,100,165,230,295,360,425,490] as const).map((x) => (
+                        <g key={x} transform={`translate(${x}, 110)`}>
+                            <line x1="0" y1="130" x2="0" y2="0" stroke="#fef08a" strokeWidth="2" opacity="0.5" strokeLinecap="round" />
+                            <ellipse cx="-4" cy="-2" rx="5" ry="14" fill="#fef08a" opacity="0.45" transform="rotate(-12 -4 -2)" />
+                            <ellipse cx="4" cy="-2" rx="5" ry="14" fill="#fef08a" opacity="0.4" transform="rotate(12 4 -2)" />
+                            <line x1="-12" y1="40" x2="0" y2="30" stroke="#86efac" strokeWidth="1.5" opacity="0.4" strokeLinecap="round" />
+                            <line x1="12" y1="65" x2="0" y2="55" stroke="#86efac" strokeWidth="1.5" opacity="0.4" strokeLinecap="round" />
+                        </g>
+                    ))}
+                    {/* Sun */}
+                    <circle cx="460" cy="60" r="45" fill="#fde68a" opacity="0.12" />
+                    <circle cx="460" cy="60" r="28" fill="#fde68a" opacity="0.2" />
+                    <circle cx="460" cy="60" r="16" fill="#fbbf24" opacity="0.3" />
+                    {([0,45,90,135,180,225,270,315] as const).map((deg) => (
+                        <line key={deg}
+                            x1={460 + Math.cos((deg * Math.PI) / 180) * 32}
+                            y1={60  + Math.sin((deg * Math.PI) / 180) * 32}
+                            x2={460 + Math.cos((deg * Math.PI) / 180) * 52}
+                            y2={60  + Math.sin((deg * Math.PI) / 180) * 52}
+                            stroke="#fde68a" strokeWidth="2.5" opacity="0.25" strokeLinecap="round"
+                        />
+                    ))}
+                </svg>
+
+                {/* Content over gradient */}
+                <div className="relative z-10 flex flex-col h-full px-10 py-10">
+                    {/* Logo */}
+                    <Link href="/" className="inline-block hover:opacity-80 transition-opacity mb-auto">
+                        <KbouffeLogo height={34} variant="white" />
+                    </Link>
+
+                    {/* Main copy */}
+                    <div className="mb-10">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-semibold mb-5">
+                            <Wheat size={13} />
+                            Marché B2B · Cameroun
+                        </div>
+                        <h2 className="text-3xl xl:text-4xl font-extrabold text-white leading-snug mb-3">
+                            Vendez directement<br />
+                            <span className="text-emerald-300">aux restaurants</span><br />
+                            de votre région
+                        </h2>
+                        <p className="text-emerald-100/70 text-base leading-relaxed">
+                            Rejoignez des centaines d&apos;agriculteurs qui approvisionnent
+                            les restaurants camerounais sans passer par un intermédiaire.
+                        </p>
+                    </div>
+
+                    {/* Feature list */}
+                    <ul className="space-y-4 mb-10">
+                        {[
+                            { emoji: "🌿", title: "Inscription 100 % gratuite", desc: "Aucun frais pour créer votre profil" },
+                            { emoji: "💰", title: "Paiement MTN MoMo garanti", desc: "Encaissez directement sur votre téléphone" },
+                            { emoji: "📦", title: "Gérez vos stocks & prix", desc: "Catalogue en ligne, commandes en temps réel" },
+                            { emoji: "🚜", title: "Toutes régions du Cameroun", desc: "Maroua, Garoua, Douala, Yaoundé et plus" },
+                        ].map(({ emoji, title, desc }) => (
+                            <li key={title} className="flex items-start gap-3">
+                                <span className="text-xl mt-0.5">{emoji}</span>
+                                <div>
+                                    <p className="text-white font-semibold text-sm">{title}</p>
+                                    <p className="text-emerald-200/60 text-xs">{desc}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+
+                    {/* Testimonial */}
+                    <div className="p-5 rounded-2xl bg-white/8 border border-white/12 backdrop-blur-sm">
+                        <p className="text-white/80 text-sm italic leading-relaxed mb-3">
+                            &ldquo;Depuis que je suis sur Kbouffe, mes tomates partent
+                            directement aux restaurants de Bafoussam. Plus besoin
+                            d&apos;attendre le marché du mardi.&rdquo;
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-emerald-500/30 border border-emerald-400/30 flex items-center justify-center text-sm font-bold text-emerald-300">
+                                M
+                            </div>
+                            <div>
+                                <p className="text-white text-xs font-semibold">Mama Nkeng</p>
+                                <p className="text-emerald-300/60 text-xs">Maraîchère · Bafoussam</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            {/* ══════════════════════════════════════════════════════════
+                RIGHT PANEL — Form
+            ══════════════════════════════════════════════════════════ */}
+            <div className="flex-1 flex flex-col min-h-screen">
             {/* ── Header ──────────────────────────────────────────────── */}
             <header className="px-6 py-5 flex justify-between items-center max-w-5xl mx-auto w-full">
-                <Link href="/" className="hover:opacity-80 transition-opacity">
+                <Link href="/" className="hover:opacity-80 transition-opacity lg:hidden">
                     <KbouffeLogo height={30} variant="white" />
                 </Link>
+                <div className="hidden lg:block" />
                 <Link
                     href="/login"
                     className="text-sm font-medium text-surface-400 hover:text-brand-300 transition-colors"
@@ -562,6 +676,7 @@ export default function FournisseurRegisterPage() {
             <footer className="py-6 text-center text-surface-600 text-xs">
                 &copy; {new Date().getFullYear()} Kbouffe. Tous droits réservés.
             </footer>
+            </div>{/* end right panel */}
         </div>
     );
 }
