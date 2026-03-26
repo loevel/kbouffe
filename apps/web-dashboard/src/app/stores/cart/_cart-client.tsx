@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
+import { UpsellModal } from "@/components/store/UpsellModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type DeliveryType = "delivery" | "pickup" | "dine_in";
@@ -134,6 +135,7 @@ export function CartPageClient() {
     const [promoDiscount, setPromoDiscount]   = useState(0);
     const [promoError, setPromoError]         = useState<string | null>(null);
     const [promoLoading, setPromoLoading]     = useState(false);
+    const [showUpsell, setShowUpsell]         = useState(false);
 
     const deliveryFee = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.fee ?? 0;
     const total       = subtotal + deliveryFee + SERVICE_FEE - promoDiscount;
@@ -164,6 +166,12 @@ export function CartPageClient() {
     };
 
     const handleCheckout = () => {
+        // Show upsell modal before proceeding to checkout
+        setShowUpsell(true);
+    };
+
+    const handleProceedToCheckout = () => {
+        setShowUpsell(false);
         router.push(`/stores/checkout?deliveryType=${deliveryType}`);
     };
 
@@ -339,6 +347,13 @@ export function CartPageClient() {
                     {" "}de Kbouffe.
                 </p>
             </div>
+
+            {/* Upsell Modal — shown before checkout */}
+            <UpsellModal
+                isOpen={showUpsell}
+                onClose={() => setShowUpsell(false)}
+                onProceed={handleProceedToCheckout}
+            />
         </div>
     );
 }

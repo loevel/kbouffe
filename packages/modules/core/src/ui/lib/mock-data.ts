@@ -81,6 +81,9 @@ export const MOCK_RESTAURANT: Restaurant = {
     sponsored_rank: 0,
     sms_notifications_enabled: false,
     notification_channels: ["email", "push"] as unknown as null,
+    meta_pixel_id: null,
+    google_analytics_id: null,
+    theme_layout: "grid",
     created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-02-28T10:00:00Z",
 };
