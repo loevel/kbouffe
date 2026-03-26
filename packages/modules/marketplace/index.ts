@@ -1,2 +1,2 @@
-export * from './api/index.js';
-export * from './lib/index.js';
+export * from './src/api/index.js';
+export * from './src/lib/index.js';
