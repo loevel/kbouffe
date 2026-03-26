@@ -70,6 +70,241 @@ suppliersRoutes.get('/', async (c) => {
   }
 });
 
+// ──────────────────────────────────────────────────────────────────────
+//  SELF-SERVICE — Fournisseur authentifié gérant son propre compte
+//  IMPORTANT: ces routes /me doivent être AVANT /:id pour éviter le conflit
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/marketplace/suppliers/me
+ * Récupère le profil du fournisseur connecté (y compris si KYC pending)
+ */
+suppliersRoutes.get('/me', async (c) => {
+  try {
+    const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: 'Non autorisé' }, 401);
+
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select(`
+        *,
+        supplier_products(*)
+      `)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) {
+      return c.json({ error: 'Aucun profil fournisseur trouvé pour ce compte' }, 404);
+    }
+
+    return c.json({ success: true, supplier: data });
+  } catch (err) {
+    console.error('Error fetching supplier me:', err);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/marketplace/suppliers/me
+ * Mise à jour du profil fournisseur (champs non-KYC uniquement)
+ */
+suppliersRoutes.patch('/me', async (c) => {
+  try {
+    const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: 'Non autorisé' }, 401);
+
+    const body = await c.req.json<Partial<{
+      description: string;
+      logo_url: string;
+      address: string;
+      gps_lat: number;
+      gps_lng: number;
+      locality: string;
+    }>>();
+
+    const allowed = ['description', 'logo_url', 'address', 'gps_lat', 'gps_lng', 'locality'];
+    const updates: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in body) updates[key] = (body as Record<string, unknown>)[key];
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return c.json({ error: 'Aucune modification fournie' }, 400);
+    }
+
+    const { data, error } = await supabase
+      .from('suppliers')
+      .update(updates)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update supplier me error:', error);
+      return c.json({ error: 'Erreur lors de la mise à jour' }, 500);
+    }
+
+    return c.json({ success: true, supplier: data });
+  } catch (err) {
+    console.error('Error updating supplier me:', err);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
+/**
+ * GET /api/marketplace/suppliers/me/products
+ * Liste tous les produits du fournisseur connecté (actifs + inactifs)
+ */
+suppliersRoutes.get('/me/products', async (c) => {
+  try {
+    const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: 'Non autorisé' }, 401);
+
+    const { data: supplier } = await supabase
+      .from('suppliers')
+      .select('id, kyc_status')
+      .eq('user_id', userId)
+      .single();
+
+    if (!supplier) return c.json({ error: 'Profil fournisseur introuvable' }, 404);
+
+    const { data, error } = await supabase
+      .from('supplier_products')
+      .select('*')
+      .eq('supplier_id', supplier.id)
+      .order('created_at', { ascending: false });
+
+    if (error) return c.json({ error: 'Erreur serveur' }, 500);
+
+    return c.json({
+      success: true,
+      products: data ?? [],
+      kyc_status: supplier.kyc_status,
+    });
+  } catch (err) {
+    console.error('Error fetching my products:', err);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
+/**
+ * POST /api/marketplace/suppliers/me/products
+ * Ajouter un produit à mon catalogue (KYC approved requis)
+ */
+suppliersRoutes.post('/me/products', async (c) => {
+  try {
+    const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: 'Non autorisé' }, 401);
+
+    const { data: supplier } = await supabase
+      .from('suppliers')
+      .select('id, kyc_status')
+      .eq('user_id', userId)
+      .single();
+
+    if (!supplier) return c.json({ error: 'Profil fournisseur introuvable' }, 404);
+    if (supplier.kyc_status !== 'approved') {
+      return c.json({ error: 'Votre dossier KYC est en attente de validation — vous pourrez ajouter des produits une fois approuvé' }, 403);
+    }
+
+    const body = await c.req.json<CreateSupplierProductRequest>();
+    const {
+      name, category, price_per_unit, unit,
+      description, min_order_quantity, available_quantity,
+      origin_region, harvest_date, allergens,
+      is_organic, phytosanitary_note,
+    } = body;
+
+    if (!name?.trim() || !category || !price_per_unit || !unit) {
+      return c.json({ error: 'Champs obligatoires : nom, catégorie, prix, unité' }, 400);
+    }
+    if (price_per_unit <= 0) {
+      return c.json({ error: 'Le prix doit être supérieur à 0 FCFA' }, 400);
+    }
+
+    const { data, error } = await supabase
+      .from('supplier_products')
+      .insert({
+        supplier_id: supplier.id,
+        name: name.trim(),
+        category,
+        description: description?.trim() || null,
+        photos: [],
+        price_per_unit,
+        unit,
+        min_order_quantity: min_order_quantity ?? 1,
+        available_quantity: available_quantity ?? null,
+        origin_region: origin_region?.trim() || null,
+        harvest_date: harvest_date || null,
+        lot_number: null,
+        allergens: allergens ?? [],
+        is_organic: is_organic ?? false,
+        phytosanitary_note: phytosanitary_note?.trim() || null,
+      })
+      .select()
+      .single();
+
+    if (error) return c.json({ error: 'Erreur lors de la création du produit' }, 500);
+
+    return c.json({ success: true, product: data as SupplierProduct }, 201);
+  } catch (err) {
+    console.error('Error creating my product:', err);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
+/**
+ * GET /api/marketplace/suppliers/me/orders
+ * Commandes reçues par le fournisseur (traces de traçabilité)
+ */
+suppliersRoutes.get('/me/orders', async (c) => {
+  try {
+    const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: 'Non autorisé' }, 401);
+
+    const { data: supplier } = await supabase
+      .from('suppliers')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (!supplier) return c.json({ error: 'Profil fournisseur introuvable' }, 404);
+
+    const { data, error } = await supabase
+      .from('supplier_order_traces')
+      .select(`
+        *,
+        supplier_products(name, unit, category)
+      `)
+      .eq('supplier_id', supplier.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) return c.json({ error: 'Erreur serveur' }, 500);
+
+    const totalRevenue = (data ?? []).reduce((sum: number, t: Record<string, unknown>) => {
+      return sum + (typeof t.total_price === 'number' ? t.total_price : 0);
+    }, 0);
+
+    return c.json({
+      success: true,
+      orders: data ?? [],
+      summary: {
+        total_orders: data?.length ?? 0,
+        total_revenue_fcfa: totalRevenue,
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching my orders:', err);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
 /**
  * GET /api/marketplace/suppliers/:id
  * Profil public d'un fournisseur avec ses produits actifs
@@ -114,6 +349,24 @@ suppliersRoutes.get('/:id', async (c) => {
 suppliersRoutes.post('/register', async (c) => {
   try {
     const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: 'Veuillez vous connecter avant de vous inscrire comme fournisseur' }, 401);
+
+    // Vérifier qu'il n'y a pas déjà un profil fournisseur pour ce compte
+    const { data: existing } = await supabase
+      .from('suppliers')
+      .select('id, kyc_status')
+      .eq('user_id', userId)
+      .single();
+
+    if (existing) {
+      return c.json({
+        error: 'Un profil fournisseur existe déjà pour ce compte',
+        existing_id: existing.id,
+        kyc_status: existing.kyc_status,
+      }, 409);
+    }
+
     const body = await c.req.json<RegisterSupplierRequest>();
 
     const {
@@ -141,6 +394,7 @@ suppliersRoutes.post('/register', async (c) => {
     const { data, error } = await supabase
       .from('suppliers')
       .insert({
+        user_id: userId,
         name: name.trim(),
         type,
         contact_name: contact_name.trim(),

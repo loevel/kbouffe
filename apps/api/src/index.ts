@@ -157,6 +157,11 @@ api.use("/marketplace/subscriptions", authMiddleware);
 api.use("/marketplace/purchase/*", authMiddleware);
 api.use("/marketplace/purchase", authMiddleware);
 
+// Supplier self-service routes require auth (register + /me/*)
+api.use("/marketplace/suppliers/register", authMiddleware);
+api.use("/marketplace/suppliers/me", authMiddleware);
+api.use("/marketplace/suppliers/me/*", authMiddleware);
+
 // Chat uses userAuthMiddleware (works for clients + merchants, no restaurant required)
 api.use("/chat/*", userAuthMiddleware);
 api.use("/chat", userAuthMiddleware);

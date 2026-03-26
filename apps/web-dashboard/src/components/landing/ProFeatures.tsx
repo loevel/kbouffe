@@ -256,6 +256,14 @@ export function ProFeatures() {
                         {copy.cta}
                         <ArrowRight className="h-4 w-4" />
                     </Link>
+                    <p className="mt-4 text-sm text-surface-500">
+                        {locale === "fr"
+                            ? "Agriculteur ou producteur ? "
+                            : "Farmer or producer? "}
+                        <Link href="/register/fournisseur" className="text-emerald-400 hover:text-emerald-300 font-medium underline underline-offset-2">
+                            {locale === "fr" ? "Inscrivez votre exploitation →" : "Register your farm →"}
+                        </Link>
+                    </p>
                 </motion.div>
             </div>
         </section>

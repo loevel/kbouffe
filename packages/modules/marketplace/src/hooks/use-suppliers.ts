@@ -89,6 +89,66 @@ export function useMySupplierProducts(supplierId: string) {
   };
 }
 
+// ── Self-service hooks (fournisseur connecté) ──────────────────────────────
+
+interface MySupplierResponse {
+  supplier: Supplier & { supplier_products?: SupplierProduct[] };
+}
+
+interface MyOrdersResponse {
+  orders: Array<Record<string, unknown>>;
+  summary: { total_orders: number; total_revenue_fcfa: number };
+}
+
+interface MyProductsResponse {
+  products: SupplierProduct[];
+  kyc_status: string;
+}
+
+export function useMySupplier() {
+  const { data, error, isLoading, mutate } = useSWR<MySupplierResponse>(
+    "/api/marketplace/suppliers/me",
+    fetcher
+  );
+
+  return {
+    supplier: data?.supplier ?? null,
+    isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useMyOrders() {
+  const { data, error, isLoading, mutate } = useSWR<MyOrdersResponse>(
+    "/api/marketplace/suppliers/me/orders",
+    fetcher
+  );
+
+  return {
+    orders: data?.orders ?? [],
+    summary: data?.summary ?? { total_orders: 0, total_revenue_fcfa: 0 },
+    isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useMyProducts() {
+  const { data, error, isLoading, mutate } = useSWR<MyProductsResponse>(
+    "/api/marketplace/suppliers/me/products",
+    fetcher
+  );
+
+  return {
+    products: data?.products ?? [],
+    kycStatus: data?.kyc_status ?? "pending",
+    isLoading,
+    error,
+    mutate,
+  };
+}
+
 // ── Mutations ─────────────────────────────────────────────────────────────
 
 export async function registerSupplier(
@@ -117,12 +177,11 @@ export async function registerSupplier(
   }
 }
 
-export async function updateSupplier(
-  id: string,
-  data: Partial<RegisterSupplierRequest>
+export async function updateMyProfile(
+  data: Partial<{ description: string; logo_url: string; address: string; locality: string }>
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await authFetch(`/api/marketplace/suppliers/${id}`, {
+    const res = await authFetch("/api/marketplace/suppliers/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -130,17 +189,31 @@ export async function updateSupplier(
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      return { success: false, error: body.error };
+      return { success: false, error: (body as { error?: string }).error };
     }
 
-    globalMutate(
-      (key: unknown) =>
-        typeof key === "string" && key.includes("/marketplace/suppliers"),
-      undefined,
-      { revalidate: true }
-    );
-
+    globalMutate("/api/marketplace/suppliers/me", undefined, { revalidate: true });
     return { success: true };
+  } catch {
+    return { success: false, error: "Erreur réseau" };
+  }
+}
+
+export async function createMyProduct(
+  data: CreateSupplierProductRequest
+): Promise<{ success: boolean; product?: SupplierProduct; error?: string }> {
+  try {
+    const res = await authFetch("/api/marketplace/suppliers/me/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    const body = await res.json() as { success?: boolean; product?: SupplierProduct; error?: string };
+    if (!res.ok) return { success: false, error: body.error };
+
+    globalMutate("/api/marketplace/suppliers/me/products", undefined, { revalidate: true });
+    return { success: true, product: body.product };
   } catch {
     return { success: false, error: "Erreur réseau" };
   }
