@@ -168,6 +168,31 @@ cd apps/mobile-client && npm start
 - **Shared UI**: All reusable components (`Button`, `Modal`, `Table`, etc.) live in `@kbouffe/module-core`, not duplicated across apps.
 - **authFetch**: Centralized authenticated fetch utility in `@kbouffe/module-core/ui/lib/auth-fetch.ts`.
 
+## AI Agents & Skills
+
+### Legal Compliance Agent (`cameroon-legal-advisor`)
+
+Custom Copilot agent located at `.copilot/agents/cameroon-legal-advisor.md`. Use **proactively** when:
+- Designing new features that touch payments, user data, or food handling
+- Adding restaurants (onboarding/verification)
+- Implementing marketing campaigns (SMS, ads)
+- Modifying team management or payroll features
+- Creating or updating CGV/CGU/privacy policies
+
+The agent references the `cameroon-legal-compliance` skill (`.agents/skills/cameroon-legal-compliance/`) which contains 14 detailed legal reference files covering Cameroonian law:
+- **Fiscalité** : TVA 19.25%, IS, retenues à la source
+- **Commerce** : RCCM, NIF, licences restaurants
+- **Santé** : Hygiène alimentaire, allergènes, traçabilité
+- **Données** : Protection des données personnelles (loi 2010/012)
+- **Paiements** : Réglementation mobile money CEMAC/COBAC
+- **Travail** : Code du travail, statut livreurs
+- **Marketing** : SMS commercial, opt-in/opt-out
+- **Consommateur** : Protection, prix TTC, réclamations
+- **Comptabilité** : SYSCOHADA, factures normalisées
+- **E-commerce** : Statut plateforme, CGV/CGU
+
+> ⚠️ L'agent ne remplace pas un avocat. Toujours consulter un professionnel pour les décisions structurantes.
+
 ## Deployment
 
 | Service | Platform | URL |
