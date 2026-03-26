@@ -16,3 +16,6 @@ export * from "./Turnstile";
 export * from "./ReceiptPrinter";
 export * from "./Reports";
 export * from "./layout";
+export * from "./KYCComplianceBanner";
+export * from "./KYCForm";
+export * from "./BrandManager";
