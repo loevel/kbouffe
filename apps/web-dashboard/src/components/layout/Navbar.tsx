@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, ChevronDown, Utensils, Store, Wheat } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -13,12 +13,80 @@ import { ThemeSelector } from "./ThemeSelector";
 
 type NavbarRole = "guest" | "client" | "merchant";
 
+// ── Audience dropdown entries ──────────────────────────────────────────────
+
+const audienceLinks = [
+    {
+        href: "/pour-les-clients",
+        icon: Utensils,
+        label: "Pour les clients",
+        desc: "Commandez dans les meilleurs restaurants",
+        color: "text-brand-400",
+        bg: "bg-brand-500/10",
+    },
+    {
+        href: "/pour-les-restaurateurs",
+        icon: Store,
+        label: "Pour les restaurateurs",
+        desc: "Gérez et développez votre établissement",
+        color: "text-orange-400",
+        bg: "bg-orange-500/10",
+    },
+    {
+        href: "/pour-les-agriculteurs",
+        icon: Wheat,
+        label: "Pour les agriculteurs",
+        desc: "Vendez vos produits aux restaurants",
+        color: "text-emerald-400",
+        bg: "bg-emerald-500/10",
+    },
+] as const;
+
+// ── Audience dropdown ──────────────────────────────────────────────────────
+
+function AudienceDropdown({ onClose }: { onClose?: () => void }) {
+    return (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-80 bg-surface-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden z-50">
+            <div className="p-2">
+                {audienceLinks.map(({ href, icon: Icon, label, desc, color, bg }) => (
+                    <Link
+                        key={href}
+                        href={href}
+                        onClick={onClose}
+                        className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
+                    >
+                        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", bg)}>
+                            <Icon size={17} className={color} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-white group-hover:text-brand-300 transition-colors">{label}</p>
+                            <p className="text-xs text-surface-500">{desc}</p>
+                        </div>
+                    </Link>
+                ))}
+            </div>
+            <div className="px-4 py-3 bg-white/3 border-t border-white/6">
+                <Link
+                    href="/register"
+                    onClick={onClose}
+                    className="flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-white text-sm font-semibold transition-colors"
+                >
+                    Créer un compte gratuit
+                </Link>
+            </div>
+        </div>
+    );
+}
+
 export function Navbar() {
     const { t } = useLocale();
     const router = useRouter();
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isAudienceOpen, setIsAudienceOpen] = useState(false);
+    const [isMobileAudienceOpen, setIsMobileAudienceOpen] = useState(false);
     const [role, setRole] = useState<NavbarRole>("guest");
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const publicNavLinks = [
         { href: "/#features", label: t.navbar.features },
@@ -42,14 +110,23 @@ export function Navbar() {
         { href: "/stores", label: t.navbar.explore },
     ];
 
-
-
     const navLinks =
         role === "client"
             ? clientNavLinks
             : role === "merchant"
                 ? merchantNavLinks
                 : publicNavLinks;
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setIsAudienceOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -125,6 +202,32 @@ export function Navbar() {
                     </Link>
 
                     <nav className="hidden md:flex items-center gap-1">
+                        {/* Audience dropdown — guests only */}
+                        {role === "guest" && (
+                            <div className="relative" ref={dropdownRef}>
+                                <button
+                                    onClick={() => setIsAudienceOpen((v) => !v)}
+                                    className={cn(
+                                        "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                                        isAudienceOpen
+                                            ? "text-white bg-white/8"
+                                            : "text-surface-300 hover:text-white hover:bg-white/5"
+                                    )}
+                                    aria-expanded={isAudienceOpen}
+                                    aria-haspopup="true"
+                                >
+                                    Solutions
+                                    <ChevronDown
+                                        size={15}
+                                        className={cn("transition-transform duration-200", isAudienceOpen && "rotate-180")}
+                                    />
+                                </button>
+                                {isAudienceOpen && (
+                                    <AudienceDropdown onClose={() => setIsAudienceOpen(false)} />
+                                )}
+                            </div>
+                        )}
+
                         {navLinks.map((link) => (
                             <Link
                                 key={link.href}
@@ -190,10 +293,43 @@ export function Navbar() {
             <div
                 className={cn(
                     "md:hidden absolute top-full left-0 right-0 bg-surface-950/95 backdrop-blur-xl border-t border-surface-800/50 transition-all duration-300 overflow-hidden",
-                    isMobileMenuOpen ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
+                    isMobileMenuOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
                 )}
             >
                 <div className="p-4 flex flex-col gap-1">
+                    {/* Audience section — guests only */}
+                    {role === "guest" && (
+                        <>
+                            <button
+                                onClick={() => setIsMobileAudienceOpen((v) => !v)}
+                                className="flex items-center justify-between p-3 font-medium text-surface-300 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                            >
+                                <span>Solutions</span>
+                                <ChevronDown
+                                    size={15}
+                                    className={cn("transition-transform duration-200", isMobileAudienceOpen && "rotate-180")}
+                                />
+                            </button>
+                            {isMobileAudienceOpen && (
+                                <div className="ml-2 pl-3 border-l border-white/10 flex flex-col gap-1 mb-1">
+                                    {audienceLinks.map(({ href, icon: Icon, label, color, bg }) => (
+                                        <Link
+                                            key={href}
+                                            href={href}
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                            className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors"
+                                        >
+                                            <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0", bg)}>
+                                                <Icon size={14} className={color} />
+                                            </div>
+                                            <span className="text-sm font-medium text-surface-200">{label}</span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+
                     {navLinks.map((link) => (
                         <Link
                             key={link.href}
