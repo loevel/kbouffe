@@ -1,15 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useLocale, formatCFA, Card, Button, ReportStatCard, Badge } from "@kbouffe/module-core/ui";
 import { useOrders, useDashboardStats } from "@kbouffe/module-orders/ui";
-import { Download, TrendingUp, Zap } from "lucide-react";
+import { useProducts, useCategories } from "@/hooks/use-data";
+import {
+    Download,
+    TrendingUp,
+    Zap,
+    FileSpreadsheet,
+    FileText,
+    ChevronDown,
+    ShoppingBag,
+    DollarSign,
+    BarChart3,
+    Package,
+    XCircle,
+    CheckCircle2,
+    Clock,
+    Truck,
+} from "lucide-react";
 
 type ReportPeriod = "7d" | "30d" | "90d";
 
 type ParsedOrderItem = {
     name: string;
     quantity: number;
+    unitPrice: number;
 };
 
 function getDayLabel(date: Date) {
@@ -18,7 +35,6 @@ function getDayLabel(date: Date) {
 
 function parseOrderItems(items: unknown): ParsedOrderItem[] {
     if (!Array.isArray(items)) return [];
-
     return items
         .map((entry): ParsedOrderItem | null => {
             if (!entry || typeof entry !== "object") return null;
@@ -28,10 +44,13 @@ function parseOrderItems(items: unknown): ParsedOrderItem[] {
                     ? item.name
                     : typeof item.productName === "string"
                         ? item.productName
-                        : "Produit";
+                        : typeof item.product_name === "string"
+                            ? item.product_name
+                            : "Produit";
             const rawQty = Number(item.quantity ?? 1);
             const quantity = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
-            return { name, quantity };
+            const unitPrice = Number(item.unit_price ?? item.unitPrice ?? item.price ?? 0);
+            return { name, quantity, unitPrice };
         })
         .filter((item): item is ParsedOrderItem => item !== null);
 }
@@ -41,13 +60,46 @@ function toCsvValue(value: string | number) {
     return `"${str.replace(/"/g, '""')}"`;
 }
 
+function downloadCsv(filename: string, header: string[], rows: (string | number)[][]) {
+    const csv = [header, ...rows]
+        .map((row) => row.map((v) => toCsvValue(v)).join(","))
+        .join("\n");
+    const bom = "\uFEFF"; // BOM for Excel UTF-8 compat
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+// Status config
+const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
+    pending: { label: "En attente", icon: Clock, color: "text-amber-500" },
+    confirmed: { label: "Confirmee", icon: CheckCircle2, color: "text-blue-500" },
+    preparing: { label: "En preparation", icon: Package, color: "text-indigo-500" },
+    ready: { label: "Prete", icon: CheckCircle2, color: "text-cyan-500" },
+    delivering: { label: "En livraison", icon: Truck, color: "text-orange-500" },
+    delivered: { label: "Livree", icon: CheckCircle2, color: "text-green-500" },
+    completed: { label: "Completee", icon: CheckCircle2, color: "text-emerald-500" },
+    cancelled: { label: "Annulee", icon: XCircle, color: "text-red-500" },
+};
+
 export default function ReportsPage() {
     const { t } = useLocale();
     const { stats } = useDashboardStats();
     const { orders } = useOrders({ limit: 1000 });
+    const { products } = useProducts();
+    const { categories } = useCategories();
     const [period, setPeriod] = useState<ReportPeriod>("30d");
+    const [showExportMenu, setShowExportMenu] = useState(false);
 
     const periodDays = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+    const periodLabel = period === "7d" ? "7 jours" : period === "30d" ? "30 jours" : "90 jours";
+
     const cutoffDate = useMemo(() => {
         const date = new Date();
         date.setHours(0, 0, 0, 0);
@@ -61,30 +113,36 @@ export default function ReportsPage() {
     );
 
     const completedOrders = useMemo(
-        () => filteredOrders.filter((order) => order.status === "completed"),
+        () => filteredOrders.filter((order) => order.status === "completed" || order.status === "delivered"),
+        [filteredOrders],
+    );
+
+    const cancelledOrders = useMemo(
+        () => filteredOrders.filter((order) => order.status === "cancelled"),
         [filteredOrders],
     );
 
     const totalOrdersCount = filteredOrders.length;
     const totalRevenue = completedOrders.reduce((sum, order) => sum + (order.total ?? 0), 0);
-    const avgOrderValue = totalOrdersCount > 0 ? totalRevenue / totalOrdersCount : 0;
+    const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
+    const cancelRate = totalOrdersCount > 0 ? Math.round((cancelledOrders.length / totalOrdersCount) * 100) : 0;
 
+    // Revenue by day chart
     const weeklySeries = useMemo(() => {
         const now = new Date();
         now.setHours(0, 0, 0, 0);
-
-        const days = Array.from({ length: 7 }, (_, index) => {
+        const numDays = Math.min(periodDays, 14);
+        const days = Array.from({ length: numDays }, (_, index) => {
             const date = new Date(now);
-            date.setDate(now.getDate() - (6 - index));
+            date.setDate(now.getDate() - (numDays - 1 - index));
             return {
                 key: date.toISOString().slice(0, 10),
-                label: getDayLabel(date),
+                label: numDays <= 7 ? getDayLabel(date) : `${date.getDate()}/${date.getMonth() + 1}`,
                 value: 0,
             };
         });
 
         const dayMap = new Map(days.map((day) => [day.key, day]));
-
         completedOrders.forEach((order) => {
             const key = new Date(order.created_at).toISOString().slice(0, 10);
             const bucket = dayMap.get(key);
@@ -96,57 +154,98 @@ export default function ReportsPage() {
             ...day,
             heightPercent: Math.max(8, Math.round((day.value / max) * 100)),
         }));
-    }, [completedOrders]);
+    }, [completedOrders, periodDays]);
 
+    // Top products with revenue
     const topProducts = useMemo(() => {
-        const counters = new Map<string, number>();
-
+        const counters = new Map<string, { quantity: number; revenue: number }>();
         completedOrders.forEach((order) => {
             const parsedItems = parseOrderItems(order.items);
             parsedItems.forEach((item) => {
-                counters.set(item.name, (counters.get(item.name) ?? 0) + item.quantity);
+                const existing = counters.get(item.name) ?? { quantity: 0, revenue: 0 };
+                existing.quantity += item.quantity;
+                existing.revenue += item.unitPrice * item.quantity;
+                counters.set(item.name, existing);
             });
         });
-
         return Array.from(counters.entries())
-            .map(([name, quantity]) => ({ name, quantity }))
+            .map(([name, data]) => ({ name, ...data }))
             .sort((a, b) => b.quantity - a.quantity)
-            .slice(0, 5);
+            .slice(0, 10);
     }, [completedOrders]);
 
-    const handleExport = () => {
-        const header = ["Date", "Commande", "Statut", "Client", "Total (FCFA)"];
-        const rows = filteredOrders.map((order) => [
-            new Date(order.created_at).toLocaleString("fr-FR"),
-            order.id,
-            order.status,
-            order.customer_name,
-            order.total ?? 0,
+    // Orders by status
+    const ordersByStatus = useMemo(() => {
+        const counts: Record<string, number> = {};
+        filteredOrders.forEach((order) => {
+            counts[order.status] = (counts[order.status] ?? 0) + 1;
+        });
+        return Object.entries(counts).sort(([, a], [, b]) => b - a);
+    }, [filteredOrders]);
+
+    // ── Exports ──────────────────────────────────────────────────────────
+
+    const exportOrders = useCallback(() => {
+        const header = ["Date", "Heure", "ID Commande", "Client", "Statut", "Mode", "Total (FCFA)"];
+        const rows = filteredOrders.map((order) => {
+            const d = new Date(order.created_at);
+            return [
+                d.toLocaleDateString("fr-FR"),
+                d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+                order.id,
+                order.customer_name ?? "",
+                STATUS_CONFIG[order.status]?.label ?? order.status,
+                (order as any).delivery_method ?? "",
+                order.total ?? 0,
+            ];
+        });
+        downloadCsv(`commandes-${period}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+        setShowExportMenu(false);
+    }, [filteredOrders, period]);
+
+    const exportProducts = useCallback(() => {
+        const header = ["Produit", "Quantite vendue", "Chiffre d'affaires (FCFA)", "Prix unitaire moyen (FCFA)"];
+        const rows = topProducts.map((p) => [
+            p.name,
+            p.quantity,
+            Math.round(p.revenue),
+            p.quantity > 0 ? Math.round(p.revenue / p.quantity) : 0,
         ]);
+        downloadCsv(`produits-vendus-${period}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+        setShowExportMenu(false);
+    }, [topProducts, period]);
 
-        const csv = [header, ...rows]
-            .map((row) => row.map((value) => toCsvValue(value)).join(","))
-            .join("\n");
-
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", `rapports-${period}-${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
+    const exportSummary = useCallback(() => {
+        const header = ["Indicateur", "Valeur"];
+        const rows: (string | number)[][] = [
+            ["Periode", periodLabel],
+            ["Nombre de commandes", totalOrdersCount],
+            ["Commandes completees", completedOrders.length],
+            ["Commandes annulees", cancelledOrders.length],
+            ["Taux d'annulation (%)", cancelRate],
+            ["Chiffre d'affaires total (FCFA)", totalRevenue],
+            ["Panier moyen (FCFA)", Math.round(avgOrderValue)],
+            ["Nombre de clients", stats?.totalCustomers ?? 0],
+            ["Nombre de produits actifs", products.filter((p: any) => p.is_available).length],
+            ["Nombre de categories", categories.length],
+            ["", ""],
+            ["--- TOP PRODUITS ---", ""],
+            ...topProducts.map((p, i) => [`${i + 1}. ${p.name}`, `${p.quantity} vendus — ${Math.round(p.revenue)} FCFA`]),
+        ];
+        downloadCsv(`resume-${period}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+        setShowExportMenu(false);
+    }, [periodLabel, totalOrdersCount, completedOrders, cancelledOrders, cancelRate, totalRevenue, avgOrderValue, stats, products, categories, topProducts, period]);
 
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{t.reports.title}</h1>
                     <p className="text-surface-500 dark:text-surface-400 mt-1">{t.reports.subtitle}</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Period selector */}
                     <div className="inline-flex rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 p-1">
                         {([
                             { id: "7d", label: "7j" },
@@ -162,88 +261,214 @@ export default function ReportsPage() {
                                         ? "bg-brand-500 text-white"
                                         : "text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800"
                                 }`}
-                                aria-label={`${t.reports.periodSelect} ${entry.label}`}
                             >
                                 {entry.label}
                             </button>
                         ))}
                     </div>
-                    <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
-                        {t.reports.export}
-                    </Button>
+
+                    {/* Export dropdown */}
+                    <div className="relative">
+                        <Button
+                            variant="outline"
+                            leftIcon={<Download size={18} />}
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                        >
+                            Exporter <ChevronDown size={14} className="ml-1" />
+                        </Button>
+                        {showExportMenu && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                                <div className="absolute right-0 top-full mt-2 z-20 w-64 bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700 shadow-xl overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={exportOrders}
+                                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                                    >
+                                        <FileSpreadsheet size={16} className="text-green-500 flex-shrink-0" />
+                                        <div>
+                                            <p className="font-medium text-surface-900 dark:text-white">Commandes (CSV)</p>
+                                            <p className="text-xs text-surface-400">{totalOrdersCount} commandes sur {periodLabel}</p>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={exportProducts}
+                                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors border-t border-surface-100 dark:border-surface-800"
+                                    >
+                                        <FileSpreadsheet size={16} className="text-blue-500 flex-shrink-0" />
+                                        <div>
+                                            <p className="font-medium text-surface-900 dark:text-white">Produits vendus (CSV)</p>
+                                            <p className="text-xs text-surface-400">{topProducts.length} produits, CA par produit</p>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={exportSummary}
+                                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors border-t border-surface-100 dark:border-surface-800"
+                                    >
+                                        <FileText size={16} className="text-purple-500 flex-shrink-0" />
+                                        <div>
+                                            <p className="font-medium text-surface-900 dark:text-white">Resume comptable (CSV)</p>
+                                            <p className="text-xs text-surface-400">KPIs + top produits, import Excel</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
+            {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <ReportStatCard 
-                    label={t.reports.revenue} 
-                    value={formatCFA(totalRevenue)} 
-                    description={t.dashboard.monthRevenue}
+                <ReportStatCard
+                    label={t.reports.revenue}
+                    value={formatCFA(totalRevenue)}
+                    description={`${completedOrders.length} commandes completees`}
                 />
-                <ReportStatCard 
-                    label={t.reports.orders} 
-                    value={totalOrdersCount} 
-                    description={`${completedOrders.length} ${t.orders.completedPlural.toLowerCase()}`}
+                <ReportStatCard
+                    label={t.reports.orders}
+                    value={totalOrdersCount}
+                    description={`${cancelledOrders.length} annulees (${cancelRate}%)`}
                 />
-                <ReportStatCard 
-                    label={t.reports.averageOrder} 
-                    value={formatCFA(avgOrderValue)} 
+                <ReportStatCard
+                    label={t.reports.averageOrder}
+                    value={formatCFA(avgOrderValue)}
+                    description={`Sur ${periodLabel}`}
                 />
-                <ReportStatCard 
-                    label={t.reports.customerGrowth} 
-                    value={stats?.totalCustomers ?? 0} 
+                <ReportStatCard
+                    label={t.reports.customerGrowth}
+                    value={stats?.totalCustomers ?? 0}
+                    description="clients au total"
                 />
             </div>
 
+            {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Revenue Chart */}
                 <Card className="lg:col-span-2">
                     <h3 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
                         <TrendingUp size={18} className="text-brand-500" />
                         {t.dashboard.revenueChart}
                     </h3>
                     <div className="h-64 p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl border border-surface-200 dark:border-surface-700">
-                        <div className="h-full grid grid-cols-7 items-end gap-2">
+                        <div className="h-full flex items-end gap-1.5">
                             {weeklySeries.map((point) => (
-                                <div key={point.key} className="h-full flex flex-col justify-end items-center gap-2">
-                                    <div className="text-[10px] text-surface-400 dark:text-surface-500 leading-none">
+                                <div key={point.key} className="flex-1 h-full flex flex-col justify-end items-center gap-2 min-w-0">
+                                    <div className="text-[10px] text-surface-400 dark:text-surface-500 leading-none hidden sm:block">
                                         {point.value > 0 ? `${Math.round(point.value / 1000)}k` : "0"}
                                     </div>
-                                    <div className="w-full flex justify-center">
+                                    <div className="w-full flex justify-center" style={{ height: "180px" }}>
                                         <div
-                                            className="w-7 rounded-t-md bg-brand-500/80 hover:bg-brand-500 transition-colors"
+                                            className="w-full max-w-[28px] rounded-t-md bg-brand-500/80 hover:bg-brand-500 transition-colors"
                                             style={{ height: `${point.heightPercent}%` }}
                                             title={`${point.label} : ${formatCFA(point.value)}`}
                                         />
                                     </div>
-                                    <div className="text-xs text-surface-500 dark:text-surface-400">{point.label}</div>
+                                    <div className="text-[10px] text-surface-500 dark:text-surface-400 whitespace-nowrap">{point.label}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </Card>
 
+                {/* Orders by Status */}
                 <Card>
                     <h3 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
-                        <Zap size={18} className="text-brand-500" />
-                        {t.reports.topProducts}
+                        <ShoppingBag size={18} className="text-brand-500" />
+                        Par statut
                     </h3>
-                    <div className="space-y-4">
-                        {topProducts.map((product, i) => (
-                            <div key={`${product.name}-${i}`} className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-xs font-bold text-surface-500">
-                                        {i + 1}
+                    <div className="space-y-3">
+                        {ordersByStatus.map(([status, count]) => {
+                            const conf = STATUS_CONFIG[status] ?? { label: status, icon: Package, color: "text-surface-400" };
+                            const Icon = conf.icon;
+                            const pct = totalOrdersCount > 0 ? Math.round((count / totalOrdersCount) * 100) : 0;
+                            return (
+                                <div key={status} className="flex items-center gap-3">
+                                    <Icon size={14} className={`${conf.color} flex-shrink-0`} />
+                                    <span className="text-sm text-surface-600 dark:text-surface-400 flex-1 truncate">{conf.label}</span>
+                                    <span className="text-sm font-bold text-surface-900 dark:text-white">{count}</span>
+                                    <div className="w-16 h-1.5 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
+                                        <div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} />
                                     </div>
-                                    <span className="text-sm font-medium text-surface-700 dark:text-surface-200">{product.name}</span>
+                                    <span className="text-xs text-surface-400 w-8 text-right">{pct}%</span>
                                 </div>
-                                <Badge variant="outline">{product.quantity} vds</Badge>
-                            </div>
-                        ))}
-                        {topProducts.length === 0 && (
-                            <p className="text-sm text-surface-400 italic text-center py-8">Aucun produit vendu pour le moment</p>
+                            );
+                        })}
+                        {ordersByStatus.length === 0 && (
+                            <p className="text-sm text-surface-400 italic text-center py-6">Aucune commande</p>
                         )}
                     </div>
                 </Card>
+            </div>
+
+            {/* Products Performance Table */}
+            <Card>
+                <h3 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Zap size={18} className="text-brand-500" />
+                    {t.reports.topProducts} — Performance
+                </h3>
+                {topProducts.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-surface-200 dark:border-surface-700">
+                                    <th className="text-left text-xs font-semibold text-surface-500 uppercase tracking-wider py-3 px-2">#</th>
+                                    <th className="text-left text-xs font-semibold text-surface-500 uppercase tracking-wider py-3 px-2">Produit</th>
+                                    <th className="text-right text-xs font-semibold text-surface-500 uppercase tracking-wider py-3 px-2">Qte vendue</th>
+                                    <th className="text-right text-xs font-semibold text-surface-500 uppercase tracking-wider py-3 px-2">CA</th>
+                                    <th className="text-right text-xs font-semibold text-surface-500 uppercase tracking-wider py-3 px-2">Prix moy.</th>
+                                    <th className="text-left text-xs font-semibold text-surface-500 uppercase tracking-wider py-3 px-2 hidden sm:table-cell">Part</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {topProducts.map((product, i) => {
+                                    const avgUnitPrice = product.quantity > 0 ? Math.round(product.revenue / product.quantity) : 0;
+                                    const revenuePct = totalRevenue > 0 ? Math.round((product.revenue / totalRevenue) * 100) : 0;
+                                    return (
+                                        <tr key={`${product.name}-${i}`} className="border-b border-surface-100 dark:border-surface-800 last:border-0">
+                                            <td className="py-3 px-2">
+                                                <div className="w-7 h-7 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-xs font-bold text-surface-500">
+                                                    {i + 1}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <span className="text-sm font-medium text-surface-900 dark:text-white">{product.name}</span>
+                                            </td>
+                                            <td className="py-3 px-2 text-right">
+                                                <Badge variant="outline">{product.quantity}</Badge>
+                                            </td>
+                                            <td className="py-3 px-2 text-right">
+                                                <span className="text-sm font-bold text-surface-900 dark:text-white">
+                                                    {formatCFA(Math.round(product.revenue))}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-2 text-right">
+                                                <span className="text-sm text-surface-500">{formatCFA(avgUnitPrice)}</span>
+                                            </td>
+                                            <td className="py-3 px-2 hidden sm:table-cell">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-20 h-1.5 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-brand-500 rounded-full" style={{ width: `${revenuePct}%` }} />
+                                                    </div>
+                                                    <span className="text-xs text-surface-400">{revenuePct}%</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <p className="text-sm text-surface-400 italic text-center py-8">Aucun produit vendu pour le moment</p>
+                )}
+            </Card>
+
+            {/* Footer info */}
+            <div className="text-center text-xs text-surface-400 pb-4">
+                Donnees basees sur les {periodLabel} derniers. Les exports CSV sont compatibles Excel et Google Sheets.
             </div>
         </div>
     );

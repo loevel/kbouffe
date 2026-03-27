@@ -166,7 +166,7 @@ interface AddBrandModalProps {
 
 function AddBrandModal({ onClose, onSuccess }: AddBrandModalProps) {
     const [brandName, setBrandName] = useState("");
-    const [cuisineType, setCuisineType] = useState(CUISINE_TYPES[0].value);
+    const [cuisineType, setCuisineType] = useState<string>(CUISINE_TYPES[0].value);
     const [description, setDescription] = useState("");
     const [licenceSanitaire, setLicenceSanitaire] = useState("");
     const [legalDeclared, setLegalDeclared] = useState(false);

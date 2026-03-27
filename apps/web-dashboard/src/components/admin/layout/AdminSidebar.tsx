@@ -14,7 +14,12 @@ import {
     ShoppingBag,
     ShieldCheck,
     UtensilsCrossed,
-    Store as StoreIcon, // Use alias to avoid conflict
+    Store as StoreIcon,
+    Brain,
+    CreditCard,
+    CheckSquare,
+    Bell,
+    Share2,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -23,7 +28,7 @@ import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion } from "framer-motion";
 import { type AdminPermission } from "@/lib/admin-permissions";
 
-export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories";
+export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories" | "aiUsage" | "subscriptions" | "onboarding" | "broadcast" | "socialMonitor";
 
 export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any; permission?: AdminPermission }[] = [
     { href: "/admin", labelKey: "dashboard", icon: LayoutDashboard },
@@ -32,8 +37,13 @@ export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any;
     { href: "/admin/orders", labelKey: "orders", icon: ShoppingBag, permission: "admin:orders:read" },
     { href: "/admin/moderation", labelKey: "moderation", icon: ShieldCheck, permission: "admin:reviews:manage" },
     { href: "/admin/billing", labelKey: "billing", icon: Wallet, permission: "admin:billing:read" },
+    { href: "/admin/subscriptions", labelKey: "subscriptions", icon: CreditCard, permission: "admin:billing:read" },
+    { href: "/admin/onboarding", labelKey: "onboarding", icon: CheckSquare, permission: "admin:settings:manage" },
     { href: "/admin/marketing", labelKey: "marketing", icon: Megaphone, permission: "admin:marketing:read" },
     { href: "/admin/marketplace", labelKey: "marketplace", icon: StoreIcon, permission: "admin:marketplace:manage" },
+    { href: "/admin/ai-usage", labelKey: "aiUsage", icon: Brain, permission: "admin:settings:manage" },
+    { href: "/admin/broadcast", labelKey: "broadcast", icon: Bell, permission: "admin:settings:manage" },
+    { href: "/admin/social-monitor", labelKey: "socialMonitor", icon: Share2, permission: "admin:settings:manage" },
     { href: "/admin/cuisine-categories", labelKey: "cuisineCategories", icon: UtensilsCrossed, permission: "admin:settings:manage" },
     { href: "/admin/support", labelKey: "support", icon: LifeBuoy, permission: "admin:support:manage" },
     { href: "/admin/audits", labelKey: "audits", icon: ShieldAlert, permission: "admin:settings:manage" },

@@ -10,6 +10,8 @@
  * Returns: { imageUrl: string } or { prompt: string }
  */
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/api/helpers";
+import { checkAiRateLimit, logAiUsage } from "@/lib/ai-rate-limiter";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.0-flash";
@@ -30,6 +32,18 @@ export async function POST(request: NextRequest) {
             { error: "Gemini API key non configurée" },
             { status: 500 },
         );
+    }
+
+    const auth = await withAuth();
+    if (auth.error) return auth.error;
+    const { supabase, restaurantId } = auth.ctx;
+
+    const rateCheck = await checkAiRateLimit(supabase, restaurantId, "ai_photo");
+    if (!rateCheck.allowed) {
+        return NextResponse.json({
+            error: `Limite quotidienne atteinte (${rateCheck.limit}/jour). Reessayez demain.`,
+            usage: rateCheck,
+        }, { status: 429 });
     }
 
     try {
@@ -69,6 +83,7 @@ export async function POST(request: NextRequest) {
             const data = await res.json();
             const prompt = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
+            await logAiUsage(supabase, restaurantId, "ai_photo");
             return NextResponse.json({ prompt: prompt.trim() });
         }
 
@@ -112,6 +127,8 @@ export async function POST(request: NextRequest) {
                     fallback: true,
                 });
             }
+
+            await logAiUsage(supabase, restaurantId, "ai_photo");
 
             // Return base64 image
             return NextResponse.json({

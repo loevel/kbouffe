@@ -20,6 +20,7 @@ import {
     MessageCircle,
     Store as StoreIcon, // Alias to avoid conflict
     Globe,
+    Activity,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "../brand/Logo";
 import { cn } from "../../lib/utils";
@@ -27,7 +28,7 @@ import { useLocale } from "../../contexts/LocaleContext";
 import { useDashboard } from "../../contexts/DashboardContext";
 import { NAV_PERMISSIONS } from "../../lib/permissions";
 
-export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "marketplace" | "reviews" | "messages" | "showcase";
+export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "analytics" | "marketplace" | "reviews" | "messages" | "showcase";
 
 export interface NavItem {
     href: string;
@@ -48,6 +49,7 @@ export const navItemsDef: NavItem[] = [
     { href: "/dashboard/messages", labelKey: "messages", icon: MessageCircle },
     { href: "/dashboard/finances", labelKey: "finances", icon: Wallet },
     { href: "/dashboard/reports", labelKey: "reports", icon: BarChart3 },
+    { href: "/dashboard/analytics", labelKey: "analytics", icon: Activity },
     { href: "/dashboard/marketing", labelKey: "marketing", icon: Megaphone },
     { href: "/dashboard/marketplace", labelKey: "marketplace", icon: StoreIcon },
     { href: "/dashboard/store", labelKey: "myStore", icon: Store },

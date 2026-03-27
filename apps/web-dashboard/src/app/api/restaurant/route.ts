@@ -35,6 +35,7 @@ const fieldMapping: Record<string, string> = {
   metaPixelId: "meta_pixel_id",
   googleAnalyticsId: "google_analytics_id",
   themeLayout: "theme_layout",
+  onboardingCompleted: "onboarding_completed",
 };
 
 /**
@@ -89,7 +90,8 @@ export async function PATCH(request: NextRequest) {
       "max_delivery_radius_km", "maxDeliveryRadiusKm",
       "metaPixelId", "meta_pixel_id",
       "googleAnalyticsId", "google_analytics_id",
-      "themeLayout", "theme_layout"
+      "themeLayout", "theme_layout",
+      "onboardingCompleted", "onboarding_completed"
     ];
 
     // Mapper les champs pour Supabase

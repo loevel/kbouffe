@@ -19,6 +19,7 @@
     "@kbouffe/module-core": "*",
     "@kbouffe/module-crm": "*",
     "@kbouffe/module-hr": "*",
+    "@kbouffe/module-marketplace": "*",
     "@kbouffe/module-marketing": "*",
     "@kbouffe/module-orders": "*",
     "@kbouffe/module-reports": "*",

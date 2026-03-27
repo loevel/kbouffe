@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get pack details
+        // Get pack details from marketplace_services
         const { data: pack, error: packError } = await (supabase
-            .from("marketplace_packs" as any)
+            .from("marketplace_services" as any)
             .select("*")
             .eq("id", serviceId)
             .eq("is_active", true)
@@ -56,34 +56,43 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Initiate purchase via RPC (payment integration)
-        const { data: purchaseData, error: purchaseError } = await supabase.rpc(
-            'marketplace_initiate_purchase' as any,
-            {
-                p_restaurant_id: restaurantId,
-                p_pack_id: serviceId,
-                p_payer_msisdn: user.email, // Using email as fallback msisdn
-            }
-        ) as any;
+        // Calculate expiry
+        const startsAt = new Date();
+        const expiresAt = pack.duration_days
+            ? new Date(Date.now() + pack.duration_days * 24 * 60 * 60 * 1000)
+            : null;
 
-        if (purchaseError || !purchaseData || purchaseData.length === 0) {
-            console.error("Purchase error:", purchaseError);
+        // Insert purchase record
+        const { data: purchase, error: purchaseError } = await (supabase
+            .from("marketplace_purchases" as any)
+            .insert({
+                restaurant_id: restaurantId,
+                service_id: serviceId,
+                status: "active",
+                starts_at: startsAt.toISOString(),
+                expires_at: expiresAt?.toISOString() || null,
+                amount_paid: pack.price,
+                notes: `Achat de ${pack.name} via dashboard`,
+            })
+            .select("id")
+            .single() as any);
+
+        if (purchaseError) {
+            console.error("Purchase insert error:", purchaseError);
             return NextResponse.json(
-                { error: "Erreur lors de l'initiation de l'achat" },
+                { error: "Erreur lors de l'enregistrement de l'achat" },
                 { status: 500 }
             );
         }
 
-        const { subscription_id, transaction_id, reference_id } = purchaseData[0];
-
         return NextResponse.json({
             success: true,
             data: {
-                subscription_id,
-                transaction_id,
-                reference_id,
+                purchase_id: purchase.id,
+                pack_name: pack.name,
                 amount: pack.price,
                 currency: 'XAF',
+                expires_at: expiresAt?.toISOString() || null,
             }
         }, { status: 201 });
     } catch (error) {

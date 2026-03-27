@@ -16,6 +16,8 @@ import {
     Shield,
     Zap,
     LayoutDashboard,
+    Brain,
+    Package,
 } from "lucide-react";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
@@ -25,7 +27,10 @@ import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 
 interface PlatformStats {
     restaurants: { total: number; active: number; pending: number };
-    users: { total: number; active: number };
+    users: { total: number; customers: number; merchants: number; drivers: number };
+    metrics: { gmv: number; totalOrders: number; avgOrderValue: number };
+    saas: { mrr: number; restaurantsWithPacks: number; packAdoptionRate: number; activeSubscriptions: number };
+    aiUsage: { todayCalls: number; monthCalls: number };
     recentActivity: {
         newRestaurants: Array<{
             id: string;
@@ -153,7 +158,7 @@ export default function AdminDashboardPage() {
             ) : (
                 <>
                     {/* Main KPI Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
                         <KpiCard
                             label="Répertoire Marchand"
                             value={`${s?.restaurants.active ?? 0} / ${s?.restaurants.total ?? 0}`}
@@ -164,17 +169,78 @@ export default function AdminDashboardPage() {
                         <KpiCard
                             label="Population Utilisateur"
                             value={(s?.users.total ?? 0).toLocaleString("fr-FR")}
-                            sub={`${s?.users.active ?? 0} Sessions actives`}
+                            sub={`${s?.users.merchants ?? 0} marchands · ${s?.users.customers ?? 0} clients`}
                             icon={Users}
                             variant="blue"
                         />
                         <KpiCard
-                            label="Flux Transactionnel"
-                            value="OPTIMISÉ"
-                            sub="Protocol KBouffe V2"
-                            icon={Zap}
+                            label="GMV Plateforme"
+                            value={`${((s?.metrics.gmv ?? 0) / 1000).toFixed(0)}k FCFA`}
+                            sub={`${(s?.metrics.totalOrders ?? 0).toLocaleString("fr-FR")} commandes`}
+                            icon={ShoppingBag}
                             variant="emerald"
                         />
+                    </div>
+
+                    {/* SaaS & AI Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                        <motion.div
+                            variants={itemVariants}
+                            className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-2xl p-6 text-white"
+                        >
+                            <div className="flex items-center gap-2 mb-3">
+                                <Wallet size={18} className="text-violet-200" />
+                                <span className="text-[10px] font-black text-violet-200 uppercase tracking-widest">MRR</span>
+                            </div>
+                            <p className="text-3xl font-black tabular-nums">
+                                {((s?.saas.mrr ?? 0) / 1000).toFixed(0)}k
+                            </p>
+                            <p className="text-xs text-violet-200 mt-1">FCFA / mois (packs actifs)</p>
+                        </motion.div>
+
+                        <motion.div
+                            variants={itemVariants}
+                            className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6"
+                        >
+                            <div className="flex items-center gap-2 mb-3">
+                                <Package size={16} className="text-emerald-500" />
+                                <span className="text-[10px] font-black text-surface-400 uppercase tracking-widest">Pack adoption</span>
+                            </div>
+                            <p className="text-3xl font-black text-surface-900 dark:text-white tabular-nums">
+                                {s?.saas.packAdoptionRate ?? 0}%
+                            </p>
+                            <p className="text-xs text-surface-400 mt-1">
+                                {s?.saas.restaurantsWithPacks ?? 0} restaurants avec packs
+                            </p>
+                        </motion.div>
+
+                        <motion.div
+                            variants={itemVariants}
+                            className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6"
+                        >
+                            <div className="flex items-center gap-2 mb-3">
+                                <Brain size={16} className="text-purple-500" />
+                                <span className="text-[10px] font-black text-surface-400 uppercase tracking-widest">IA aujourd'hui</span>
+                            </div>
+                            <p className="text-3xl font-black text-surface-900 dark:text-white tabular-nums">
+                                {(s?.aiUsage.todayCalls ?? 0).toLocaleString("fr-FR")}
+                            </p>
+                            <p className="text-xs text-surface-400 mt-1">appels Gemini</p>
+                        </motion.div>
+
+                        <motion.div
+                            variants={itemVariants}
+                            className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6"
+                        >
+                            <div className="flex items-center gap-2 mb-3">
+                                <Activity size={16} className="text-brand-500" />
+                                <span className="text-[10px] font-black text-surface-400 uppercase tracking-widest">IA ce mois</span>
+                            </div>
+                            <p className="text-3xl font-black text-surface-900 dark:text-white tabular-nums">
+                                {(s?.aiUsage.monthCalls ?? 0).toLocaleString("fr-FR")}
+                            </p>
+                            <p className="text-xs text-surface-400 mt-1">appels Gemini</p>
+                        </motion.div>
                     </div>
 
                     {/* Content Row */}
@@ -260,7 +326,7 @@ export default function AdminDashboardPage() {
                                     {[
                                         { label: "Marchands", href: "/admin/restaurants", icon: Store, color: "bg-surface-800 hover:bg-brand-500" },
                                         { label: "Identités", href: "/admin/users", icon: Users, color: "bg-surface-800 hover:bg-blue-500" },
-                                        { label: "Sécurité", href: "/admin/audits", icon: Shield, color: "bg-surface-800 hover:bg-emerald-500" },
+                                        { label: "Usage IA", href: "/admin/ai-usage", icon: Brain, color: "bg-surface-800 hover:bg-purple-500" },
                                         { label: "Monétique", href: "/admin/billing", icon: Wallet, color: "bg-surface-800 hover:bg-amber-500" },
                                     ].map((action) => (
                                         <a
