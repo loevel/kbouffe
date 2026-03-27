@@ -1,0 +1,52 @@
+{
+  "id": "/",
+  "name": "Kbouffe — Restaurant en ligne",
+  "short_name": "Kbouffe",
+  "description": "Créez votre boutique de commande en ligne en 2 minutes. Acceptez les paiements Mobile Money. 0% de commission.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "fr",
+  "background_color": "#0f172a",
+  "theme_color": "#f97316",
+  "categories": ["food", "shopping", "business"],
+  "icons": [
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tableau de bord",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/logo-icon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Commandes",
+      "short_name": "Commandes",
+      "url": "/dashboard/orders",
+      "icons": [{ "src": "/logo-icon.svg", "sizes": "96x96" }]
+    }
+  ]
+}

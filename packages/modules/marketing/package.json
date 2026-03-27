@@ -1,0 +1,25 @@
+{
+    "name": "@kbouffe/module-marketing",
+    "version": "1.0.0",
+    "main": "./src/api/index.ts",
+    "types": "./src/api/index.ts",
+    "exports": {
+        ".": "./src/api/index.ts",
+        "./ui": "./src/ui/index.ts"
+    },
+    "files": [
+        "src"
+    ],
+    "scripts": {
+        "build": "tsc --noEmit || true",
+        "dev": "tsc -w"
+    },
+    "dependencies": {
+        "hono": "^4.7.0",
+        "@kbouffe/module-core": "*"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20240405.0",
+        "typescript": "^5.0.0"
+    }
+}

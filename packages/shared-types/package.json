@@ -1,0 +1,14 @@
+{
+    "name": "@kbouffe/shared-types",
+    "version": "1.0.0",
+    "description": "Shared TypeScript interfaces for Kbouffe",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc -w"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}

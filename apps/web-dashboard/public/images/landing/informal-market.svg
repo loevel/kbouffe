@@ -1,0 +1,42 @@
+<svg width="880" height="760" viewBox="0 0 880 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="880" height="760" rx="44" fill="#1A120D"/>
+  <circle cx="153" cy="113" r="98" fill="#F97316" fill-opacity="0.12"/>
+  <circle cx="742" cy="667" r="130" fill="#FACC15" fill-opacity="0.08"/>
+  <rect x="58" y="74" width="764" height="612" rx="36" fill="#241912" stroke="#3B2A1F" stroke-width="2"/>
+  <rect x="102" y="120" width="300" height="220" rx="28" fill="#2B1D15"/>
+  <text x="132" y="164" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="28" font-weight="700">Tourne-dos</text>
+  <text x="132" y="204" fill="#FDBA74" font-family="Arial, sans-serif" font-size="18">Android + WhatsApp + MoMo</text>
+  <rect x="132" y="232" width="240" height="20" rx="10" fill="#3E2A1E"/>
+  <rect x="132" y="232" width="166" height="20" rx="10" fill="#F97316"/>
+  <text x="132" y="282" fill="#FED7AA" font-family="Arial, sans-serif" font-size="16">Menu du jour partage a 10h30</text>
+  <text x="132" y="312" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="16">Le midi devient enfin lisible</text>
+
+  <rect x="430" y="120" width="348" height="220" rx="28" fill="#2B1D15"/>
+  <text x="460" y="164" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="28" font-weight="700">Braiserie / Snack</text>
+  <text x="460" y="204" fill="#FDBA74" font-family="Arial, sans-serif" font-size="18">QR code sur table + lien unique</text>
+  <rect x="460" y="232" width="268" height="72" rx="20" fill="#1C140F" stroke="#4A3526"/>
+  <rect x="482" y="252" width="54" height="32" rx="10" fill="#F59E0B" fill-opacity="0.2"/>
+  <path d="M496 263H522V289H496V263Z" stroke="#FBBF24" stroke-width="4"/>
+  <path d="M503 270H515V282H503V270Z" fill="#FBBF24"/>
+  <text x="552" y="274" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="18" font-weight="700">Scan. Commande. Encaisse.</text>
+  <text x="552" y="298" fill="#CBD5E1" font-family="Arial, sans-serif" font-size="15">Sans changer la facon de cuisiner</text>
+
+  <rect x="102" y="374" width="676" height="112" rx="28" fill="#15100C" stroke="#2F241D"/>
+  <text x="136" y="425" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="24" font-weight="700">Le bon client ne se mesure pas seulement a la taille</text>
+  <text x="136" y="462" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="18">1. Android en main  2. Mobile Money deja utilise  3. Commandes actuelles desorganisees</text>
+
+  <rect x="102" y="522" width="204" height="120" rx="24" fill="#2B1D15"/>
+  <text x="126" y="562" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="22" font-weight="700">Fast-food local</text>
+  <text x="126" y="594" fill="#FDBA74" font-family="Arial, sans-serif" font-size="16">Jeune gerant</text>
+  <text x="126" y="620" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="16">Veut aller vite</text>
+
+  <rect x="338" y="522" width="204" height="120" rx="24" fill="#2B1D15"/>
+  <text x="362" y="562" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="22" font-weight="700">Restaurant midi</text>
+  <text x="362" y="594" fill="#FDBA74" font-family="Arial, sans-serif" font-size="16">5 a 20 tables</text>
+  <text x="362" y="620" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="16">Appels en pagaille</text>
+
+  <rect x="574" y="522" width="204" height="120" rx="24" fill="#2B1D15"/>
+  <text x="598" y="562" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="22" font-weight="700">Cantine campus</text>
+  <text x="598" y="594" fill="#FDBA74" font-family="Arial, sans-serif" font-size="16">Demande repetitive</text>
+  <text x="598" y="620" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="16">Gros potentiel d'avance</text>
+</svg>

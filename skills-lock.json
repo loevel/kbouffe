@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "computedHash": "9c87c315aed143ee3b34bec8117100f5035e0df09e6b23e1ecc772cff434c9ad"
+    },
+    "cameroon-legal-compliance": {
+      "source": "local",
+      "sourceType": "local",
+      "computedHash": "5ac377e38875b40f834217340c8387e33aa7a56d35bab01ae68fd7d20d1eb0a1"
+    }
+  }
+}

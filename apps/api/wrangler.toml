@@ -1,0 +1,45 @@
+#:schema node_modules/wrangler/config-schema.json
+
+name = "kbouffe-api"
+main = "src/index.ts"
+compatibility_date = "2025-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# --- R2 bucket (Images) ---
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "kbouffe-images"
+
+# ── Supabase Auth ──────────────────────────────────────────────────
+# Set via `wrangler secret put <KEY_NAME>`:
+#   SUPABASE_URL        — https://xxxxx.supabase.co
+#   SUPABASE_ANON_KEY   — Your Supabase anon/public key
+#   SUPABASE_SERVICE_ROLE_KEY — For admin bypass
+
+# ── SMS Queue ──────────────────────────────────────────────────────
+[[queues.producers]]
+binding = "SMS_QUEUE"
+queue = "kbouffe-sms-queue"
+
+[[queues.consumers]]
+queue = "kbouffe-sms-queue"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "kbouffe-sms-dlq"
+
+# ── MTN MoMo Secrets ───────────────────────────────────────────────
+# Set via `wrangler secret put <KEY_NAME>`:
+# MTN_COLLECTION_API_USER
+# MTN_COLLECTION_API_KEY
+# MTN_COLLECTION_SUBSCRIPTION_KEY
+# MTN_WEBHOOK_SECRET
+# MTN_DISBURSEMENT_API_USER
+# MTN_DISBURSEMENT_API_KEY
+# MTN_DISBURSEMENT_SUBSCRIPTION_KEY
+
+# ── External Services ──────────────────────────────────────────────
+# Set via `wrangler secret put <KEY_NAME>`:
+# MTN_ADS_SUBSCRIPTION_KEY
+# MTN_KYC_SUBSCRIPTION_KEY
+
