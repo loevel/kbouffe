@@ -220,7 +220,7 @@ const REGIONS = [
 
 export default function PourLesAgricultureursPage() {
     return (
-        <div className="min-h-screen bg-surface-950 flex flex-col">
+        <div className="min-h-screen bg-white dark:bg-surface-950 flex flex-col">
             {/* ── Navbar ── */}
             <Navbar />
 
@@ -265,7 +265,7 @@ export default function PourLesAgricultureursPage() {
                     </svg>
 
                     {/* Fade-to-dark overlay at bottom */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-surface-950 via-surface-950/40 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-surface-950 via-white/40 dark:via-surface-950/40 to-transparent" />
 
                     {/* ── Hero content ── */}
                     <div className="container mx-auto px-4 md:px-6 relative z-10 pt-16 md:pt-20">
@@ -385,7 +385,7 @@ export default function PourLesAgricultureursPage() {
                     TRUST STATS
                 ════════════════════════════════════════════════════════ */}
                 <motion.section
-                    className="border-b border-surface-800/50 bg-surface-900/40"
+                    className="border-b border-surface-200/50 dark:border-surface-800/50 bg-surface-100/40 dark:bg-surface-900/40"
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-80px" }}
@@ -432,11 +432,11 @@ export default function PourLesAgricultureursPage() {
                             <motion.h2
                                 id="how-it-works-heading"
                                 variants={fadeIn}
-                                className="text-3xl md:text-4xl font-extrabold text-white tracking-tight"
+                                className="text-3xl md:text-4xl font-extrabold text-surface-900 dark:text-white tracking-tight"
                             >
                                 Comment ça marche ?
                             </motion.h2>
-                            <motion.p variants={fadeIn} className="mt-4 text-surface-400 text-base max-w-lg mx-auto">
+                            <motion.p variants={fadeIn} className="mt-4 text-surface-600 dark:text-surface-400 text-base max-w-lg mx-auto">
                                 De l'inscription à votre première vente, tout est conçu pour aller vite.
                             </motion.p>
                         </motion.div>
@@ -454,10 +454,10 @@ export default function PourLesAgricultureursPage() {
                                 <motion.li
                                     key={number}
                                     variants={fadeIn}
-                                    className={`relative rounded-2xl border ${border} bg-surface-900/50 p-7 hover:bg-surface-900 transition-colors duration-300`}
+                                    className={`relative rounded-2xl border ${border} bg-surface-100/50 dark:bg-surface-900/50 p-7 hover:bg-surface-100 dark:hover:bg-surface-900 transition-colors duration-300`}
                                 >
                                     {/* Step number */}
-                                    <span className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-surface-950 border border-surface-800 flex items-center justify-center text-xs font-bold text-surface-500">
+                                    <span className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-white dark:bg-surface-950 border border-surface-200 dark:border-surface-800 flex items-center justify-center text-xs font-bold text-surface-500">
                                         {number}
                                     </span>
 
@@ -466,14 +466,14 @@ export default function PourLesAgricultureursPage() {
                                         <Icon size={22} className={color} />
                                     </div>
 
-                                    <h3 className="text-white font-bold text-lg mb-3 leading-snug">{title}</h3>
-                                    <p className="text-surface-400 text-sm leading-relaxed">{desc}</p>
+                                    <h3 className="text-surface-900 dark:text-white font-bold text-lg mb-3 leading-snug">{title}</h3>
+                                    <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">{desc}</p>
 
                                     {/* Connector */}
                                     {number !== "03" && (
                                         <ChevronRight
                                             size={20}
-                                            className="hidden md:block absolute top-1/2 -right-4 -translate-y-1/2 text-surface-700 z-10"
+                                            className="hidden md:block absolute top-1/2 -right-4 -translate-y-1/2 text-surface-300 dark:text-surface-700 z-10"
                                             aria-hidden="true"
                                         />
                                     )}
@@ -487,7 +487,7 @@ export default function PourLesAgricultureursPage() {
                     BENEFITS
                 ════════════════════════════════════════════════════════ */}
                 <section
-                    className="py-20 md:py-28 bg-surface-900/20"
+                    className="py-20 md:py-28 bg-surface-100/30 dark:bg-surface-900/20"
                     aria-labelledby="benefits-heading"
                 >
                     <div className="container mx-auto px-4 md:px-6">
@@ -505,11 +505,11 @@ export default function PourLesAgricultureursPage() {
                             <motion.h2
                                 id="benefits-heading"
                                 variants={fadeIn}
-                                className="text-3xl md:text-4xl font-extrabold text-white tracking-tight"
+                                className="text-3xl md:text-4xl font-extrabold text-surface-900 dark:text-white tracking-tight"
                             >
                                 Conçu pour les producteurs camerounais
                             </motion.h2>
-                            <motion.p variants={fadeIn} className="mt-4 text-surface-400 text-base max-w-lg mx-auto">
+                            <motion.p variants={fadeIn} className="mt-4 text-surface-600 dark:text-surface-400 text-base max-w-lg mx-auto">
                                 Pas de jargon technologique. Une app simple, adaptée au terrain.
                             </motion.p>
                         </motion.div>
@@ -527,14 +527,14 @@ export default function PourLesAgricultureursPage() {
                                 <motion.li
                                     key={title}
                                     variants={fadeIn}
-                                    className={`group flex flex-col gap-4 rounded-2xl border ${border} bg-surface-900/60 p-6 hover:bg-surface-900 hover:-translate-y-1 transition-all duration-300`}
+                                    className={`group flex flex-col gap-4 rounded-2xl border ${border} bg-surface-100/60 dark:bg-surface-900/60 p-6 hover:bg-surface-100 dark:hover:bg-surface-900 hover:-translate-y-1 transition-all duration-300`}
                                 >
                                     <div className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${bg}`} aria-hidden="true">
                                         <Icon size={21} className={color} />
                                     </div>
                                     <div>
-                                        <h3 className="text-white font-bold text-base mb-2">{title}</h3>
-                                        <p className="text-surface-400 text-sm leading-relaxed">{desc}</p>
+                                        <h3 className="text-surface-900 dark:text-white font-bold text-base mb-2">{title}</h3>
+                                        <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">{desc}</p>
                                     </div>
                                 </motion.li>
                             ))}
@@ -563,11 +563,11 @@ export default function PourLesAgricultureursPage() {
                                 <motion.h2
                                     id="products-heading"
                                     variants={fadeIn}
-                                    className="text-2xl md:text-3xl font-extrabold text-white tracking-tight mb-4"
+                                    className="text-2xl md:text-3xl font-extrabold text-surface-900 dark:text-white tracking-tight mb-4"
                                 >
                                     Tous types de produits agricoles acceptés
                                 </motion.h2>
-                                <motion.p variants={fadeIn} className="text-surface-400 text-sm max-w-lg mx-auto">
+                                <motion.p variants={fadeIn} className="text-surface-600 dark:text-surface-400 text-sm max-w-lg mx-auto">
                                     Aucune restriction — si un restaurant peut le cuisiner, vous pouvez le vendre.
                                 </motion.p>
                             </div>
@@ -623,7 +623,7 @@ export default function PourLesAgricultureursPage() {
                     REGIONS COVERAGE
                 ════════════════════════════════════════════════════════ */}
                 <motion.section
-                    className="py-14 bg-surface-900/20"
+                    className="py-14 bg-surface-100/30 dark:bg-surface-900/20"
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-80px" }}
@@ -638,7 +638,7 @@ export default function PourLesAgricultureursPage() {
                             <motion.h2
                                 id="regions-heading"
                                 variants={fadeIn}
-                                className="text-xl md:text-2xl font-extrabold text-white mb-6"
+                                className="text-xl md:text-2xl font-extrabold text-surface-900 dark:text-white mb-6"
                             >
                                 Votre exploitation, visible dans{" "}
                                 <span className="text-emerald-400">toutes les villes</span>
@@ -652,7 +652,7 @@ export default function PourLesAgricultureursPage() {
                                     <motion.li
                                         key={region}
                                         variants={fadeIn}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-900/60 border border-surface-800/50 text-surface-400 text-xs font-medium"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-100/60 dark:bg-surface-900/60 border border-surface-200/50 dark:border-surface-800/50 text-surface-600 dark:text-surface-400 text-xs font-medium"
                                     >
                                         <MapPin size={10} className="text-emerald-500" aria-hidden="true" />
                                         {region}
@@ -827,7 +827,7 @@ export default function PourLesAgricultureursPage() {
             </main>
 
             {/* ── Footer ── */}
-            <footer className="bg-surface-950 border-t border-surface-800/50 py-10">
+            <footer className="bg-white dark:bg-surface-950 border-t border-surface-200/50 dark:border-surface-800/50 py-10">
                 <div className="container mx-auto px-4 md:px-6">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <Link href="/" aria-label="Retour à l'accueil Kbouffe">
@@ -835,12 +835,12 @@ export default function PourLesAgricultureursPage() {
                         </Link>
                         <nav aria-label="Liens secondaires">
                             <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-surface-500">
-                                <li><Link href="/pour-les-clients" className="hover:text-surface-300 transition-colors">Pour les clients</Link></li>
-                                <li><Link href="/pour-les-restaurateurs" className="hover:text-surface-300 transition-colors">Pour les restaurateurs</Link></li>
-                                <li><Link href="/pricing" className="hover:text-surface-300 transition-colors">Tarifs</Link></li>
-                                <li><Link href="/terms" className="hover:text-surface-300 transition-colors">CGU</Link></li>
-                                <li><Link href="/privacy" className="hover:text-surface-300 transition-colors">Confidentialité</Link></li>
-                                <li><Link href="/contact" className="hover:text-surface-300 transition-colors">Contact</Link></li>
+                                <li><Link href="/pour-les-clients" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Pour les clients</Link></li>
+                                <li><Link href="/pour-les-restaurateurs" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Pour les restaurateurs</Link></li>
+                                <li><Link href="/pricing" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Tarifs</Link></li>
+                                <li><Link href="/terms" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">CGU</Link></li>
+                                <li><Link href="/privacy" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Confidentialité</Link></li>
+                                <li><Link href="/contact" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Contact</Link></li>
                             </ul>
                         </nav>
                         <p className="text-xs text-surface-600 text-center md:text-right">

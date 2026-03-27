@@ -188,7 +188,7 @@ const CHECKLIST = [
 
 export default function PourLesRestaurateursPage() {
     return (
-        <div className="min-h-screen bg-surface-950 flex flex-col">
+        <div className="min-h-screen bg-white dark:bg-surface-950 flex flex-col">
             {/* ── Navbar ── */}
             <Navbar />
 
@@ -200,7 +200,7 @@ export default function PourLesRestaurateursPage() {
                 <section className="relative overflow-hidden pt-24 pb-20 md:pt-32 md:pb-28">
 
                     {/* Background layers */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-surface-950 via-surface-950 to-orange-950/20" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-surface-50 via-surface-50 to-orange-50/20 dark:from-surface-950 dark:via-surface-950 dark:to-orange-950/20" />
                     <div className="absolute top-0 right-0 w-[700px] h-[500px] rounded-full bg-orange-500/5 blur-3xl pointer-events-none" />
                     <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-yellow-500/4 blur-3xl pointer-events-none" />
 
@@ -229,7 +229,7 @@ export default function PourLesRestaurateursPage() {
 
                                     <motion.h1
                                         variants={fadeIn}
-                                        className="text-4xl sm:text-5xl md:text-[3.25rem] font-extrabold text-white leading-[1.1] tracking-tight mb-5"
+                                        className="text-4xl sm:text-5xl md:text-[3.25rem] font-extrabold text-surface-900 dark:text-white leading-[1.1] tracking-tight mb-5"
                                     >
                                         Digitalisez votre restaurant,{" "}
                                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-yellow-400">
@@ -239,7 +239,7 @@ export default function PourLesRestaurateursPage() {
 
                                     <motion.p
                                         variants={fadeIn}
-                                        className="text-lg text-surface-400 leading-relaxed mb-8"
+                                        className="text-lg text-surface-600 dark:text-surface-400 leading-relaxed mb-8"
                                     >
                                         La plateforme tout-en-un pensée pour les restaurateurs camerounais.
                                         Gérez vos commandes, encaissez via MTN MoMo et développez votre
@@ -256,7 +256,7 @@ export default function PourLesRestaurateursPage() {
                                             <motion.li
                                                 key={item}
                                                 variants={fadeIn}
-                                                className="flex items-start gap-3 text-sm text-surface-300"
+                                                className="flex items-start gap-3 text-sm text-surface-700 dark:text-surface-300"
                                             >
                                                 <CheckCircle2 size={17} className="text-orange-400 mt-0.5 shrink-0" aria-hidden="true" />
                                                 {item}
@@ -267,7 +267,7 @@ export default function PourLesRestaurateursPage() {
                                     <motion.div variants={fadeIn} className="flex flex-col sm:flex-row gap-4">
                                         <Link
                                             href="/register/restaurant"
-                                            className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold rounded-xl text-base transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-orange-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
+                                            className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold rounded-xl text-base transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-orange-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:ring-offset-surface-950"
                                             aria-label="Ouvrir mon restaurant gratuitement sur Kbouffe"
                                         >
                                             Ouvrir mon restaurant gratuitement
@@ -278,7 +278,7 @@ export default function PourLesRestaurateursPage() {
 
                                 {/* Right — feature preview card */}
                                 <motion.div variants={fadeUp} className="hidden lg:block">
-                                    <div className="relative rounded-2xl bg-surface-900/80 border border-surface-800/60 p-6 backdrop-blur-sm">
+                                    <div className="dark relative rounded-2xl bg-surface-900/80 border border-surface-800/60 p-6 backdrop-blur-sm">
                                         {/* Mock dashboard header */}
                                         <div className="flex items-center justify-between mb-5 pb-4 border-b border-surface-800/50">
                                             <div>
@@ -336,7 +336,7 @@ export default function PourLesRestaurateursPage() {
                     NUMBERS BAR
                 ════════════════════════════════════════════════════════ */}
                 <motion.section
-                    className="border-y border-surface-800/50 bg-surface-900/40"
+                    className="border-y border-surface-200/50 dark:border-surface-800/50 bg-surface-100/40 dark:bg-surface-900/40"
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-80px" }}
@@ -350,11 +350,11 @@ export default function PourLesRestaurateursPage() {
                                 <motion.div
                                     key={label}
                                     variants={fadeIn}
-                                    className={`text-center p-4 rounded-2xl bg-surface-900/60 border border-surface-800/40 shadow-lg ${glow}`}
+                                    className={`text-center p-4 rounded-2xl bg-surface-100/60 dark:bg-surface-900/60 border border-surface-200/40 dark:border-surface-800/40 shadow-lg ${glow}`}
                                 >
                                     <dt className={`text-3xl md:text-4xl font-extrabold ${color} leading-none`}>{value}</dt>
                                     <dd className="mt-2">
-                                        <span className="block text-white font-semibold text-sm">{label}</span>
+                                        <span className="block text-surface-900 dark:text-white font-semibold text-sm">{label}</span>
                                         <span className="block text-surface-500 text-xs mt-0.5">{sub}</span>
                                     </dd>
                                 </motion.div>
@@ -385,11 +385,11 @@ export default function PourLesRestaurateursPage() {
                             <motion.h2
                                 id="features-heading"
                                 variants={fadeIn}
-                                className="text-3xl md:text-4xl font-extrabold text-white tracking-tight"
+                                className="text-3xl md:text-4xl font-extrabold text-surface-900 dark:text-white tracking-tight"
                             >
                                 Tout pour gérer et grandir
                             </motion.h2>
-                            <motion.p variants={fadeIn} className="mt-4 text-surface-400 text-base max-w-xl mx-auto">
+                            <motion.p variants={fadeIn} className="mt-4 text-surface-600 dark:text-surface-400 text-base max-w-xl mx-auto">
                                 Une suite d'outils pensée par et pour les restaurateurs camerounais.
                                 Pas de superflu, que l'essentiel.
                             </motion.p>
@@ -408,7 +408,7 @@ export default function PourLesRestaurateursPage() {
                                 <motion.li
                                     key={title}
                                     variants={fadeIn}
-                                    className={`relative group rounded-2xl border ${border} bg-surface-900/50 p-6 hover:bg-surface-900 transition-all duration-300 hover:-translate-y-1`}
+                                    className={`relative group rounded-2xl border ${border} bg-surface-100/50 dark:bg-surface-900/50 p-6 hover:bg-surface-100 dark:hover:bg-surface-900 transition-all duration-300 hover:-translate-y-1`}
                                 >
                                     {badge && (
                                         <span className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-xs font-bold ${badge === "0% commission" ? "bg-green-500/15 text-green-400 border border-green-500/25" : "bg-orange-500/15 text-orange-400 border border-orange-500/25"}`}>
@@ -418,8 +418,8 @@ export default function PourLesRestaurateursPage() {
                                     <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${bg} mb-5`} aria-hidden="true">
                                         <Icon size={22} className={color} />
                                     </div>
-                                    <h3 className="text-white font-bold text-base mb-2">{title}</h3>
-                                    <p className="text-surface-400 text-sm leading-relaxed">{desc}</p>
+                                    <h3 className="text-surface-900 dark:text-white font-bold text-base mb-2">{title}</h3>
+                                    <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">{desc}</p>
                                 </motion.li>
                             ))}
                         </motion.ul>
@@ -430,7 +430,7 @@ export default function PourLesRestaurateursPage() {
                     PRICING TEASER
                 ════════════════════════════════════════════════════════ */}
                 <section
-                    className="py-20 md:py-28 bg-surface-900/20"
+                    className="py-20 md:py-28 bg-surface-100/30 dark:bg-surface-900/20"
                     aria-labelledby="pricing-heading"
                 >
                     <div className="container mx-auto px-4 md:px-6">
@@ -448,14 +448,14 @@ export default function PourLesRestaurateursPage() {
                             <motion.h2
                                 id="pricing-heading"
                                 variants={fadeIn}
-                                className="text-3xl md:text-4xl font-extrabold text-white tracking-tight"
+                                className="text-3xl md:text-4xl font-extrabold text-surface-900 dark:text-white tracking-tight"
                             >
                                 Gratuit pour commencer,{" "}
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-yellow-400">
                                     upgrades disponibles
                                 </span>
                             </motion.h2>
-                            <motion.p variants={fadeIn} className="mt-4 text-surface-400 text-base max-w-md mx-auto">
+                            <motion.p variants={fadeIn} className="mt-4 text-surface-600 dark:text-surface-400 text-base max-w-md mx-auto">
                                 Lancez votre restaurant sans rien débourser. Passez à Pro
                                 quand vous êtes prêt à scaler.
                             </motion.p>
@@ -475,25 +475,25 @@ export default function PourLesRestaurateursPage() {
                                     variants={fadeIn}
                                     className={`relative rounded-2xl p-7 border flex flex-col ${
                                         highlight
-                                            ? "bg-gradient-to-b from-orange-950/50 to-surface-900/80 border-orange-500/40 shadow-xl shadow-orange-500/10"
-                                            : "bg-surface-900/60 border-surface-800/60"
+                                            ? "bg-gradient-to-b from-orange-50/50 to-surface-100/80 dark:from-orange-950/50 dark:to-surface-900/80 border-orange-500/40 shadow-xl shadow-orange-500/10"
+                                            : "bg-surface-100/60 dark:bg-surface-900/60 border-surface-200/60 dark:border-surface-800/60"
                                     }`}
                                 >
                                     {highlight && (
                                         <div className="absolute -top-px left-6 right-6 h-[2px] bg-gradient-to-r from-transparent via-orange-500 to-transparent" aria-hidden="true" />
                                     )}
                                     <div className="mb-6">
-                                        <p className="text-surface-400 text-xs font-bold uppercase tracking-widest mb-1">{name}</p>
+                                        <p className="text-surface-600 dark:text-surface-400 text-xs font-bold uppercase tracking-widest mb-1">{name}</p>
                                         <div className="flex items-end gap-1.5">
-                                            <span className={`text-3xl font-extrabold ${highlight ? "text-orange-400" : "text-white"}`}>{price}</span>
+                                            <span className={`text-3xl font-extrabold ${highlight ? "text-orange-400" : "text-surface-900 dark:text-white"}`}>{price}</span>
                                             <span className="text-surface-500 text-sm mb-1">{period}</span>
                                         </div>
-                                        <p className="text-surface-400 text-sm mt-2">{desc}</p>
+                                        <p className="text-surface-600 dark:text-surface-400 text-sm mt-2">{desc}</p>
                                     </div>
 
                                     <ul className="space-y-2.5 mb-8 flex-1" role="list">
                                         {features.map((f) => (
-                                            <li key={f} className="flex items-center gap-2.5 text-sm text-surface-300">
+                                            <li key={f} className="flex items-center gap-2.5 text-sm text-surface-700 dark:text-surface-300">
                                                 <CheckCircle2 size={15} className={highlight ? "text-orange-400 shrink-0" : "text-surface-500 shrink-0"} aria-hidden="true" />
                                                 {f}
                                             </li>
@@ -502,10 +502,10 @@ export default function PourLesRestaurateursPage() {
 
                                     <Link
                                         href={href}
-                                        className={`inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950 ${
+                                        className={`inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:ring-offset-surface-950 ${
                                             highlight
                                                 ? "bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white shadow-lg shadow-orange-500/20 focus-visible:ring-orange-500"
-                                                : "bg-surface-800 hover:bg-surface-700 text-white border border-surface-700/50 focus-visible:ring-surface-500"
+                                                : "bg-surface-200 dark:bg-surface-800 hover:bg-surface-300 dark:hover:bg-surface-700 text-surface-900 dark:text-white border border-surface-300/50 dark:border-surface-700/50 focus-visible:ring-surface-500"
                                         }`}
                                         aria-label={highlight ? "Voir tous les tarifs Pro" : "Ouvrir mon restaurant gratuitement"}
                                     >
@@ -546,7 +546,7 @@ export default function PourLesRestaurateursPage() {
                             viewport={{ once: true, margin: "-80px" }}
                             variants={fadeUp}
                         >
-                            <h2 id="onboarding-heading" className="text-2xl md:text-3xl font-extrabold text-white">
+                            <h2 id="onboarding-heading" className="text-2xl md:text-3xl font-extrabold text-surface-900 dark:text-white">
                                 Votre restaurant en ligne en{" "}
                                 <span className="text-orange-400">10 minutes</span>
                             </h2>
@@ -574,7 +574,7 @@ export default function PourLesRestaurateursPage() {
                                     <div className="w-11 h-11 rounded-full bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 font-extrabold text-lg mx-auto mb-4" aria-hidden="true">
                                         {step}
                                     </div>
-                                    <h3 className="text-white font-bold text-sm mb-1.5">{title}</h3>
+                                    <h3 className="text-surface-900 dark:text-white font-bold text-sm mb-1.5">{title}</h3>
                                     <p className="text-surface-500 text-xs leading-relaxed">{desc}</p>
                                 </motion.li>
                             ))}
@@ -586,7 +586,7 @@ export default function PourLesRestaurateursPage() {
                     SOCIAL PROOF
                 ════════════════════════════════════════════════════════ */}
                 <motion.section
-                    className="py-14 bg-surface-900/20"
+                    className="py-14 bg-surface-100/30 dark:bg-surface-900/20"
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-80px" }}
@@ -594,11 +594,11 @@ export default function PourLesRestaurateursPage() {
                     aria-label="Témoignage restaurateur"
                 >
                     <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-2xl mx-auto rounded-2xl bg-surface-900/60 border border-orange-500/15 p-8 md:p-10 relative overflow-hidden">
+                        <div className="max-w-2xl mx-auto rounded-2xl bg-surface-100/60 dark:bg-surface-900/60 border border-orange-500/15 p-8 md:p-10 relative overflow-hidden">
                             <div className="absolute top-4 left-6 text-orange-500/20 text-8xl font-serif leading-none pointer-events-none select-none" aria-hidden="true">&ldquo;</div>
                             <div className="relative z-10">
                                 <blockquote>
-                                    <p className="text-white text-base md:text-lg italic leading-relaxed mb-6">
+                                    <p className="text-surface-900 dark:text-white text-base md:text-lg italic leading-relaxed mb-6">
                                         &ldquo;J'ai mis mon restaurant en ligne un vendredi soir. Le samedi matin,
                                         j'avais déjà 6 commandes MTN MoMo encaissées. Kbouffe m'a sauvé la mise
                                         pendant la saison creuse.&rdquo;
@@ -608,7 +608,7 @@ export default function PourLesRestaurateursPage() {
                                             P
                                         </div>
                                         <div>
-                                            <cite className="not-italic text-white text-sm font-semibold">Pascal Ngo</cite>
+                                            <cite className="not-italic text-surface-900 dark:text-white text-sm font-semibold">Pascal Ngo</cite>
                                             <p className="text-surface-500 text-xs">Propriétaire · Resto La Saveur · Yaoundé</p>
                                         </div>
                                         <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
@@ -661,7 +661,7 @@ export default function PourLesRestaurateursPage() {
                                 <motion.div variants={fadeIn}>
                                     <Link
                                         href="/register/restaurant"
-                                        className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold rounded-xl text-lg transition-all duration-200 hover:-translate-y-0.5 shadow-2xl shadow-orange-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
+                                        className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-white font-bold rounded-xl text-lg transition-all duration-200 hover:-translate-y-0.5 shadow-2xl shadow-orange-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:ring-offset-surface-950"
                                         aria-label="Ouvrir mon restaurant gratuitement sur Kbouffe"
                                     >
                                         Ouvrir mon restaurant gratuitement
@@ -678,7 +678,7 @@ export default function PourLesRestaurateursPage() {
             </main>
 
             {/* ── Footer ── */}
-            <footer className="bg-surface-950 border-t border-surface-800/50 py-10">
+            <footer className="bg-white dark:bg-surface-950 border-t border-surface-200/50 dark:border-surface-800/50 py-10">
                 <div className="container mx-auto px-4 md:px-6">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <Link href="/" aria-label="Retour à l'accueil Kbouffe">
@@ -686,12 +686,12 @@ export default function PourLesRestaurateursPage() {
                         </Link>
                         <nav aria-label="Liens secondaires">
                             <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-surface-500">
-                                <li><Link href="/pour-les-clients" className="hover:text-surface-300 transition-colors">Pour les clients</Link></li>
-                                <li><Link href="/pour-les-agriculteurs" className="hover:text-surface-300 transition-colors">Pour les agriculteurs</Link></li>
-                                <li><Link href="/pricing" className="hover:text-surface-300 transition-colors">Tarifs</Link></li>
-                                <li><Link href="/terms" className="hover:text-surface-300 transition-colors">CGU</Link></li>
-                                <li><Link href="/privacy" className="hover:text-surface-300 transition-colors">Confidentialité</Link></li>
-                                <li><Link href="/contact" className="hover:text-surface-300 transition-colors">Contact</Link></li>
+                                <li><Link href="/pour-les-clients" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Pour les clients</Link></li>
+                                <li><Link href="/pour-les-agriculteurs" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Pour les agriculteurs</Link></li>
+                                <li><Link href="/pricing" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Tarifs</Link></li>
+                                <li><Link href="/terms" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">CGU</Link></li>
+                                <li><Link href="/privacy" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Confidentialité</Link></li>
+                                <li><Link href="/contact" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Contact</Link></li>
                             </ul>
                         </nav>
                         <p className="text-xs text-surface-600 text-center md:text-right">
