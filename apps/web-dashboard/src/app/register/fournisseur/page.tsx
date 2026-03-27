@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { motion, type Variants } from "framer-motion";
 import {
     Phone,
+    Mail,
     Lock,
     User,
     Eye,
@@ -47,6 +48,7 @@ function getSupabaseClient() {
 
 interface Step1Form {
     full_name: string;
+    email: string;
     phone: string;
     password: string;
     confirmPassword: string;
@@ -159,6 +161,7 @@ export default function FournisseurRegisterPage() {
     // Step 1 form state
     const [form, setForm] = useState<Step1Form>({
         full_name: "",
+        email: "",
         phone: "",
         password: "",
         confirmPassword: "",
@@ -187,9 +190,12 @@ export default function FournisseurRegisterPage() {
     function validate(): string | null {
         if (!form.full_name.trim()) return "Le nom complet est requis.";
 
+        if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
+            return "Adresse email invalide.";
+
         const phone = normalisePhone(form.phone);
         if (!/^\+237[0-9]{9}$/.test(phone))
-            return "Numéro invalide. Format attendu : +237XXXXXXXXX";
+            return "Numéro de téléphone invalide. Format : +237 6XX XXX XXX";
 
         if (form.password.length < 6)
             return "Le mot de passe doit comporter au moins 6 caractères.";
@@ -213,43 +219,16 @@ export default function FournisseurRegisterPage() {
         }
 
         const phone = normalisePhone(form.phone);
+        const email = form.email.trim().toLowerCase();
         setLoading(true);
 
         try {
-            // 1. Create Supabase Auth account (phone-first with email fallback pattern)
-            //    Supabase phone auth requires OTP; we use email as the auth identifier
-            //    and store phone in metadata, which is the pattern used in Cameroon.
-            const supabase = getSupabaseClient();
-
-            // Use phone-formatted email as Supabase identifier (common Cameroonian pattern)
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                phone,
-                password: form.password,
-                options: {
-                    data: {
-                        full_name: form.full_name,
-                        phone,
-                        role: "fournisseur",
-                    },
-                },
-            });
-
-            if (authError) {
-                // Supabase may not have phone auth enabled — fall back gracefully
-                setError(authError.message);
-                return;
-            }
-
-            if (!authData.session && !authData.user) {
-                setError("Impossible de créer le compte. Vérifiez vos informations.");
-                return;
-            }
-
-            // 2. Register user profile in app database
-            const registerRes = await authFetch("/api/auth/register", {
+            // 1. Create account via API (admin client — bypasses email confirmation)
+            const registerRes = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    email,
                     phone,
                     password: form.password,
                     full_name: form.full_name,
@@ -257,10 +236,24 @@ export default function FournisseurRegisterPage() {
                 }),
             });
 
+            const registerBody = await registerRes.json() as { error?: string };
+
             if (!registerRes.ok) {
-                const body = await registerRes.json().catch(() => ({})) as { message?: string };
-                // Non-blocking: user already created in Auth — warn but continue
-                console.warn("Register endpoint:", body?.message ?? registerRes.status);
+                if (registerRes.status === 409) {
+                    setError("Un compte avec cet email existe déjà. Connectez-vous ou utilisez un autre email.");
+                } else {
+                    setError(registerBody.error ?? "Impossible de créer le compte.");
+                }
+                return;
+            }
+
+            // 2. Sign in to establish a session
+            const supabase = getSupabaseClient();
+            const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: form.password });
+
+            if (signInError) {
+                // Account created but sign-in failed — rare, but proceed to step 2 anyway
+                console.warn("Auto sign-in failed:", signInError.message);
             }
 
             // 3. Move to supplier profile step
@@ -471,7 +464,7 @@ export default function FournisseurRegisterPage() {
                                     Créer votre compte
                                 </h2>
                                 <p className="text-sm text-surface-400 mb-6">
-                                    Votre numéro de téléphone est votre identifiant principal.
+                                    Votre adresse email sera votre identifiant de connexion.
                                 </p>
 
                                 {/* Error banner */}
@@ -509,6 +502,19 @@ export default function FournisseurRegisterPage() {
 
                                     <motion.div variants={itemVariants}>
                                         <InputField
+                                            id="email"
+                                            label="Adresse email *"
+                                            type="email"
+                                            placeholder="jean@exemple.cm"
+                                            value={form.email}
+                                            onChange={(v) => updateField("email", v)}
+                                            icon={Mail}
+                                            autoComplete="email"
+                                        />
+                                    </motion.div>
+
+                                    <motion.div variants={itemVariants}>
+                                        <InputField
                                             id="phone"
                                             label="Numéro de téléphone *"
                                             placeholder="+237 6XX XXX XXX"
@@ -518,7 +524,7 @@ export default function FournisseurRegisterPage() {
                                             autoComplete="tel"
                                         />
                                         <p className="mt-1.5 text-xs text-surface-500">
-                                            Format Cameroun : +237XXXXXXXXX
+                                            Cameroun : +237XXXXXXXXX — utilisé pour les paiements MTN MoMo
                                         </p>
                                     </motion.div>
 

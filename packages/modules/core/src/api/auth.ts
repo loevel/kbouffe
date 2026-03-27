@@ -170,6 +170,74 @@ authRoutes.post("/", async (c) => {
     }
 });
 
+// ── Generic register (email-based) — used by fournisseur & merchant onboarding ──
+
+authRoutes.post("/register", async (c) => {
+    try {
+        if (!c.env.SUPABASE_SERVICE_ROLE_KEY) {
+            return c.json({ error: "Configuration d'inscription manquante" }, 500);
+        }
+
+        const body = await c.req.json();
+        const fullName = String(body.full_name ?? body.fullName ?? "").trim();
+        const email = String(body.email ?? "").trim().toLowerCase();
+        const phone = String(body.phone ?? "").trim() || null;
+        const password = String(body.password ?? "");
+        const role = String(body.role ?? "customer");
+
+        if (!fullName) return c.json({ error: "Nom complet requis" }, 400);
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+            return c.json({ error: "Adresse email invalide" }, 400);
+        if (password.length < 6) return c.json({ error: "Mot de passe trop court (min. 6 caractères)" }, 400);
+
+        const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: {
+                full_name: fullName,
+                role,
+                auth_method: "email",
+            },
+        });
+
+        if (authError) {
+            const status = /already|exists|registered/i.test(authError.message) ? 409 : 400;
+            return c.json({ error: authError.message }, status);
+        }
+
+        const newUser = {
+            id: authUser.user.id,
+            email,
+            full_name: fullName,
+            ...(phone ? { phone } : {}),
+            role,
+            preferred_lang: "fr",
+            notifications_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error: dbError } = await supabaseAdmin
+            .from("users")
+            .upsert(newUser, { onConflict: "id" });
+
+        if (dbError) {
+            await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+            return c.json({ error: dbError.message || "Erreur lors de la création du profil" }, 500);
+        }
+
+        return c.json({ success: true, userId: authUser.user.id, email });
+    } catch (error: any) {
+        console.error("Register error:", error);
+        return c.json({ error: error.message || "Erreur lors de l'inscription" }, 500);
+    }
+});
+
+// ── Customer register (phone-alias) — legacy mobile flow ──────────────────
+
 authRoutes.post("/customer-register", async (c) => {
     try {
         if (!c.env.SUPABASE_SERVICE_ROLE_KEY) {
