@@ -123,7 +123,7 @@ const TRUST_STATS = [
 
 export default function PourLesClientsPage() {
     return (
-        <div className="min-h-screen bg-surface-950 flex flex-col">
+        <div className="min-h-screen bg-white dark:bg-surface-950 flex flex-col">
             {/* ── Navbar ── */}
             <Navbar />
 
@@ -135,7 +135,7 @@ export default function PourLesClientsPage() {
                 <section className="relative overflow-hidden pt-24 pb-20 md:pt-32 md:pb-28">
 
                     {/* Background layers */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-surface-950 via-surface-950 to-brand-950/30" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-surface-50 via-surface-50 to-brand-50/30 dark:from-surface-950 dark:via-surface-950 dark:to-brand-950/30" />
                     <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full bg-brand-500/6 blur-3xl pointer-events-none" />
                     <div className="absolute bottom-0 left-1/4 w-96 h-96 rounded-full bg-orange-500/5 blur-3xl pointer-events-none" />
 
@@ -160,7 +160,7 @@ export default function PourLesClientsPage() {
                             {/* Headline */}
                             <motion.h1
                                 variants={fadeIn}
-                                className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white leading-[1.1] tracking-tight mb-6"
+                                className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-surface-900 dark:text-white leading-[1.1] tracking-tight mb-6"
                             >
                                 Mangez bien,{" "}
                                 <span className="relative">
@@ -175,7 +175,7 @@ export default function PourLesClientsPage() {
                             {/* Subtitle */}
                             <motion.p
                                 variants={fadeIn}
-                                className="text-lg md:text-xl text-surface-400 leading-relaxed max-w-2xl mx-auto mb-10"
+                                className="text-lg md:text-xl text-surface-600 dark:text-surface-400 leading-relaxed max-w-2xl mx-auto mb-10"
                             >
                                 Découvrez les meilleurs restaurants camerounais de votre ville.
                                 Commandez en ligne, payez avec votre mobile money et recevez
@@ -189,7 +189,7 @@ export default function PourLesClientsPage() {
                             >
                                 <Link
                                     href="/register/client"
-                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-brand-500 to-orange-500 hover:from-brand-400 hover:to-orange-400 text-white font-bold rounded-xl text-base transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-brand-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
+                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-brand-500 to-orange-500 hover:from-brand-400 hover:to-orange-400 text-white font-bold rounded-xl text-base transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-brand-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:ring-offset-surface-950"
                                     aria-label="Créer un compte client gratuitement"
                                 >
                                     Commencer gratuitement
@@ -197,7 +197,7 @@ export default function PourLesClientsPage() {
                                 </Link>
                                 <Link
                                     href="/stores"
-                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-surface-800/60 hover:bg-surface-700/60 text-white font-semibold rounded-xl text-base border border-surface-700/50 hover:border-surface-600/50 transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
+                                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-surface-200/60 dark:bg-surface-800/60 hover:bg-surface-300/60 dark:hover:bg-surface-700/60 text-surface-900 dark:text-white font-semibold rounded-xl text-base border border-surface-300/50 dark:border-surface-700/50 hover:border-surface-400/50 dark:hover:border-surface-600/50 transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:ring-offset-surface-950"
                                     aria-label="Explorer les restaurants disponibles"
                                 >
                                     <MapPin size={18} className="text-brand-400" />
@@ -223,7 +223,7 @@ export default function PourLesClientsPage() {
                     TRUST STATS BAR
                 ════════════════════════════════════════════════════════ */}
                 <motion.section
-                    className="border-y border-surface-800/50 bg-surface-900/40 backdrop-blur-sm"
+                    className="border-y border-surface-200/50 dark:border-surface-800/50 bg-surface-100/40 dark:bg-surface-900/40 backdrop-blur-sm"
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-80px" }}
@@ -233,7 +233,7 @@ export default function PourLesClientsPage() {
                         <dl className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-4">
                             {TRUST_STATS.map(({ value, label }) => (
                                 <div key={label} className="text-center">
-                                    <dt className="text-2xl md:text-3xl font-extrabold text-white">{value}</dt>
+                                    <dt className="text-2xl md:text-3xl font-extrabold text-surface-900 dark:text-white">{value}</dt>
                                     <dd className="text-xs text-surface-500 mt-1 font-medium uppercase tracking-wider">{label}</dd>
                                 </div>
                             ))}
@@ -263,11 +263,11 @@ export default function PourLesClientsPage() {
                             <motion.h2
                                 id="how-it-works-heading"
                                 variants={fadeIn}
-                                className="text-3xl md:text-4xl font-extrabold text-white tracking-tight"
+                                className="text-3xl md:text-4xl font-extrabold text-surface-900 dark:text-white tracking-tight"
                             >
                                 Comment ça marche ?
                             </motion.h2>
-                            <motion.p variants={fadeIn} className="mt-4 text-surface-400 text-base max-w-lg mx-auto">
+                            <motion.p variants={fadeIn} className="mt-4 text-surface-600 dark:text-surface-400 text-base max-w-lg mx-auto">
                                 De la faim à la livraison en 3 étapes, tout depuis votre téléphone.
                             </motion.p>
                         </motion.div>
@@ -285,10 +285,10 @@ export default function PourLesClientsPage() {
                                 <motion.li
                                     key={number}
                                     variants={fadeIn}
-                                    className={`relative group rounded-2xl border ${border} bg-surface-900/50 p-6 hover:bg-surface-900 transition-colors duration-300`}
+                                    className={`relative group rounded-2xl border ${border} bg-surface-100/50 dark:bg-surface-900/50 p-6 hover:bg-surface-100 dark:hover:bg-surface-900 transition-colors duration-300`}
                                 >
                                     {/* Step number */}
-                                    <span className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-surface-950 border border-surface-800 flex items-center justify-center text-xs font-bold text-surface-500">
+                                    <span className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-white dark:bg-surface-950 border border-surface-200 dark:border-surface-800 flex items-center justify-center text-xs font-bold text-surface-500">
                                         {number}
                                     </span>
 
@@ -298,14 +298,14 @@ export default function PourLesClientsPage() {
                                     </div>
 
                                     {/* Content */}
-                                    <h3 className="text-white font-bold text-lg mb-3 leading-snug">{title}</h3>
-                                    <p className="text-surface-400 text-sm leading-relaxed">{desc}</p>
+                                    <h3 className="text-surface-900 dark:text-white font-bold text-lg mb-3 leading-snug">{title}</h3>
+                                    <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">{desc}</p>
 
                                     {/* Connector arrow (desktop) */}
                                     {number !== "03" && (
                                         <ChevronRight
                                             size={20}
-                                            className="hidden md:block absolute top-1/2 -right-4 -translate-y-1/2 text-surface-700 z-10"
+                                            className="hidden md:block absolute top-1/2 -right-4 -translate-y-1/2 text-surface-300 dark:text-surface-700 z-10"
                                             aria-hidden="true"
                                         />
                                     )}
@@ -319,7 +319,7 @@ export default function PourLesClientsPage() {
                     BENEFITS
                 ════════════════════════════════════════════════════════ */}
                 <section
-                    className="py-20 md:py-28 bg-surface-900/20"
+                    className="py-20 md:py-28 bg-surface-100/30 dark:bg-surface-900/20"
                     aria-labelledby="benefits-heading"
                 >
                     <div className="container mx-auto px-4 md:px-6">
@@ -337,11 +337,11 @@ export default function PourLesClientsPage() {
                             <motion.h2
                                 id="benefits-heading"
                                 variants={fadeIn}
-                                className="text-3xl md:text-4xl font-extrabold text-white tracking-tight"
+                                className="text-3xl md:text-4xl font-extrabold text-surface-900 dark:text-white tracking-tight"
                             >
                                 Tout ce dont vous avez besoin
                             </motion.h2>
-                            <motion.p variants={fadeIn} className="mt-4 text-surface-400 text-base max-w-lg mx-auto">
+                            <motion.p variants={fadeIn} className="mt-4 text-surface-600 dark:text-surface-400 text-base max-w-lg mx-auto">
                                 Une expérience pensée pour le marché camerounais, de A à Z.
                             </motion.p>
                         </motion.div>
@@ -359,14 +359,14 @@ export default function PourLesClientsPage() {
                                 <motion.li
                                     key={title}
                                     variants={fadeIn}
-                                    className="group flex flex-col gap-4 rounded-2xl bg-surface-900/60 border border-surface-800/60 p-6 hover:bg-surface-900 hover:border-surface-700/60 transition-all duration-300 hover:-translate-y-1"
+                                    className="group flex flex-col gap-4 rounded-2xl bg-surface-100/60 dark:bg-surface-900/60 border border-surface-200/60 dark:border-surface-800/60 p-6 hover:bg-surface-100 dark:hover:bg-surface-900 hover:border-surface-300/60 dark:hover:border-surface-700/60 transition-all duration-300 hover:-translate-y-1"
                                 >
                                     <div className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${bg}`} aria-hidden="true">
                                         <Icon size={21} className={color} />
                                     </div>
                                     <div>
-                                        <h3 className="text-white font-bold text-base mb-2">{title}</h3>
-                                        <p className="text-surface-400 text-sm leading-relaxed">{desc}</p>
+                                        <h3 className="text-surface-900 dark:text-white font-bold text-base mb-2">{title}</h3>
+                                        <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">{desc}</p>
                                     </div>
                                 </motion.li>
                             ))}
@@ -393,7 +393,7 @@ export default function PourLesClientsPage() {
                                 ))}
                             </div>
                             <blockquote>
-                                <p className="text-white text-lg md:text-xl font-medium italic leading-relaxed mb-6">
+                                <p className="text-surface-900 dark:text-white text-lg md:text-xl font-medium italic leading-relaxed mb-6">
                                     &ldquo;J'ai découvert un restaurant de ndolé à 10 minutes de chez moi que je ne connaissais pas.
                                     La commande a été livrée en 35 minutes, j'ai payé avec mon MTN MoMo. Impeccable !&rdquo;
                                 </p>
@@ -402,7 +402,7 @@ export default function PourLesClientsPage() {
                                         A
                                     </div>
                                     <div className="text-left">
-                                        <cite className="not-italic text-white text-sm font-semibold">Angèle K.</cite>
+                                        <cite className="not-italic text-surface-900 dark:text-white text-sm font-semibold">Angèle K.</cite>
                                         <p className="text-surface-500 text-xs">Cliente · Douala</p>
                                     </div>
                                 </footer>
@@ -478,7 +478,7 @@ export default function PourLesClientsPage() {
             </main>
 
             {/* ── Footer ── */}
-            <footer className="bg-surface-950 border-t border-surface-800/50 py-10">
+            <footer className="bg-white dark:bg-surface-950 border-t border-surface-200/50 dark:border-surface-800/50 py-10">
                 <div className="container mx-auto px-4 md:px-6">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <Link href="/" aria-label="Retour à l'accueil Kbouffe">
@@ -486,12 +486,12 @@ export default function PourLesClientsPage() {
                         </Link>
                         <nav aria-label="Liens secondaires">
                             <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-surface-500">
-                                <li><Link href="/pour-les-restaurateurs" className="hover:text-surface-300 transition-colors">Pour les restaurateurs</Link></li>
-                                <li><Link href="/pour-les-agriculteurs" className="hover:text-surface-300 transition-colors">Pour les agriculteurs</Link></li>
-                                <li><Link href="/pricing" className="hover:text-surface-300 transition-colors">Tarifs</Link></li>
-                                <li><Link href="/terms" className="hover:text-surface-300 transition-colors">CGU</Link></li>
-                                <li><Link href="/privacy" className="hover:text-surface-300 transition-colors">Confidentialité</Link></li>
-                                <li><Link href="/contact" className="hover:text-surface-300 transition-colors">Contact</Link></li>
+                                <li><Link href="/pour-les-restaurateurs" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Pour les restaurateurs</Link></li>
+                                <li><Link href="/pour-les-agriculteurs" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Pour les agriculteurs</Link></li>
+                                <li><Link href="/pricing" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Tarifs</Link></li>
+                                <li><Link href="/terms" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">CGU</Link></li>
+                                <li><Link href="/privacy" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Confidentialité</Link></li>
+                                <li><Link href="/contact" className="hover:text-surface-700 dark:hover:text-surface-300 transition-colors">Contact</Link></li>
                             </ul>
                         </nav>
                         <p className="text-xs text-surface-600 text-center md:text-right">
