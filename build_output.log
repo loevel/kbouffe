@@ -1,0 +1,79 @@
+
+> build
+> turbo build
+
+• turbo 2.8.17
+• Packages in scope: @kbouffe/module-catalog, @kbouffe/module-chat, @kbouffe/module-core, @kbouffe/module-crm, @kbouffe/module-hr, @kbouffe/module-marketing, @kbouffe/module-orders, @kbouffe/module-reports, @kbouffe/module-reservations, @kbouffe/shared-types, api, mobile-client, web-dashboard
+• Running build in 13 packages
+• Remote caching disabled
+@kbouffe/shared-types:build: cache hit, replaying logs 74e9197aeb7f8028
+@kbouffe/module-core:build: cache hit, replaying logs 02d7a2aae4183fa2
+@kbouffe/shared-types:build: 
+@kbouffe/shared-types:build: > @kbouffe/shared-types@1.0.0 build
+@kbouffe/shared-types:build: > tsc
+@kbouffe/shared-types:build: 
+@kbouffe/module-core:build: 
+@kbouffe/module-core:build: > @kbouffe/module-core@0.1.0 build
+@kbouffe/module-core:build: > tsc
+@kbouffe/module-core:build: 
+@kbouffe/module-reports:build: cache hit, replaying logs ed7e3c5512e0ea3d
+@kbouffe/module-reports:build: 
+@kbouffe/module-reports:build: > @kbouffe/module-reports@1.0.0 build
+@kbouffe/module-reports:build: > tsc
+@kbouffe/module-reports:build: 
+@kbouffe/module-marketing:build: cache hit, replaying logs 7e6a967d285df6af
+@kbouffe/module-crm:build: cache hit, replaying logs 61fb3885cf7eaca9
+@kbouffe/module-marketing:build: 
+@kbouffe/module-marketing:build: > @kbouffe/module-marketing@1.0.0 build
+@kbouffe/module-marketing:build: > tsc --noEmit || true
+@kbouffe/module-marketing:build: 
+@kbouffe/module-crm:build: 
+@kbouffe/module-crm:build: > @kbouffe/module-crm@1.0.0 build
+@kbouffe/module-crm:build: > tsc
+@kbouffe/module-crm:build: 
+@kbouffe/module-hr:build: cache hit, replaying logs 5552bb3e47ea7ac2
+@kbouffe/module-hr:build: 
+@kbouffe/module-hr:build: > @kbouffe/module-hr@1.0.0 build
+@kbouffe/module-hr:build: > tsc
+@kbouffe/module-hr:build: 
+web-dashboard:build: cache miss, executing 39897e3c89485104
+web-dashboard:build: 
+web-dashboard:build: > web-dashboard@0.1.0 build
+web-dashboard:build: > next build
+web-dashboard:build: 
+web-dashboard:build: ▲ Next.js 16.1.6 (Turbopack)
+web-dashboard:build: - Environments: .env.local
+web-dashboard:build: 
+web-dashboard:build: ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+web-dashboard:build:   Creating an optimized production build ...
+web-dashboard:build: ✓ Compiled successfully in 4.7s
+web-dashboard:build:   Running TypeScript ...
+web-dashboard:build: Failed to compile.
+web-dashboard:build: 
+web-dashboard:build: ./src/components/dashboard/settings/DeliverySettingsForm.tsx:15:38
+web-dashboard:build: Type error: Property 'delivery_base_fee' does not exist on type '{ id: string; owner_id: string; name: string; slug: string; description: string | null; address: string | null; city: string | null; phone: string | null; email: string | null; logo_url: string | null; ... 24 more ...; updated_at: string; }'. Did you mean 'delivery_fee'?
+web-dashboard:build: 
+web-dashboard:build: [0m [90m 13 |[39m     [36mconst[39m { t } [33m=[39m useLocale()[33m;[39m
+web-dashboard:build:  [90m 14 |[39m     [36mconst[39m [form[33m,[39m setForm] [33m=[39m useState({
+web-dashboard:build: [31m[1m>[22m[39m[90m 15 |[39m         deliveryBaseFee[33m:[39m restaurant[33m?[39m[33m.[39mdelivery_base_fee[33m?[39m[33m.[39mtoString() [33m?[39m[33m?[39m [32m"0"[39m[33m,[39m
+web-dashboard:build:  [90m    |[39m                                      [31m[1m^[22m[39m
+web-dashboard:build:  [90m 16 |[39m         deliveryPerKmFee[33m:[39m restaurant[33m?[39m[33m.[39mdelivery_per_km_fee[33m?[39m[33m.[39mtoString() [33m?[39m[33m?[39m [32m"0"[39m[33m,[39m
+web-dashboard:build:  [90m 17 |[39m         maxDeliveryRadiusKm[33m:[39m restaurant[33m?[39m[33m.[39mmax_delivery_radius_km[33m?[39m[33m.[39mtoString() [33m?[39m[33m?[39m [32m"10"[39m[33m,[39m
+web-dashboard:build:  [90m 18 |[39m         minOrderAmount[33m:[39m restaurant[33m?[39m[33m.[39mmin_order_amount[33m?[39m[33m.[39mtoString() [33m?[39m[33m?[39m [32m"0"[39m[33m,[39m[0m
+web-dashboard:build: Next.js build worker exited with code: 1 and signal: null
+web-dashboard:build: npm error Lifecycle script `build` failed with error:
+web-dashboard:build: npm error code 1
+web-dashboard:build: npm error path /Users/loevel/Projets/kbouffe.com/apps/web-dashboard
+web-dashboard:build: npm error workspace web-dashboard@0.1.0
+web-dashboard:build: npm error location /Users/loevel/Projets/kbouffe.com/apps/web-dashboard
+web-dashboard:build: npm error command failed
+web-dashboard:build: npm error command sh -c next build
+web-dashboard:build: ERROR: command finished with error: command (/Users/loevel/Projets/kbouffe.com/apps/web-dashboard) /usr/local/bin/npm run build exited (1)
+web-dashboard#build: command (/Users/loevel/Projets/kbouffe.com/apps/web-dashboard) /usr/local/bin/npm run build exited (1)
+
+ Tasks:    6 successful, 7 total
+Cached:    6 cached, 7 total
+  Time:    10.207s 
+Failed:    web-dashboard#build
+
+ ERROR  run failed: command  exited (1)
