@@ -1,0 +1,30 @@
+#:schema node_modules/wrangler/config-schema.json
+# ⚠️  CONFIG DE DÉVELOPPEMENT LOCAL — NE PAS UTILISER EN PRODUCTION
+# Les Queues et R2 ne sont pas disponibles en local → commentés ici.
+# Pour la prod, utiliser wrangler.toml normal.
+
+name = "kbouffe-api"
+main = "src/index.ts"
+compatibility_date = "2025-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ── Supabase Auth ──────────────────────────────────────────────────
+# Variables définies dans .dev.vars :
+#   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+
+# --- R2 bucket (Images) — désactivé en local ---
+# [[r2_buckets]]
+# binding = "IMAGES_BUCKET"
+# bucket_name = "kbouffe-images"
+
+# ── SMS Queue — désactivée en local ───────────────────────────────
+# [[queues.producers]]
+# binding = "SMS_QUEUE"
+# queue = "kbouffe-sms-queue"
+
+# [[queues.consumers]]
+# queue = "kbouffe-sms-queue"
+# max_batch_size = 10
+# max_batch_timeout = 5
+# max_retries = 3
+# dead_letter_queue = "kbouffe-sms-dlq"

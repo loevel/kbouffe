@@ -1,0 +1,135 @@
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import { motion } from "framer-motion";
+import { ArrowRight, Utensils, User, LogIn } from "lucide-react";
+import { KbouffeLogo } from "@/components/brand/Logo";
+
+export default function LoginPage() {
+    return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans">
+            {/* Header */}
+            <header className="fixed top-0 left-0 right-0 p-6 z-50">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <Link href="/">
+                        <KbouffeLogo height={32} />
+                    </Link>
+                    <Link 
+                        href="/register"
+                        className="text-sm font-semibold text-surface-600 dark:text-surface-400 hover:text-brand-500 transition-colors"
+                    >
+                        Créer un compte
+                    </Link>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="flex-1 flex flex-col items-center justify-center p-6 pt-24 pb-12">
+                <div className="max-w-4xl w-full">
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-center mb-16"
+                    >
+                        <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-brand-500/10 text-brand-500 mb-6">
+                            <LogIn size={28} />
+                        </div>
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-surface-900 dark:text-white mb-4 tracking-tight">
+                            Content de vous <span className="text-brand-500 italic">revoir</span>.
+                        </h1>
+                        <p className="text-lg text-surface-600 dark:text-surface-400 max-w-xl mx-auto">
+                            Choisissez votre espace pour accéder à votre univers Kbouffe.
+                        </p>
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Client Card */}
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.1 }}
+                        >
+                            <Link href="/login/client" className="group block h-full">
+                                <div className="relative h-full flex flex-col bg-white dark:bg-surface-900 rounded-3xl overflow-hidden border border-surface-200 dark:border-surface-800 shadow-xl transition-all duration-500 hover:shadow-brand-500/10 hover:border-brand-500/30 hover:-translate-y-2">
+                                    <div className="relative h-64 overflow-hidden">
+                                        <Image 
+                                            src="/images/client_registration_hero.png" 
+                                            alt="Espace Client" 
+                                            fill
+                                            className="object-cover group-hover:scale-110 transition-transform duration-700"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                                        <div className="absolute bottom-6 left-6">
+                                            <div className="bg-brand-500 text-white text-[10px] font-bold uppercase tracking-widest py-1 px-3 rounded-full mb-2 inline-flex items-center gap-1.5 shadow-lg">
+                                                <User size={10} />
+                                                Client
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-white">Consulter mes commandes</h3>
+                                        </div>
+                                    </div>
+                                    <div className="p-8 flex flex-col flex-1">
+                                        <p className="text-surface-600 dark:text-surface-400 mb-8 flex-1 leading-relaxed">
+                                            Suivez vos livraisons en temps réel, gérez vos adresses et profitez de vos offres de fidélité personnalisées.
+                                        </p>
+                                        <div className="flex items-center text-brand-500 font-bold group-hover:gap-2 transition-all">
+                                            <span>Accéder à mon espace</span>
+                                            <ArrowRight size={18} className="ml-2 opacity-0 group-hover:opacity-100 transition-all" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </Link>
+                        </motion.div>
+
+                        {/* Merchant Card */}
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 }}
+                        >
+                            <Link href="/login/restaurant" className="group block h-full">
+                                <div className="relative h-full flex flex-col bg-white dark:bg-surface-900 rounded-3xl overflow-hidden border border-surface-200 dark:border-surface-800 shadow-xl transition-all duration-500 hover:shadow-brand-500/10 hover:border-brand-500/30 hover:-translate-y-2">
+                                    <div className="relative h-64 overflow-hidden">
+                                        <Image 
+                                            src="/images/wizard_step2.png" 
+                                            alt="Espace Restaurant" 
+                                            fill
+                                            className="object-cover group-hover:scale-110 transition-transform duration-700"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                                        <div className="absolute bottom-6 left-6">
+                                            <div className="bg-orange-500 text-white text-[10px] font-bold uppercase tracking-widest py-1 px-3 rounded-full mb-2 inline-flex items-center gap-1.5 shadow-lg">
+                                                <Utensils size={10} />
+                                                Restaurateur
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-white">Gérer mon établissement</h3>
+                                        </div>
+                                    </div>
+                                    <div className="p-8 flex flex-col flex-1">
+                                        <p className="text-surface-600 dark:text-surface-400 mb-8 flex-1 leading-relaxed">
+                                            Accédez à votre tableau de bord, gérez vos menus, analysez vos performances et optimisez vos ventes.
+                                        </p>
+                                        <div className="flex items-center text-orange-500 font-bold group-hover:gap-2 transition-all">
+                                            <span>Tableau de bord restaurant</span>
+                                            <ArrowRight size={18} className="ml-2 opacity-0 group-hover:opacity-100 transition-all" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </Link>
+                        </motion.div>
+                    </div>
+
+                    <footer className="mt-16 text-center">
+                        <Link 
+                            href="/" 
+                            className="text-sm font-medium text-surface-500 dark:text-surface-500 hover:text-brand-500 transition-colors inline-flex items-center gap-2"
+                        >
+                            <ArrowRight size={14} className="rotate-180" />
+                            Retour à l'accueil
+                        </Link>
+                    </footer>
+                </div>
+            </main>
+        </div>
+    );
+}

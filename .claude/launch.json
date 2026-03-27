@@ -1,0 +1,33 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true,
+      "cwd": "apps/web-dashboard"
+    },
+    {
+      "name": "api (Hono/Cloudflare Workers)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8787,
+      "cwd": "apps/api"
+    },
+    {
+      "name": "mobile-client (Expo)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start"],
+      "port": 8081,
+      "cwd": "apps/mobile-client"
+    },
+    {
+      "name": "turbo-dev (all)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    }
+  ]
+}

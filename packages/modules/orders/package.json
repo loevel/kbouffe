@@ -1,0 +1,27 @@
+{
+    "name": "@kbouffe/module-orders",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "main": "./src/api/index.ts",
+    "types": "./src/api/index.ts",
+    "exports": {
+        ".": "./src/api/index.ts",
+        "./ui": "./src/ui/index.ts"
+    },
+    "dependencies": {
+        "@kbouffe/module-core": "*",
+        "hono": "^4.7.0",
+        "react": "19.2.3",
+        "react-dom": "19.2.3",
+        "lucide-react": "^0.575.0",
+        "@kbouffe/shared-types": "^1.0.0",
+        "swr": "^2.2.4"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250621.0",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "typescript": "^5"
+    }
+}

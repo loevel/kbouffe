@@ -1,0 +1,49 @@
+<!-- 
+  Kbouffe food pattern — repeating tile for backgrounds.
+  Usage: background-image: url('/pattern-food.svg'); background-size: 200px;
+-->
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fork -->
+  <g opacity="0.06" transform="translate(20,20) rotate(-15)">
+    <rect x="14" y="0" width="4" height="50" rx="2" fill="currentColor"/>
+    <rect x="6" y="0" width="2.5" height="14" rx="1.25" fill="currentColor"/>
+    <rect x="14.5" y="0" width="2.5" height="14" rx="1.25" fill="currentColor"/>
+    <rect x="23" y="0" width="2.5" height="14" rx="1.25" fill="currentColor"/>
+    <rect x="6" y="13" width="19.5" height="3" rx="1.5" fill="currentColor"/>
+  </g>
+  
+  <!-- Knife -->
+  <g opacity="0.05" transform="translate(100,10) rotate(10)">
+    <rect x="0" y="0" width="6" height="55" rx="3" fill="currentColor"/>
+    <path d="M6 5 L18 2 L18 35 L6 38 Z" fill="currentColor" opacity="0.7"/>
+  </g>
+  
+  <!-- Plate circle -->
+  <circle cx="160" cy="60" r="18" stroke="currentColor" stroke-width="2" fill="none" opacity="0.04"/>
+  <circle cx="160" cy="60" r="14" stroke="currentColor" stroke-width="1" fill="none" opacity="0.03"/>
+  
+  <!-- Spoon -->
+  <g opacity="0.05" transform="translate(50,100) rotate(25)">
+    <rect x="8" y="16" width="4" height="40" rx="2" fill="currentColor"/>
+    <ellipse cx="10" cy="10" rx="10" ry="12" fill="currentColor" opacity="0.7"/>
+  </g>
+  
+  <!-- Steam wisp -->
+  <g opacity="0.04" transform="translate(140,120)">
+    <path d="M0 20 C0 12 8 8 8 0" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M10 22 C10 14 18 10 18 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Small K mark -->
+  <g opacity="0.03" transform="translate(20,150) scale(0.4)">
+    <rect x="0" y="0" width="6" height="50" rx="3" fill="currentColor"/>
+    <path d="M6 25 L35 5 L40 10 L14 25" fill="currentColor"/>
+    <path d="M6 27 L35 47 L40 42 L14 27" fill="currentColor"/>
+  </g>
+  
+  <!-- Chef hat outline -->
+  <g opacity="0.04" transform="translate(100,140)">
+    <path d="M10 30 L10 20 C10 8 20 2 30 2 C40 2 50 8 50 20 L50 30" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <rect x="8" y="28" width="44" height="4" rx="2" fill="currentColor"/>
+  </g>
+</svg>

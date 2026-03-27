@@ -1,0 +1,39 @@
+{
+  "servers": {
+    "kbouffe-cloudflare": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "tools/mcp-cloudflare/server.mjs"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdXl1aXlwa2Jnc2Z0Z3RzdHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM0MTcxMywiZXhwIjoyMDg3OTE3NzEzfQ.4CDVQatuXvXmksCHlVUztdE4jC6XwHH2AAhvhQBO0Zs"
+      }
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=wkuyuiypkbgsftgtstra"
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "firebase-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "firebase-tools@latest",
+        "mcp"
+      ],
+      "env": {
+        "FIREBASE_PROJECT_ID": "kbouffe-app"
+      }
+    }
+  }
+}

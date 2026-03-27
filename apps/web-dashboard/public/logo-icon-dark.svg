@@ -1,0 +1,19 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded square background — dark variant -->
+  <rect width="120" height="120" rx="28" fill="#0f172a"/>
+  <!-- Fork handle -->
+  <rect x="30" y="24" width="8" height="72" rx="4" fill="#f97316"/>
+  <!-- Prongs -->
+  <rect x="24" y="24" width="4" height="20" rx="2" fill="#f97316" opacity="0.85"/>
+  <rect x="33" y="24" width="4" height="20" rx="2" fill="#f97316" opacity="0.85"/>
+  <rect x="42" y="24" width="4" height="20" rx="2" fill="#f97316" opacity="0.85"/>
+  <!-- Fork neck -->
+  <rect x="24" y="42" width="22" height="5" rx="2.5" fill="#f97316" opacity="0.7"/>
+  <!-- Upper K arm -->
+  <path d="M44 60 L82 28 C84 26 88 26 90 28 L92 30 C94 32 94 36 92 38 L50 60" fill="#f97316" opacity="0.95"/>
+  <!-- Lower K arm -->
+  <path d="M44 62 L86 94 C88 96 88 100 86 102 L84 104 C82 106 78 106 76 104 L44 68" fill="#f97316" opacity="0.9"/>
+  <!-- Steam wisps -->
+  <path d="M62 18 C62 14 66 12 66 8" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.5"/>
+  <path d="M72 20 C72 16 76 14 76 10" stroke="#f97316" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5"/>
+</svg>

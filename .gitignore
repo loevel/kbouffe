@@ -1,0 +1,58 @@
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+
+# next.js
+.next/
+out/
+.open-next/
+
+# production
+build
+dist
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.dev.vars
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# expo
+.expo/
+*.jks
+*.p12
+*.key
+*.mobileprovision
+
+# wrangler
+.wrangler
+.turbo
+
+# build logs
+build_output.log
+*.log
+
+# Claude Code worktrees (temporary)
+.claude/worktrees/
+
+# Firebase Admin credentials
+*service-account*.json
+firebase-adminsdk*.json
