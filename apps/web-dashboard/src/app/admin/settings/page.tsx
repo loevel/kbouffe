@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Settings,
@@ -16,6 +17,8 @@ import {
     Database,
     Cloud,
     AlertCircle,
+    KeyRound,
+    ArrowRight,
 } from "lucide-react";
 import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
@@ -129,6 +132,23 @@ export default function AdminSettingsPage() {
             animate="visible"
             className="max-w-5xl mx-auto space-y-10 pb-20"
         >
+            {/* Integrations shortcut */}
+            <Link
+                href="/admin/settings/integrations"
+                className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-brand-50 to-emerald-50 dark:from-brand-500/10 dark:to-emerald-500/10 border border-brand-200 dark:border-brand-500/20 hover:shadow-md transition-all group"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-emerald-500 flex items-center justify-center shadow-md shadow-brand-500/25">
+                        <KeyRound size={18} className="text-white" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-surface-900 dark:text-white">Intégrations & API Keys</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">Gemini, Meta, TikTok, Telegram, WhatsApp, Firebase</p>
+                    </div>
+                </div>
+                <ArrowRight size={18} className="text-surface-400 group-hover:text-brand-500 group-hover:translate-x-1 transition-all" />
+            </Link>
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-surface-100 dark:border-surface-800 pb-8">
                 <div className="space-y-1">
                     <h1 className="text-4xl font-black text-surface-900 dark:text-white tracking-tight flex items-center gap-3">
