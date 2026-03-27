@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Star, Megaphone, TrendingUp, CheckCircle2, Crown, Calendar, Image, Heart, Share2, Package, X, AlertCircle, CheckCircle, MapPin } from "lucide-react";
+import { Star, Megaphone, TrendingUp, CheckCircle2, Crown, Calendar, Image, Heart, Share2, Package, X, AlertCircle, CheckCircle, MapPin, Sparkles, Brain, Zap } from "lucide-react";
 import { Button, Card } from "@kbouffe/module-core/ui";
 import { AnimatePresence, motion } from "framer-motion";
 
 const ICON_MAP: Record<string, any> = {
-    Star, Megaphone, TrendingUp, Crown, Calendar, Image, Heart, Share2, Package, MapPin,
+    Star, Megaphone, TrendingUp, Crown, Calendar, Image, Heart, Share2, Package, MapPin, Sparkles, Brain, Zap,
 };
 
 interface MarketplaceService {
@@ -149,6 +149,9 @@ export default function MarketplacePage() {
             communication: "Communication",
             advertising: "Publicité",
             analytics: "Analytics",
+            premium: "Premium",
+            ai: "Intelligence Artificielle",
+            ai_bundle: "Bundle IA",
         };
         return labels[category] || category;
     };
@@ -159,6 +162,9 @@ export default function MarketplacePage() {
             communication: { color: "text-blue-500", bgColor: "bg-blue-500/10", buttonVariant: "outline" },
             advertising: { color: "text-pink-500", bgColor: "bg-pink-500/10", buttonVariant: "primary" },
             analytics: { color: "text-yellow-500", bgColor: "bg-yellow-500/10", buttonVariant: "outline" },
+            premium: { color: "text-amber-500", bgColor: "bg-gradient-to-br from-amber-500/10 to-orange-500/10", buttonVariant: "primary" },
+            ai: { color: "text-purple-500", bgColor: "bg-purple-500/10", buttonVariant: "primary" },
+            ai_bundle: { color: "text-violet-500", bgColor: "bg-gradient-to-br from-violet-500/10 to-purple-500/10", buttonVariant: "primary" },
         };
         return colors[category] || { color: "text-brand-500", bgColor: "bg-brand-500/10", buttonVariant: "primary" as const };
     };
@@ -182,7 +188,7 @@ export default function MarketplacePage() {
             {/* Quick Comparison Banner */}
             {!loading && displayPacks.length > 0 && (
                 <div className="bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent border border-brand-500/20 rounded-2xl p-8">
-                    <div className="grid md:grid-cols-3 gap-8">
+                    <div className="grid md:grid-cols-4 gap-8">
                         <div>
                             <h3 className="font-black text-lg mb-3">💰 Budget limité ?</h3>
                             <p className="text-sm text-surface-600 dark:text-surface-400 mb-4">
@@ -199,6 +205,12 @@ export default function MarketplacePage() {
                             <h3 className="font-black text-lg mb-3">👥 Fidéliser clients ?</h3>
                             <p className="text-sm text-surface-600 dark:text-surface-400 mb-4">
                                 Combinez <strong>Avis & Réputation</strong>, <strong>Fidélité+</strong> et <strong>Social Amplifier</strong>.
+                            </p>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-lg mb-3">🤖 Automatiser avec l'IA ?</h3>
+                            <p className="text-sm text-surface-600 dark:text-surface-400 mb-4">
+                                Le <strong>Pack IA Complet</strong> regroupe marketing, photos et conseils IA. Economisez 30 000 FCFA.
                             </p>
                         </div>
                     </div>
@@ -362,15 +374,15 @@ export default function MarketplacePage() {
                         </div>
                     </div>
 
-                    {/* Advanced Solutions Section */}
-                    {displayPacks.filter(p => p.sort_order >= 10).length > 0 && (
+                    {/* Advanced Solutions Section (sort_order 10) */}
+                    {displayPacks.filter(p => p.sort_order === 10).length > 0 && (
                         <div>
                             <div className="mb-6">
                                 <h2 className="text-2xl font-black text-surface-900 dark:text-white tracking-tight">🚀 Solutions Avancées</h2>
                                 <p className="text-surface-500 text-sm mt-2">Services spécialisés pour transformer votre présence digitale</p>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {displayPacks.filter(p => p.sort_order >= 10).map((pack) => {
+                                {displayPacks.filter(p => p.sort_order === 10).map((pack) => {
                                     const colors = getColorByCategory(pack.category);
                                     const IconComponent = getIconComponent(pack.icon);
                                     const durationText = pack.duration_days ? `${pack.duration_days} jour${pack.duration_days > 1 ? 's' : ''}` : 'Permanent';
@@ -379,15 +391,12 @@ export default function MarketplacePage() {
                                             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${colors.bgColor} ${colors.color}`}>
                                                 <IconComponent className="w-7 h-7" />
                                             </div>
-
                                             <h3 className="text-xl font-bold mb-2">{pack.name}</h3>
                                             <p className="text-surface-500 text-sm mb-6 flex-1">{pack.description}</p>
-
                                             <div className="mb-6">
                                                 <span className="text-3xl font-black">{pack.price.toLocaleString()}</span>
                                                 <span className="text-surface-500 text-sm ml-1">FCFA / {durationText}</span>
                                             </div>
-
                                             <div className="space-y-3 mb-8">
                                                 {(pack.features || []).map((feature, idx) => (
                                                     <div key={idx} className="flex items-start gap-3">
@@ -396,7 +405,6 @@ export default function MarketplacePage() {
                                                     </div>
                                                 ))}
                                             </div>
-
                                             <div className="mt-auto">
                                                 <Button
                                                     onClick={() => setSelectedPack(pack)}
@@ -404,6 +412,100 @@ export default function MarketplacePage() {
                                                     className="w-full py-6 text-base rounded-xl font-bold shadow-lg shadow-brand-500/20"
                                                 >
                                                     Acheter ce pack
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* IA & Automatisation Section (sort_order 11-14) */}
+                    {displayPacks.filter(p => p.sort_order >= 11).length > 0 && (
+                        <div>
+                            <div className="mb-6">
+                                <h2 className="text-2xl font-black text-surface-900 dark:text-white tracking-tight">🤖 IA & Automatisation</h2>
+                                <p className="text-surface-500 text-sm mt-2">Propulsez votre restaurant avec l'intelligence artificielle Gemini</p>
+                            </div>
+
+                            {/* Hero banner for Pack IA Complet */}
+                            {(() => {
+                                const bundlePack = displayPacks.find(p => p.sort_order === 14);
+                                if (!bundlePack) return null;
+                                return (
+                                    <div className="relative mb-8 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-8 md:p-10 text-white shadow-2xl shadow-purple-500/20">
+                                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+                                        <div className="relative flex flex-col md:flex-row items-start md:items-center gap-6">
+                                            <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                                                <Zap className="w-8 h-8" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <h3 className="text-2xl font-black">{bundlePack.name}</h3>
+                                                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/30">
+                                                        -30 000 FCFA
+                                                    </span>
+                                                </div>
+                                                <p className="text-white/80 text-sm max-w-xl">{bundlePack.description}</p>
+                                                <div className="flex flex-wrap gap-3 mt-4">
+                                                    {(bundlePack.features || []).slice(0, 4).map((f, i) => (
+                                                        <span key={i} className="text-xs px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
+                                                            {f}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                                <div>
+                                                    <span className="text-sm text-white/60 line-through">180 000</span>
+                                                    <span className="text-3xl font-black ml-2">{bundlePack.price.toLocaleString()}</span>
+                                                    <span className="text-sm text-white/60 ml-1">FCFA/mois</span>
+                                                </div>
+                                                <Button
+                                                    onClick={() => setSelectedPack(bundlePack)}
+                                                    className="bg-white text-purple-700 hover:bg-white/90 font-black px-8 py-3 rounded-xl shadow-lg"
+                                                >
+                                                    Tout débloquer
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Individual AI packs (sort_order 11-13) */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {displayPacks.filter(p => p.sort_order >= 11 && p.sort_order <= 13).map((pack) => {
+                                    const colors = getColorByCategory(pack.category);
+                                    const IconComponent = getIconComponent(pack.icon);
+                                    const durationText = pack.duration_days ? `${pack.duration_days} jour${pack.duration_days > 1 ? 's' : ''}` : 'Permanent';
+                                    return (
+                                        <Card key={pack.id} className="relative flex flex-col p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-purple-200 dark:border-purple-500/20">
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${colors.bgColor} ${colors.color}`}>
+                                                <IconComponent className="w-7 h-7" />
+                                            </div>
+                                            <h3 className="text-xl font-bold mb-2">{pack.name}</h3>
+                                            <p className="text-surface-500 text-sm mb-6 flex-1">{pack.description}</p>
+                                            <div className="mb-6">
+                                                <span className="text-3xl font-black">{pack.price.toLocaleString()}</span>
+                                                <span className="text-surface-500 text-sm ml-1">FCFA / {durationText}</span>
+                                            </div>
+                                            <div className="space-y-3 mb-8">
+                                                {(pack.features || []).map((feature, idx) => (
+                                                    <div key={idx} className="flex items-start gap-3">
+                                                        <CheckCircle2 className="w-5 h-5 text-purple-500 shrink-0" />
+                                                        <span className="text-sm font-medium text-surface-700 dark:text-surface-300">{feature}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-auto">
+                                                <Button
+                                                    onClick={() => setSelectedPack(pack)}
+                                                    className="w-full py-6 text-base rounded-xl font-bold bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white shadow-lg shadow-purple-500/20"
+                                                >
+                                                    Activer l'IA
                                                 </Button>
                                             </div>
                                         </Card>

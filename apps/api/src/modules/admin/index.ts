@@ -12,6 +12,10 @@ import { adminSystemRoutes } from "./system";
 import { adminOrdersRoutes } from "./orders";
 import { adminCatalogRoutes } from "./catalog";
 import { adminMarketplaceRoutes } from "./marketplace";
+import { adminAiUsageRoutes } from "./ai-usage";
+import { adminSubscriptionsRoutes } from "./subscriptions";
+import { adminOnboardingRoutes } from "./onboarding";
+import { adminSocialMonitorRoutes } from "./social-monitor";
 import { createClient } from "@supabase/supabase-js";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -30,61 +34,92 @@ adminRoutes.get("/stats", async (c) => {
 
     const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
 
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+
     const [
         { data: globalMetrics },
         { count: totalUsers },
         { count: countClients },
         { count: countMerchants },
         { count: countLivreurs },
-        { data: newSupabaseRestaurants }
+        { data: newSupabaseRestaurants },
+        { data: activeSubscriptions },
+        { count: aiCallsToday },
+        { count: aiCallsMonth },
     ] = await Promise.all([
         supabase.from("platform_global_metrics").select("*").single(),
-
         supabase.from("users").select("*", { count: "exact", head: true }),
         supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "customer"),
         supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "merchant"),
         supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "driver"),
-
         supabase.from("restaurants")
             .select("id, name, is_published, created_at")
             .order("created_at", { ascending: false })
-            .limit(5)
+            .limit(5),
+        // MRR: active marketplace purchases
+        supabase.from("marketplace_purchases")
+            .select("amount_paid, restaurant_id")
+            .eq("status", "active")
+            .or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`),
+        // AI calls today
+        supabase.from("ai_usage_logs").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
+        // AI calls this month
+        supabase.from("ai_usage_logs").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
     ]);
 
-    const newRestaurants = (newSupabaseRestaurants || []).map(r => ({
+    const newRestaurants = (newSupabaseRestaurants || []).map((r: any) => ({
         id: r.id,
         name: r.name,
         isActive: r.is_published,
-        createdAt: r.created_at
+        createdAt: r.created_at,
     }));
 
-    const metrics = globalMetrics || { 
-        total_restaurants: 0, 
-        active_restaurants: 0, 
-        total_gmv: 0, 
-        total_orders: 0, 
-        total_unique_customers: 0 
+    const metrics = globalMetrics || {
+        total_restaurants: 0,
+        active_restaurants: 0,
+        total_gmv: 0,
+        total_orders: 0,
+        total_unique_customers: 0,
     };
 
+    // MRR = sum of active subscription amounts
+    const mrr = (activeSubscriptions ?? []).reduce((sum: number, p: any) => sum + (p.amount_paid ?? 0), 0);
+    const restaurantsWithPacks = new Set((activeSubscriptions ?? []).map((p: any) => p.restaurant_id)).size;
+    const packAdoptionRate = metrics.total_restaurants > 0
+        ? Math.round((restaurantsWithPacks / metrics.total_restaurants) * 100)
+        : 0;
+
     return c.json({
-        restaurants: { 
-            total: metrics.total_restaurants, 
-            active: metrics.active_restaurants, 
-            pending: metrics.total_restaurants - metrics.active_restaurants
+        restaurants: {
+            total: metrics.total_restaurants,
+            active: metrics.active_restaurants,
+            pending: metrics.total_restaurants - metrics.active_restaurants,
         },
-        users: { 
-            total: totalUsers || 0, 
+        users: {
+            total: totalUsers || 0,
             customers: countClients || 0,
             merchants: countMerchants || 0,
-            drivers: countLivreurs || 0
+            drivers: countLivreurs || 0,
         },
         metrics: {
             gmv: metrics.total_gmv,
             totalOrders: metrics.total_orders,
             totalCustomers: metrics.total_unique_customers,
-            avgOrderValue: metrics.total_orders > 0 ? Math.round(metrics.total_gmv / metrics.total_orders) : 0
+            avgOrderValue: metrics.total_orders > 0 ? Math.round(metrics.total_gmv / metrics.total_orders) : 0,
         },
-        recentActivity: { newRestaurants }
+        saas: {
+            mrr,
+            restaurantsWithPacks,
+            packAdoptionRate,
+            activeSubscriptions: (activeSubscriptions ?? []).length,
+        },
+        aiUsage: {
+            todayCalls: aiCallsToday ?? 0,
+            monthCalls: aiCallsMonth ?? 0,
+        },
+        recentActivity: { newRestaurants },
     });
 });
 
@@ -100,5 +135,9 @@ adminRoutes.route("/system", adminSystemRoutes);
 adminRoutes.route("/orders", adminOrdersRoutes);
 adminRoutes.route("/catalog", adminCatalogRoutes);
 adminRoutes.route("/marketplace", adminMarketplaceRoutes);
+adminRoutes.route("/ai-usage", adminAiUsageRoutes);
+adminRoutes.route("/subscriptions", adminSubscriptionsRoutes);
+adminRoutes.route("/onboarding", adminOnboardingRoutes);
+adminRoutes.route("/social-monitor", adminSocialMonitorRoutes);
 // For backward compatibility on /admin/audit
 adminRoutes.route("/audit", adminSystemRoutes);

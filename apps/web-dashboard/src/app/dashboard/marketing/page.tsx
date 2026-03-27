@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, ArrowRight, Send, Calendar } from "lucide-react";
+import { Sparkles, ArrowRight, Send, Calendar, Tag } from "lucide-react";
 import { MarketingStats, CouponsTable, CampaignsTable } from "@kbouffe/module-marketing";
 import { useLocale } from "@kbouffe/module-core/ui";
 
@@ -78,7 +78,38 @@ export default function MarketingPage() {
 
             <div className="space-y-6">
                 <MarketingStats />
-                <CouponsTable />
+
+                {/* Quick-action cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Link
+                        href="/dashboard/marketing/promotions"
+                        className="flex items-center gap-4 p-4 rounded-2xl border border-green-200 dark:border-green-500/20 bg-green-50/50 dark:bg-green-500/5 hover:shadow-md transition-all text-left"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                            <Tag size={18} className="text-green-500" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-surface-900 dark:text-white text-sm">Codes promo</h4>
+                            <p className="text-xs text-surface-500">Créez des réductions pour vos clients</p>
+                        </div>
+                    </Link>
+                    <Link
+                        href="/dashboard/marketing/upsells"
+                        className="flex items-center gap-4 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5 hover:shadow-md transition-all"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                            <Sparkles size={18} className="text-amber-500" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-surface-900 dark:text-white text-sm">Upsells & Extras</h4>
+                            <p className="text-xs text-surface-500">+15-25% de panier moyen</p>
+                        </div>
+                    </Link>
+                </div>
+
+                <div id="coupons-section">
+                    <CouponsTable />
+                </div>
                 <CampaignsTable />
             </div>
         </>

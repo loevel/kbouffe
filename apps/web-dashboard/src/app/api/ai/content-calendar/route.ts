@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, apiError } from "@/lib/api/helpers";
+import { checkAiRateLimit, logAiUsage } from "@/lib/ai-rate-limiter";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.0-flash";
@@ -19,6 +20,14 @@ export async function POST(request: NextRequest) {
     const auth = await withAuth();
     if (auth.error) return auth.error;
     const { supabase, restaurantId } = auth.ctx;
+
+    const rateCheck = await checkAiRateLimit(supabase, restaurantId, "ai_calendar");
+    if (!rateCheck.allowed) {
+        return NextResponse.json({
+            error: `Limite quotidienne atteinte (${rateCheck.limit}/jour). Reessayez demain.`,
+            usage: rateCheck,
+        }, { status: 429 });
+    }
 
     try {
         const body = await request.json().catch(() => ({}));
@@ -124,6 +133,8 @@ Regles:
             console.error("[ai/content-calendar] Parse error:", rawText);
             return NextResponse.json({ error: "Impossible de generer le calendrier" }, { status: 422 });
         }
+
+        await logAiUsage(supabase, restaurantId, "ai_calendar");
 
         return NextResponse.json({
             calendar: parsed.calendar ?? [],

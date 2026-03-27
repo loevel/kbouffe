@@ -36,6 +36,14 @@ import {
     Megaphone,
     Truck,
     Utensils,
+    Brain,
+    Package,
+    Activity,
+    Zap,
+    Send,
+    FileSearch,
+    PenSquare,
+    Loader2,
 } from "lucide-react";
 import { Badge, Button, toast, adminFetch, Modal, ModalFooter } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
@@ -115,7 +123,7 @@ export default function AdminRestaurantDetailPage() {
     const [toggling, setToggling] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
     const [showRejectionInput, setShowRejectionInput] = useState(false);
-    const [activeTab, setActiveTab] = useState<"overview" | "team" | "catalog" | "modules">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "team" | "catalog" | "modules" | "ia-packs">("overview");
 
     // Modules state
     const [modules, setModules] = useState<Array<{
@@ -125,6 +133,15 @@ export default function AdminRestaurantDetailPage() {
     const [togglingModule, setTogglingModule] = useState<string | null>(null);
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
+
+    // IA & Packs state
+    type PacksUsageData = {
+        packs: any[];
+        aiUsage: any[];
+        summary: { activePacks: number; totalPacks: number; todayCalls: number; monthCalls: number; totalCostFCFA: number };
+    };
+    const [packsUsage, setPacksUsage] = useState<PacksUsageData | null>(null);
+    const [loadingPacksUsage, setLoadingPacksUsage] = useState(false);
     
     // Edit Mode State
     const [isEditing, setIsEditing] = useState(false);
@@ -161,6 +178,14 @@ export default function AdminRestaurantDetailPage() {
                     const data = await modRes.json();
                     setModules(data.modules || []);
                 }
+
+                // Fetch IA & packs usage
+                setLoadingPacksUsage(true);
+                const puRes = await adminFetch(`/api/admin/restaurants/${id}/packs-usage`);
+                if (puRes.ok) {
+                    const data = await puRes.json();
+                    setPacksUsage(data);
+                }
             } catch (err) {
                 console.error("Failed to fetch restaurant details:", err);
                 toast.error("Échec du chargement du restaurant");
@@ -168,6 +193,7 @@ export default function AdminRestaurantDetailPage() {
                 setLoading(false);
                 setLoadingMembers(false);
                 setLoadingModules(false);
+                setLoadingPacksUsage(false);
             }
         })();
     }, [id]);
@@ -538,6 +564,23 @@ export default function AdminRestaurantDetailPage() {
                 >
                     <Puzzle size={14} />
                     Modules
+                </button>
+                <button
+                    onClick={() => setActiveTab("ia-packs")}
+                    className={cn(
+                        "px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5",
+                        activeTab === "ia-packs"
+                            ? "bg-white dark:bg-surface-700 text-brand-500 shadow-sm"
+                            : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                    )}
+                >
+                    <Brain size={14} />
+                    IA & Packs
+                    {packsUsage && packsUsage.summary.activePacks > 0 && (
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">
+                            {packsUsage.summary.activePacks}
+                        </span>
+                    )}
                 </button>
             </div>
 
@@ -1170,6 +1213,138 @@ export default function AdminRestaurantDetailPage() {
                                 </ul>
                             )}
                         </div>
+                    </motion.div>
+                ) : activeTab === "ia-packs" ? (
+                    <motion.div
+                        key="ia-packs"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        className="space-y-6"
+                    >
+                        {loadingPacksUsage ? (
+                            <div className="flex items-center justify-center py-20">
+                                <Loader2 size={24} className="animate-spin text-surface-400" />
+                            </div>
+                        ) : !packsUsage ? (
+                            <div className="text-center py-16 text-surface-400 text-sm">Impossible de charger les données</div>
+                        ) : (
+                            <>
+                                {/* Summary cards */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                    {[
+                                        { label: "Packs actifs", value: packsUsage.summary.activePacks, icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+                                        { label: "Total packs achetés", value: packsUsage.summary.totalPacks, icon: Zap, color: "text-brand-500", bg: "bg-brand-500/10" },
+                                        { label: "Appels IA ce mois", value: packsUsage.summary.monthCalls, icon: Brain, color: "text-purple-500", bg: "bg-purple-500/10" },
+                                        { label: "Coût estimé (mois)", value: `${packsUsage.summary.totalCostFCFA.toLocaleString("fr-FR")} F`, icon: Activity, color: "text-amber-500", bg: "bg-amber-500/10" },
+                                    ].map((stat) => (
+                                        <div key={stat.label} className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5 flex items-start gap-3">
+                                            <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center flex-shrink-0`}>
+                                                <stat.icon size={18} className={stat.color} />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-surface-400 font-medium">{stat.label}</p>
+                                                <p className="text-xl font-black text-surface-900 dark:text-white mt-0.5">{stat.value}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Packs list */}
+                                <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800 flex items-center gap-2">
+                                        <Package size={16} className="text-brand-500" />
+                                        <h3 className="font-bold text-surface-900 dark:text-white text-sm">Packs Marketplace</h3>
+                                    </div>
+                                    {packsUsage.packs.length === 0 ? (
+                                        <div className="py-12 text-center text-surface-400 text-sm">
+                                            <Package size={32} className="mx-auto opacity-20 mb-3" />
+                                            Aucun pack acheté
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-surface-100 dark:divide-surface-800">
+                                            {packsUsage.packs.map((pack: any) => {
+                                                const isActive = pack.status === "active";
+                                                const isExpired = pack.expires_at && new Date(pack.expires_at) < new Date();
+                                                return (
+                                                    <div key={pack.id} className="flex items-center gap-4 px-6 py-4">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-bold text-surface-900 dark:text-white">
+                                                                    {pack.service?.name ?? "Pack inconnu"}
+                                                                </span>
+                                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                                                                    isActive && !isExpired
+                                                                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
+                                                                        : isExpired
+                                                                        ? "bg-surface-100 text-surface-500"
+                                                                        : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400"
+                                                                }`}>
+                                                                    {isExpired ? "EXPIRÉ" : isActive ? "ACTIF" : pack.status.toUpperCase()}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-xs text-surface-400 mt-0.5">
+                                                                {pack.service?.category} · {pack.amount_paid?.toLocaleString("fr-FR")} FCFA payé
+                                                                {pack.expires_at ? ` · expire le ${new Date(pack.expires_at).toLocaleDateString("fr-FR")}` : ""}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right text-xs text-surface-400">
+                                                            {new Date(pack.created_at).toLocaleDateString("fr-FR")}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* AI usage per feature */}
+                                <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800 flex items-center gap-2">
+                                        <Brain size={16} className="text-purple-500" />
+                                        <h3 className="font-bold text-surface-900 dark:text-white text-sm">Consommation IA ce mois</h3>
+                                    </div>
+                                    <div className="divide-y divide-surface-100 dark:divide-surface-800">
+                                        {packsUsage.aiUsage.filter((u: any) => u.month > 0 || u.today > 0).length === 0 ? (
+                                            <div className="py-10 text-center text-surface-400 text-sm">
+                                                <Brain size={28} className="mx-auto opacity-20 mb-2" />
+                                                Aucun appel IA ce mois
+                                            </div>
+                                        ) : packsUsage.aiUsage.map((usage: any) => {
+                                            const FEATURE_ICONS: Record<string, any> = {
+                                                ai_photo: Camera, ai_analytics: Brain, ai_social: Send,
+                                                ai_calendar: CalendarDays, ai_ocr: FileSearch, ai_copywriter: PenSquare,
+                                            };
+                                            const Icon = FEATURE_ICONS[usage.feature] ?? Zap;
+                                            return (
+                                                <div key={usage.feature} className="flex items-center gap-4 px-6 py-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-surface-50 dark:bg-surface-800 flex items-center justify-center flex-shrink-0">
+                                                        <Icon size={14} className="text-surface-500" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm text-surface-700 dark:text-surface-300">{usage.label}</span>
+                                                            <span className="text-sm font-bold text-surface-900 dark:text-white">{usage.month} / {usage.limit * 30}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className="flex-1 h-1.5 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all ${usage.quotaPct > 80 ? "bg-red-500" : usage.quotaPct > 50 ? "bg-amber-500" : "bg-brand-500"}`}
+                                                                    style={{ width: `${Math.min(100, usage.month / (usage.limit * 30) * 100)}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-surface-400 w-20 text-right">
+                                                                auj: {usage.today} · ~{usage.estimatedCostFCFA} F
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </motion.div>
                 ) : null}
             </AnimatePresence>

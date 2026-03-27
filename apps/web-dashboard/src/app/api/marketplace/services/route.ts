@@ -8,17 +8,16 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
     try {
         const supabase = await createClient();
-        const type = request.nextUrl.searchParams.get("type");
+        const category = request.nextUrl.searchParams.get("category");
 
         let query = supabase
-            .from("marketplace_packs" as any)
+            .from("marketplace_services" as any)
             .select("*")
             .eq("is_active", true)
-            .order("is_featured", { ascending: false })
             .order("sort_order", { ascending: true });
 
-        if (type && type !== "all") {
-            query = query.eq("type", type);
+        if (category && category !== "all") {
+            query = query.eq("category", category);
         }
 
         const { data, error } = await query;
@@ -35,7 +34,6 @@ export async function GET(request: NextRequest) {
         const packs = (data || []).map((pack: any) => ({
             ...pack,
             features: Array.isArray(pack.features) ? pack.features : [],
-            limits: pack.limits || {},
         }));
 
         return NextResponse.json({ success: true, data: packs });
