@@ -96,6 +96,7 @@ export const fr = {
         onboarding: "Suivi Onboarding",
         broadcast: "Broadcast",
         socialMonitor: "Social Monitor",
+        backup: "Backup & Export",
         backToSite: "Retour au site",
     },
 

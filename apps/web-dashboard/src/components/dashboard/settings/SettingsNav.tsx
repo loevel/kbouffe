@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Clock, Truck, ImageIcon, Bell, CreditCard, Shield, Armchair, Star, Images, BarChart3, LayoutGrid } from "lucide-react";
+import { Building2, Clock, Truck, ImageIcon, Bell, CreditCard, Shield, Armchair, Star, Images, BarChart3, LayoutGrid, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@kbouffe/module-core/ui";
 
@@ -22,6 +22,7 @@ export function SettingsNav() {
         { href: "/dashboard/settings/payments", label: t.settings.payments, icon: CreditCard },
         { href: "/dashboard/settings/notifications", label: t.settings.notifications, icon: Bell },
         { href: "/dashboard/settings/security", label: t.settings.security, icon: Shield },
+        { href: "/dashboard/settings/data", label: "Données & Export", icon: Download },
     ];
 
     return (
