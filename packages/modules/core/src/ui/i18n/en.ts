@@ -98,6 +98,7 @@ export const en: TranslationKeys = {
         onboarding: "Onboarding Tracker",
         broadcast: "Broadcast",
         socialMonitor: "Social Monitor",
+        backup: "Backup & Export",
         backToSite: "Back to site",
     },
 
