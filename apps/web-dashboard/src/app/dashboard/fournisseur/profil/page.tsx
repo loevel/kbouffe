@@ -25,6 +25,7 @@ import {
     ChevronDown,
     ChevronUp,
     AlertTriangle,
+    Shield,
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier, type SupplierProfile } from "../SupplierContext";
