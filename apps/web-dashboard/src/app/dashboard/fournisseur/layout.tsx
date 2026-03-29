@@ -21,6 +21,7 @@ import {
     Package,
     ClipboardList,
     UserCog,
+    MessageCircle,
     LogOut,
     Menu,
     X,
@@ -50,6 +51,12 @@ const NAV_ITEMS = [
         href: "/dashboard/fournisseur/commandes",
         label: "Commandes reçues",
         icon: ClipboardList,
+        exact: false,
+    },
+    {
+        href: "/dashboard/fournisseur/messages",
+        label: "Messages",
+        icon: MessageCircle,
         exact: false,
     },
     {
