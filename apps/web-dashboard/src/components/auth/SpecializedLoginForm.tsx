@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, User } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, User, Shield, Smartphone, ChevronLeft } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,13 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
+
+    const [mfaStep, setMfaStep] = useState(false);
+    const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+    const [mfaCode, setMfaCode] = useState("");
+    const [mfaLoading, setMfaLoading] = useState(false);
+    const [mfaError, setMfaError] = useState<string | null>(null);
+    const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
 
     const [form, setForm] = useState({
         email: "",
@@ -96,6 +103,20 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                 setRedirectMessage(t.auth.redirectingStores);
             }
 
+            // Check if MFA (TOTP) is required before redirecting
+            const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            if (aal?.nextLevel === "aal2" && aal?.currentLevel !== "aal2") {
+                const { data: factors } = await supabase.auth.mfa.listFactors();
+                const totpFactor = factors?.totp?.[0];
+                if (totpFactor) {
+                    setMfaFactorId(totpFactor.id);
+                    setPendingRedirect(redirectPath);
+                    setRedirectMessage(null);
+                    setMfaStep(true);
+                    return;
+                }
+            }
+
             setTimeout(() => {
                 router.push(redirectPath);
             }, 500);
@@ -103,6 +124,27 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
             setError(t.auth.unexpectedError);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleMfaVerify(e: React.FormEvent) {
+        e.preventDefault();
+        if (!mfaFactorId || mfaCode.length !== 6) return;
+        setMfaLoading(true);
+        setMfaError(null);
+        try {
+            const supabase = createClient()!;
+            const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
+                factorId: mfaFactorId,
+                code: mfaCode,
+            });
+            if (verifyError) throw verifyError;
+            router.push(pendingRedirect!);
+        } catch {
+            setMfaError("Code invalide ou expiré. Vérifiez votre application et réessayez.");
+            setMfaCode("");
+        } finally {
+            setMfaLoading(false);
         }
     }
 
@@ -163,6 +205,69 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                     </div>
 
                     <div className="bg-white dark:bg-surface-900 rounded-3xl border border-surface-200 dark:border-surface-800 p-8 shadow-xl">
+                        {mfaStep ? (
+                            <form className="space-y-6" onSubmit={handleMfaVerify}>
+                                <div className="text-center space-y-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto">
+                                        <Smartphone size={28} className="text-purple-600 dark:text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-surface-900 dark:text-white text-lg">Double authentification</p>
+                                        <p className="text-sm text-surface-500 mt-1">
+                                            Ouvrez votre application authenticator (Google Authenticator, Authy…) et entrez le code à 6 chiffres.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {mfaError && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+                                    >
+                                        {mfaError}
+                                    </motion.div>
+                                )}
+
+                                <div>
+                                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5 ml-1">
+                                        Code à 6 chiffres
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={6}
+                                        value={mfaCode}
+                                        onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                                        placeholder="000000"
+                                        autoComplete="one-time-code"
+                                        autoFocus
+                                        className="w-full px-4 py-3.5 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-white text-center text-2xl font-mono tracking-[0.5em] placeholder:text-surface-300 placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={mfaLoading || mfaCode.length !== 6}
+                                    className="group relative w-full py-4 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-all shadow-lg shadow-brand-500/25 flex items-center justify-center gap-3"
+                                >
+                                    {mfaLoading ? <Loader2 size={20} className="animate-spin" /> : (
+                                        <>
+                                            <Shield size={18} />
+                                            <span>Vérifier et se connecter</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => { setMfaStep(false); setMfaCode(""); setMfaError(null); }}
+                                    className="w-full flex items-center justify-center gap-1.5 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 transition-colors"
+                                >
+                                    <ChevronLeft size={16} /> Retour à la connexion
+                                </button>
+                            </form>
+                        ) : (
                         <form className="space-y-6" onSubmit={handleSubmit}>
                             {error && (
                                 <motion.div 
@@ -244,9 +349,10 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                                 )}
                             </button>
                         </form>
+                        )}
                     </div>
 
-                    <div className="mt-8 text-center space-y-4">
+                    {!mfaStep && <div className="mt-8 text-center space-y-4">
                         <p className="text-surface-600 dark:text-surface-400 text-sm">
                             Pas encore de compte ?{" "}
                             <Link
@@ -283,7 +389,7 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                                 </Link>
                             )}
                         </div>
-                    </div>
+                    </div>}
                 </motion.div>
             </div>
         </div>
