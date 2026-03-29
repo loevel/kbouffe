@@ -48,6 +48,8 @@ categoriesRoutes.post("/", async (c) => {
             description: body.description?.trim() || null,
             is_active: body.is_active ?? true,
             sort_order: ((lastCat as any)?.sort_order ?? 0) + 1,
+            name_i18n: body.name_i18n ?? {},
+            description_i18n: body.description_i18n ?? {},
         } as any)
         .select()
         .single();
@@ -65,7 +67,7 @@ categoriesRoutes.patch("/:id", async (c) => {
     const id = c.req.param("id");
     const body = await c.req.json();
 
-    const allowedFields = ["name", "description", "is_active", "sort_order"];
+    const allowedFields = ["name", "description", "is_active", "sort_order", "name_i18n", "description_i18n"];
     const updateData: Record<string, unknown> = {};
     for (const field of allowedFields) {
         if (body[field] !== undefined) updateData[field] = body[field];

@@ -67,6 +67,8 @@ interface Restaurant {
     hasDineIn: boolean;
     hasReservations: boolean;
     totalTables: number;
+    corkageFeeAmount: number;
+    dineInServiceFee: number;
     reservationCancelPolicy: "flexible" | "moderate" | "strict";
     reservationCancelNoticeMinutes: number;
     reservationCancellationFeeAmount: number;
@@ -79,14 +81,18 @@ interface Restaurant {
 interface Category {
     id: string;
     name: string;
+    name_i18n?: Record<string, string>;
     description: string | null;
+    description_i18n?: Record<string, string>;
     sort_order: number;
 }
 
 interface Product {
     id: string;
     name: string;
+    name_i18n?: Record<string, string>;
     description: string | null;
+    description_i18n?: Record<string, string>;
     price: number;
     compare_at_price: number | null;
     image_url: string | null;
@@ -94,6 +100,11 @@ interface Product {
     is_available: boolean;
     category_id: string | null;
     sort_order: number;
+}
+
+/** Retourne le texte traduit ou le fallback FR */
+function t18n(i18n: Record<string, string> | undefined, fallback: string, lang: string): string {
+    return i18n?.[lang] || fallback;
 }
 
 interface Review {
@@ -137,11 +148,17 @@ function ProductCard({
     product,
     onAdd,
     onClick,
+    lang = "fr",
 }: {
     product: Product;
     onAdd: () => void;
     onClick: () => void;
+    lang?: string;
 }) {
+    const displayName = t18n(product.name_i18n, product.name, lang);
+    const displayDesc = product.description_i18n || product.description
+        ? t18n(product.description_i18n, product.description ?? "", lang)
+        : null;
     return (
         <motion.div
             layout
@@ -156,11 +173,11 @@ function ProductCard({
             <div className="flex-1 min-w-0 flex flex-col justify-between">
                 <div>
                     <h3 className="font-bold text-surface-900 dark:text-white text-[15px] leading-tight group-hover:text-brand-500 transition-colors">
-                        {product.name}
+                        {displayName}
                     </h3>
-                    {product.description && (
+                    {displayDesc && (
                         <p className="text-[13px] text-surface-500 dark:text-surface-400 mt-1.5 line-clamp-2 leading-relaxed font-medium opacity-80">
-                            {product.description}
+                            {displayDesc}
                         </p>
                     )}
                 </div>
@@ -667,6 +684,14 @@ export function StorePageClient({ slug }: { slug: string }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
+    // i18n : langue d'affichage de la vitrine (FR par défaut, EN si dispo)
+    const [storeLang, setStoreLang] = useState<"fr" | "en">(() => {
+        if (typeof window !== "undefined") {
+            const browserLang = navigator.language.toLowerCase().startsWith("en") ? "en" : "fr";
+            return browserLang;
+        }
+        return "fr";
+    });
     const [cartOpen, setCartOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [reservationOpen, setReservationOpen] = useState(false);
@@ -684,6 +709,9 @@ export function StorePageClient({ slug }: { slug: string }) {
     const [resSelectedZone, setResSelectedZone] = useState<string | null>(null);
     const [resStep, setResStep] = useState<1 | 2 | 3>(1);
     const [resAutoFilled, setResAutoFilled] = useState(false);
+    // BYOB / droit de bouchon
+    const [resByob, setResByob] = useState(false);
+    const [resCorkageAcknowledged, setResCorkageAcknowledged] = useState(false);
     // Zone image lightbox
     const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
     const [availability, setAvailability] = useState<{
@@ -848,6 +876,8 @@ export function StorePageClient({ slug }: { slug: string }) {
                     zoneId: resSelectedZone || undefined,
                     occasion: resOccasion || undefined,
                     specialRequests: resSpecial.trim() || undefined,
+                    byobRequested: resByob,
+                    corkageFeeAcknowledged: resByob ? resCorkageAcknowledged : false,
                 }),
             });
 
@@ -861,13 +891,15 @@ export function StorePageClient({ slug }: { slug: string }) {
             setResSpecial("");
             setResOccasion("");
             setResSelectedZone(null);
+            setResByob(false);
+            setResCorkageAcknowledged(false);
             setResStep(1);
         } catch {
             setResError("Erreur réseau pendant la réservation.");
         } finally {
             setResSubmitting(false);
         }
-    }, [resName, resPhone, resEmail, resPartySize, resDate, resTime, resSpecial, resSelectedZone, resOccasion]);
+    }, [resName, resPhone, resEmail, resPartySize, resDate, resTime, resSpecial, resSelectedZone, resOccasion, resByob, resCorkageAcknowledged]);
 
     if (loading) {
         return (
@@ -907,6 +939,21 @@ export function StorePageClient({ slug }: { slug: string }) {
     const uncategorised = products.filter(
         (p) => !p.category_id || !categories.find((c) => c.id === p.category_id),
     );
+
+    // ── i18n : check if English translations are available ──
+    const hasEnglish = products.some(p => p.name_i18n?.en) || categories.some(c => c.name_i18n?.en);
+
+    // Localized data — map translated text before passing to theme components
+    const localizedProducts = products.map(p => ({
+        ...p,
+        name: t18n(p.name_i18n, p.name, storeLang),
+        description: t18n(p.description_i18n, p.description ?? "", storeLang) || null,
+    }));
+    const localizedCategories = categories.map(c => ({
+        ...c,
+        name: t18n(c.name_i18n, c.name, storeLang),
+        description: t18n(c.description_i18n, c.description ?? "", storeLang) || null,
+    }));
 
     // ── Theme engine ──
     const ThemeComponent = {
@@ -1502,6 +1549,14 @@ export function StorePageClient({ slug }: { slug: string }) {
                                                                 const z = availability.zones.find((z) => z.zone.id === resSelectedZone);
                                                                 return z ? <p className="text-xs text-brand-500 font-medium">📍 {z.zone.name}</p> : null;
                                                             })()}
+                                                            {resByob && (
+                                                                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                                                                    🍷 BYOB
+                                                                    {restaurant.corkageFeeAmount > 0 && (
+                                                                        <span>· Droit de bouchon : {(restaurant.corkageFeeAmount * resPartySize).toLocaleString("fr-FR")} FCFA</span>
+                                                                    )}
+                                                                </p>
+                                                            )}
                                                         </div>
 
                                                         {/* Occasion picker */}
@@ -1543,6 +1598,116 @@ export function StorePageClient({ slug }: { slug: string }) {
                                                             className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-sm resize-none focus:ring-2 ring-brand-500/20 outline-none transition-all"
                                                         />
 
+                                                        {/* ── BYOB / Droit de bouchon ── */}
+                                                        <div className="rounded-2xl border border-surface-200 dark:border-surface-700 overflow-hidden">
+                                                            {/* Toggle BYOB */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setResByob(!resByob);
+                                                                    if (resByob) setResCorkageAcknowledged(false);
+                                                                }}
+                                                                className={`w-full flex items-center justify-between px-4 py-3 transition-colors text-left ${
+                                                                    resByob
+                                                                        ? "bg-amber-50 dark:bg-amber-500/10"
+                                                                        : "bg-white dark:bg-surface-800 hover:bg-surface-50 dark:hover:bg-surface-700/50"
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-xl">🍷</span>
+                                                                    <div>
+                                                                        <p className="text-sm font-bold text-surface-900 dark:text-white">
+                                                                            J&apos;apporte ma propre boisson
+                                                                        </p>
+                                                                        <p className="text-xs text-surface-500">
+                                                                            BYOB — Bring Your Own Bottle
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                {/* Toggle visuel */}
+                                                                <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${resByob ? "bg-amber-500" : "bg-surface-200 dark:bg-surface-600"}`}>
+                                                                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${resByob ? "translate-x-5" : "translate-x-0"}`} />
+                                                                </div>
+                                                            </button>
+
+                                                            {/* Droit de bouchon — affiché seulement si BYOB activé ET montant > 0 */}
+                                                            {resByob && restaurant.corkageFeeAmount > 0 && (
+                                                                <div className="border-t border-amber-200 dark:border-amber-500/20 bg-amber-50/80 dark:bg-amber-500/5 px-4 py-4 space-y-3">
+                                                                    {/* Montant */}
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                                                                                Droit de bouchon
+                                                                            </p>
+                                                                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                                                                                Frais appliqués pour apporter vos propres boissons
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <p className="text-lg font-extrabold text-amber-700 dark:text-amber-300">
+                                                                                {restaurant.corkageFeeAmount.toLocaleString("fr-FR")} FCFA
+                                                                            </p>
+                                                                            <p className="text-[10px] text-amber-500 uppercase tracking-wider">par personne</p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Total estimé */}
+                                                                    <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-amber-100 dark:bg-amber-500/10">
+                                                                        <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                                                                            Total estimé ({resPartySize} pers.)
+                                                                        </span>
+                                                                        <span className="text-sm font-extrabold text-amber-700 dark:text-amber-300">
+                                                                            {(restaurant.corkageFeeAmount * resPartySize).toLocaleString("fr-FR")} FCFA
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* Confirmation paiement sur place */}
+                                                                    <label className="flex items-start gap-3 cursor-pointer group">
+                                                                        <div className="relative mt-0.5 flex-shrink-0">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={resCorkageAcknowledged}
+                                                                                onChange={(e) => setResCorkageAcknowledged(e.target.checked)}
+                                                                                className="sr-only"
+                                                                            />
+                                                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                                                                                resCorkageAcknowledged
+                                                                                    ? "bg-amber-500 border-amber-500"
+                                                                                    : "border-amber-300 dark:border-amber-600 bg-white dark:bg-surface-800 group-hover:border-amber-400"
+                                                                            }`}>
+                                                                                {resCorkageAcknowledged && (
+                                                                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                                                    </svg>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                                                                            Je comprends et j&apos;accepte de payer le droit de bouchon de{" "}
+                                                                            <strong>{(restaurant.corkageFeeAmount * resPartySize).toLocaleString("fr-FR")} FCFA</strong>{" "}
+                                                                            directement au restaurant lors de ma visite.
+                                                                        </p>
+                                                                    </label>
+
+                                                                    {!resCorkageAcknowledged && (
+                                                                        <p className="text-[11px] text-amber-500 dark:text-amber-400 font-medium">
+                                                                            ☝️ Cochez la case pour confirmer votre accord
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {/* BYOB sans frais */}
+                                                            {resByob && restaurant.corkageFeeAmount === 0 && (
+                                                                <div className="border-t border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/5 px-4 py-3">
+                                                                    <p className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                                                                        <CheckCircle2 size={14} />
+                                                                        Ce restaurant n&apos;applique pas de droit de bouchon. Vous pouvez apporter vos boissons gratuitement.
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
                                                         {resError && (
                                                             <p className="text-xs text-red-500 font-bold px-1">{resError}</p>
                                                         )}
@@ -1555,8 +1720,8 @@ export function StorePageClient({ slug }: { slug: string }) {
 
                                                         <button
                                                             onClick={() => submitReservation(restaurant.slug)}
-                                                            disabled={resSubmitting}
-                                                            className="w-full h-11 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold transition-all shadow-lg shadow-brand-500/20 disabled:opacity-60"
+                                                            disabled={resSubmitting || (resByob && restaurant.corkageFeeAmount > 0 && !resCorkageAcknowledged)}
+                                                            className="w-full h-11 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold transition-all shadow-lg shadow-brand-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
                                                         >
                                                             {resSubmitting ? "Traitement..." : "Confirmer ma réservation ✓"}
                                                         </button>
@@ -1628,11 +1793,31 @@ export function StorePageClient({ slug }: { slug: string }) {
                         </div>
                     )}
 
+                    {/* i18n langue toggle — visible seulement si traductions EN existent */}
+                    {hasEnglish && (
+                        <div className="flex justify-end mb-4">
+                            <div className="flex p-0.5 bg-surface-100 dark:bg-surface-800 rounded-full text-xs font-bold shadow-sm">
+                                <button
+                                    onClick={() => setStoreLang("fr")}
+                                    className={`flex items-center gap-1 px-3 py-1 rounded-full transition-colors ${storeLang === "fr" ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-400 hover:text-surface-700 dark:hover:text-surface-300"}`}
+                                >
+                                    🇫🇷 FR
+                                </button>
+                                <button
+                                    onClick={() => setStoreLang("en")}
+                                    className={`flex items-center gap-1 px-3 py-1 rounded-full transition-colors ${storeLang === "en" ? "bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-sm" : "text-surface-400 hover:text-surface-700 dark:hover:text-surface-300"}`}
+                                >
+                                    🇬🇧 EN
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Theme-driven menu rendering */}
                     <ThemeComponent
                         restaurant={restaurant}
-                        categories={categories}
-                        products={products}
+                        categories={localizedCategories}
+                        products={localizedProducts}
                         activeCategory={activeCategory ?? ""}
                         onCategoryChange={scrollToCategory}
                         onAddToCart={handleAddToCart}

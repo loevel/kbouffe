@@ -134,6 +134,16 @@ api.route("/sync-user", authRoutes);       // Combined in authRoutes
 
 // ── Marketplace — routes publiques (annuaire fournisseurs, inscription) ─
 api.route("/marketplace", marketplacePublicRoutes);        // packs visibles
+
+// Supplier self-service routes require auth (register + /me/*)
+// IMPORTANT: middleware MUST be registered BEFORE api.route() in Hono,
+// otherwise matched routes bypass the middleware entirely.
+// Using userAuthMiddleware (not authMiddleware) because suppliers have no restaurant.
+api.use("/marketplace/suppliers/register", userAuthMiddleware);
+api.use("/marketplace/suppliers/me", userAuthMiddleware);
+api.use("/marketplace/suppliers/me/*", userAuthMiddleware);
+api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
+
 api.route("/marketplace/suppliers", suppliersRoutes);      // annuaire + inscription
 
 // ── Auth middleware for merchant routes ───────────────────────────────
@@ -157,10 +167,6 @@ api.use("/marketplace/subscriptions", authMiddleware);
 api.use("/marketplace/purchase/*", authMiddleware);
 api.use("/marketplace/purchase", authMiddleware);
 
-// Supplier self-service routes require auth (register + /me/*)
-api.use("/marketplace/suppliers/register", authMiddleware);
-api.use("/marketplace/suppliers/me", authMiddleware);
-api.use("/marketplace/suppliers/me/*", authMiddleware);
 
 // Chat uses userAuthMiddleware (works for clients + merchants, no restaurant required)
 api.use("/chat/*", userAuthMiddleware);

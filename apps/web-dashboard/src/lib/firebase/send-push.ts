@@ -5,12 +5,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendFcmMessage, sendFcmBatch } from "./admin";
 
-interface PushPayload {
+export interface PushPayload {
     title: string;
     body: string;
     data?: Record<string, string>;
     link?: string;
 }
+
 
 /**
  * Envoie une push à un utilisateur identifié par son ID.
@@ -45,6 +46,47 @@ export async function sendPushToUser(
             .in("token", tokens);
     } catch (err: any) {
         console.error("[sendPushToUser]", err?.message ?? err);
+    }
+}
+
+/**
+ * Envoie une push à tous les super-admins de la plateforme.
+ * Utile pour notifier l'équipe support quand un restaurant envoie un message.
+ */
+export async function sendPushToAdmins(
+    adminDb: SupabaseClient,
+    payload: PushPayload
+): Promise<void> {
+    try {
+        // Récupère tous les utilisateurs avec le rôle admin
+        const { data: admins } = await adminDb
+            .from("users")
+            .select("id")
+            .eq("role", "admin") as any;
+
+        const adminIds: string[] = (admins ?? []).map((u: any) => u.id);
+        if (!adminIds.length) return;
+
+        // Récupère leurs tokens push (multi-device)
+        const { data: tokenRows } = await adminDb
+            .from("push_tokens")
+            .select("token")
+            .in("user_id", adminIds);
+
+        const tokens = (tokenRows ?? [])
+            .map((r: any) => r.token as string)
+            .filter(Boolean);
+
+        if (!tokens.length) return;
+
+        await sendFcmBatch(tokens, payload.title, payload.body, payload.data, payload.link);
+
+        await adminDb
+            .from("push_tokens")
+            .update({ last_used_at: new Date().toISOString() })
+            .in("token", tokens);
+    } catch (err: any) {
+        console.error("[sendPushToAdmins]", err?.message ?? err);
     }
 }
 

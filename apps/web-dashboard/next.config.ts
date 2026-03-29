@@ -20,6 +20,8 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   reactCompiler: true,
   turbopack: {},
+  // tesseract.js est un module CommonJS — Next.js doit le transpiler
+  transpilePackages: ["tesseract.js"],
   typescript: {
     ignoreBuildErrors: true,
   },

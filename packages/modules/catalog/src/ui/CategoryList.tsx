@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, FolderOpen } from "lucide-react";
+import { Plus, Edit, Trash2, FolderOpen, Languages, Loader2 } from "lucide-react";
 import useSWR from "swr";
 import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState, toast, useLocale, useDashboard, authFetch } from "@kbouffe/module-core/ui";
 import { useCategories, useProducts, createCategory as apiCreateCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory, importCategoryPack } from "../hooks/use-catalog";
@@ -61,7 +61,9 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
     const [showImportModal, setShowImportModal] = useState(false);
     const [selectedPack, setSelectedPack] = useState("");
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-    const [form, setForm] = useState({ name: "", description: "", isActive: true });
+    const [form, setForm] = useState({ name: "", description: "", isActive: true, nameEn: "", descriptionEn: "" });
+    const [catLang, setCatLang] = useState<"fr" | "en">("fr");
+    const [catTranslating, setCatTranslating] = useState(false);
     const [saving, setSaving] = useState(false);
     const [importing, setImporting] = useState(false);
 
@@ -74,7 +76,8 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
 
     const openCreate = () => {
         setEditingCategory(null);
-        setForm({ name: "", description: "", isActive: true });
+        setForm({ name: "", description: "", isActive: true, nameEn: "", descriptionEn: "" });
+        setCatLang("fr");
         setShowModal(true);
     };
 
@@ -84,7 +87,14 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
 
     const openEdit = (cat: Category) => {
         setEditingCategory(cat);
-        setForm({ name: cat.name, description: cat.description ?? "", isActive: cat.is_active });
+        setForm({
+            name: cat.name,
+            description: cat.description ?? "",
+            isActive: cat.is_active,
+            nameEn: (cat as any).name_i18n?.en ?? "",
+            descriptionEn: (cat as any).description_i18n?.en ?? "",
+        });
+        setCatLang("fr");
         setShowModal(true);
     };
 
@@ -92,11 +102,20 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
         if (!form.name.trim()) { toast.error(t.menu.nameRequired); return; }
         setSaving(true);
 
+        const i18nPayload = {
+            name_i18n: { fr: form.name.trim(), ...(form.nameEn.trim() ? { en: form.nameEn.trim() } : {}) },
+            description_i18n: {
+                ...(form.description.trim() ? { fr: form.description.trim() } : {}),
+                ...(form.descriptionEn.trim() ? { en: form.descriptionEn.trim() } : {}),
+            },
+        };
+
         if (editingCategory) {
             const { error } = await apiUpdateCategory(editingCategory.id, {
                 name: form.name,
                 description: form.description || null,
                 is_active: form.isActive,
+                ...i18nPayload,
             }, isAdmin);
             if (error) { toast.error(error); setSaving(false); return; }
             mutateCategories();
@@ -107,6 +126,7 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
                 name: form.name,
                 description: form.description || null,
                 is_active: form.isActive,
+                ...i18nPayload,
             }, isAdmin);
             if (error) { toast.error(error); setSaving(false); return; }
             mutateCategories();
@@ -227,19 +247,93 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
                 title={editingCategory ? t.menu.editCategory : t.menu.newCategory}
             >
                 <div className="space-y-4">
-                    <Input
-                        label={t.menu.categoryName}
-                        placeholder={t.menu.categoryNamePlaceholder}
-                        value={form.name}
-                        onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                    />
-                    <Textarea
-                        label={t.menu.categoryDescription}
-                        placeholder={t.menu.categoryDescPlaceholder}
-                        value={form.description}
-                        onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
-                        rows={2}
-                    />
+                    {/* Onglets FR / EN */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex p-0.5 bg-surface-100 dark:bg-surface-800 rounded-lg">
+                            <button
+                                type="button"
+                                onClick={() => setCatLang("fr")}
+                                className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-colors ${catLang === "fr" ? "bg-white dark:bg-surface-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-surface-400 hover:text-surface-700"}`}
+                            >
+                                🇫🇷 FR {form.name.trim() && <span className="w-1.5 h-1.5 rounded-full bg-green-400 ml-0.5" />}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCatLang("en")}
+                                className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-colors ${catLang === "en" ? "bg-white dark:bg-surface-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-surface-400 hover:text-surface-700"}`}
+                            >
+                                🇬🇧 EN {form.nameEn.trim() && <span className="w-1.5 h-1.5 rounded-full bg-green-400 ml-0.5" />}
+                            </button>
+                        </div>
+                        {catLang === "en" && (
+                            <button
+                                type="button"
+                                disabled={catTranslating || !form.name.trim()}
+                                onClick={async () => {
+                                    setCatTranslating(true);
+                                    try {
+                                        const res = await authFetch("/api/ai/translate", {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ texts: [form.name, form.description] }),
+                                        });
+                                        const data = await res.json() as any;
+                                        if (data.translations) {
+                                            setForm(prev => ({ ...prev, nameEn: data.translations[0] || prev.nameEn, descriptionEn: data.translations[1] || prev.descriptionEn }));
+                                            toast.success("Traduction générée ✨");
+                                        }
+                                    } catch { toast.error("Erreur de traduction"); }
+                                    finally { setCatTranslating(false); }
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                {catTranslating ? <Loader2 size={12} className="animate-spin" /> : <Languages size={12} />}
+                                {catTranslating ? "..." : "Traduire IA"}
+                            </button>
+                        )}
+                    </div>
+
+                    {catLang === "fr" ? (
+                        <>
+                            <Input
+                                label={t.menu.categoryName}
+                                placeholder={t.menu.categoryNamePlaceholder}
+                                value={form.name}
+                                onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+                            />
+                            <Textarea
+                                label={t.menu.categoryDescription}
+                                placeholder={t.menu.categoryDescPlaceholder}
+                                value={form.description}
+                                onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
+                                rows={2}
+                            />
+                        </>
+                    ) : (
+                        <>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Category name <span className="text-surface-400 font-normal">(English)</span></label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Grilled Meats"
+                                    value={form.nameEn}
+                                    onChange={(e) => setForm(prev => ({ ...prev, nameEn: e.target.value }))}
+                                    className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Description <span className="text-surface-400 font-normal">(English, optional)</span></label>
+                                <textarea
+                                    placeholder="e.g. Our finest grilled meats and poultry"
+                                    value={form.descriptionEn}
+                                    onChange={(e) => setForm(prev => ({ ...prev, descriptionEn: e.target.value }))}
+                                    rows={2}
+                                    className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                                />
+                            </div>
+                        </>
+                    )}
+
                     <Toggle
                         checked={form.isActive}
                         onChange={(val) => setForm(prev => ({ ...prev, isActive: val }))}
@@ -249,7 +343,7 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
                 </div>
                 <ModalFooter>
                     <Button variant="outline" onClick={() => setShowModal(false)}>{t.common.cancel}</Button>
-                    <Button onClick={handleSave}>{editingCategory ? t.common.save : t.common.create}</Button>
+                    <Button onClick={handleSave} isLoading={saving}>{editingCategory ? t.common.save : t.common.create}</Button>
                 </ModalFooter>
             </Modal>
 

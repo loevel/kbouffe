@@ -7,6 +7,7 @@
  *   - Tableau des commandes avec date, produit, qté, restaurant, total, statut
  *   - Filtre par statut
  *   - Résumé du chiffre d'affaires en haut
+ *   - Boutons d'action : Confirmer (pending) / Marquer livré (confirmed)
  *   - État vide illustré si aucune commande
  */
 
@@ -20,6 +21,8 @@ import {
     AlertCircle,
     Store,
     Calendar,
+    CheckCircle2,
+    PackageCheck,
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier } from "../SupplierContext";
@@ -187,6 +190,67 @@ function SummaryCard({
     );
 }
 
+// ── Order action button ────────────────────────────────────────────────────
+
+function OrderActionButton({
+    order,
+    onStatusChange,
+}: {
+    order: Order;
+    onStatusChange: (id: string, newStatus: Order["delivery_status"]) => void;
+}) {
+    const [loading, setLoading] = useState(false);
+
+    if (order.delivery_status !== "pending" && order.delivery_status !== "confirmed") {
+        return null;
+    }
+
+    const isPending = order.delivery_status === "pending";
+    const targetStatus = isPending ? "confirmed" : "delivered";
+    const label = isPending ? "Confirmer" : "Marquer livré";
+    const Icon = isPending ? CheckCircle2 : PackageCheck;
+    const colorClass = isPending
+        ? "bg-blue-500/15 text-blue-300 border-blue-500/25 hover:bg-blue-500/25"
+        : "bg-emerald-500/15 text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/25";
+
+    async function handleClick() {
+        setLoading(true);
+        try {
+            const res = await authFetch(
+                `/api/marketplace/suppliers/me/orders/${order.id}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ delivery_status: targetStatus }),
+                }
+            );
+            if (res.ok) {
+                onStatusChange(order.id, targetStatus as Order["delivery_status"]);
+            }
+        } catch (err) {
+            console.error("Order status update error:", err);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    return (
+        <button
+            onClick={handleClick}
+            disabled={loading}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-50 ${colorClass}`}
+            title={label}
+        >
+            {loading ? (
+                <Loader2 size={13} className="animate-spin" />
+            ) : (
+                <Icon size={13} />
+            )}
+            {label}
+        </button>
+    );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function CommandesPage() {
@@ -219,6 +283,12 @@ export default function CommandesPage() {
         fetchOrders();
     }, [supplier]);
 
+    function handleStatusChange(id: string, newStatus: Order["delivery_status"]) {
+        setOrders((prev) =>
+            prev.map((o) => (o.id === id ? { ...o, delivery_status: newStatus } : o))
+        );
+    }
+
     // Counts per status
     const countByStatus = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -246,6 +316,12 @@ export default function CommandesPage() {
         [orders]
     );
 
+    // Count of actionable orders (pending + confirmed)
+    const actionableCount = useMemo(
+        () => orders.filter((o) => o.delivery_status === "pending" || o.delivery_status === "confirmed").length,
+        [orders]
+    );
+
     const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
         { value: "all", label: "Toutes" },
         { value: "pending", label: "En attente" },
@@ -265,6 +341,21 @@ export default function CommandesPage() {
                     Toutes les commandes passées par les restaurants
                 </p>
             </div>
+
+            {/* Actionable orders banner */}
+            {!loading && actionableCount > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm"
+                >
+                    <CheckCircle2 size={16} className="shrink-0 text-amber-400" />
+                    <span>
+                        <strong className="text-amber-200">{actionableCount} commande{actionableCount > 1 ? "s" : ""}</strong>{" "}
+                        nécessite{actionableCount === 1 ? "" : "nt"} votre action (confirmation ou livraison).
+                    </span>
+                </motion.div>
+            )}
 
             {/* Summary cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -342,7 +433,7 @@ export default function CommandesPage() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[640px]">
+                        <table className="w-full min-w-[680px]">
                             <thead>
                                 <tr className="border-b border-white/8">
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
@@ -362,6 +453,9 @@ export default function CommandesPage() {
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
                                         Statut
+                                    </th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-surface-500 uppercase tracking-wider">
+                                        Action
                                     </th>
                                 </tr>
                             </thead>
@@ -424,6 +518,14 @@ export default function CommandesPage() {
                                         {/* Status */}
                                         <td className="px-4 py-3.5">
                                             <StatusBadge status={order.delivery_status} />
+                                        </td>
+
+                                        {/* Action */}
+                                        <td className="px-4 py-3.5 text-right">
+                                            <OrderActionButton
+                                                order={order}
+                                                onStatusChange={handleStatusChange}
+                                            />
                                         </td>
                                     </motion.tr>
                                 ))}

@@ -137,7 +137,7 @@ function Field({
 // ── Main component ────────────────────────────────────────────────────────
 
 interface SupplierRegisterFormProps {
-  onSuccess?: () => void;
+  onSuccess?: (type: SupplierType) => void;
 }
 
 export function SupplierRegisterForm({ onSuccess }: SupplierRegisterFormProps) {
@@ -228,7 +228,7 @@ export function SupplierRegisterForm({ onSuccess }: SupplierRegisterFormProps) {
     }
 
     toast.success("Votre dossier a été soumis avec succès ! Nous le traiterons sous 48h.");
-    onSuccess?.();
+    onSuccess?.(form.type as SupplierType);
   };
 
   // ── Step renders ────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import type { Database } from "@/lib/supabase/types";
 function resolveRoleHomePath(role: string | undefined) {
     if (role === "admin") return "/admin";
     if (role === "merchant") return "/dashboard";
+    if (role === "supplier") return "/dashboard/fournisseur";
     if (role === "livreur") return "/driver";
     return "/stores";
 }
@@ -77,8 +78,21 @@ export async function updateSession(request: NextRequest) {
             return NextResponse.redirect(url);
         }
 
-        // Dashboard / onboarding réservés aux restaurateurs
-        if ((pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")) && role !== "merchant") {
+        // /dashboard/fournisseur réservé aux fournisseurs
+        if (pathname.startsWith("/dashboard/fournisseur") && role !== "supplier") {
+            const url = request.nextUrl.clone();
+            url.pathname = homePath;
+            return NextResponse.redirect(url);
+        }
+
+        // Dashboard / onboarding réservés aux restaurateurs (hors /dashboard/fournisseur)
+        if (
+            (
+                (pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/fournisseur")) ||
+                pathname.startsWith("/onboarding")
+            ) &&
+            role !== "merchant"
+        ) {
             const url = request.nextUrl.clone();
             url.pathname = homePath;
             return NextResponse.redirect(url);

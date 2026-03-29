@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
     ArrowLeft,
-    Headset,
     User,
     Mail,
     Phone,
@@ -20,9 +19,12 @@ import {
     Send,
     MessageSquare,
     Shield,
+    RotateCcw,
+    Inbox,
+    Loader2,
 } from "lucide-react";
-import { Badge, Button, Input, Textarea, toast, adminFetch, Card } from "@kbouffe/module-core/ui";
-import { motion, AnimatePresence } from "framer-motion";
+import { Badge, Button, Textarea, toast, adminFetch, Card } from "@kbouffe/module-core/ui";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface TicketDetail {
@@ -35,6 +37,7 @@ interface TicketDetail {
     priority: string;
     assignedTo: string | null;
     restaurantId: string | null;
+    restaurantName: string | null;
     orderId: string | null;
     createdAt: string;
     resolvedAt: string | null;
@@ -43,13 +46,25 @@ interface TicketDetail {
     reporterPhone: string | null;
     assigneeName: string | null;
     assigneeEmail: string | null;
+    unreadAdmin: number;
+    unreadReporter: number;
 }
 
-const statusBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info"; color: string }> = {
-    open: { label: "Nouveau", variant: "warning", color: "text-amber-500 bg-amber-500/10" },
-    in_progress: { label: "En cours", variant: "info", color: "text-blue-500 bg-blue-500/10" },
-    resolved: { label: "Résolu", variant: "success", color: "text-emerald-500 bg-emerald-500/10" },
-    closed: { label: "Fermé", variant: "default", color: "text-surface-400 bg-surface-100" },
+interface Message {
+    id: string;
+    senderType: "restaurant" | "admin" | "customer";
+    senderName: string | null;
+    senderAvatar: string | null;
+    content: string;
+    isRead: boolean;
+    createdAt: string;
+}
+
+const statusBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info"; color: string; icon: any }> = {
+    open: { label: "Nouveau", variant: "warning", color: "text-amber-500 bg-amber-500/10", icon: Inbox },
+    in_progress: { label: "En cours", variant: "info", color: "text-blue-500 bg-blue-500/10", icon: Clock },
+    resolved: { label: "Résolu", variant: "success", color: "text-emerald-500 bg-emerald-500/10", icon: CheckCircle },
+    closed: { label: "Fermé", variant: "default", color: "text-surface-400 bg-surface-100", icon: XCircle },
 };
 
 const priorityBadge: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger"; color: string }> = {
@@ -59,12 +74,38 @@ const priorityBadge: Record<string, { label: string; variant: "default" | "succe
     urgent: { label: "Urgente", variant: "danger", color: "bg-red-500/10 text-red-600" },
 };
 
+function formatTime(dateStr: string) {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 export default function AdminSupportDetailPage() {
     const { id } = useParams<{ id: string }>();
     const [ticket, setTicket] = useState<TicketDetail | null>(null);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMsgs, setLoadingMsgs] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [sendingMsg, setSendingMsg] = useState(false);
     const [response, setResponse] = useState("");
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    const fetchMessages = useCallback(async () => {
+        try {
+            const res = await adminFetch(`/api/admin/support/${id}/messages`);
+            if (res.ok) {
+                const data = await res.json();
+                setMessages(data.messages ?? []);
+            }
+        } catch {
+            console.error("Failed to load messages");
+        } finally {
+            setLoadingMsgs(false);
+        }
+    }, [id]);
 
     useEffect(() => {
         (async () => {
@@ -75,7 +116,20 @@ export default function AdminSupportDetailPage() {
                 setLoading(false);
             }
         })();
-    }, [id]);
+        fetchMessages();
+    }, [id, fetchMessages]);
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    // Poll every 15s
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (document.visibilityState === "visible") fetchMessages();
+        }, 15_000);
+        return () => clearInterval(interval);
+    }, [fetchMessages]);
 
     const updateTicket = async (updates: Partial<TicketDetail>) => {
         if (!ticket) return;
@@ -97,17 +151,37 @@ export default function AdminSupportDetailPage() {
         }
     };
 
-    const handleSendResponse = async () => {
-        if (!response.trim()) return;
-        toast.info("Envoi de la réponse (Simulation)...");
-        // Here you would call an API to send email/notification to user
-        setTimeout(() => {
-            setResponse("");
-            toast.success("Réponse envoyée au rapporteur");
-            if (ticket?.status === "open") {
-                updateTicket({ status: "in_progress" });
+    const handleSendMessage = async () => {
+        const trimmed = response.trim();
+        if (!trimmed || sendingMsg) return;
+        setSendingMsg(true);
+        try {
+            const res = await adminFetch(`/api/admin/support/${id}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: trimmed }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setMessages(prev => [...prev, {
+                    ...data.message,
+                    senderType: "admin",
+                    senderName: "kBouffe Admin",
+                    senderAvatar: null,
+                    isRead: true,
+                }]);
+                setResponse("");
+                // Auto in_progress
+                if (ticket?.status === "open") {
+                    setTicket(t => t ? { ...t, status: "in_progress" } : t);
+                }
+                toast.success("Message envoyé");
+            } else {
+                toast.error("Erreur lors de l'envoi");
             }
-        }, 1000);
+        } finally {
+            setSendingMsg(false);
+        }
     };
 
     if (loading) return (
@@ -138,7 +212,7 @@ export default function AdminSupportDetailPage() {
         val ? new Date(val).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
     return (
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="max-w-6xl mx-auto pb-20"
@@ -151,11 +225,20 @@ export default function AdminSupportDetailPage() {
                     Retour à l'assistance
                 </Link>
                 <div className="flex items-center gap-3">
-                    <Button 
-                        variant="outline" 
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={fetchMessages}
+                        className="text-surface-400"
+                    >
+                        <RotateCcw size={14} className="mr-1" /> Actualiser
+                    </Button>
+                    <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => updateTicket({ status: t.status === "resolved" ? "open" : "resolved" })}
                         className={t.status === "resolved" ? "text-amber-600" : "text-emerald-600"}
+                        disabled={saving}
                     >
                         {t.status === "resolved" ? "Réouvrir le ticket" : "Marquer comme résolu"}
                     </Button>
@@ -165,7 +248,7 @@ export default function AdminSupportDetailPage() {
             {/* Main Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Content Area */}
-                <div className="lg:col-span-8 space-y-8">
+                <div className="lg:col-span-8 space-y-6">
                     {/* Header Card */}
                     <Card className="p-0 overflow-hidden">
                         <div className={`p-6 border-b border-surface-100 dark:border-surface-800 ${sb.color.split(" ")[1]} bg-opacity-30`}>
@@ -174,87 +257,145 @@ export default function AdminSupportDetailPage() {
                                     <div className="flex items-center gap-2">
                                         <Badge variant={sb.variant} className="font-bold border-none shadow-sm">{sb.label}</Badge>
                                         <Badge variant={pb.variant} className="font-bold border-none">{pb.label}</Badge>
+                                        {t.unreadAdmin > 0 && (
+                                            <span className="bg-brand-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                                {t.unreadAdmin} non lu{t.unreadAdmin > 1 ? "s" : ""}
+                                            </span>
+                                        )}
                                     </div>
                                     <h1 className="text-2xl font-black text-surface-900 dark:text-white tracking-tight uppercase">
                                         {t.subject}
                                     </h1>
                                 </div>
-                                <span className="text-[10px] font-mono text-surface-400 bg-white/50 dark:bg-black/20 px-2 py-1 rounded-lg">
+                                <span className="text-[10px] font-mono text-surface-400 bg-white/50 dark:bg-black/20 px-2 py-1 rounded-lg shrink-0">
                                     ID: #{t.id.slice(0, 12)}
                                 </span>
                             </div>
                         </div>
-                        <div className="p-8">
-                            <div className="flex items-start gap-4 mb-8">
-                                <div className="w-10 h-10 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-surface-400 shrink-0">
-                                    <User size={20} />
-                                </div>
-                                <div className="space-y-4 flex-1">
-                                    <div className="bg-surface-50 dark:bg-surface-800/50 p-6 rounded-2xl border border-surface-100 dark:border-surface-800">
-                                        <p className="text-base text-surface-700 dark:text-surface-200 leading-relaxed whitespace-pre-wrap">
-                                            {t.description}
-                                        </p>
-                                    </div>
-                                    <p className="text-[10px] text-surface-400 font-bold uppercase tracking-widest px-2">
-                                        Soumis le {formatDate(t.createdAt)} par {t.reporterName}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* References */}
-                            {(t.restaurantId || t.orderId) && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
-                                    {t.restaurantId && (
-                                        <Link href={`/admin/restaurants/${t.restaurantId}`} className="group p-4 rounded-2xl border border-surface-100 dark:border-surface-800 hover:border-brand-500/20 hover:bg-brand-500/5 transition-all">
-                                            <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-2">Établissement lié</p>
-                                            <div className="flex items-center gap-3">
-                                                <Store size={18} className="text-brand-500" />
-                                                <span className="text-sm font-bold text-surface-900 dark:text-white truncate group-hover:text-brand-500">#{t.restaurantId.slice(0, 8)}</span>
-                                            </div>
-                                        </Link>
-                                    )}
-                                    {t.orderId && (
-                                        <div className="p-4 rounded-2xl border border-surface-100 dark:border-surface-800">
-                                            <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-2">Commande associée</p>
-                                            <div className="flex items-center gap-3">
-                                                <FileText size={18} className="text-brand-500" />
-                                                <span className="text-sm font-bold text-surface-900 dark:text-white">#{t.orderId.slice(0, 8)}</span>
-                                            </div>
+                        {/* References */}
+                        {(t.restaurantId || t.orderId) && (
+                            <div className="px-6 pt-4 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {t.restaurantId && (
+                                    <Link href={`/admin/restaurants/${t.restaurantId}`} className="group p-4 rounded-2xl border border-surface-100 dark:border-surface-800 hover:border-brand-500/20 hover:bg-brand-500/5 transition-all">
+                                        <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-2">Établissement lié</p>
+                                        <div className="flex items-center gap-3">
+                                            <Store size={18} className="text-brand-500" />
+                                            <span className="text-sm font-bold text-surface-900 dark:text-white truncate group-hover:text-brand-500">
+                                                {t.restaurantName ?? `#${t.restaurantId.slice(0, 8)}`}
+                                            </span>
                                         </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                                    </Link>
+                                )}
+                                {t.orderId && (
+                                    <div className="p-4 rounded-2xl border border-surface-100 dark:border-surface-800">
+                                        <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-2">Commande associée</p>
+                                        <div className="flex items-center gap-3">
+                                            <FileText size={18} className="text-brand-500" />
+                                            <span className="text-sm font-bold text-surface-900 dark:text-white">#{t.orderId.slice(0, 8)}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </Card>
 
-                    {/* Response Area */}
-                    <Card className="space-y-4">
-                        <h3 className="text-lg font-bold text-surface-900 dark:text-white flex items-center gap-2">
-                            <MessageSquare size={20} className="text-brand-500" />
-                            Répondre au rapporteur
-                        </h3>
-                        <div className="relative">
-                            <Textarea
-                                value={response}
-                                onChange={(e) => setResponse(e.target.value)}
-                                placeholder="Saisissez votre réponse ici. Le rapporteur recevra une notification par email."
-                                rows={6}
-                                className="bg-surface-50 dark:bg-surface-800 border-none rounded-2xl focus:ring-2 focus:ring-brand-500 transition-all p-4"
-                            />
+                    {/* Messages thread */}
+                    <Card className="p-0 overflow-hidden">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100 dark:border-surface-800">
+                            <h3 className="text-sm font-bold text-surface-900 dark:text-white flex items-center gap-2">
+                                <MessageSquare size={16} className="text-brand-500" />
+                                Conversation ({messages.length} messages)
+                            </h3>
                         </div>
-                        <div className="flex justify-between items-center">
-                            <p className="text-xs text-surface-400 italic">
-                                Une réponse officielle sera enregistrée dans l'audit.
-                            </p>
-                            <Button
-                                disabled={!response.trim() || saving}
-                                onClick={handleSendResponse}
-                                leftIcon={<Send size={18} />}
-                                className="px-8 shadow-lg shadow-brand-500/20"
-                            >
-                                Envoyer la réponse
-                            </Button>
+
+                        {/* Thread */}
+                        <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
+                            {loadingMsgs ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 size={20} className="animate-spin text-brand-500" />
+                                </div>
+                            ) : messages.length === 0 ? (
+                                <p className="text-sm text-surface-400 text-center py-8">Aucun message dans ce ticket.</p>
+                            ) : (
+                                messages.map((msg, idx) => {
+                                    const isAdmin = msg.senderType === "admin";
+                                    const showSender = idx === 0 || messages[idx - 1].senderType !== msg.senderType;
+
+                                    return (
+                                        <div key={msg.id} className={cn("flex gap-3", isAdmin ? "flex-row-reverse" : "flex-row")}>
+                                            {!isAdmin && (
+                                                <div className="w-8 h-8 rounded-full bg-surface-200 dark:bg-surface-700 flex items-center justify-center shrink-0 mt-auto text-surface-500 font-bold text-sm">
+                                                    {msg.senderName?.charAt(0) ?? "U"}
+                                                </div>
+                                            )}
+                                            {isAdmin && (
+                                                <div className="w-8 h-8 rounded-full bg-brand-500/10 flex items-center justify-center shrink-0 mt-auto">
+                                                    <Shield size={14} className="text-brand-500" />
+                                                </div>
+                                            )}
+
+                                            <div className={cn("max-w-[75%] space-y-1 flex flex-col", isAdmin ? "items-end" : "items-start")}>
+                                                {showSender && (
+                                                    <span className="text-[11px] font-medium text-surface-400 px-1">
+                                                        {isAdmin ? "kBouffe Admin" : (msg.senderName ?? "Restaurant")}
+                                                    </span>
+                                                )}
+                                                <div className={cn(
+                                                    "px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words",
+                                                    isAdmin
+                                                        ? "bg-brand-500 text-white rounded-tr-sm"
+                                                        : "bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-white rounded-tl-sm"
+                                                )}>
+                                                    {msg.content}
+                                                </div>
+                                                <span className="text-[10px] text-surface-400 px-1">
+                                                    {formatTime(msg.createdAt)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                            <div ref={bottomRef} />
                         </div>
+
+                        {/* Reply box */}
+                        {t.status !== "closed" ? (
+                            <div className="px-6 pb-6 pt-2 border-t border-surface-100 dark:border-surface-800">
+                                <div className="space-y-3">
+                                    <Textarea
+                                        value={response}
+                                        onChange={(e) => setResponse(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendMessage();
+                                            }
+                                        }}
+                                        placeholder="Répondre au restaurant… (Entrée pour envoyer)"
+                                        rows={3}
+                                        className="bg-surface-50 dark:bg-surface-800 border-none rounded-2xl focus:ring-2 focus:ring-brand-500 transition-all p-4"
+                                    />
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-xs text-surface-400 italic">
+                                            Le restaurant sera notifié de votre réponse.
+                                        </p>
+                                        <Button
+                                            disabled={!response.trim() || sendingMsg}
+                                            onClick={handleSendMessage}
+                                            leftIcon={sendingMsg ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                            className="px-6 shadow-lg shadow-brand-500/20"
+                                        >
+                                            {sendingMsg ? "Envoi..." : "Envoyer"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="px-6 pb-6 pt-2 border-t border-surface-100 dark:border-surface-800 text-center">
+                                <p className="text-sm text-surface-400">Ce ticket est fermé.</p>
+                            </div>
+                        )}
                     </Card>
                 </div>
 
@@ -293,18 +434,22 @@ export default function AdminSupportDetailPage() {
                     {/* Meta Info */}
                     <Card className="space-y-4">
                         <h3 className="text-sm font-black uppercase tracking-widest text-surface-400">Informations Clés</h3>
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div className="flex items-center justify-between py-2 border-b border-surface-100 dark:border-surface-800">
                                 <span className="text-xs font-bold text-surface-500 flex items-center gap-2"><Calendar size={14} /> Création</span>
-                                <span className="text-xs font-bold text-surface-900 dark:text-white">{new Date(t.createdAt).toLocaleDateString()}</span>
+                                <span className="text-xs font-bold text-surface-900 dark:text-white">{new Date(t.createdAt).toLocaleDateString("fr-FR")}</span>
                             </div>
                             <div className="flex items-center justify-between py-2 border-b border-surface-100 dark:border-surface-800">
                                 <span className="text-xs font-bold text-surface-500 flex items-center gap-2"><UserCheck size={14} /> Assigné à</span>
                                 <span className="text-xs font-bold text-brand-500">{t.assigneeName || "En attente"}</span>
                             </div>
+                            <div className="flex items-center justify-between py-2 border-b border-surface-100 dark:border-surface-800">
+                                <span className="text-xs font-bold text-surface-500 flex items-center gap-2"><MessageSquare size={14} /> Messages</span>
+                                <span className="text-xs font-bold text-surface-900 dark:text-white">{messages.length}</span>
+                            </div>
                             <div className="flex items-center justify-between py-2">
                                 <span className="text-xs font-bold text-surface-500 flex items-center gap-2"><Clock size={14} /> Résolu le</span>
-                                <span className="text-xs font-bold text-surface-900 dark:text-white">{t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString() : "—"}</span>
+                                <span className="text-xs font-bold text-surface-900 dark:text-white">{t.resolvedAt ? new Date(t.resolvedAt).toLocaleDateString("fr-FR") : "—"}</span>
                             </div>
                         </div>
                     </Card>
@@ -315,6 +460,8 @@ export default function AdminSupportDetailPage() {
                         <div className="grid grid-cols-1 gap-2">
                             {(["open", "in_progress", "resolved", "closed"] as const).map((s) => {
                                 const active = t.status === s;
+                                const sc = statusBadge[s];
+                                const StatusIcon = sc.icon;
                                 return (
                                     <button
                                         key={s}
@@ -327,7 +474,10 @@ export default function AdminSupportDetailPage() {
                                                 : "bg-surface-50 dark:bg-surface-800 border-surface-100 dark:border-surface-700 text-surface-500 hover:border-brand-500/30"
                                         )}
                                     >
-                                        <span className="uppercase">{statusBadge[s].label}</span>
+                                        <span className="flex items-center gap-2 uppercase">
+                                            <StatusIcon size={12} />
+                                            {sc.label}
+                                        </span>
                                         {active && <CheckCircle size={14} />}
                                     </button>
                                 );

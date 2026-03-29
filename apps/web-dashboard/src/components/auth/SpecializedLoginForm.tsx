@@ -10,7 +10,7 @@ import { useLocale } from "@kbouffe/module-core/ui";
 import { motion } from "framer-motion";
 import Image from "next/image";
 
-type UserType = "client" | "restaurant";
+type UserType = "client" | "restaurant" | "supplier";
 
 interface SpecializedLoginFormProps {
     type: UserType;
@@ -30,8 +30,13 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
     });
 
     const isClient = type === "client";
-    const bgImage = isClient ? "/images/client_registration_hero.png" : "/images/wizard_step2.png";
-    const themeColor = isClient ? "brand" : "surface"; // Can adjust based on design system
+    const isSupplier = type === "supplier";
+    const bgImage = isClient
+        ? "/images/client_registration_hero.png"
+        : isSupplier
+        ? "/images/wizard_step2.png"
+        : "/images/wizard_step2.png";
+    const themeColor = isClient ? "brand" : "surface";
 
     function updateField(field: string, value: string) {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -76,14 +81,14 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
             }
 
             const userRole = data?.user?.user_metadata?.role;
-            
-            // Basic validation: if they are logging in on the restaurant page, they should probably have a merchant role
-            // However, we'll keep the redirect logic flexible for now
-            
+
             let redirectPath = "/stores";
             if (userRole === "merchant" || userRole === "admin") {
                 redirectPath = "/dashboard";
                 setRedirectMessage(t.auth.redirectingDashboard);
+            } else if (userRole === "supplier") {
+                redirectPath = "/dashboard/fournisseur";
+                setRedirectMessage("Redirection vers votre espace fournisseur…");
             } else if (userRole === "livreur") {
                 redirectPath = "/driver";
                 setRedirectMessage(t.auth.redirectingDeliveries);
@@ -120,11 +125,13 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                         className="text-white"
                     >
                         <h2 className="text-4xl font-bold mb-4">
-                            {isClient ? "Bienvenue sur Kbouffe" : "Gérez votre restaurant"}
+                            {isClient ? "Bienvenue sur Kbouffe" : isSupplier ? "Espace Fournisseur" : "Gérez votre restaurant"}
                         </h2>
                         <p className="text-lg text-white/80">
-                            {isClient 
-                                ? "La révolution culinaire au Cameroun dans votre poche." 
+                            {isClient
+                                ? "La révolution culinaire au Cameroun dans votre poche."
+                                : isSupplier
+                                ? "Gérez votre catalogue, vos commandes et votre profil agriculteur."
                                 : "Digitalisez votre établissement et boostez votre chiffre d'affaires."}
                         </p>
                     </motion.div>
@@ -147,7 +154,7 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                                 {isClient ? <User size={20} /> : <Mail size={20} />}
                             </div>
                             <h1 className="text-3xl font-bold text-surface-900 dark:text-white">
-                                {isClient ? "Espace Client" : "Espace Restaurant"}
+                                {isClient ? "Espace Client" : isSupplier ? "Espace Fournisseur" : "Espace Restaurant"}
                             </h1>
                         </div>
                         <p className="text-surface-600 dark:text-surface-400">
@@ -242,22 +249,39 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                     <div className="mt-8 text-center space-y-4">
                         <p className="text-surface-600 dark:text-surface-400 text-sm">
                             Pas encore de compte ?{" "}
-                            <Link 
-                                href={isClient ? "/register/client" : "/register/restaurant"} 
+                            <Link
+                                href={isClient ? "/register/client" : isSupplier ? "/register/fournisseur" : "/register/restaurant"}
                                 className="text-brand-500 hover:text-brand-600 font-bold"
                             >
                                 S'inscrire gratuitement
                             </Link>
                         </p>
-                        
-                        <div className="pt-4 border-t border-surface-200 dark:border-surface-800">
-                            <Link 
-                                href={isClient ? "/login/restaurant" : "/login/client"}
-                                className="text-xs text-surface-500 dark:text-surface-500 hover:text-brand-500 transition-colors inline-flex items-center gap-2"
-                            >
-                                Passer à l'espace {isClient ? "Restaurant" : "Client"}
-                                <ArrowRight size={12} />
-                            </Link>
+
+                        <div className="pt-4 border-t border-surface-200 dark:border-surface-800 flex flex-col gap-2 items-center">
+                            {!isClient && (
+                                <Link
+                                    href="/login/client"
+                                    className="text-xs text-surface-500 hover:text-brand-500 transition-colors inline-flex items-center gap-2"
+                                >
+                                    Passer à l&apos;espace Client <ArrowRight size={12} />
+                                </Link>
+                            )}
+                            {!isSupplier && (
+                                <Link
+                                    href="/login/fournisseur"
+                                    className="text-xs text-surface-500 hover:text-brand-500 transition-colors inline-flex items-center gap-2"
+                                >
+                                    Espace Fournisseur / Agriculteur <ArrowRight size={12} />
+                                </Link>
+                            )}
+                            {!isClient && !isSupplier && (
+                                <Link
+                                    href="/login/client"
+                                    className="text-xs text-surface-500 hover:text-brand-500 transition-colors inline-flex items-center gap-2"
+                                >
+                                    Passer à l&apos;espace Client <ArrowRight size={12} />
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </motion.div>

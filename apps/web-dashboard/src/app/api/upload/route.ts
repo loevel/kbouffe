@@ -3,108 +3,85 @@ import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "edge";
 
+// ── R2 types ────────────────────────────────────────────────────────────────
+
 interface R2Bucket {
   put(
     key: string,
     value: ReadableStream<Uint8Array> | ArrayBuffer | string,
     options?: { httpMetadata?: { contentType: string }; customMetadata?: Record<string, string> }
-  ): Promise<R2Object>;
+  ): Promise<unknown>;
 }
 
-interface R2Object {
-  key: string;
-  version: string;
-  size: number;
-  etag: string;
-  httpEtag: string;
-  checksums: Record<string, string>;
-  uploaded: Date;
-  httpMetadata: { contentType: string };
-  customMetadata: Record<string, string>;
-  range?: { offset: number; length: number };
-}
+// ── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_SIZE = 5 * 1024 * 1024; // 5 Mo
+const MAX_SIZE = 8 * 1024 * 1024; // 8 Mo
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const R2_PUBLIC_URL = "https://pub-1729b536b57c42c9a54d530432764964.r2.dev";
+
+// ── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
     try {
-        console.log("[Upload API] Requête reçue");
-
-        // 1. Authentification
+        // 1. Auth
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
-
         if (!user) {
-            console.error("[Upload API] Authentification échouée");
             return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
         }
-        console.log("[Upload API] Utilisateur authentifié:", user.id);
 
-        // 2. Récupération du fichier
+        // 2. Fichier
         const formData = await request.formData();
         const file = formData.get("file") as File | null;
-
         if (!file) {
-            console.error("[Upload API] Aucun fichier fourni");
             return NextResponse.json({ error: "Aucun fichier fourni" }, { status: 400 });
         }
-        console.log("[Upload API] Fichier reçu:", { name: file.name, size: file.size, type: file.type });
 
         // 3. Validations
         if (!ALLOWED_TYPES.includes(file.type)) {
-            console.error("[Upload API] Type non autorisé:", file.type);
-            return NextResponse.json({ error: "Type de fichier non autorisé" }, { status: 400 });
+            return NextResponse.json({ error: "Type non autorisé (jpeg, png, webp, avif)" }, { status: 400 });
         }
-
         if (file.size > MAX_SIZE) {
-            console.error("[Upload API] Fichier trop volumineux:", file.size);
-            return NextResponse.json({ error: "Fichier trop volumineux (max 5 Mo)" }, { status: 400 });
+            return NextResponse.json({ error: "Fichier trop volumineux (max 8 Mo)" }, { status: 400 });
         }
 
-        // 4. Préparation de l'upload
-        const ext = file.name.split(".").pop() || "jpg";
-        const key = `dishes/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-        console.log("[Upload API] Clé préparée:", key);
-
-        // 5. Upload vers R2
-        console.log("[Upload API] Accès au bucket R2...");
-        const bucket = (request as any).env?.IMAGES_BUCKET as R2Bucket | undefined;
-
-        if (!bucket) {
-            console.error("[Upload API] IMAGES_BUCKET binding non trouvé");
-            console.error("[Upload API] env keys:", Object.keys((request as any).env || {}));
-            throw new Error("Binding IMAGES_BUCKET non disponible. Vérifiez que le binding est configuré dans wrangler.toml");
-        }
-
-        console.log("[Upload API] Début de l'upload R2...");
+        // 4. Clé de fichier
+        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const folder = (formData.get("folder") as string | null) || "dishes";
+        const key = `${folder}/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
         const arrayBuffer = await file.arrayBuffer();
 
-        await bucket.put(key, arrayBuffer, {
-            httpMetadata: {
+        // 5a. Tentative upload R2 (production Cloudflare Workers)
+        const r2Bucket = (request as any).env?.IMAGES_BUCKET as R2Bucket | undefined;
+        if (r2Bucket) {
+            await r2Bucket.put(key, arrayBuffer, {
+                httpMetadata: { contentType: file.type },
+                customMetadata: { uploadedBy: user.id },
+            });
+            const publicUrl = `${R2_PUBLIC_URL}/${key}`;
+            return NextResponse.json({ success: true, url: publicUrl, key, storage: "r2" });
+        }
+
+        // 5b. Fallback Supabase Storage (dev local / environnements sans R2)
+        console.warn("[Upload API] R2 indisponible — fallback Supabase Storage");
+        const { data, error: sbError } = await supabase.storage
+            .from("images")
+            .upload(key, arrayBuffer, {
                 contentType: file.type,
-            },
-            customMetadata: {
-                uploadedBy: user.id,
-            }
-        });
-        console.log("[Upload API] Upload R2 réussi");
+                upsert: false,
+            });
 
-        // URL publique du bucket R2
-        const publicUrl = `https://pub-1729b536b57c42c9a54d530432764964.r2.dev/${key}`;
+        if (sbError) {
+            console.error("[Upload API] Supabase Storage error:", sbError);
+            throw new Error(sbError.message);
+        }
 
-        console.log("[Upload API] Succès:", { url: publicUrl });
-        return NextResponse.json({
-            success: true,
-            url: publicUrl,
-            key: key
-        });
+        const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(data.path);
+        return NextResponse.json({ success: true, url: publicUrl, key: data.path, storage: "supabase" });
 
     } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        console.error("[Upload API] Erreur complète:", errorMsg, err);
-        return NextResponse.json({
-            error: `Erreur lors de l'upload: ${errorMsg}`
-        }, { status: 500 });
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[Upload API] Erreur:", msg);
+        return NextResponse.json({ error: `Erreur lors de l'upload : ${msg}` }, { status: 500 });
     }
 }

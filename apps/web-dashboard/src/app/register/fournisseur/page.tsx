@@ -3,10 +3,12 @@
 /**
  * Page d'inscription Fournisseur — KBouffe
  *
- * Flux en 2 étapes :
- *   Étape 1 — Création du compte Supabase Auth (téléphone + mot de passe)
+ * Flux en 3 étapes :
+ *   Étape 1 — Création du compte Supabase Auth (email + mot de passe)
  *             + enregistrement en base via POST /api/auth/register
  *   Étape 2 — Formulaire de profil fournisseur (SupplierRegisterForm)
+ *   Étape 3 — Vérification d'identité KYC (individual_farmer uniquement)
+ *             Face liveness 100 % client-side — aucune donnée biométrique stockée
  *
  * Usage :
  *   Accessible via /register/fournisseur
@@ -34,6 +36,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { SupplierRegisterForm } from "@kbouffe/module-marketplace/ui";
+import type { SupplierType } from "@kbouffe/module-marketplace/lib";
+import { FaceLivenessKYC, type KYCResult } from "@/components/kyc/FaceLivenessKYC";
 
 // ── Supabase client ────────────────────────────────────────────────────────
 
@@ -155,8 +159,9 @@ function StepBadge({ step, current }: { step: number; current: number }) {
 export default function FournisseurRegisterPage() {
     const router = useRouter();
 
-    // Step state: 0 = auth form, 1 = supplier profile form
+    // Step state: 0 = auth form, 1 = supplier profile form, 2 = KYC (individual_farmer only)
     const [currentStep, setCurrentStep] = useState(0);
+    const [supplierType, setSupplierType] = useState<SupplierType | null>(null);
 
     // Step 1 form state
     const [form, setForm] = useState<Step1Form>({
@@ -232,7 +237,7 @@ export default function FournisseurRegisterPage() {
                     phone,
                     password: form.password,
                     full_name: form.full_name,
-                    role: "fournisseur",
+                    role: "supplier",
                 }),
             });
 
@@ -269,7 +274,41 @@ export default function FournisseurRegisterPage() {
 
     // ── Step 2 success ───────────────────────────────────────────────────
 
-    function handleSupplierSuccess() {
+    function handleSupplierSuccess(type: SupplierType) {
+        setSupplierType(type);
+        if (type === "individual_farmer") {
+            // Étape KYC obligatoire pour les agriculteurs individuels
+            setCurrentStep(2);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        } else {
+            // Coopératives et grossistes → vérification manuelle par l'admin
+            router.push("/dashboard/fournisseur");
+        }
+    }
+
+    // ── Step 3: KYC success ───────────────────────────────────────────────
+
+    async function handleKYCSuccess(result: KYCResult) {
+        // Envoyer le résultat KYC (score uniquement — pas de biométrie)
+        try {
+            await authFetch("/api/marketplace/suppliers/me", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    kyc_face_verified: result.verified,
+                    kyc_face_score: Math.round(result.faceMatchScore * 100),
+                    kyc_name_match: result.nameMatch,
+                    kyc_confidence: result.confidence,
+                }),
+            });
+        } catch {
+            // Non bloquant — on continue vers le dashboard
+        }
+        router.push("/dashboard/fournisseur");
+    }
+
+    function handleKYCSkip() {
+        // Vérification ignorée → révision manuelle
         router.push("/dashboard/fournisseur");
     }
 
@@ -436,17 +475,17 @@ export default function FournisseurRegisterPage() {
                         aria-label="Progression de l'inscription"
                     >
                         <StepBadge step={0} current={currentStep} />
-                        <div
-                            className={`h-px w-16 transition-all duration-500 ${
-                                currentStep >= 1 ? "bg-brand-500" : "bg-white/10"
-                            }`}
-                        />
+                        <div className={`h-px w-12 transition-all duration-500 ${currentStep >= 1 ? "bg-brand-500" : "bg-white/10"}`} />
                         <StepBadge step={1} current={currentStep} />
+                        <div className={`h-px w-12 transition-all duration-500 ${currentStep >= 2 ? "bg-emerald-500" : "bg-white/10"}`} />
+                        <StepBadge step={2} current={currentStep} />
 
-                        <div className="ml-4 text-xs text-surface-500">
+                        <div className="ml-3 text-xs text-surface-500">
                             {currentStep === 0
-                                ? "Étape 1 sur 2 — Compte"
-                                : "Étape 2 sur 2 — Profil fournisseur"}
+                                ? "Étape 1/3 — Compte"
+                                : currentStep === 1
+                                ? "Étape 2/3 — Profil"
+                                : "Étape 3/3 — Identité"}
                         </div>
                     </motion.div>
 
@@ -657,6 +696,32 @@ export default function FournisseurRegisterPage() {
 
                             {/* SupplierRegisterForm from marketplace module */}
                             <SupplierRegisterForm onSuccess={handleSupplierSuccess} />
+                        </motion.div>
+                    )}
+
+                    {/* ── Step 3: KYC face liveness (individual_farmer only) ── */}
+                    {currentStep === 2 && supplierType === "individual_farmer" && (
+                        <motion.div
+                            key="step3"
+                            variants={pageVariants}
+                            initial="hidden"
+                            animate="visible"
+                        >
+                            <div className="flex items-center gap-3 mb-5 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm">
+                                <CheckCircle2 size={18} className="shrink-0" />
+                                <div>
+                                    <p className="font-semibold">Profil soumis avec succès !</p>
+                                    <p className="text-emerald-400/80 text-xs mt-0.5">
+                                        Dernière étape : vérifiez votre identité pour accélérer la validation de votre dossier.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <FaceLivenessKYC
+                                expectedName={form.full_name}
+                                onSuccess={handleKYCSuccess}
+                                onSkip={handleKYCSkip}
+                            />
                         </motion.div>
                     )}
 

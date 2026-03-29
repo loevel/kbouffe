@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ImagePlus, Upload, Trash2, PlusCircle, Link2, Wand2, Loader2, Flame, Clock, Sparkles } from "lucide-react";
+import { Save, ImagePlus, Upload, Trash2, PlusCircle, Link2, Wand2, Loader2, Flame, Clock, Sparkles, Languages } from "lucide-react";
 import { Card, Button, Input, Textarea, Select, Toggle, toast, useLocale, useDashboard, authFetch } from "@kbouffe/module-core/ui";
 
 import { ProductOptionEditor } from "./ProductOptionEditor";
@@ -22,9 +22,15 @@ export function ProductForm({ product }: ProductFormProps) {
     const { categories } = useCategories(effectiveRestaurantId);
     const isEditing = !!product;
 
+    // i18n : onglet actif FR/EN
+    const [activeLang, setActiveLang] = useState<"fr" | "en">("fr");
+    const [translateLoading, setTranslateLoading] = useState(false);
+
     const [form, setForm] = useState({
         name: product?.name ?? "",
         description: product?.description ?? "",
+        nameEn: (product as any)?.name_i18n?.en ?? "",
+        descriptionEn: (product as any)?.description_i18n?.en ?? "",
         price: product?.price?.toString() ?? "",
         compareAtPrice: product?.compare_at_price?.toString() ?? "",
         categoryId: product?.category_id ?? "",
@@ -39,6 +45,41 @@ export function ProductForm({ product }: ProductFormProps) {
         stockQuantity: (product as any)?.stock_quantity?.toString() ?? "",
         availableUntil: (product as any)?.available_until ?? "",
     });
+    // ── AI Auto-Translate FR → EN ─────────────────────────────────────
+    const handleAiTranslate = async () => {
+        const frName = form.name.trim();
+        const frDesc = form.description.trim();
+        if (!frName && !frDesc) {
+            toast.error("Renseignez d'abord le nom ou la description en français");
+            return;
+        }
+        setTranslateLoading(true);
+        try {
+            const res = await fetch("/api/ai/translate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ texts: [frName, frDesc] }),
+            });
+            const data = await res.json();
+            if (data.translations) {
+                const [nameEn, descriptionEn] = data.translations as string[];
+                setForm(prev => ({
+                    ...prev,
+                    nameEn: nameEn || prev.nameEn,
+                    descriptionEn: descriptionEn || prev.descriptionEn,
+                }));
+                setActiveLang("en");
+                toast.success("Traduction anglaise générée ✨");
+            } else {
+                toast.error(data.error ?? "Erreur de traduction");
+            }
+        } catch {
+            toast.error("Erreur de connexion au service IA");
+        } finally {
+            setTranslateLoading(false);
+        }
+    };
+
     const [aiLoading, setAiLoading] = useState(false);
     const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
     const [options, setOptions] = useState<ProductOption[]>(
@@ -249,6 +290,14 @@ export function ProductForm({ product }: ProductFormProps) {
         const productData = {
             name: form.name.trim(),
             description: form.description.trim() || null,
+            name_i18n: {
+                fr: form.name.trim(),
+                ...(form.nameEn.trim() ? { en: form.nameEn.trim() } : {}),
+            },
+            description_i18n: {
+                ...(form.description.trim() ? { fr: form.description.trim() } : {}),
+                ...(form.descriptionEn.trim() ? { en: form.descriptionEn.trim() } : {}),
+            },
             price: Number(form.price),
             compare_at_price: form.compareAtPrice ? Number(form.compareAtPrice) : null,
             category_id: form.categoryId || null,
@@ -284,76 +333,143 @@ export function ProductForm({ product }: ProductFormProps) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
-                        <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.menu.productInfo}</h3>
-                        <div className="space-y-4">
-                            <Input
-                                label={t.menu.productNameLabel}
-                                placeholder={t.menu.productNamePlaceholder}
-                                value={form.name}
-                                onChange={(e) => updateField("name", e.target.value)}
-                            />
-                            {/* Description + AI Wand */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">
-                                        {t.menu.productDescription}
-                                    </label>
+                        {/* Header : titre + onglets FR/EN + bouton Traduire */}
+                        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                            <h3 className="font-semibold text-surface-900 dark:text-white">{t.menu.productInfo}</h3>
+                            <div className="flex items-center gap-2">
+                                {/* Onglets FR / EN */}
+                                <div className="flex p-0.5 bg-surface-100 dark:bg-surface-800 rounded-lg">
                                     <button
                                         type="button"
-                                        onClick={handleAiCopywrite}
-                                        disabled={aiLoading || !form.name.trim()}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                        title="Générer une description avec l'IA"
+                                        onClick={() => setActiveLang("fr")}
+                                        className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeLang === "fr" ? "bg-white dark:bg-surface-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-surface-400 hover:text-surface-700 dark:hover:text-surface-300"}`}
                                     >
-                                        {aiLoading ? (
-                                            <Loader2 size={14} className="animate-spin" />
-                                        ) : (
-                                            <Wand2 size={14} />
-                                        )}
-                                        {aiLoading ? "Génération..." : "Baguette Magique"}
+                                        🇫🇷 FR
+                                        {form.name.trim() && <span className="w-1.5 h-1.5 rounded-full bg-green-400 ml-0.5" />}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveLang("en")}
+                                        className={`flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeLang === "en" ? "bg-white dark:bg-surface-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-surface-400 hover:text-surface-700 dark:hover:text-surface-300"}`}
+                                    >
+                                        🇬🇧 EN
+                                        {form.nameEn.trim() && <span className="w-1.5 h-1.5 rounded-full bg-green-400 ml-0.5" />}
                                     </button>
                                 </div>
-                                <Textarea
-                                    placeholder={t.menu.productDescPlaceholder}
-                                    value={form.description}
-                                    onChange={(e) => updateField("description", e.target.value)}
-                                    rows={4}
-                                />
-
-                                {/* AI Suggestions */}
-                                {aiSuggestions.length > 0 && (
-                                    <div className="mt-3 space-y-2">
-                                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                                            <Wand2 size={12} />
-                                            Choisissez une suggestion :
-                                        </p>
-                                        {aiSuggestions.map((suggestion, idx) => (
-                                            <button
-                                                key={idx}
-                                                type="button"
-                                                onClick={() => {
-                                                    updateField("description", suggestion);
-                                                    setAiSuggestions([]);
-                                                    toast.success("Description appliquée !");
-                                                }}
-                                                className="w-full text-left p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-100 dark:hover:bg-amber-500/15 text-sm text-surface-700 dark:text-surface-300 transition-colors"
-                                            >
-                                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block mb-1">
-                                                    {idx === 0 ? "Courte" : idx === 1 ? "Moyenne" : "Storytelling"}
-                                                </span>
-                                                {suggestion}
-                                            </button>
-                                        ))}
-                                        <button
-                                            type="button"
-                                            onClick={() => setAiSuggestions([])}
-                                            className="text-xs text-surface-400 hover:text-surface-600 transition-colors"
-                                        >
-                                            Fermer les suggestions
-                                        </button>
-                                    </div>
+                                {/* Bouton traduire IA */}
+                                {activeLang === "en" && (
+                                    <button
+                                        type="button"
+                                        onClick={handleAiTranslate}
+                                        disabled={translateLoading || (!form.name.trim() && !form.description.trim())}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title="Traduire automatiquement FR → EN avec l'IA"
+                                    >
+                                        {translateLoading ? <Loader2 size={13} className="animate-spin" /> : <Languages size={13} />}
+                                        {translateLoading ? "Traduction..." : "Traduire avec l'IA"}
+                                    </button>
                                 )}
                             </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {activeLang === "fr" ? (
+                                <>
+                                    <Input
+                                        label={t.menu.productNameLabel}
+                                        placeholder={t.menu.productNamePlaceholder}
+                                        value={form.name}
+                                        onChange={(e) => updateField("name", e.target.value)}
+                                    />
+                                    {/* Description FR + AI Wand */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">
+                                                {t.menu.productDescription}
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={handleAiCopywrite}
+                                                disabled={aiLoading || !form.name.trim()}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                title="Générer une description avec l'IA"
+                                            >
+                                                {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                                                {aiLoading ? "Génération..." : "Baguette Magique"}
+                                            </button>
+                                        </div>
+                                        <Textarea
+                                            placeholder={t.menu.productDescPlaceholder}
+                                            value={form.description}
+                                            onChange={(e) => updateField("description", e.target.value)}
+                                            rows={4}
+                                        />
+                                        {/* AI Suggestions FR */}
+                                        {aiSuggestions.length > 0 && (
+                                            <div className="mt-3 space-y-2">
+                                                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                                                    <Wand2 size={12} /> Choisissez une suggestion :
+                                                </p>
+                                                {aiSuggestions.map((suggestion, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => { updateField("description", suggestion); setAiSuggestions([]); toast.success("Description appliquée !"); }}
+                                                        className="w-full text-left p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-100 dark:hover:bg-amber-500/15 text-sm text-surface-700 dark:text-surface-300 transition-colors"
+                                                    >
+                                                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block mb-1">
+                                                            {idx === 0 ? "Courte" : idx === 1 ? "Moyenne" : "Storytelling"}
+                                                        </span>
+                                                        {suggestion}
+                                                    </button>
+                                                ))}
+                                                <button type="button" onClick={() => setAiSuggestions([])} className="text-xs text-surface-400 hover:text-surface-600 transition-colors">
+                                                    Fermer les suggestions
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Version anglaise */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                                            Product name <span className="text-surface-400 font-normal">(English)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Braised Sea Bass"
+                                            value={form.nameEn}
+                                            onChange={(e) => updateField("nameEn", e.target.value)}
+                                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                        />
+                                        {form.name.trim() && !form.nameEn.trim() && (
+                                            <p className="mt-1 text-xs text-surface-400 italic">🇫🇷 Référence FR : {form.name}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                                            Description <span className="text-surface-400 font-normal">(English)</span>
+                                        </label>
+                                        <textarea
+                                            placeholder="e.g. Fresh sea bass marinated in spices, slow-grilled over charcoal..."
+                                            value={form.descriptionEn}
+                                            onChange={(e) => updateField("descriptionEn", e.target.value)}
+                                            rows={4}
+                                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                                        />
+                                        {form.description.trim() && !form.descriptionEn.trim() && (
+                                            <p className="mt-1 text-xs text-surface-400 italic line-clamp-2">🇫🇷 Référence FR : {form.description}</p>
+                                        )}
+                                    </div>
+                                    <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-500/5 border border-indigo-100 dark:border-indigo-500/10">
+                                        <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                                            💡 La version anglaise est optionnelle. Si vide, le français s'affichera par défaut sur la vitrine.
+                                        </p>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </Card>
 

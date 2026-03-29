@@ -21,10 +21,33 @@ export const suppliersRoutes = new Hono<{ Bindings: Env; Variables: Variables }>
 suppliersRoutes.get('/', async (c) => {
   try {
     const supabase = c.var.supabase;
-    const { region, category, type, page = '1' } = c.req.query() as SupplierFilters & { page?: string };
+    const {
+      region, category, type, page = '1',
+      q,        // search by supplier name
+      product,  // search by product name
+      locality, // filter by city/locality
+      organic,  // '1' = bio only
+      featured, // '1' = featured only
+    } = c.req.query() as SupplierFilters & {
+      page?: string; q?: string; product?: string;
+      locality?: string; organic?: string; featured?: string;
+    };
     const pageNum = Math.max(1, parseInt(page as string, 10));
     const limit = 20;
     const offset = (pageNum - 1) * limit;
+
+    // If searching by product name, find matching supplier IDs first
+    let productMatchIds: string[] | null = null;
+    if (product?.trim()) {
+      const { data: productMatches } = await supabase
+        .from('supplier_products')
+        .select('supplier_id')
+        .ilike('name', `%${product.trim()}%`)
+        .eq('is_active', true);
+      productMatchIds = productMatches
+        ? [...new Set(productMatches.map((p: { supplier_id: string }) => p.supplier_id))]
+        : [];
+    }
 
     let query = supabase
       .from('suppliers')
@@ -32,18 +55,29 @@ suppliersRoutes.get('/', async (c) => {
         id, name, type, contact_name, phone, region, locality,
         description, logo_url, minader_cert_url, is_featured,
         listing_tier, created_at,
-        supplier_products(id, name, category, price_per_unit, unit, is_active)
+        supplier_products(id, name, category, price_per_unit, unit, is_active, is_organic, photos)
       `)
       .eq('is_active', true)
       .eq('kyc_status', 'approved')
       .order('is_featured', { ascending: false })
+      .order('listing_tier', { ascending: false })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (region) query = query.eq('region', region);
     if (type) query = query.eq('type', type);
+    if (q?.trim()) query = query.ilike('name', `%${q.trim()}%`);
+    if (locality?.trim()) query = query.ilike('locality', `%${locality.trim()}%`);
+    if (featured === '1') query = query.eq('is_featured', true);
+    if (productMatchIds !== null) {
+      if (productMatchIds.length === 0) {
+        // No matching products — return empty result immediately
+        return c.json({ success: true, suppliers: [], pagination: { page: pageNum, limit, total: 0 } });
+      }
+      query = query.in('id', productMatchIds);
+    }
 
-    const { data, error, count } = await query;
+    const { data, error } = await query;
 
     if (error) {
       console.error('Suppliers list error:', error);
@@ -52,17 +86,22 @@ suppliersRoutes.get('/', async (c) => {
 
     let suppliers = (data ?? []) as unknown as Supplier[];
 
-    // Filtre par catégorie de produit côté application
+    // Client-side filters (on joined data)
     if (category) {
       suppliers = suppliers.filter((s) =>
         s.products?.some((p) => p.category === category && p.is_active)
+      );
+    }
+    if (organic === '1') {
+      suppliers = suppliers.filter((s) =>
+        s.products?.some((p) => p.is_organic && p.is_active)
       );
     }
 
     return c.json({
       success: true,
       suppliers,
-      pagination: { page: pageNum, limit, total: count ?? suppliers.length },
+      pagination: { page: pageNum, limit, total: suppliers.length },
     });
   } catch (err) {
     console.error('Error listing suppliers:', err);
@@ -115,16 +154,15 @@ suppliersRoutes.patch('/me', async (c) => {
     const userId = c.var.userId;
     if (!userId) return c.json({ error: 'Non autorisé' }, 401);
 
-    const body = await c.req.json<Partial<{
-      description: string;
-      logo_url: string;
-      address: string;
-      gps_lat: number;
-      gps_lng: number;
-      locality: string;
-    }>>();
+    const body = await c.req.json<Record<string, unknown>>();
 
-    const allowed = ['description', 'logo_url', 'address', 'gps_lat', 'gps_lng', 'locality'];
+    const allowed = [
+      'description', 'logo_url', 'cover_url', 'address', 'gps_lat', 'gps_lng', 'locality',
+      'gallery', 'social_links', 'delivery_zones', 'payment_methods',
+      'delivery_delay_days', 'specialties', 'processing_delay_days',
+      // Résultats KYC face liveness (scores uniquement — pas de biométrie brute)
+      'kyc_face_verified', 'kyc_face_score', 'kyc_name_match', 'kyc_confidence',
+    ];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) updates[key] = (body as Record<string, unknown>)[key];
@@ -211,12 +249,12 @@ suppliersRoutes.post('/me/products', async (c) => {
       return c.json({ error: 'Votre dossier KYC est en attente de validation — vous pourrez ajouter des produits une fois approuvé' }, 403);
     }
 
-    const body = await c.req.json<CreateSupplierProductRequest>();
+    const body = await c.req.json<CreateSupplierProductRequest & { photos?: string[] }>();
     const {
       name, category, price_per_unit, unit,
       description, min_order_quantity, available_quantity,
       origin_region, harvest_date, allergens,
-      is_organic, phytosanitary_note,
+      is_organic, phytosanitary_note, photos,
     } = body;
 
     if (!name?.trim() || !category || !price_per_unit || !unit) {
@@ -224,6 +262,13 @@ suppliersRoutes.post('/me/products', async (c) => {
     }
     if (price_per_unit <= 0) {
       return c.json({ error: 'Le prix doit être supérieur à 0 FCFA' }, 400);
+    }
+    const photosList = Array.isArray(photos) ? photos : [];
+    if (photosList.length < 1) {
+      return c.json({ error: 'Au moins 1 photo est requise pour le produit' }, 400);
+    }
+    if (photosList.length > 5) {
+      return c.json({ error: 'Maximum 5 photos autorisées par produit' }, 400);
     }
 
     const { data, error } = await supabase
@@ -233,9 +278,9 @@ suppliersRoutes.post('/me/products', async (c) => {
         name: name.trim(),
         category,
         description: description?.trim() || null,
-        photos: [],
         price_per_unit,
         unit,
+        photos: photosList,
         min_order_quantity: min_order_quantity ?? 1,
         available_quantity: available_quantity ?? null,
         origin_region: origin_region?.trim() || null,
@@ -301,6 +346,74 @@ suppliersRoutes.get('/me/orders', async (c) => {
     });
   } catch (err) {
     console.error('Error fetching my orders:', err);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/marketplace/suppliers/me/orders/:orderId
+ * Le fournisseur confirme ou marque comme livrée une commande
+ * Transitions autorisées : pending → confirmed → delivered
+ */
+suppliersRoutes.patch('/me/orders/:orderId', async (c) => {
+  try {
+    const supabase = c.var.supabase;
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: 'Non autorisé' }, 401);
+
+    const orderId = c.req.param('orderId');
+    const { delivery_status } = await c.req.json<{ delivery_status: string }>();
+
+    const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+      pending: ['confirmed'],
+      confirmed: ['delivered'],
+    };
+
+    // Récupérer le fournisseur et l'ordre
+    const { data: supplier } = await supabase
+      .from('suppliers')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (!supplier) return c.json({ error: 'Profil fournisseur introuvable' }, 404);
+
+    const { data: order } = await supabase
+      .from('supplier_order_traces')
+      .select('id, delivery_status')
+      .eq('id', orderId)
+      .eq('supplier_id', supplier.id)
+      .single();
+
+    if (!order) return c.json({ error: 'Commande introuvable' }, 404);
+
+    const allowed = ALLOWED_TRANSITIONS[order.delivery_status as string] ?? [];
+    if (!allowed.includes(delivery_status)) {
+      return c.json({
+        error: `Transition non autorisée : ${order.delivery_status} → ${delivery_status}`,
+      }, 400);
+    }
+
+    const updateData: Record<string, unknown> = { delivery_status };
+    if (delivery_status === 'delivered') {
+      updateData.actual_delivery_date = new Date().toISOString().split('T')[0];
+    }
+
+    const { data, error } = await supabase
+      .from('supplier_order_traces')
+      .update(updateData)
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update order status error:', error);
+      return c.json({ error: 'Erreur lors de la mise à jour' }, 500);
+    }
+
+    return c.json({ success: true, order: data });
+  } catch (err) {
+    console.error('Error updating order status:', err);
     return c.json({ error: 'Erreur serveur' }, 500);
   }
 });
@@ -547,7 +660,7 @@ suppliersRoutes.patch('/supplier-products/:productId', async (c) => {
     const body = await c.req.json<Partial<CreateSupplierProductRequest>>();
 
     const allowed = [
-      'name', 'description', 'price_per_unit', 'unit', 'min_order_quantity',
+      'name', 'category', 'description', 'price_per_unit', 'unit', 'min_order_quantity',
       'available_quantity', 'origin_region', 'harvest_date', 'allergens',
       'is_organic', 'phytosanitary_note', 'is_active', 'photos',
     ];
@@ -558,6 +671,17 @@ suppliersRoutes.patch('/supplier-products/:productId', async (c) => {
 
     if (Object.keys(updates).length === 0) {
       return c.json({ error: 'Aucune modification fournie' }, 400);
+    }
+
+    // Validate photos array if provided
+    if ('photos' in updates) {
+      const photosList = updates.photos as unknown[];
+      if (!Array.isArray(photosList) || photosList.length < 1) {
+        return c.json({ error: 'Au moins 1 photo est requise pour le produit' }, 400);
+      }
+      if (photosList.length > 5) {
+        return c.json({ error: 'Maximum 5 photos autorisées par produit' }, 400);
+      }
     }
 
     const { data, error } = await supabase
