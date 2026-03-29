@@ -3,6 +3,20 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import type { Metadata } from "next";
 
+// ── Identité légale de l'éditeur ─────────────────────────────────────────────
+// Mettre à jour ces constantes dès l'immatriculation de la société.
+const EDITOR = {
+    raisonSociale:    process.env.NEXT_PUBLIC_KBOUFFE_RAISON_SOCIALE    ?? "KBouffe",
+    formeJuridique:   process.env.NEXT_PUBLIC_KBOUFFE_FORME_JURIDIQUE   ?? "[À compléter — ex. SARL]",
+    capital:          process.env.NEXT_PUBLIC_KBOUFFE_CAPITAL            ?? "[À compléter — ex. 1 000 000 FCFA]",
+    siege:            process.env.NEXT_PUBLIC_KBOUFFE_SIEGE              ?? "[À compléter — ex. Douala, Cameroun]",
+    rccm:             process.env.NEXT_PUBLIC_KBOUFFE_RCCM               ?? "[À compléter — ex. RC/DLA/2025/B/XXXX]",
+    niu:              process.env.NEXT_PUBLIC_KBOUFFE_NIU                ?? "[À compléter]",
+    directeur:        process.env.NEXT_PUBLIC_KBOUFFE_DIRECTEUR_PUB     ?? "[À compléter — Directeur de Publication]",
+    email:            "privacy@kbouffe.com",
+    site:             "https://kbouffe.com",
+};
+
 export const metadata: Metadata = {
     title: "Conditions Générales d'Utilisation — Kbouffe",
     description: "Consultez les conditions générales d'utilisation de la plateforme Kbouffe.",
@@ -47,6 +61,20 @@ export default function TermsPage() {
                     </p>
 
                     <div className="prose dark:prose-invert max-w-none space-y-10">
+
+                        {/* ── Bloc éditeur ── */}
+                        <div className="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800/50 p-5 text-sm text-surface-700 dark:text-surface-300 space-y-1.5">
+                            <p className="font-semibold text-surface-900 dark:text-white mb-3">Éditeur de la plateforme</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">Raison sociale :</span> {EDITOR.raisonSociale}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">Forme juridique :</span> {EDITOR.formeJuridique}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">Capital social :</span> {EDITOR.capital}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">Siège social :</span> {EDITOR.siege}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">RCCM :</span> {EDITOR.rccm}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">NIU :</span> {EDITOR.niu}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">Directeur de publication :</span> {EDITOR.directeur}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">Site web :</span> {EDITOR.site}</p>
+                            <p><span className="font-medium text-surface-900 dark:text-white">Contact :</span> {EDITOR.email}</p>
+                        </div>
 
                         {/* ── 1. Objet ── */}
                         <section>

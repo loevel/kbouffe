@@ -798,6 +798,7 @@ export const en: TranslationKeys = {
         legal: "Legal",
         terms: "Terms of Service",
         privacy: "Privacy",
+        mentionsLegales: "Legal Notice",
         ctaTitle: "Ready to launch your online restaurant?",
         ctaDesc: "Join the first Cameroonian restaurateurs using Kbouffe.",
         ctaButton: "Create my store for free",

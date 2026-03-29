@@ -796,6 +796,7 @@ export const fr = {
         legal: "Legal",
         terms: "Conditions Generales",
         privacy: "Confidentialite",
+        mentionsLegales: "Mentions Legales",
         ctaTitle: "Pret a lancer votre restaurant en ligne ?",
         ctaDesc: "Rejoignez les premiers restaurateurs camerounais sur Kbouffe.",
         ctaButton: "Creer ma boutique gratuitement",

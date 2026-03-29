@@ -24,6 +24,7 @@ export function Footer() {
         legal: [
             { label: t.footer.terms, href: "/terms" },
             { label: t.footer.privacy, href: "/privacy" },
+            { label: t.footer.mentionsLegales, href: "/mentions-legales" },
         ],
     };
     return (
