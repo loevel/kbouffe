@@ -306,13 +306,38 @@ app.onError((err, c) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Export Worker Handlers (Fetch + Queue)
+//  Export Worker Handlers (Fetch + Queue + Scheduled)
 // ═══════════════════════════════════════════════════════════════════════
 import { processSmsQueue, type SmsMessage } from "./lib/sms-queue";
+
+async function runDataPurge(env: Env): Promise<void> {
+    const serviceKey = (env as any).SUPABASE_SERVICE_ROLE_KEY ?? (env as any).SUPABASE_ANON_KEY;
+    if (!serviceKey) return;
+    const db = createClient((env as any).SUPABASE_URL, serviceKey);
+
+    const threeYearsAgo = new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000).toISOString();
+    const tenYearsAgo  = new Date(Date.now() - 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    // 1. Purge old completed ad campaigns (> 3 ans)
+    await db.from("ad_campaigns").delete().eq("status", "completed").lt("ends_at", threeYearsAgo);
+
+    // 2. Purge old coupon uses (> 3 ans — données marketing, non fiscales)
+    await db.from("coupon_uses").delete().lt("used_at", threeYearsAgo);
+
+    // 3. Anonymise les données PII des commandes > 10 ans (obligation fiscale mais PDCP Loi 2010/012)
+    await db
+        .from("orders")
+        .update({ customer_name: "[archivé]", customer_phone: null, delivery_address: null })
+        .lt("created_at", tenYearsAgo)
+        .neq("customer_name", "[archivé]");
+}
 
 export default {
     fetch: app.fetch,
     async queue(batch: MessageBatch<SmsMessage>, env: Env): Promise<void> {
         await processSmsQueue(batch, env);
+    },
+    async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+        ctx.waitUntil(runDataPurge(env));
     },
 };

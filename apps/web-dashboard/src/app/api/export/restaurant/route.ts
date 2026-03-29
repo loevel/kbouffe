@@ -66,7 +66,7 @@ export async function GET() {
                 exported_at: new Date().toISOString(),
                 restaurant_id: restaurantId,
                 platform: "kBouffe",
-                gdpr_note: "Export conforme RGPD — Article 20 portabilité des données.",
+                legal_note: "Export conforme Loi camerounaise n°2010/012 du 21 décembre 2010 Art.48 — Droit d'accès aux données personnelles.",
             },
             restaurant: restaurantRes.data ?? null,
             statistics: {

@@ -26,7 +26,10 @@ export default function PrivacyPage() {
                             <p className="text-surface-600 dark:text-surface-400 leading-relaxed">
                                 Kbouffe s&apos;engage à protéger la vie privée de ses utilisateurs. La présente
                                 politique de confidentialité décrit les types de données personnelles que nous collectons,
-                                comment nous les utilisons et les mesures prises pour les protéger.
+                                comment nous les utilisons et les mesures prises pour les protéger, conformément à la
+                                <strong className="text-surface-900 dark:text-white"> Loi n°2010/012 du 21 décembre 2010</strong> relative
+                                à la cybersécurité et à la cybercriminalité au Cameroun, et aux directives de l&apos;
+                                <strong className="text-surface-900 dark:text-white">Agence Nationale des Technologies de l&apos;Information et de la Communication (ANTIC)</strong>.
                             </p>
                         </section>
 
@@ -131,7 +134,7 @@ export default function PrivacyPage() {
                         <section>
                             <h2 className="text-2xl font-bold text-surface-900 dark:text-white mb-4">7. Vos droits</h2>
                             <p className="text-surface-600 dark:text-surface-400 leading-relaxed mb-3">
-                                Conformément à la réglementation en vigueur, vous disposez des droits suivants :
+                                Conformément à la <strong className="text-surface-900 dark:text-white">Loi n°2010/012 Art.48</strong>, vous disposez des droits suivants :
                             </p>
                             <ul className="space-y-3 text-surface-600 dark:text-surface-400 leading-relaxed">
                                 <li><strong className="text-surface-900 dark:text-white">Droit d&apos;accès :</strong> obtenir une copie de vos données personnelles.</li>
@@ -139,6 +142,12 @@ export default function PrivacyPage() {
                                 <li><strong className="text-surface-900 dark:text-white">Droit de suppression :</strong> demander la suppression de vos données.</li>
                                 <li><strong className="text-surface-900 dark:text-white">Droit d&apos;opposition :</strong> vous opposer au traitement de vos données.</li>
                             </ul>
+                            <p className="text-surface-600 dark:text-surface-400 leading-relaxed mt-4">
+                                Pour tout exercice de vos droits ou réclamation relative à la protection de vos données
+                                personnelles, vous pouvez également saisir l&apos;
+                                <strong className="text-surface-900 dark:text-white">ANTIC</strong> (Agence Nationale des Technologies de l&apos;Information et de la Communication) :
+                                {" "}<a href="https://antic.cm" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://antic.cm</a>.
+                            </p>
                         </section>
 
                         <section>

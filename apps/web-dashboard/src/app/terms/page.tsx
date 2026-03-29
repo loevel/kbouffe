@@ -302,9 +302,34 @@ export default function TermsPage() {
                             </P>
                         </section>
 
-                        {/* ── 12. Responsabilités ── */}
+                        {/* ── 12. Droit de rétractation ── */}
                         <section>
-                            <H2>12. Limitation de responsabilité</H2>
+                            <H2>12. Droit de rétractation</H2>
+                            <P>
+                                Conformément à la <Strong>Loi n°2015/003 du 16 avril 2015</Strong> portant protection
+                                du consommateur au Cameroun (Art.22), tout abonné à un service SaaS Kbouffe dispose
+                                d&apos;un <Strong>délai de 14 jours calendaires</Strong> à compter de la date de
+                                souscription pour exercer son droit de rétractation, sans pénalité et sans obligation
+                                de justification.
+                            </P>
+                            <P>
+                                <Strong>Exceptions :</Strong> Le droit de rétractation ne s&apos;applique pas si
+                                vous avez expressément consenti au démarrage immédiat de la prestation et que le
+                                service a été pleinement exécuté avant l&apos;expiration du délai (activation du compte,
+                                traitement de commandes, accès immédiat aux fonctionnalités).
+                            </P>
+                            <P>
+                                <Strong>Exercice du droit de rétractation :</Strong> Pour exercer ce droit, envoyez
+                                une demande écrite non équivoque à <Strong>privacy@kbouffe.com</Strong> mentionnant
+                                votre nom, votre identifiant de compte et la date de souscription. Le remboursement
+                                sera effectué dans les <Strong>14 jours</Strong> suivant la réception de votre demande,
+                                via le même moyen de paiement utilisé.
+                            </P>
+                        </section>
+
+                        {/* ── 13. Responsabilités ── */}
+                        <section>
+                            <H2>13. Limitation de responsabilité</H2>
                             <P>
                                 Kbouffe met tout en œuvre pour assurer la disponibilité et la fiabilité de la plateforme,
                                 mais ne peut garantir une disponibilité ininterrompue. La responsabilité de Kbouffe
@@ -323,9 +348,9 @@ export default function TermsPage() {
                             </ul>
                         </section>
 
-                        {/* ── 13. Propriété intellectuelle ── */}
+                        {/* ── 14. Propriété intellectuelle ── */}
                         <section>
-                            <H2>13. Propriété intellectuelle</H2>
+                            <H2>14. Propriété intellectuelle</H2>
                             <P>
                                 L&apos;ensemble des éléments de la plateforme (logos, textes, interface, code source, algorithmes
                                 de scoring) sont la propriété exclusive de Kbouffe, protégés par le droit camerounais
@@ -339,9 +364,9 @@ export default function TermsPage() {
                             </P>
                         </section>
 
-                        {/* ── 14. Résiliation ── */}
+                        {/* ── 15. Résiliation ── */}
                         <section>
-                            <H2>14. Résiliation du compte</H2>
+                            <H2>15. Résiliation du compte</H2>
                             <P>
                                 L&apos;Utilisateur peut résilier son compte à tout moment depuis les paramètres de la plateforme.
                                 Kbouffe peut suspendre ou résilier un compte sans préavis en cas de :
@@ -354,9 +379,9 @@ export default function TermsPage() {
                             </ul>
                         </section>
 
-                        {/* ── 15. Droit applicable ── */}
+                        {/* ── 16. Droit applicable ── */}
                         <section>
-                            <H2>15. Droit applicable et juridiction compétente</H2>
+                            <H2>16. Droit applicable et juridiction compétente</H2>
                             <P>
                                 Les présentes CGU sont régies par le droit camerounais, notamment :
                             </P>
@@ -374,9 +399,9 @@ export default function TermsPage() {
                             </P>
                         </section>
 
-                        {/* ── 16. Contact ── */}
+                        {/* ── 17. Contact ── */}
                         <section>
-                            <H2>16. Contact</H2>
+                            <H2>17. Contact</H2>
                             <P>
                                 Pour toute question relative aux présentes CGU ou pour exercer vos droits :
                             </P>
