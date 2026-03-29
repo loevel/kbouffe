@@ -28,6 +28,7 @@ import { PreferencesPanelReal } from "./PreferencesPanelReal";
 import { ClientNotificationsPanel } from "./ClientNotificationsPanel";
 import { SupportPanelReal } from "./SupportPanelReal";
 import { ReservationsPanelReal } from "./ReservationsPanelReal";
+import { TwoFactorSection } from "@/components/shared/TwoFactorSection";
 
 function PanelShell({
     title,
@@ -191,6 +192,8 @@ export function SecurityPanel() {
                         </form>
                     )}
                 </div>
+
+                <TwoFactorSection />
 
                 <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700 flex items-center justify-between">
                     <div className="flex items-center gap-3">

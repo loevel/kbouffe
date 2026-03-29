@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
+import { TwoFactorSection } from "@/components/shared/TwoFactorSection";
 
 interface SettingField {
     key: string;
@@ -282,6 +283,22 @@ export default function AdminSettingsPage() {
                     </motion.section>
                 ))}
             </div>
+
+            {/* Sécurité Personnelle */}
+            <motion.section variants={itemVariants} className="space-y-3">
+                <div className="flex items-center gap-3 px-1">
+                    <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <KeyRound size={16} className="text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-surface-900 dark:text-white">Sécurité Personnelle</h2>
+                        <p className="text-xs text-surface-500">Protégez votre compte administrateur</p>
+                    </div>
+                </div>
+                <div className="p-6 rounded-3xl bg-surface-50 dark:bg-surface-800/40 border border-surface-200/80 dark:border-surface-700/60">
+                    <TwoFactorSection />
+                </div>
+            </motion.section>
 
             {/* Quick Actions Footer */}
             <motion.div 
