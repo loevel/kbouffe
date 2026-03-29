@@ -68,6 +68,8 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Permet à la BottomNavBar de s'étendre sous le notch iPhone / Dynamic Island
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

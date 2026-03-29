@@ -269,12 +269,51 @@ function FournisseurLayoutInner({ children }: { children: ReactNode }) {
                     </span>
                 </header>
 
-                {/* Page content */}
-                <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                {/* Page content — pb-24 sur mobile pour la bottom nav */}
+                <main className="flex-1 p-4 pb-28 sm:p-6 sm:pb-6 lg:p-8 max-w-7xl mx-auto w-full">
                     {children}
                 </main>
             </div>
+
+            {/* ── Bottom navigation mobile ─────────────────────────────── */}
+            <SupplierBottomNav />
         </div>
+    );
+}
+
+// ── Bottom navigation mobile (fournisseur) ──────────────────────────────────
+
+function SupplierBottomNav() {
+    const pathname = usePathname();
+
+    function isActive(href: string, exact: boolean) {
+        return exact ? pathname === href : pathname.startsWith(href);
+    }
+
+    return (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-900 border-t border-white/8 flex items-center justify-around pb-safe">
+            {NAV_ITEMS.map((item) => {
+                const active = isActive(item.href, item.exact);
+                return (
+                    <Link
+                        key={item.href}
+                        href={item.href}
+                        className="flex flex-col items-center justify-center gap-1 py-2 px-3 flex-1 transition-colors"
+                    >
+                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                            active ? "bg-emerald-500/15" : "hover:bg-white/5"
+                        }`}>
+                            <item.icon size={20} className={active ? "text-emerald-400" : "text-surface-500"} />
+                        </span>
+                        <span className={`text-[10px] font-medium truncate leading-none ${
+                            active ? "text-emerald-400" : "text-surface-600"
+                        }`}>
+                            {item.label.split(" ")[0]}
+                        </span>
+                    </Link>
+                );
+            })}
+        </nav>
     );
 }
 
