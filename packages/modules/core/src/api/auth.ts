@@ -149,7 +149,7 @@ authRoutes.post("/", async (c) => {
                 },
                 saas_plan: saasPlanId || "starter",
                 is_premium: !!isPremium,
-                is_published: true,
+                is_published: false, // Publié après approbation KYC admin (Arrêté MINSANTE n°0007/A)
                 is_verified: false,
                 lat: latitude,
                 lng: longitude,
@@ -356,7 +356,7 @@ authRoutes.post("/sync", async (c) => {
                     address: "À définir",
                     city: "Douala",
                     country: "CM",
-                    is_published: true,
+                    is_published: false, // Publié après approbation KYC admin (Arrêté MINSANTE n°0007/A)
                     is_verified: false,
                     is_premium: false,
                     cuisine_type: "Autre",

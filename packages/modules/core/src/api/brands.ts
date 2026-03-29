@@ -50,6 +50,11 @@ brandsRoutes.post("/", async (c) => {
 
     if (!brand_name?.trim()) return c.json({ error: "Le nom de la marque est requis" }, 400);
     if (!cuisine_type?.trim()) return c.json({ error: "Le type de cuisine est requis" }, 400);
+    if (!licence_sanitaire?.trim()) {
+        return c.json({
+            error: "Le numéro de licence sanitaire est obligatoire (Arrêté MINSANTE n°0007/A). Aucune marque alimentaire ne peut être activée sans ce justificatif.",
+        }, 422);
+    }
     if (!legal_declaration) {
         return c.json({
             error: "Vous devez cocher la déclaration légale attestant que vous possédez toutes les licences nécessaires (RCCM, NIF, Licence sanitaire) pour cette marque.",
@@ -64,7 +69,7 @@ brandsRoutes.post("/", async (c) => {
             cuisine_type: cuisine_type.trim(),
             description: description?.trim() ?? null,
             logo_url: logo_url ?? null,
-            licence_sanitaire: licence_sanitaire?.trim() ?? null,
+            licence_sanitaire: licence_sanitaire.trim(),
             legal_declaration: true,
             is_active: true,
         })
@@ -173,6 +178,8 @@ brandsAdminRoutes.patch("/restaurants/:restaurantId/kyc", async (c) => {
             kyc_notes: notes ?? null,
             kyc_reviewed_at: new Date().toISOString(),
             kyc_reviewer_id: c.var.userId,
+            // Publish restaurant only when KYC is approved (Arrêté MINSANTE n°0007/A)
+            ...(status === "approved" ? { is_published: true } : { is_published: false }),
         })
         .eq("id", c.req.param("restaurantId"));
 

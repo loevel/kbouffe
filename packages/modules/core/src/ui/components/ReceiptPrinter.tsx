@@ -15,6 +15,12 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
         if (!printWindow) return;
 
         const items = order.items || [];
+        const isTvaRegistered = !!restaurant?.tva_registered;
+        // TVA 19,25% — CGI Art.149 (calcul inversé depuis TTC)
+        const subtotalTtc  = order.subtotal || 0;
+        const subtotalHt   = isTvaRegistered ? Math.floor(subtotalTtc / 1.1925) : subtotalTtc;
+        const tvaAmount    = isTvaRegistered ? subtotalTtc - subtotalHt : 0;
+
         const itemsHtml = items.map((item: any) => `
             <tr>
                 <td style="padding: 5px 0;">${item.quantity}x ${item.name || "Produit"}</td>
@@ -28,6 +34,35 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                 </tr>
             ` : ""}
         `).join("");
+
+        const fiscalHeaderHtml = `
+            ${restaurant?.nif  ? `<div>NIF/NIU : ${restaurant.nif}</div>`  : ""}
+            ${restaurant?.rccm ? `<div>RCCM : ${restaurant.rccm}</div>`    : ""}
+        `;
+
+        const invoiceNumberHtml = order.invoice_number
+            ? `<div class="bold">N° Facture : ${order.invoice_number}</div>`
+            : "";
+
+        const tvaRowsHtml = isTvaRegistered ? `
+            <tr>
+                <td>Sous-total HT</td>
+                <td style="text-align: right;">${formatCFA(subtotalHt)}</td>
+            </tr>
+            <tr>
+                <td>TVA 19,25% (CGI Art.125)</td>
+                <td style="text-align: right;">${formatCFA(tvaAmount)}</td>
+            </tr>
+            <tr>
+                <td>Sous-total TTC</td>
+                <td style="text-align: right;">${formatCFA(subtotalTtc)}</td>
+            </tr>
+        ` : `
+            <tr>
+                <td>Sous-total</td>
+                <td style="text-align: right;">${formatCFA(subtotalTtc)}</td>
+            </tr>
+        `;
 
         printWindow.document.write(`
             <html>
@@ -48,6 +83,7 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                         .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
                         table { width: 100%; border-collapse: collapse; }
                         .footer { margin-top: 20px; font-size: 10px; }
+                        .fiscal { font-size: 10px; color: #555; }
                     </style>
                 </head>
                 <body>
@@ -55,15 +91,15 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                         <div class="bold" style="font-size: 16px;">${restaurant?.name || "Kbouffe"}</div>
                         <div>${restaurant?.address || ""}</div>
                         <div>${restaurant?.phone || ""}</div>
+                        <div class="fiscal">${fiscalHeaderHtml}</div>
                     </div>
                     
                     <div class="divider"></div>
                     
                     <div>
+                        ${invoiceNumberHtml}
                         <div class="bold">COMMANDE: ${formatOrderId(order.id)}</div>
                         <div>Date: ${formatDateTime(order.created_at)}</div>
-                        <div>Client: ${order.customer_name}</div>
-                        <div>Tél: ${order.customer_phone}</div>
                         <div>Type: ${order.delivery_type === "delivery" ? "LIVRAISON" : "À EMPORTER"}</div>
                     </div>
                     
@@ -76,16 +112,13 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                     <div class="divider"></div>
                     
                     <table>
-                        <tr>
-                            <td>Sous-total</td>
-                            <td style="text-align: right;">${formatCFA(order.subtotal)}</td>
-                        </tr>
+                        ${tvaRowsHtml}
                         <tr>
                             <td>Livraison</td>
                             <td style="text-align: right;">${formatCFA(order.delivery_fee)}</td>
                         </tr>
                         <tr class="bold" style="font-size: 14px;">
-                            <td>TOTAL</td>
+                            <td>TOTAL ${isTvaRegistered ? "TTC" : ""}</td>
                             <td style="text-align: right;">${formatCFA(order.total)}</td>
                         </tr>
                     </table>
@@ -93,6 +126,7 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                     <div class="divider"></div>
                     
                     <div class="text-center footer">
+                        ${isTvaRegistered ? "<p class='fiscal'>Prix incluant TVA 19,25% (CGI Art.125)</p>" : ""}
                         <p>Merci de votre confiance !</p>
                         <p>Commandez sur kbouffe.com</p>
                     </div>
