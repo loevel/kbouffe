@@ -22,7 +22,7 @@ import { coreApi } from "@kbouffe/module-core";
 const { storesRoutes, uploadRoutes, authRoutes, usersRoutes, securityRoutes, brandsRoutes, restaurantKycRoutes, brandsAdminRoutes, billingRoutes, adminBillingRoutes } = coreApi;
 
 import { capitalApi } from "@kbouffe/module-capital";
-const { capitalRoutes, capitalAdminRoutes } = capitalApi;
+const { capitalAdminRoutes } = capitalApi;
 import { catalogApi } from "@kbouffe/module-catalog/api";
 const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute: productsRoutes } = catalogApi;
 import { storePublicRoutes } from "./modules/store/store-public";
@@ -153,7 +153,7 @@ const merchantPaths = [
     "/customers", "/account", "/security", "/register-restaurant",
     "/marketing", "/notifications", "/payouts",
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
-    "/capital", "/restaurant/brands", "/restaurant/kyc",
+    "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
 ] as const;
 
@@ -239,9 +239,6 @@ api.route("/restaurant/kyc", restaurantKycRoutes);   // PATCH /restaurant/kyc
 // ── Facturation TVA (SaaS + Marketplace) ────────────────────────────
 api.use("/billing/*", authMiddleware);
 api.route("/billing", billingRoutes);                // merchant: factures restaurant
-
-// ── KBouffe Capital (broker scoring) ────────────────────────────────
-api.route("/capital", capitalRoutes);
 
 // ── Marketplace — routes marchands ──────────────────────────────────
 api.route("/marketplace", marketplaceMerchantRoutes);      // packs + souscriptions

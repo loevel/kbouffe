@@ -76,8 +76,8 @@ export default function TermsPage() {
                                 <Li><Strong>Restaurateur / Marchand :</Strong> Toute personne physique ou morale exploitant un établissement de restauration inscrit sur la plateforme.</Li>
                                 <Li><Strong>Fournisseur / Agriculteur :</Strong> Tout producteur agricole ou fournisseur de denrées alimentaires inscrit sur la marketplace Kbouffe.</Li>
                                 <Li><Strong>Client :</Strong> Toute personne passant commande via la plateforme auprès d&apos;un Restaurateur.</Li>
-                                <Li><Strong>Livreur :</Strong> Tout prestataire indépendant effectuant des livraisons via la plateforme.</Li>
-                                <Li><Strong>Services :</Strong> L&apos;ensemble des fonctionnalités SaaS proposées par Kbouffe (logiciel de caisse, gestion de commandes, marketplace B2B, module RH indicatif, module Capital).</Li>
+                                <Li><Strong>Livreur :</Strong> Tout membre du personnel d&apos;un Restaurateur chargé d&apos;effectuer les livraisons via la plateforme.</Li>
+                                <Li><Strong>Services :</Strong> L&apos;ensemble des fonctionnalités SaaS proposées par Kbouffe (logiciel de caisse, gestion de commandes, marketplace B2B, module RH indicatif).</Li>
                                 <Li><Strong>RCCM :</Strong> Registre du Commerce et du Crédit Mobilier.</Li>
                                 <Li><Strong>NC :</Strong> Numéro Contribuable délivré par la Direction Générale des Impôts (DGI) du Cameroun.</Li>
                                 <Li><Strong>TVA :</Strong> Taxe sur la Valeur Ajoutée au taux de 19,25 % applicable au Cameroun (CGI Art. 125).</Li>
@@ -95,9 +95,9 @@ export default function TermsPage() {
                             <ul className="space-y-2 list-disc pl-6 mb-3">
                                 <Li>Kbouffe <Strong>n&apos;est pas partie</Strong> aux contrats de vente conclus entre Restaurateurs et Clients.</Li>
                                 <Li>Kbouffe <Strong>ne détient pas</Strong> les fonds des transactions. Les paiements s&apos;effectuent directement entre le Client et le Restaurateur via les opérateurs de Mobile Money (MTN MoMo, Orange Money).</Li>
-                                <Li>Kbouffe <Strong>n&apos;est pas employeur</Strong> des Livreurs, Restaurateurs ou de leur personnel.</Li>
+                                <Li>Kbouffe <Strong>n&apos;est pas employeur</Strong> des Livreurs, Restaurateurs ou de leur personnel. Les livreurs sont employés par les Restaurateurs.</Li>
                                 <Li>Kbouffe <Strong>n&apos;est pas propriétaire</Strong> des marchandises vendues sur la marketplace.</Li>
-                                <Li>Kbouffe <Strong>n&apos;est pas un établissement de crédit ou de microfinance</Strong> au sens du Règlement COBAC. Le module Kbouffe Capital est un service de scoring et de mise en relation avec des établissements financiers partenaires agréés.</Li>
+                                <Li>Kbouffe <Strong>n&apos;est pas un établissement de crédit ou de microfinance</Strong> au sens du Règlement COBAC.</Li>
                             </ul>
                             <P>
                                 Ce statut est conforme à la Loi n°2010/021 du 21 décembre 2010 régissant le commerce
@@ -166,19 +166,21 @@ export default function TermsPage() {
                             </ul>
                         </section>
 
-                        {/* ── 6. Livreurs indépendants ── */}
+                        {/* ── 6. Livreurs ── */}
                         <section>
-                            <H2>6. Livreurs — Statut de prestataire indépendant</H2>
+                            <H2>6. Livreurs — Personnel du Restaurateur</H2>
                             <P>
-                                Les livreurs utilisant la plateforme Kbouffe interviennent en qualité de <Strong>prestataires
-                                de services indépendants</Strong>. Il n&apos;existe aucun lien de subordination, contrat de travail
+                                Les livreurs opérant sur la plateforme Kbouffe sont des <Strong>membres du personnel
+                                du Restaurateur</Strong> (salariés, stagiaires ou prestataires contractuels du Restaurateur).
+                                Kbouffe est un <Strong>logiciel de gestion</Strong> utilisé par le Restaurateur pour
+                                coordonner ses livraisons. Il n&apos;existe aucun lien de subordination, contrat de travail
                                 ni relation d&apos;emploi entre Kbouffe et les livreurs.
                             </P>
                             <ul className="space-y-2 list-disc pl-6 mb-3">
-                                <Li>Le livreur est responsable de sa propre couverture sociale, de ses déclarations fiscales et de sa conformité aux règles de circulation routière.</Li>
-                                <Li>Le contrat de livraison est conclu entre le <Strong>Restaurateur et le Livreur</Strong>. Kbouffe n&apos;est pas partie à ce contrat.</Li>
-                                <Li>En cas d&apos;accident, de perte ou de dégradation de marchandises durant la livraison, la responsabilité incombe au Livreur, sauf convention contraire avec le Restaurateur.</Li>
-                                <Li>Le livreur déclare ne pas être en situation de travail dissimulé et assumer ses obligations vis-à-vis de l&apos;administration fiscale et de la CNPS.</Li>
+                                <Li>Le Restaurateur est l&apos;<Strong>employeur légal</Strong> du livreur et assume seul les obligations afférentes : CNPS, Code du Travail (Loi n°92/007), assurance RC professionnelle et déclarations fiscales.</Li>
+                                <Li>Le contrat de livraison (tâche, zone, rémunération) est établi entre le <Strong>Restaurateur et son livreur</Strong>. Kbouffe n&apos;est pas partie à ce contrat.</Li>
+                                <Li>En cas d&apos;accident, de perte ou de dégradation de marchandises durant la livraison, la responsabilité incombe au Restaurateur, sauf convention contraire avec le Client.</Li>
+                                <Li>Kbouffe fournit uniquement des outils de suivi GPS et de gestion des missions. Le Restaurateur reste seul décideur des affectations, horaires et rémunérations de son personnel.</Li>
                             </ul>
                         </section>
 
@@ -195,30 +197,23 @@ export default function TermsPage() {
                             <P>
                                 Kbouffe perçoit une <Strong>redevance SaaS</Strong> (abonnement logiciel) auprès des Restaurateurs
                                 et, le cas échéant, des <Strong>frais de plateforme</Strong> auprès des Fournisseurs pour l&apos;accès
-                                à la marketplace. Ces redevances sont soumises à la TVA applicable.
-                            </P>
-                            <P>
-                                Dans le cadre du module Kbouffe Capital, Kbouffe perçoit auprès des établissements
-                                financiers partenaires une <Strong>commission de mise en relation</Strong> pour chaque dossier
-                                de financement abouti. Cette commission est indépendante du montant du prêt accordé
-                                et n&apos;est pas à la charge du Restaurateur.
+                                à la marketplace. Ces redevances sont soumises à la TVA au taux applicable.
                             </P>
                         </section>
 
-                        {/* ── 8. Module Capital ── */}
+                        {/* ── 8. Marketplace B2B et Centrale d'Achat ── */}
                         <section>
-                            <H2>8. Module Kbouffe Capital — Financement</H2>
+                            <H2>8. Marketplace B2B — Centrale d&apos;Achat</H2>
                             <P>
-                                Le module Kbouffe Capital est un service de <Strong>scoring financier et de mise en relation</Strong>
-                                entre les Restaurateurs et des établissements financiers partenaires agréés par la COBAC
-                                (Advans Cameroun, Express Union, BICEC, etc.). Kbouffe agit en qualité d&apos;<Strong>apporteur
-                                d&apos;affaires</Strong>.
+                                La Marketplace Kbouffe est une <Strong>plateforme de mise en relation</Strong> entre Restaurateurs
+                                et Fournisseurs (agriculteurs, grossistes, coopératives). Kbouffe agit en qualité
+                                d&apos;<Strong>hébergeur</Strong> au sens de la Loi n°2010/021.
                             </P>
                             <ul className="space-y-2 list-disc pl-6 mb-3">
-                                <Li>Le contrat de prêt est conclu <Strong>exclusivement entre le Restaurateur et l&apos;établissement financier</Strong>. Kbouffe n&apos;est pas partie au contrat de crédit.</Li>
-                                <Li>Le score de crédit calculé par Kbouffe est <Strong>indicatif</Strong> et basé sur les données de la plateforme. Il ne constitue pas une garantie d&apos;obtention d&apos;un financement.</Li>
-                                <Li>En soumettant une demande de financement, le Restaurateur consent explicitement à la <Strong>transmission de ses données financières agrégées</Strong> à l&apos;établissement partenaire sélectionné, dans le strict cadre de l&apos;instruction de sa demande.</Li>
-                                <Li>Kbouffe ne porte aucun risque de défaut de paiement. En cas d&apos;impayé, le recouvrement relève exclusivement de l&apos;établissement financier prêteur.</Li>
+                                <Li>La facture de marchandises est émise <Strong>directement par le Fournisseur au Restaurateur</Strong>. Kbouffe n&apos;est jamais propriétaire des marchandises.</Li>
+                                <Li>En cas de litige (retard, marchandise avariée), la responsabilité incombe exclusivement au Fournisseur, conformément aux mentions obligatoires des CGU Fournisseurs.</Li>
+                                <Li>Kbouffe perçoit des frais d&apos;abonnement ou de listing auprès des Fournisseurs pour le droit d&apos;être référencés dans l&apos;annuaire. Ces frais sont soumis à la TVA.</Li>
+                                <Li>Les Fournisseurs de type coopérative ou grossiste doivent justifier d&apos;un numéro RCCM valide (OHADA AUDCG Art.22). Les agriculteurs individuels sont dispensés sous le régime agricole simplifié.</Li>
                             </ul>
                         </section>
 
@@ -259,7 +254,6 @@ export default function TermsPage() {
                                 <Li><Strong>Tableau de bord analytique :</Strong> statistiques de ventes, produits les plus commandés, heures de pointe.</Li>
                                 <Li><Strong>Marketplace B2B :</Strong> mise en relation avec des fournisseurs et agriculteurs locaux.</Li>
                                 <Li><Strong>Module RH indicatif :</Strong> calcul indicatif des primes, pourboires et estimations CNPS/IRPP (voir Art. 4.4).</Li>
-                                <Li><Strong>Module Capital :</Strong> scoring financier et mise en relation avec des établissements de crédit agréés (voir Art. 8).</Li>
                                 <Li><Strong>Réservations :</Strong> gestion des tables et réservations en salle.</Li>
                                 <Li><Strong>Marketing :</Strong> coupons de réduction, campagnes promotionnelles.</Li>
                             </ul>

@@ -232,7 +232,8 @@ export function DeliveryTracker({
 
       {/* Deliverer controls */}
       {isDeliverer && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
           <button
             onClick={toggleGps}
             className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-bold transition-all ${
@@ -253,6 +254,12 @@ export function DeliveryTracker({
               </>
             )}
           </button>
+          </div>
+          {/* Legal notice — geolocation consent (Loi n°2010/012 Art.29) */}
+          <p className="text-[10px] text-surface-400 dark:text-surface-500 text-center leading-relaxed">
+            En activant le GPS, vous consentez à la collecte de votre position toutes les 5 s pendant la livraison.
+            Données supprimées à la fin de la session. Base légale : Loi n°2010/012 Art.29.
+          </p>
         </div>
       )}
 
