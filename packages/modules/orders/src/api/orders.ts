@@ -9,6 +9,7 @@
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
+import { getMobileMoneyProvider } from "./mobile-money-providers";
 
 function getAdminClient(c: any) {
     return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -251,13 +252,13 @@ ordersRoutes.patch("/:id", async (c) => {
     return c.json({ success: true, order: data });
 });
 
-/** POST /orders/:id/refund — Refund an order */
+/** POST /orders/:id/refund — Refund an order (Loi 2015/003 Art.33 — restitution effective) */
 ordersRoutes.post("/:id/refund", async (c) => {
     const supabase = c.var.supabase;
     const restaurantId = c.var.restaurantId;
     const id = c.req.param("id");
 
-    // 1. Fetch order to verify ownership and current status
+    // 1. Fetch order
     const { data: order, error: fetchError } = await supabase
         .from("orders")
         .select("id, restaurant_id, payment_status, total, payment_method")
@@ -269,23 +270,83 @@ ordersRoutes.post("/:id/refund", async (c) => {
         return c.json({ error: "Commande non trouvée" }, 404);
     }
 
-    // 2. Constraints: Only paid orders can be refunded
+    // 2. Only paid orders can be refunded
     if (order.payment_status !== "paid") {
         return c.json({ error: "Seules les commandes payées peuvent être remboursées" }, 400);
     }
 
-    // 3. Logic: Update payment_status to 'refunded'
-    // Note: For now, we manually track the refund. 
-    // Automated MoMo/Stripe refund logic would be added here in the future.
+    const admin = getAdminClient(c);
+
+    // 3. Fetch the original payment transaction to get payer MSISDN
+    const { data: txn } = await admin
+        .from("payment_transactions")
+        .select("id, payer_msisdn, amount, provider")
+        .eq("order_id", id)
+        .eq("status", "paid")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+    // 4. Attempt real MoMo disbursement (Loi 2015/003 Art.33)
+    let refundReferenceId: string | null = null;
+    let refundError: string | null = null;
+
+    if (txn && txn.payer_msisdn && txn.amount > 0 && (order as any).payment_method !== "cash") {
+        const providerCode = (txn.provider ?? "mtn_momo") as any;
+        const provider = getMobileMoneyProvider(providerCode);
+
+        if (provider?.transfer && provider.isConfigured(c.env)) {
+            refundReferenceId = crypto.randomUUID();
+            try {
+                await provider.transfer(c.env, {
+                    referenceId: refundReferenceId,
+                    amount: txn.amount,
+                    currency: "XAF",
+                    externalId: `refund-${id}`,
+                    payeeMsisdn: txn.payer_msisdn,
+                    payerMessage: "Remboursement commande KBouffe",
+                    payeeNote: `Remboursement commande #${id.slice(0, 8)}`,
+                });
+                // Record the refund transaction
+                await admin.from("payment_transactions").insert({
+                    id: crypto.randomUUID(),
+                    order_id: id,
+                    restaurant_id: restaurantId,
+                    amount: txn.amount,
+                    currency: "XAF",
+                    status: "pending",
+                    provider: providerCode,
+                    provider_status: "PENDING",
+                    payer_msisdn: txn.payer_msisdn,
+                    reference_id: refundReferenceId,
+                    type: "refund",
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                } as never);
+            } catch (err) {
+                refundError = err instanceof Error ? err.message : "Erreur disbursement MoMo";
+                console.error("Refund disbursement failed:", refundError);
+                // Block the refund — do not mark as refunded without actual money movement
+                return c.json({
+                    error: `Impossible d'envoyer le remboursement MoMo : ${refundError}. Contactez le support.`,
+                }, 502);
+            }
+        } else {
+            // Provider not configured — flag but allow manual refund path
+            refundError = "Provider MoMo non configuré — remboursement manuel requis";
+        }
+    }
+
+    // 5. Update order status (only reached after successful disbursement or cash order)
     const { data: updatedOrder, error: updateError } = await supabase
         .from("orders")
-        .update({ 
+        .update({
             payment_status: "refunded",
-            status: "cancelled", // Automatically cancel order if refunded
+            status: "cancelled",
             updated_at: new Date().toISOString(),
-            notes: (order as any).notes 
-                ? `${(order as any).notes}\n[Refund] Remboursement effectué le ${new Date().toLocaleString()}`
-                : `[Refund] Remboursement effectué le ${new Date().toLocaleString()}`
+            notes: (order as any).notes
+                ? `${(order as any).notes}\n[Remboursement] ${new Date().toLocaleString()}${refundReferenceId ? ` — ref: ${refundReferenceId}` : " — espèces"}`
+                : `[Remboursement] ${new Date().toLocaleString()}${refundReferenceId ? ` — ref: ${refundReferenceId}` : " — espèces"}`,
         } as any)
         .eq("id", id)
         .eq("restaurant_id", restaurantId)
@@ -293,11 +354,16 @@ ordersRoutes.post("/:id/refund", async (c) => {
         .single();
 
     if (updateError) {
-        console.error("Refund order error:", updateError);
-        return c.json({ error: "Erreur lors du remboursement" }, 500);
+        return c.json({ error: "Erreur lors de la mise à jour de la commande" }, 500);
     }
 
-    // 4. Log the refund transaction if needed (future work)
-
-    return c.json({ success: true, order: updatedOrder });
+    return c.json({
+        success: true,
+        order: updatedOrder,
+        refund: {
+            method: refundReferenceId ? "momo_disbursement" : "cash_or_manual",
+            referenceId: refundReferenceId,
+            warning: refundError ?? undefined,
+        },
+    });
 });

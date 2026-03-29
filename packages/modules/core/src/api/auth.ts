@@ -228,7 +228,7 @@ authRoutes.post("/register", async (c) => {
             ...(phone ? { phone } : {}),
             role,
             preferred_lang: "fr",
-            notifications_enabled: true,
+            notifications_enabled: false, // Opt-in requis — Loi 2010/012 Art.62
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
@@ -293,7 +293,7 @@ authRoutes.post("/customer-register", async (c) => {
             phone: normalizedPhone,
             role: "customer",
             preferred_lang: "fr",
-            notifications_enabled: true,
+            notifications_enabled: false, // Opt-in requis — Loi 2010/012 Art.62
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
@@ -376,7 +376,7 @@ authRoutes.post("/sync", async (c) => {
             role,
             restaurant_id: restaurantId,
             preferred_lang: "fr",
-            notifications_enabled: true,
+            notifications_enabled: false, // Opt-in requis — Loi 2010/012 Art.62
         };
 
         // Insert into Supabase

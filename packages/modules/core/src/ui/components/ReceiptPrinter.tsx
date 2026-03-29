@@ -16,7 +16,7 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
 
         const items = order.items || [];
         const isTvaRegistered = !!restaurant?.tva_registered;
-        // TVA 19,25% — CGI Art.149 (calcul inversé depuis TTC)
+        // TVA 19,25% — CGI Art.125 (calcul inversé depuis TTC : HT = TTC / 1.1925)
         const subtotalTtc  = order.subtotal || 0;
         const subtotalHt   = isTvaRegistered ? Math.floor(subtotalTtc / 1.1925) : subtotalTtc;
         const tvaAmount    = isTvaRegistered ? subtotalTtc - subtotalHt : 0;
