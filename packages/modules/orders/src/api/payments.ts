@@ -68,11 +68,28 @@ paymentRoutes.post("/request-to-pay", async (c) => {
     }
 
     const admin = getAdminClient(c.env);
+
+    // Récupérer la commande ET le numéro MTN du restaurant en une seule requête.
+    // payment_account_id = numéro MTN du restaurant (bénéficiaire direct).
     const { data: order, error: orderError } = await admin
-        .from("orders").select("id, restaurant_id, total, payment_status")
-        .eq("id", body.orderId).eq("restaurant_id", c.var.restaurantId).single();
+        .from("orders")
+        .select("id, restaurant_id, total, payment_status, restaurants!inner(payment_account_id, payment_provider)")
+        .eq("id", body.orderId)
+        .eq("restaurant_id", c.var.restaurantId)
+        .single();
 
     if (orderError || !order) return c.json({ error: "Commande introuvable" }, 404);
+
+    // Conformité COBAC/BEAC : le restaurant doit avoir un numéro MTN configuré.
+    // Sans ça, KBouffe deviendrait l'intermédiaire financier — illégal sans agrément EMF.
+    const restaurant = (order as any).restaurants;
+    const payeeMsisdn: string | null = restaurant?.payment_account_id?.trim() || null;
+    if (!payeeMsisdn) {
+        return c.json({
+            error: "Ce restaurant n'a pas configuré son numéro Mobile Money. Le paiement ne peut pas être traité.",
+            code: "RESTAURANT_NO_MTN",
+        }, 422);
+    }
 
     const referenceId = crypto.randomUUID();
     const externalId = `order-${order.id}`;
@@ -81,7 +98,10 @@ paymentRoutes.post("/request-to-pay", async (c) => {
         .insert({
             restaurant_id: c.var.restaurantId, order_id: order.id, provider: providerCode,
             reference_id: referenceId, external_id: externalId,
-            payer_msisdn: body.payerMsisdn.trim(), amount: order.total,
+            payer_msisdn: body.payerMsisdn.trim(),
+            payee_msisdn: payeeMsisdn,   // traçabilité : prouve que l'argent va au resto
+            payment_flow: "direct",       // client → restaurant directement, jamais via KBouffe
+            amount: order.total,
             currency: "XAF", status: "pending", provider_status: "PENDING",
         } as never).select("id, reference_id, status").single();
 
@@ -91,6 +111,7 @@ paymentRoutes.post("/request-to-pay", async (c) => {
         await provider.requestToPay(c.env, {
             referenceId, amount: order.total, currency: "XAF", externalId,
             payerMsisdn: body.payerMsisdn.trim(),
+            payeeMsisdn,                 // argent va DIRECTEMENT au numéro MTN du restaurant
             payerMessage: body.payerMessage ?? "Paiement commande Kbouffe",
             payeeNote: body.payeeNote ?? `Commande ${order.id}`,
         });

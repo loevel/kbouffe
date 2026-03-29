@@ -42,6 +42,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
     }
 
+    // Conformité COBAC/BEAC : l'argent doit aller directement au restaurant.
+    // KBouffe est un facilitateur technique SaaS, pas un intermédiaire financier.
+    const { data: paymentSettings } = await (admin as any)
+      .from("restaurant_payment_settings")
+      .select("momo_phone, momo_enabled")
+      .eq("restaurant_id", order.restaurant_id)
+      .single();
+
+    const payeeMsisdn = (paymentSettings as any)?.momo_phone?.trim() || null;
+    if (!payeeMsisdn) {
+      return NextResponse.json(
+        { error: "Ce restaurant n'a pas configuré son numéro MTN Mobile Money. Le paiement ne peut pas être traité.", code: "RESTAURANT_NO_MTN" },
+        { status: 422 }
+      );
+    }
+
     const referenceId = crypto.randomUUID();
     const externalId = `order-${order.id}`;
 
@@ -54,6 +70,8 @@ export async function POST(request: NextRequest) {
         reference_id: referenceId,
         external_id: externalId,
         payer_msisdn: body.payerMsisdn.trim(),
+        payee_msisdn: payeeMsisdn,   // traçabilité légale : bénéficiaire direct
+        payment_flow: "direct",
         amount: order.total,
         currency: "XAF",
         status: "pending",
@@ -75,6 +93,7 @@ export async function POST(request: NextRequest) {
         currency: "XAF",
         externalId,
         payerMsisdn: body.payerMsisdn.trim(),
+        payeeMsisdn,                 // argent va directement au numéro MTN du restaurant
         payerMessage: body.payerMessage ?? "Paiement commande Kbouffe",
         payeeNote: body.payeeNote ?? `Commande ${order.id}`,
       });
@@ -102,10 +121,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           orderId: order.id,
-          payment: {
-            referenceId: tx.reference_id,
-            status: "failed",
-          },
+          payment: { referenceId: tx.reference_id, status: "failed" },
           error: message,
         },
         { status: 502 }

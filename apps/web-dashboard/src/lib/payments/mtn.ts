@@ -16,6 +16,10 @@ export interface RequestToPayInput {
   currency: string;
   externalId: string;
   payerMsisdn: string;
+  /** Numéro MTN du restaurant bénéficiaire.
+   *  OBLIGATOIRE — conformité COBAC : l'argent va directement au restaurant.
+   *  KBouffe ne détient jamais les fonds. */
+  payeeMsisdn: string;
   payerMessage: string;
   payeeNote: string;
 }
@@ -95,6 +99,11 @@ export async function requestToPay(input: RequestToPayInput): Promise<void> {
     payer: {
       partyIdType: "MSISDN",
       partyId: input.payerMsisdn,
+    },
+    // Paiement DIRECT client → restaurant. KBouffe ne détient pas les fonds (COBAC).
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: input.payeeMsisdn,
     },
     payerMessage: input.payerMessage,
     payeeNote: input.payeeNote,
