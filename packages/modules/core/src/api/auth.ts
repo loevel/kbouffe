@@ -201,7 +201,7 @@ authRoutes.post("/register", async (c) => {
         if (!fullName) return c.json({ error: "Nom complet requis" }, 400);
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
             return c.json({ error: "Adresse email invalide" }, 400);
-        if (password.length < 6) return c.json({ error: "Mot de passe trop court (min. 6 caractères)" }, 400);
+        if (password.length < 8) return c.json({ error: "Mot de passe trop court (min. 8 caractères)" }, 400);
 
         const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -264,7 +264,7 @@ authRoutes.post("/customer-register", async (c) => {
 
         if (!fullName) return c.json({ error: "Nom complet requis" }, 400);
         if (!normalizedPhone) return c.json({ error: "Numéro de téléphone invalide — format attendu : +237 6X XXX XXXX" }, 400);
-        if (password.length < 6) return c.json({ error: "Mot de passe trop court" }, 400);
+        if (password.length < 8) return c.json({ error: "Mot de passe trop court (min. 8 caractères)" }, 400);
 
         const email = phoneToAuthEmail(normalizedPhone);
         const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);

@@ -839,7 +839,7 @@ export const en: TranslationKeys = {
         lastName: "Last name",
         restaurantName: "Restaurant name",
         phone: "Phone number",
-        passwordMinLength: "Password must be at least 6 characters.",
+        passwordMinLength: "Password must be at least 8 characters.",
         fullNameRequired: "Please enter your first and last name.",
         restaurantRequired: "Please enter your restaurant name.",
         registering: "Creating...",

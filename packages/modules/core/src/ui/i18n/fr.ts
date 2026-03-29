@@ -837,7 +837,7 @@ export const fr = {
         lastName: "Nom",
         restaurantName: "Nom du restaurant",
         phone: "Numero de telephone",
-        passwordMinLength: "Le mot de passe doit contenir au moins 6 caracteres.",
+        passwordMinLength: "Le mot de passe doit contenir au moins 8 caracteres.",
         fullNameRequired: "Veuillez renseigner votre prenom et nom.",
         restaurantRequired: "Veuillez renseigner le nom de votre restaurant.",
         registering: "Creation en cours...",
