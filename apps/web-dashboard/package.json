@@ -19,8 +19,8 @@
     "@kbouffe/module-core": "*",
     "@kbouffe/module-crm": "*",
     "@kbouffe/module-hr": "*",
-    "@kbouffe/module-marketplace": "*",
     "@kbouffe/module-marketing": "*",
+    "@kbouffe/module-marketplace": "*",
     "@kbouffe/module-orders": "*",
     "@kbouffe/module-reports": "*",
     "@kbouffe/module-reservations": "*",
@@ -29,6 +29,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.98.0",
     "clsx": "^2.1.1",
+    "face-api.js": "^0.22.2",
     "firebase": "^10.14.1",
     "framer-motion": "^12.34.3",
     "immer": "^10.1.1",
@@ -42,6 +43,7 @@
     "react-leaflet": "^4.2.1",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
+    "tesseract.js": "^7.0.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

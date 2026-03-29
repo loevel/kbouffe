@@ -46,9 +46,28 @@ export interface SupplierProfile {
     cooperative_number: string | null;
     kyc_status: "pending" | "approved" | "rejected" | "suspended" | "documents_submitted";
     kyc_rejection_reason: string | null;
+    // Résultats vérification faciale (face liveness — aucune biométrie brute stockée)
+    kyc_face_verified: boolean | null;
+    kyc_face_score: number | null;       // 0–100
+    kyc_name_match: boolean | null;
+    kyc_confidence: "high" | "medium" | "low" | null;
     listing_tier: "free" | "basic" | "premium";
     is_active: boolean;
     is_featured: boolean;
+    // Profile enhancements
+    cover_url: string | null;
+    gallery: string[];
+    social_links: {
+        whatsapp?: string;
+        facebook?: string;
+        instagram?: string;
+        website?: string;
+    } | null;
+    delivery_zones: string[];
+    payment_methods: string[];
+    delivery_delay_days: number | null;
+    specialties: string[];
+    processing_delay_days: number | null;
     product_count?: number;
     created_at: string;
     updated_at: string;

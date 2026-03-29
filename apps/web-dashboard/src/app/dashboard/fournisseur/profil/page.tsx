@@ -3,34 +3,33 @@
 /**
  * Page Profil & KYC — Dashboard Fournisseur KBouffe
  *
- * Deux sections :
- *   1. Profil éditable : description, localité, adresse
- *      → PATCH /api/marketplace/suppliers/me
- *   2. Dossier KYC (lecture seule) : documents soumis, statut coloré
- *      → Message de contact si rejeté ou mise à jour nécessaire
+ * Sections :
+ *   1. Éditeur de profil complet (ProfileEditor)
+ *   2. Vérification d'identité (face liveness) — CNI/Passeport
+ *   3. Dossier KYC (lecture seule) : documents soumis, statut coloré
  */
 
-import { useState, useEffect, type FormEvent } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     User,
     FileText,
     CheckCircle2,
-    AlertTriangle,
     XCircle,
     Info,
     Loader2,
-    Save,
     ExternalLink,
-    Building2,
-    MapPin,
-    Phone,
-    Mail,
-    Shield,
     Clock,
+    ScanFace,
+    RefreshCw,
+    ChevronDown,
+    ChevronUp,
+    AlertTriangle,
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier, type SupplierProfile } from "../SupplierContext";
+import { FaceLivenessKYC, type KYCResult } from "@/components/kyc/FaceLivenessKYC";
+import { ProfileEditor } from "./ProfileEditor";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -159,15 +158,9 @@ function InfoRow({
     );
 }
 
-// ── Profile form ───────────────────────────────────────────────────────────
-
-interface ProfileFormState {
-    description: string;
-    locality: string;
-    address: string;
-}
-
-function ProfileForm({ supplier }: { supplier: SupplierProfile }) {
+// ProfileForm moved to ProfileEditor (./ProfileEditor.tsx)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _ProfileForm_Removed({ supplier }: { supplier: SupplierProfile }) {
     const { refresh } = useSupplier();
 
     const [form, setForm] = useState<ProfileFormState>({
@@ -360,6 +353,169 @@ function ProfileForm({ supplier }: { supplier: SupplierProfile }) {
     );
 }
 
+// ── Face KYC section ───────────────────────────────────────────────────────
+
+function FaceKycSection({ supplier }: { supplier: SupplierProfile }) {
+    const { refresh } = useSupplier();
+    const [open, setOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+
+    const already = supplier.kyc_face_verified === true;
+    const attempted = supplier.kyc_face_score !== null;
+
+    async function handleKYCSuccess(result: KYCResult) {
+        setSaving(true);
+        try {
+            await authFetch("/api/marketplace/suppliers/me", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    kyc_face_verified: result.verified,
+                    kyc_face_score: Math.round(result.faceMatchScore * 100),
+                    kyc_name_match: result.nameMatch,
+                    kyc_confidence: result.confidence,
+                }),
+            });
+            await refresh();
+            setSaved(true);
+            setOpen(false);
+            setTimeout(() => setSaved(false), 5000);
+        } catch {
+            // silencieux — dashboard reste accessible
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Status banner */}
+            <div className={`flex items-center justify-between p-4 rounded-xl border ${
+                already
+                    ? "bg-emerald-500/10 border-emerald-500/20"
+                    : attempted
+                    ? "bg-amber-500/10 border-amber-500/20"
+                    : "bg-surface-800/60 border-white/8"
+            }`}>
+                <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                        already
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : attempted
+                            ? "bg-amber-500/20 text-amber-400"
+                            : "bg-surface-700 text-surface-400"
+                    }`}>
+                        <ScanFace size={18} />
+                    </div>
+                    <div>
+                        <p className={`text-sm font-semibold ${
+                            already ? "text-emerald-300" : attempted ? "text-amber-300" : "text-white"
+                        }`}>
+                            {already
+                                ? "Identité vérifiée"
+                                : attempted
+                                ? "Vérification partielle"
+                                : "Identité non vérifiée"}
+                        </p>
+                        <p className="text-xs text-surface-500 mt-0.5">
+                            {already
+                                ? `Score : ${supplier.kyc_face_score ?? "—"}% · Confiance : ${supplier.kyc_confidence ?? "—"}`
+                                : attempted
+                                ? `Score obtenu : ${supplier.kyc_face_score}% — réessayez pour améliorer`
+                                : "Vérifiez votre CNI ou passeport pour accélérer la validation"}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Badge confiance */}
+                {already && supplier.kyc_confidence && (
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                        supplier.kyc_confidence === "high"
+                            ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-300"
+                            : supplier.kyc_confidence === "medium"
+                            ? "bg-amber-500/15 border-amber-500/25 text-amber-300"
+                            : "bg-red-500/15 border-red-500/25 text-red-300"
+                    }`}>
+                        {supplier.kyc_confidence === "high" ? "Haute" :
+                         supplier.kyc_confidence === "medium" ? "Moyenne" : "Faible"}
+                    </span>
+                )}
+            </div>
+
+            {/* Saved confirmation */}
+            <AnimatePresence>
+                {saved && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm"
+                    >
+                        <CheckCircle2 size={16} />
+                        Résultat de vérification enregistré avec succès.
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Launch / collapse button */}
+            {!open ? (
+                <button
+                    onClick={() => setOpen(true)}
+                    className={`w-full flex items-center justify-center gap-2.5 py-3 rounded-xl font-semibold text-sm transition-all border ${
+                        already
+                            ? "bg-surface-800 hover:bg-surface-700 border-white/8 text-surface-300"
+                            : "bg-emerald-500 hover:bg-emerald-600 border-transparent text-white shadow-lg shadow-emerald-500/20"
+                    }`}
+                >
+                    {saving ? (
+                        <Loader2 size={16} className="animate-spin" />
+                    ) : already ? (
+                        <RefreshCw size={16} />
+                    ) : (
+                        <ScanFace size={18} />
+                    )}
+                    {already ? "Relancer la vérification" : "Vérifier mon identité (CNI / Passeport)"}
+                    <ChevronDown size={15} className="opacity-60" />
+                </button>
+            ) : (
+                <button
+                    onClick={() => setOpen(false)}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-surface-500 hover:text-surface-300 text-xs border border-white/6 hover:bg-white/4 transition-all"
+                >
+                    <ChevronUp size={14} />
+                    Réduire
+                </button>
+            )}
+
+            {/* Inline KYC component */}
+            <AnimatePresence>
+                {open && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="pt-2">
+                            <FaceLivenessKYC
+                                expectedName={supplier.contact_name}
+                                onSuccess={handleKYCSuccess}
+                                onSkip={() => setOpen(false)}
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Privacy note */}
+            <p className="text-xs text-surface-600 text-center">
+                🔒 Traitement 100 % local — aucune photo envoyée ni stockée sur nos serveurs
+            </p>
+        </div>
+    );
+}
+
 // ── KYC section ────────────────────────────────────────────────────────────
 
 function KycSection({ supplier }: { supplier: SupplierProfile }) {
@@ -466,25 +622,28 @@ export default function ProfilPage() {
     }
 
     return (
-        <div className="space-y-6 max-w-2xl">
+        <div className="space-y-6 max-w-3xl">
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-extrabold text-white tracking-tight">
                     Mon profil & KYC
                 </h1>
                 <p className="text-surface-400 text-sm mt-1">
-                    Gérez vos informations et suivez l'état de votre vérification
+                    Gérez vos informations, photos, présence en ligne et suivez l'état de votre vérification
                 </p>
             </div>
 
-            {/* Profile section */}
+            {/* ── Profile editor (5 sections) ── */}
+            <ProfileEditor supplier={supplier} />
+
+            {/* Face identity verification */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 }}
+                transition={{ delay: 0.10 }}
             >
-                <SectionCard title="Informations du profil" icon={User}>
-                    <ProfileForm supplier={supplier} />
+                <SectionCard title="Vérification d'identité (CNI / Passeport)" icon={ScanFace}>
+                    <FaceKycSection supplier={supplier} />
                 </SectionCard>
             </motion.div>
 
@@ -492,7 +651,7 @@ export default function ProfilPage() {
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.12 }}
+                transition={{ delay: 0.16 }}
             >
                 <SectionCard title="Dossier KYC" icon={FileText}>
                     <KycSection supplier={supplier} />

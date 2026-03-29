@@ -77,7 +77,9 @@ export const fr = {
         team: "Equipe",
         drivers: "Flotte de Livreurs",
         marketplace: "Marketplace",
+        approvisionnement: "Approvisionnement",
         showcase: "Vitrine",
+        support: "Support",
         backToSite: "Retour au site",
     },
 
@@ -97,6 +99,7 @@ export const fr = {
         broadcast: "Broadcast",
         socialMonitor: "Social Monitor",
         backup: "Backup & Export",
+        suppliers: "Fournisseurs Agricoles",
         backToSite: "Retour au site",
     },
 

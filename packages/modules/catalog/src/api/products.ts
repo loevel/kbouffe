@@ -90,6 +90,9 @@ productsRoutes.post("/", async (c) => {
             is_limited_edition: body.is_limited_edition ?? false,
             stock_quantity: body.stock_quantity ?? null,
             available_until: body.available_until ?? null,
+            // i18n bilingual support
+            name_i18n: body.name_i18n ?? {},
+            description_i18n: body.description_i18n ?? {},
         } as any)
         .select()
         .single();
@@ -153,7 +156,9 @@ productsRoutes.patch("/:id", async (c) => {
         "category_id", "image_url", "is_available", "sort_order", "options",
         "is_halal", "is_vegan", "is_gluten_free", "allergens",
         "is_dine_in_only", "is_no_delivery", "dine_in_price", "prep_time", "calories", "tags",
-        "is_limited_edition", "stock_quantity", "available_until"
+        "is_limited_edition", "stock_quantity", "available_until",
+        // i18n bilingual support
+        "name_i18n", "description_i18n",
     ];
     const updateData: Record<string, unknown> = {};
     for (const field of allowedFields) {

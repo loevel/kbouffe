@@ -3,7 +3,7 @@
  * Avoids duplicating the "get authenticated merchant's restaurant" logic.
  */
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export interface AuthContext {
   userId: string;
@@ -13,7 +13,7 @@ export interface AuthContext {
 
 export interface AdminAuthContext {
   userId: string;
-  supabase: Awaited<ReturnType<typeof createClient>>;
+  supabase: Awaited<ReturnType<typeof createAdminClient>>;
 }
 
 /**
@@ -88,16 +88,21 @@ export function apiError(message: string, status = 500) {
 /**
  * Authenticates the request and verifies the user is a platform admin.
  * Returns either { ctx } or { error } — caller should check.
+ *
+ * The returned `supabase` instance uses the SERVICE ROLE KEY (bypasses RLS)
+ * since admin routes need unrestricted access to all tables.
+ * Auth verification still uses the anon client with the user's session cookie.
  */
 export async function withAdmin(): Promise<
   | { ctx: AdminAuthContext; error?: never }
   | { ctx?: never; error: NextResponse }
 > {
-  const supabase = await createClient();
+  // Use anon client only for auth check (reads the session cookie)
+  const authClient = await createClient();
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (authError || !user) {
     return {
@@ -105,7 +110,7 @@ export async function withAdmin(): Promise<
     };
   }
 
-  const { data: dbUser } = await supabase
+  const { data: dbUser } = await authClient
     .from("users")
     .select("role")
     .eq("id", user.id)
@@ -119,6 +124,9 @@ export async function withAdmin(): Promise<
       ),
     };
   }
+
+  // Service role client — bypasses RLS for all admin data operations
+  const supabase = await createAdminClient();
 
   return {
     ctx: {

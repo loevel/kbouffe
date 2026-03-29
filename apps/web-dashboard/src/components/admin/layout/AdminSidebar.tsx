@@ -21,6 +21,7 @@ import {
     Bell,
     Share2,
     HardDrive,
+    Leaf,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion } from "framer-motion";
 import { type AdminPermission } from "@/lib/admin-permissions";
 
-export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories" | "aiUsage" | "subscriptions" | "onboarding" | "broadcast" | "socialMonitor" | "backup";
+export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories" | "aiUsage" | "subscriptions" | "onboarding" | "broadcast" | "socialMonitor" | "backup" | "suppliers";
 
 export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any; permission?: AdminPermission }[] = [
     { href: "/admin", labelKey: "dashboard", icon: LayoutDashboard },
@@ -41,6 +42,7 @@ export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any;
     { href: "/admin/subscriptions", labelKey: "subscriptions", icon: CreditCard, permission: "admin:billing:read" },
     { href: "/admin/onboarding", labelKey: "onboarding", icon: CheckSquare, permission: "admin:settings:manage" },
     { href: "/admin/marketing", labelKey: "marketing", icon: Megaphone, permission: "admin:marketing:read" },
+    { href: "/admin/suppliers", labelKey: "suppliers", icon: Leaf, permission: "admin:marketplace:manage" },
     { href: "/admin/marketplace", labelKey: "marketplace", icon: StoreIcon, permission: "admin:marketplace:manage" },
     { href: "/admin/ai-usage", labelKey: "aiUsage", icon: Brain, permission: "admin:settings:manage" },
     { href: "/admin/broadcast", labelKey: "broadcast", icon: Bell, permission: "admin:settings:manage" },

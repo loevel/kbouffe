@@ -15,28 +15,75 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Affiche la notification quand l'app est en arrière-plan
+/**
+ * Détermine le label du bouton d'action selon le type de notification.
+ */
+function getActionLabel(type) {
+  switch (type) {
+    case 'support_reply':    return 'Voir la réponse';
+    case 'support_message':  return 'Voir le message';
+    case 'support_ticket':   return 'Voir le ticket';
+    default:                 return 'Ouvrir';
+  }
+}
+
+/**
+ * Affiche la notification avec un bouton d'action contextuel.
+ * Disponible seulement quand l'app est en arrière-plan.
+ */
 messaging.onBackgroundMessage((payload) => {
   const { title, body, icon } = payload.notification ?? {};
+  const data = payload.data ?? {};
+  const type = data.type ?? '';
+  const link = data.link ?? '/';
+  const actionLabel = getActionLabel(type);
 
-  self.registration.showNotification(title ?? 'Kbouffe', {
+  self.registration.showNotification(title ?? 'kBouffe', {
     body: body ?? '',
     icon: icon ?? '/logo-icon.svg',
     badge: '/logo-icon.svg',
-    data: payload.data ?? {},
+    tag: data.ticket_id ? `support-${data.ticket_id}` : undefined,
+    renotify: true,
+    data: { ...data, link },
+    actions: [
+      {
+        action: 'view',
+        title: actionLabel,
+      },
+    ],
   });
 });
 
-// Gère le clic sur la notification
+/**
+ * Gère le clic sur la notification ou sur son bouton d'action.
+ * Dans les deux cas → ouvre / focus la page de la conversation.
+ */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
   const link = event.notification.data?.link ?? '/';
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.includes(link) && 'focus' in client) return client.focus();
-      }
-      if (clients.openWindow) return clients.openWindow(link);
-    })
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Si une fenêtre est déjà ouverte sur ce lien → la focus
+        for (const client of clientList) {
+          if (client.url.includes(link) && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // Si une fenêtre kBouffe est ouverte → naviguer dedans
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'navigate' in client) {
+            client.focus();
+            return client.navigate(link);
+          }
+        }
+        // Sinon → ouvrir un nouvel onglet
+        if (clients.openWindow) {
+          return clients.openWindow(link);
+        }
+      })
   );
 });

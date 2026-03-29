@@ -21,6 +21,8 @@ import {
     Store as StoreIcon, // Alias to avoid conflict
     Globe,
     Activity,
+    LifeBuoy,
+    Sprout,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "../brand/Logo";
 import { cn } from "../../lib/utils";
@@ -28,7 +30,7 @@ import { useLocale } from "../../contexts/LocaleContext";
 import { useDashboard } from "../../contexts/DashboardContext";
 import { NAV_PERMISSIONS } from "../../lib/permissions";
 
-export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "analytics" | "marketplace" | "reviews" | "messages" | "showcase";
+export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "analytics" | "marketplace" | "approvisionnement" | "reviews" | "messages" | "showcase" | "support";
 
 export interface NavItem {
     href: string;
@@ -52,10 +54,12 @@ export const navItemsDef: NavItem[] = [
     { href: "/dashboard/analytics", labelKey: "analytics", icon: Activity },
     { href: "/dashboard/marketing", labelKey: "marketing", icon: Megaphone },
     { href: "/dashboard/marketplace", labelKey: "marketplace", icon: StoreIcon },
+    { href: "/dashboard/approvisionnement", labelKey: "approvisionnement", icon: Sprout },
     { href: "/dashboard/store", labelKey: "myStore", icon: Store },
     { href: "/dashboard/showcase", labelKey: "showcase", icon: Globe },
     { href: "/dashboard/team", labelKey: "team", icon: Users2 },
     { href: "/dashboard/settings", labelKey: "settings", icon: Settings },
+    { href: "/dashboard/support", labelKey: "support", icon: LifeBuoy },
 ];
 
 export const MODULE_REQUIREMENTS: Record<string, string> = {

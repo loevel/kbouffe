@@ -79,7 +79,9 @@ export const en: TranslationKeys = {
         team: "Team",
         drivers: "Delivery Fleet",
         marketplace: "Marketplace",
+        approvisionnement: "Sourcing",
         showcase: "Showcase",
+        support: "Support",
         backToSite: "Back to site",
     },
 
@@ -99,6 +101,7 @@ export const en: TranslationKeys = {
         broadcast: "Broadcast",
         socialMonitor: "Social Monitor",
         backup: "Backup & Export",
+        suppliers: "Agricultural Suppliers",
         backToSite: "Back to site",
     },
 
