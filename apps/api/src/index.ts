@@ -19,7 +19,7 @@ import { requireModule } from "./middleware/module";
 
 // ── Public routes ────────────────────────────────────────────────────
 import { coreApi } from "@kbouffe/module-core";
-const { storesRoutes, uploadRoutes, authRoutes, usersRoutes, securityRoutes, brandsRoutes, restaurantKycRoutes, brandsAdminRoutes } = coreApi;
+const { storesRoutes, uploadRoutes, authRoutes, usersRoutes, securityRoutes, brandsRoutes, restaurantKycRoutes, brandsAdminRoutes, billingRoutes, adminBillingRoutes } = coreApi;
 
 import { capitalApi } from "@kbouffe/module-capital";
 const { capitalRoutes, capitalAdminRoutes } = capitalApi;
@@ -236,6 +236,10 @@ api.route("/restaurant/product-reviews", merchantProductReviewRoutes);
 api.route("/restaurant/brands", brandsRoutes);
 api.route("/restaurant/kyc", restaurantKycRoutes);   // PATCH /restaurant/kyc
 
+// ── Facturation TVA (SaaS + Marketplace) ────────────────────────────
+api.use("/billing/*", authMiddleware);
+api.route("/billing", billingRoutes);                // merchant: factures restaurant
+
 // ── KBouffe Capital (broker scoring) ────────────────────────────────
 api.route("/capital", capitalRoutes);
 
@@ -249,6 +253,7 @@ api.route("/admin/marketplace", marketplaceAdminPureRoutes);      // admin packs
 api.route("/admin/marketplace/suppliers", supplierAdminRoutes);   // admin KYC fournisseurs
 api.route("/admin/capital/applications", capitalAdminRoutes);     // admin dossiers financement
 api.route("/admin/brands", brandsAdminRoutes);                    // admin KYC restaurants + marques
+api.route("/admin/billing", adminBillingRoutes);                  // admin factures + déclaration TVA DGI
 
 // ── Mount /api/* on root ─────────────────────────────────────────────
 app.route("/api", api);

@@ -32,6 +32,10 @@ export interface CoreEnv {
     ORANGE_DISBURSEMENT_API_KEY?: string;
     ORANGE_DISBURSEMENT_SUBSCRIPTION_KEY?: string;
     ORANGE_WEBHOOK_SECRET?: string;
+    /** NIU (Numéro d'Identifiant Unique) de KBouffe — imprimé sur les factures. */
+    KBOUFFE_NIU?: string;
+    /** RCCM de KBouffe — imprimé sur les factures. */
+    KBOUFFE_RCCM?: string;
 }
 
 export type AdminRole = "super_admin" | "support" | "sales" | "moderator";
