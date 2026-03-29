@@ -64,4 +64,24 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     @apply bg-surface-300 dark:bg-surface-700;
   }
+
+  /*
+   * Safe area inset — iPhone notch / Dynamic Island
+   * Utilisé par BottomNavBar pour éviter que le contenu se cache sous la barre home.
+   * Nécessite viewport-fit=cover dans la balise meta viewport.
+   */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pb-safe-offset {
+    /* Ajoute 4px supplémentaires au-dessus du safe area */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+  }
+
+  /* Évite le chevauchement du contenu avec la BottomNavBar sur mobile */
+  @media (max-width: 1023px) {
+    .dashboard-content-area {
+      padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
 }
