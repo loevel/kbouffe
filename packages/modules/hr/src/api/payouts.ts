@@ -10,31 +10,62 @@
  *       son personnel et de ses obligations CNPS/DGI."
  *
  * Ref: Code du Travail camerounais Loi n°92/007,
- *      CNPS Décret n°78/484, CGI Art.68 (IRPP)
+ *      CNPS Décret n°78/484, CGI Art.68-70 (IRPP barème progressif)
  *
  * Taux CNPS 2024:
  *   Employeur = 11.2% | Salarié = 5.25% (déduit du net)
- * Taux IRPP (simplifié, indicatif):
- *   ≤ 62 000 FCFA/mois → 10%
- *   ≤ 310 000 → 15% | ≤ 620 000 → 25% | > 620 000 → 35%
+ *
+ * IRPP — Barème progressif annuel (CGI Art.69) + abattement 30% frais pro (CGI Art.70) :
+ *   Base imposable = salaire brut annuel × 70% (après abattement 30%)
+ *   Tranche 1 :      0 – 2 000 000 FCFA/an  → 10%
+ *   Tranche 2 :  2 000 001 – 3 000 000       → 15%
+ *   Tranche 3 :  3 000 001 – 5 000 000       → 25%
+ *   Tranche 4 :  > 5 000 000                 → 35%
+ *
+ * Exemple : 700 000 FCFA/mois → base annuelle = 700 000 × 12 × 70% = 5 880 000
+ *   IRPP annuel = 200 000 + 150 000 + 500 000 + 308 000 = 1 158 000 FCFA
+ *   IRPP mensuel = 96 500 FCFA (vs 245 000 FCFA avec l'ancien calcul erroné)
  */
 import { Hono } from "hono";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
 
 export const payoutsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+/**
+ * IRPP mensuel progressif — CGI Art.69 + abattement frais pro CGI Art.70
+ * Toutes les valeurs sont en FCFA entiers.
+ */
+function computeIrppMonthly(grossMonthly: number): number {
+    // Abattement 30% pour frais professionnels (CGI Art.70)
+    const taxableAnnual = grossMonthly * 12 * 0.70;
+
+    // Barème progressif annuel (CGI Art.69)
+    let annualTax = 0;
+    if (taxableAnnual <= 2_000_000) {
+        annualTax = taxableAnnual * 0.10;
+    } else if (taxableAnnual <= 3_000_000) {
+        annualTax = 2_000_000 * 0.10
+                  + (taxableAnnual - 2_000_000) * 0.15;
+    } else if (taxableAnnual <= 5_000_000) {
+        annualTax = 2_000_000 * 0.10
+                  + 1_000_000 * 0.15
+                  + (taxableAnnual - 3_000_000) * 0.25;
+    } else {
+        annualTax = 2_000_000 * 0.10
+                  + 1_000_000 * 0.15
+                  + 2_000_000 * 0.25
+                  + (taxableAnnual - 5_000_000) * 0.35;
+    }
+
+    return Math.floor(annualTax / 12);
+}
+
 /** Calcul CNPS + IRPP indicatif (entiers FCFA) */
 function computeDeductions(gross: number) {
-    const cnps_employer = Math.floor(gross * 0.112);
-    const cnps_employee = Math.floor(gross * 0.0525);
-
-    let irpp_rate = 0.10;
-    if (gross > 620_000) irpp_rate = 0.35;
-    else if (gross > 310_000) irpp_rate = 0.25;
-    else if (gross > 62_000) irpp_rate = 0.15;
-
-    const irpp_estimate = Math.floor(gross * irpp_rate);
-    const net_amount = Math.max(0, gross - cnps_employee - irpp_estimate);
+    const cnps_employer  = Math.floor(gross * 0.112);
+    const cnps_employee  = Math.floor(gross * 0.0525);
+    const irpp_estimate  = computeIrppMonthly(gross);
+    const net_amount     = Math.max(0, gross - cnps_employee - irpp_estimate);
 
     return { cnps_employer, cnps_employee, irpp_estimate, net_amount };
 }
