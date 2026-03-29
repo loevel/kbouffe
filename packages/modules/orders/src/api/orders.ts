@@ -41,9 +41,13 @@ ordersRoutes.get("/", async (c) => {
     if (payment) query = query.eq("payment_status", payment);
     if (delivery) query = query.eq("delivery_type", delivery);
     if (search) {
-        query = query.or(
-            `customer_name.ilike.%${search}%,id.ilike.%${search}%`,
-        );
+        // Sanitize: strip PostgREST special chars to prevent query injection (CRIT-005)
+        const safe = search.replace(/[%_(),.*!~]/g, "").slice(0, 100).trim();
+        if (safe) {
+            query = query.or(
+                `customer_name.ilike.%${safe}%,id.ilike.%${safe}%`,
+            );
+        }
     }
 
     switch (sort) {

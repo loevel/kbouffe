@@ -10,6 +10,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { createClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "./types";
 import { authMiddleware } from "./middleware/auth";
@@ -80,6 +81,7 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ── Global middleware ────────────────────────────────────────────────
 app.use("*", logger());
+app.use("*", secureHeaders());
 app.use(
     "*",
     cors({
@@ -127,7 +129,6 @@ api.route("/store", publicRestaurantReviewRoutes);          // public restaurant
 api.route("/coupons/validate", couponValidateRoutes);
 api.route("/cuisine-categories", cuisineCategoriesPublicRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
-api.route("/sms", smsRoutes);
 api.route("/auth", authRoutes);
 api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
 api.route("/sync-user", authRoutes);       // Combined in authRoutes
@@ -146,12 +147,51 @@ api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
 
 api.route("/marketplace/suppliers", suppliersRoutes);      // annuaire + inscription
 
+// ── Rate limiting on authentication endpoints (CRIT-004) ────────────
+// In-process limiter: 10 attempts / minute per IP.
+// Complement with Cloudflare Rate Limiting Rules on /api/auth/* in production.
+const authRateLimiter = (() => {
+    const attempts = new Map<string, { count: number; resetAt: number }>();
+    return async (c: any, next: any) => {
+        const ip =
+            c.req.header("CF-Connecting-IP") ??
+            c.req.header("X-Forwarded-For") ??
+            "unknown";
+        const now = Date.now();
+        const WINDOW = 60_000;
+        const MAX = 10;
+        const rec = attempts.get(ip);
+        if (!rec || now > rec.resetAt) {
+            attempts.set(ip, { count: 1, resetAt: now + WINDOW });
+        } else {
+            rec.count++;
+            if (rec.count > MAX) {
+                return c.json(
+                    { error: "Trop de tentatives. Réessayez dans 1 minute." },
+                    429,
+                );
+            }
+        }
+        // Cleanup old entries periodically
+        if (attempts.size > 5000) {
+            const nowTs = Date.now();
+            for (const [k, v] of attempts) {
+                if (nowTs > v.resetAt) attempts.delete(k);
+            }
+        }
+        await next();
+    };
+})();
+
+api.use("/auth/*", authRateLimiter);
+api.use("/auth", authRateLimiter);
+
 // ── Auth middleware for merchant routes ───────────────────────────────
 const merchantPaths = [
     "/orders", "/categories", "/products", "/reservations",
     "/dashboard", "/coupons", "/tables", "/restaurant",
     "/customers", "/account", "/security", "/register-restaurant",
-    "/marketing", "/notifications", "/payouts",
+    "/marketing", "/notifications", "/payouts", "/sms",
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
     "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
@@ -225,6 +265,7 @@ api.route("/payments/mtn", paymentRoutes);
 api.route("/ads", adsRoutes);
 api.route("/team", teamRoutes);
 api.route("/upload", uploadRoutes);
+api.route("/sms", smsRoutes);
 api.route("/chat", chatRoutes);
 api.route("/reviews", customerReviewRoutes);
 

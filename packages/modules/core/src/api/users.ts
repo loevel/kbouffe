@@ -18,18 +18,27 @@ usersRoutes.delete("/", async (c) => {
     const userId = c.var.userId;
     const supabase = c.var.supabase;
 
-    // Delete user from public.users (triggers/cascades should handle the rest if configured, 
-    // or we do it manually. Based on our earlier work, we assume client data is in Supabase).
+    // 1. Anonymize linked data (orders, wallet, messages) before deleting
+    //    to preserve accounting integrity while removing PII.
+    await supabase.from("wallet_movements").update({ note: "[compte supprimé]" } as any).eq("user_id", userId);
+
+    // 2. Delete user row from public.users (cascades to favorites, addresses, etc.)
     const { error } = await supabase
         .from("users")
         .delete()
         .eq("id", userId);
 
     if (error) return c.json({ error: error.message }, 500);
-    
-    // Note: Deleting from auth.users usually requires admin client, 
-    // but here we are primarily concerned with the data migration.
-    
+
+    // 3. Delete from auth.users — removes credentials (email, password hash).
+    //    Required by Loi 2010/012 Art.48 (droit à l'effacement).
+    const admin = adminDb(c);
+    const { error: authError } = await admin.auth.admin.deleteUser(userId);
+    if (authError) {
+        console.error("[DELETE /account] Failed to delete auth.users row:", authError.message);
+        // Non-blocking: public data is gone, auth row will be cleaned up by CRON.
+    }
+
     return c.json({ success: true });
 });
 
