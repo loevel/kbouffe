@@ -102,6 +102,18 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
+    // SEC-004: Validate tracking IDs before storing to prevent XSS via dangerouslySetInnerHTML
+    const GA4_REGEX = /^G-[A-Z0-9]{4,20}$/;
+    const META_PIXEL_REGEX = /^\d{10,20}$/;
+    const gaId = body.googleAnalyticsId ?? body.google_analytics_id;
+    const pixelId = body.metaPixelId ?? body.meta_pixel_id;
+    if (gaId !== undefined && gaId !== null && gaId !== "" && !GA4_REGEX.test(String(gaId))) {
+      return NextResponse.json({ error: "ID Google Analytics invalide (format attendu : G-XXXXXXXXXX)" }, { status: 400 });
+    }
+    if (pixelId !== undefined && pixelId !== null && pixelId !== "" && !META_PIXEL_REGEX.test(String(pixelId))) {
+      return NextResponse.json({ error: "ID Meta Pixel invalide (format attendu : 10 à 20 chiffres)" }, { status: 400 });
+    }
+
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         const mappedField = fieldMapping[field] || field;

@@ -147,15 +147,64 @@ storePublicRoutes.post("/order", async (c) => {
         const dineInServiceFee = restSettings?.dine_in_service_fee ?? 0;
         const corkageFeeAmount = restSettings?.corkage_fee_amount ?? 0;
 
-        // Compute server-side fees
+        // SEC-002: Validate product prices from DB — never trust client-sent prices
+        const productIds = body.items.map(i => i.productId);
+        const { data: dbProducts } = await supabase
+            .from("products")
+            .select("id, price, dine_in_price, is_available")
+            .in("id", productIds)
+            .eq("restaurant_id", body.restaurantId);
+
+        if (!dbProducts || dbProducts.length !== productIds.length) {
+            return c.json({ error: "Un ou plusieurs produits sont invalides ou n'appartiennent pas à ce restaurant" }, 400);
+        }
+
+        const productMap = new Map(dbProducts.map(p => [p.id, p as { id: string; price: number; dine_in_price: number | null; is_available: boolean }]));
+
+        // Fetch option values prices from DB for price_adjustment validation
+        const allValueIds = body.items.flatMap(i => (i.options ?? []).map(o => o.valueId).filter(Boolean)) as string[];
+        const valueAdjustMap = new Map<string, number>();
+        if (allValueIds.length > 0) {
+            const { data: dbValues } = await supabase
+                .from("menu_item_option_values")
+                .select("id, price_adjustment")
+                .in("id", allValueIds);
+            for (const v of dbValues ?? []) {
+                valueAdjustMap.set(v.id, (v as any).price_adjustment ?? 0);
+            }
+        }
+
+        // Compute subtotal server-side from DB prices
+        let computedSubtotal = 0;
+        for (const item of body.items) {
+            const dbProduct = productMap.get(item.productId);
+            if (!dbProduct) return c.json({ error: `Produit ${item.productId} introuvable` }, 400);
+            if (!dbProduct.is_available) return c.json({ error: `Le produit "${item.name}" n'est plus disponible` }, 400);
+
+            const basePrice = body.deliveryType === "dine_in" && dbProduct.dine_in_price
+                ? dbProduct.dine_in_price
+                : dbProduct.price;
+
+            let optionsTotal = 0;
+            for (const opt of item.options ?? []) {
+                if (opt.valueId) optionsTotal += valueAdjustMap.get(opt.valueId) ?? 0;
+            }
+            computedSubtotal += (basePrice + optionsTotal) * item.quantity;
+        }
+
+        if (restSettings?.min_order_amount && computedSubtotal < restSettings.min_order_amount) {
+            return c.json({ error: `Montant minimum de commande : ${restSettings.min_order_amount} FCFA` }, 400);
+        }
+
+        // Compute server-side fees using validated subtotal
         const serviceFee = body.deliveryType === "dine_in"
-            ? Math.round(body.subtotal * dineInServiceFee / 100)
+            ? Math.round(computedSubtotal * dineInServiceFee / 100)
             : 0;
         const externalDrinksCount = Math.max(0, Number(body.externalDrinksCount ?? 0));
         const corkageFee = externalDrinksCount > 0
             ? corkageFeeAmount * externalDrinksCount
             : 0;
-        const computedTotal = body.subtotal + (body.deliveryFee ?? 0) + serviceFee + corkageFee;
+        const computedTotal = computedSubtotal + (body.deliveryFee ?? 0) + serviceFee + corkageFee;
 
         // 1. Create the Order
         const { data: order, error: orderError } = await supabase
@@ -166,7 +215,7 @@ storePublicRoutes.post("/order", async (c) => {
                 customer_name: body.customerName.trim(),
                 customer_phone: body.customerPhone.trim(),
                 items: body.items, // Keep JSON for backward compatibility / quick view
-                subtotal: body.subtotal,
+                subtotal: computedSubtotal,
                 delivery_fee: body.deliveryFee ?? 0,
                 service_fee: serviceFee,
                 corkage_fee: corkageFee,
@@ -193,15 +242,25 @@ storePublicRoutes.post("/order", async (c) => {
 
         // 2. Create Order Items and Options
         for (const item of body.items) {
+            const dbProduct = productMap.get(item.productId)!;
+            const basePrice = body.deliveryType === "dine_in" && dbProduct.dine_in_price
+                ? dbProduct.dine_in_price
+                : dbProduct.price;
+            let optionsTotal = 0;
+            for (const opt of item.options ?? []) {
+                if (opt.valueId) optionsTotal += valueAdjustMap.get(opt.valueId) ?? 0;
+            }
+            const validatedItemPrice = basePrice + optionsTotal;
+
             const { data: orderItem, error: itemError } = await supabase
                 .from("order_items")
                 .insert({
                     order_id: orderId,
                     product_id: item.productId,
                     name: item.name,
-                    price: item.price,
+                    price: validatedItemPrice,
                     quantity: item.quantity,
-                    subtotal: item.price * item.quantity,
+                    subtotal: validatedItemPrice * item.quantity,
                 } as any)
                 .select("id")
                 .single();

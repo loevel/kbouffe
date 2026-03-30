@@ -252,7 +252,8 @@ export const paymentWebhookRoutes = new Hono<{ Bindings: Env }>();
 // ── POST /webhook — Collection webhook ───────────────────────────
 paymentWebhookRoutes.post("/webhook", async (c) => {
     const secret = c.req.header("x-webhook-secret");
-    if (c.env.MTN_WEBHOOK_SECRET && secret !== c.env.MTN_WEBHOOK_SECRET) {
+    // SEC-003: fail-closed — if secret not configured, reject ALL webhook calls
+    if (!c.env.MTN_WEBHOOK_SECRET || secret !== c.env.MTN_WEBHOOK_SECRET) {
         return c.json({ error: "Webhook non autorisé" }, 401);
     }
 
@@ -297,7 +298,8 @@ paymentWebhookRoutes.post("/webhook", async (c) => {
 // ── POST /disbursement-webhook ───────────────────────────────────
 paymentWebhookRoutes.post("/disbursement-webhook", async (c) => {
     const secret = c.req.header("x-webhook-secret");
-    if (c.env.MTN_WEBHOOK_SECRET && secret !== c.env.MTN_WEBHOOK_SECRET) {
+    // SEC-003: fail-closed — if secret not configured, reject ALL webhook calls
+    if (!c.env.MTN_WEBHOOK_SECRET || secret !== c.env.MTN_WEBHOOK_SECRET) {
         return c.json({ error: "Webhook non autorisé" }, 401);
     }
 
