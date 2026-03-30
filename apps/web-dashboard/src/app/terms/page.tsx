@@ -227,6 +227,23 @@ export default function TermsPage() {
                                 et, le cas échéant, des <Strong>frais de plateforme</Strong> auprès des Fournisseurs pour l&apos;accès
                                 à la marketplace. Ces redevances sont soumises à la TVA au taux applicable.
                             </P>
+                            <H3>7.1 Portefeuille de fidélité Kbouffe</H3>
+                            <P>
+                                La plateforme Kbouffe propose un <Strong>portefeuille de fidélité</Strong> (ci-après le
+                                &quot;Wallet&quot;) permettant aux Clients d&apos;accumuler des crédits via le programme de parrainage.
+                            </P>
+                            <ul className="space-y-2 list-disc pl-6 mb-3">
+                                <Li><Strong>Nature juridique :</Strong> les crédits Wallet constituent des <Strong>points de fidélité non monétaires</Strong>, sans valeur légale en XAF. Ils ne sont ni remboursables en espèces, ni convertibles en monnaie légale, ni cessibles à des tiers.</Li>
+                                <Li><Strong>Acquisition :</Strong> les crédits sont attribués exclusivement via le programme de parrainage et les promotions officielles Kbouffe. Aucun achat de crédits n&apos;est proposé.</Li>
+                                <Li><Strong>Utilisation :</Strong> les crédits peuvent être utilisés uniquement pour réduire le montant d&apos;une commande sur la plateforme Kbouffe, dans la limite du solde disponible.</Li>
+                                <Li><Strong>Expiration :</Strong> les crédits Wallet expirent après <Strong>12 mois d&apos;inactivité</Strong> du compte (aucune commande passée). Un email de rappel est envoyé 30 jours avant l&apos;expiration.</Li>
+                                <Li><Strong>Fermeture de compte :</Strong> en cas de suppression du compte, le solde Wallet est définitivement perdu et ne donnera lieu à aucun remboursement ni compensation.</Li>
+                            </ul>
+                            <P>
+                                Kbouffe se réserve le droit de modifier les conditions du programme de fidélité avec
+                                un préavis de <Strong>30 jours</Strong> par notification email. La poursuite de
+                                l&apos;utilisation de la plateforme après ce délai vaut acceptation des nouvelles conditions.
+                            </P>
                         </section>
 
                         {/* ── 8. Marketplace B2B et Centrale d'Achat ── */}

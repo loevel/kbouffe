@@ -86,6 +86,11 @@ ordersRoutes.post("/", async (c) => {
     const restaurantId = c.var.restaurantId;
     const body = await c.req.json();
 
+    // Génération numéro de facture unique — CGI camerounais Art.137-140
+    const now = new Date();
+    const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const invoiceNumber = `CMD-${yyyymm}-${Date.now().toString(36).toUpperCase()}`;
+
     const orderData = {
         restaurant_id: restaurantId,
         customer_id: body.customer_id ?? null,
@@ -109,6 +114,7 @@ ordersRoutes.post("/", async (c) => {
         covers: body.covers ?? null,
         external_drinks_count: body.external_drinks_count ?? 0,
         scheduled_for: body.scheduled_for ?? null,
+        invoice_number: invoiceNumber,
     };
 
     const { data, error } = await supabase

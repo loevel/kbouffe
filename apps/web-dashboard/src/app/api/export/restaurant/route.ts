@@ -1,7 +1,8 @@
 /**
  * GET /api/export/restaurant
  * Exports all data belonging to the authenticated restaurant as a JSON file.
- * GDPR Article 20 — Right to data portability.
+ * Conforme à la Loi camerounaise n°2010/012 Art.48 — Droit d'accès aux données personnelles.
+ * Voir également Loi n°2019/021 sur le commerce électronique au Cameroun.
  *
  * Includes: restaurant info, products, categories, orders (all),
  *           order items, reviews, team members.
