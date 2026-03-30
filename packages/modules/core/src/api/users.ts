@@ -473,8 +473,8 @@ securityRoutes.post("/password", async (c) => {
     if (!currentPassword || !newPassword) {
         return c.json({ error: "Mot de passe actuel et nouveau requis" }, 400);
     }
-    if (newPassword.length < 6) {
-        return c.json({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
+    if (newPassword.length < 8) {
+        return c.json({ error: "Le mot de passe doit contenir au moins 8 caractères" }, 400);
     }
 
     // Verify current password
