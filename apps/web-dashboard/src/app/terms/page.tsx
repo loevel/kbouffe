@@ -128,7 +128,7 @@ export default function TermsPage() {
                                 <Li>Kbouffe <Strong>n&apos;est pas un établissement de crédit ou de microfinance</Strong> au sens du Règlement COBAC.</Li>
                             </ul>
                             <P>
-                                Ce statut est conforme à la Loi n°2010/021 du 21 décembre 2010 régissant le commerce
+                                Ce statut est conforme à la Loi n°2019/021 du 24 décembre 2019 régissant le commerce
                                 électronique au Cameroun et au Règlement CEMAC/UMAC sur les systèmes de paiement.
                             </P>
                         </section>
@@ -252,7 +252,7 @@ export default function TermsPage() {
                             <P>
                                 La Marketplace Kbouffe est une <Strong>plateforme de mise en relation</Strong> entre Restaurateurs
                                 et Fournisseurs (agriculteurs, grossistes, coopératives). Kbouffe agit en qualité
-                                d&apos;<Strong>hébergeur</Strong> au sens de la Loi n°2010/021.
+                                d&apos;<Strong>hébergeur</Strong> au sens de la Loi n°2019/021.
                             </P>
                             <ul className="space-y-2 list-disc pl-6 mb-3">
                                 <Li>La facture de marchandises est émise <Strong>directement par le Fournisseur au Restaurateur</Strong>. Kbouffe n&apos;est jamais propriétaire des marchandises.</Li>
@@ -403,7 +403,7 @@ export default function TermsPage() {
                                 Les présentes CGU sont régies par le droit camerounais, notamment :
                             </P>
                             <ul className="space-y-2 list-disc pl-6 mb-3">
-                                <Li>Loi n°2010/021 du 21 décembre 2010 régissant le commerce électronique au Cameroun.</Li>
+                                <Li>Loi n°2019/021 du 24 décembre 2019 régissant le commerce électronique au Cameroun.</Li>
                                 <Li>Loi n°2010/012 du 21 décembre 2010 relative à la cybersécurité et à la cybercriminalité.</Li>
                                 <Li>Loi n°2015/003 du 25 juin 2015 portant protection du consommateur au Cameroun.</Li>
                                 <Li>Code Général des Impôts (CGI) du Cameroun.</Li>
