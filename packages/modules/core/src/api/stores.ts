@@ -8,10 +8,14 @@ export const storesRoutes = new Hono<{ Bindings: CoreEnv; Variables: CoreVariabl
  * Public restaurant listing (explore / search)
  */
 storesRoutes.get("/", async (c) => {
-    const q = c.req.query("q")?.trim() ?? "";
-    const cuisine = c.req.query("cuisine")?.trim() ?? "";
-    const city = c.req.query("city")?.trim() ?? "";
-    const sort = c.req.query("sort") ?? "recommended";
+    // SEC-013: Strip characters that are significant in PostgREST filter syntax
+    // to prevent query injection via .or() filter strings.
+    const sanitize = (s: string) => s.replace(/[%,.()\[\]!<>&|*;]/g, "").slice(0, 100);
+
+    const q       = sanitize(c.req.query("q")?.trim() ?? "");
+    const cuisine = sanitize(c.req.query("cuisine")?.trim() ?? "");
+    const city    = sanitize(c.req.query("city")?.trim() ?? "");
+    const sort  = c.req.query("sort") ?? "recommended";
     const limit = Math.min(parseInt(c.req.query("limit") ?? "60"), 100);
 
     const supabase = c.get("supabase");

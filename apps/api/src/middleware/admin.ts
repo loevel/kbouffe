@@ -23,7 +23,7 @@ export async function adminMiddleware(
         global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
         return c.json({ error: "Token invalide" }, 401);
     }

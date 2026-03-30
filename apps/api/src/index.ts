@@ -85,15 +85,17 @@ app.use("*", secureHeaders());
 app.use(
     "*",
     cors({
-        origin: [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:3002",
-            "http://localhost:8081",
-            "http://localhost:8787",
-            "https://kbouffe.com",
-            "https://www.kbouffe.com",
-        ],
+        // SEC-016: Localhost origins autorisés uniquement en développement (ENVIRONMENT !== "production")
+        origin: (origin: string, c: any) => {
+            const PROD_ORIGINS = ["https://kbouffe.com", "https://www.kbouffe.com"];
+            const DEV_ORIGINS  = [
+                "http://localhost:3000", "http://localhost:3001",
+                "http://localhost:3002", "http://localhost:8081", "http://localhost:8787",
+            ];
+            const isProduction = c.env?.ENVIRONMENT === "production";
+            const allowed = isProduction ? PROD_ORIGINS : [...PROD_ORIGINS, ...DEV_ORIGINS];
+            return allowed.includes(origin) ? origin : null;
+        },
         allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowHeaders: ["Content-Type", "Authorization"],
         maxAge: 86400,

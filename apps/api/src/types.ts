@@ -38,6 +38,9 @@ export interface Env {
 
     // ── Queues ─────────────────────────────────────────────
     SMS_QUEUE: Queue;
+
+    /** Deployment environment — set to "production" in prod wrangler vars */
+    ENVIRONMENT?: string;
 }
 
 /**

@@ -50,7 +50,7 @@ async function getMtnCollectionToken(env: Env): Promise<string> {
         },
     });
 
-    const payload = await response.json().catch(() => ({} as { access_token?: string; message?: string; error?: string }));
+    const payload = await response.json().catch(() => ({} as { access_token?: string; message?: string; error?: string })) as { access_token?: string; message?: string; error?: string };
     if (!response.ok || !payload.access_token) {
         throw new Error(payload.message ?? payload.error ?? `MTN token error: ${response.status}`);
     }
@@ -612,9 +612,8 @@ storePublicRoutes.get("/:slug", async (c) => {
                 const profile = memberUsersMap[member.user_id];
                 return {
                     id: member.id,
-                    userId: member.user_id,
+                    // SEC-014: user_id (UUID interne) exclu de la réponse publique
                     role: member.role,
-                    status: member.status,
                     name: profile?.full_name ?? "Membre",
                     imageUrl: profile?.avatar_url ?? null,
                 };
