@@ -443,10 +443,10 @@ export async function toggleProductFavorite(productId: string): Promise<{ active
     });
 }
 
-export async function postReferralReward(amount: number): Promise<{ success: boolean }> {
+export async function postReferralReward(): Promise<{ success: boolean }> {
     return apiFetch<{ success: boolean }>('/api/account/referral/reward', {
         method: 'POST',
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({}),
     });
 }
 

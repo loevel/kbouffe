@@ -76,7 +76,7 @@ export default function LoyaltyScreen() {
                     </Pressable>
                     <Pressable
                         style={[styles.button, { backgroundColor: theme.primary, flex: 1 }]}
-                        onPress={() => registerReferralReward(1000)}
+                        onPress={() => registerReferralReward()}
                     >
                         <Text style={styles.buttonText}>Simuler récompense</Text>
                     </Pressable>

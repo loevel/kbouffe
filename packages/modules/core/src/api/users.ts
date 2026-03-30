@@ -95,46 +95,6 @@ usersRoutes.get("/loyalty", async (c) => {
     });
 });
 
-/** POST /account/loyalty/movement — Add a wallet movement */
-usersRoutes.post("/loyalty/movement", async (c) => {
-    const userId = c.var.userId;
-    const supabase = c.var.supabase;
-    const body = await c.req.json<{
-        type: 'credit' | 'debit';
-        amount: number;
-        reason: string;
-        description: string;
-        orderId?: string;
-    }>();
-
-    if (!body.amount || body.amount < 0) return c.json({ error: "Montant invalide" }, 400);
-
-    // 1. Record movement
-    const { data: movement, error: moveError } = await supabase
-        .from("wallet_movements")
-        .insert({
-            user_id: userId,
-            type: body.type,
-            amount: body.amount,
-            reason: body.reason,
-            description: body.description,
-            order_id: body.orderId || null
-        })
-        .select()
-        .single();
-
-    if (moveError) return c.json({ error: "Erreur lors de l'enregistrement du mouvement" }, 500);
-
-    // 2. Update user balance via RPC
-    const increment = body.type === 'credit' ? body.amount : -body.amount;
-    await supabase.rpc('increment_wallet_balance', { 
-        input_user_id: userId, 
-        amount: increment 
-    });
-
-    return c.json({ success: true, movement });
-});
-
 /** POST /account/favorites/restaurant — Toggle favorite restaurant */
 usersRoutes.post("/favorites/restaurant", async (c) => {
     const { restaurantId } = await c.req.json();
@@ -180,16 +140,33 @@ usersRoutes.post("/favorites/product", async (c) => {
 });
 
 
-/** POST /account/referral/reward — Register referral reward */
+/** POST /account/referral/reward — Register referral reward (server-side amount only) */
 usersRoutes.post("/referral/reward", async (c) => {
-    const { amount } = await c.req.json();
     const supabase = c.var.supabase;
     const userId = c.var.userId;
+
+    // SEC-006: Amount is fixed server-side — never trust client-sent amount
+    const REFERRAL_REWARD_XAF = 500;
+
+    // Idempotency: max 1 referral reward per 24h per user
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: recent } = await supabase
+        .from("wallet_movements")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("reason", "referral_reward")
+        .gte("created_at", since)
+        .limit(1)
+        .maybeSingle();
+
+    if (recent) {
+        return c.json({ error: "Récompense de parrainage déjà attribuée récemment" }, 429);
+    }
 
     // 1. Update referral stats
     const { error: userUpdateError } = await supabase.rpc("increment_referral_stats", {
         input_user_id: userId,
-        reward_amount: amount
+        reward_amount: REFERRAL_REWARD_XAF
     });
 
     if (userUpdateError) return c.json({ error: "Erreur mise à jour stats parrainage" }, 500);
@@ -201,7 +178,7 @@ usersRoutes.post("/referral/reward", async (c) => {
             user_id: userId,
             type: "credit",
             reason: "referral_reward",
-            amount,
+            amount: REFERRAL_REWARD_XAF,
             description: "Bonus parrainage"
         })
         .select()
@@ -210,7 +187,7 @@ usersRoutes.post("/referral/reward", async (c) => {
     // 3. Update balance
     await supabase.rpc("increment_wallet_balance", {
         input_user_id: userId,
-        amount
+        amount: REFERRAL_REWARD_XAF
     });
 
     return c.json({ success: true, movement });

@@ -41,7 +41,7 @@ interface LoyaltyContextType extends LoyaltyState {
     isRestaurantFavorite: (id: string) => boolean;
     isProductFavorite: (id: string) => boolean;
     validatePromotion: (params: { code: string; restaurantId: string; orderTotal: number; deliveryType: string }) => Promise<{ valid: true; discount: number } | { valid: false; reason: string }>;
-    registerReferralReward: (amount: number) => void;
+    registerReferralReward: () => void;
 }
 
 const INITIAL_STATE: LoyaltyState = {
@@ -144,14 +144,15 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
 
 
-    const registerReferralReward = useCallback(async (amount: number) => {
+    const registerReferralReward = useCallback(async () => {
+        const REFERRAL_REWARD_XAF = 500; // montant fixé côté serveur
         try {
-            const res = await postReferralReward(amount);
+            const res = await postReferralReward();
             if (res.success) {
                 setState((prev) => ({
                     ...prev,
                     referralInvites: prev.referralInvites + 1,
-                    referralRewards: prev.referralRewards + amount,
+                    referralRewards: prev.referralRewards + REFERRAL_REWARD_XAF,
                 }));
             }
         } catch (error) {
