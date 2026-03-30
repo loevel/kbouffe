@@ -127,6 +127,24 @@ api.route("/store", publicReservationsRoutes);             // public reservation
 api.route("/store", publicProductReviewRoutes);            // public product reviews
 api.route("/store", publicRestaurantReviewRoutes);          // public restaurant reviews
 api.route("/coupons/validate", couponValidateRoutes);
+
+// SEC-011: Rate limiting on public coupon validation (5 req/min/IP — prevents brute-force)
+const couponRateLimiter = (() => {
+    const attempts = new Map<string, { count: number; resetAt: number }>();
+    return async (c: any, next: any) => {
+        const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
+        const now = Date.now();
+        const rec = attempts.get(ip);
+        if (!rec || now > rec.resetAt) {
+            attempts.set(ip, { count: 1, resetAt: now + 60_000 });
+        } else {
+            rec.count++;
+            if (rec.count > 5) return c.json({ valid: false, error: "Trop de tentatives. Réessayez dans 1 minute." }, 429);
+        }
+        await next();
+    };
+})();
+api.use("/coupons/validate/*", couponRateLimiter);
 api.route("/cuisine-categories", cuisineCategoriesPublicRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
 api.route("/auth", authRoutes);

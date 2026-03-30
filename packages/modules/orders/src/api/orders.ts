@@ -191,7 +191,24 @@ ordersRoutes.patch("/:id", async (c) => {
             updateData.status = nextStatus;
         }
     }
-    if (body.payment_status !== undefined) updateData.payment_status = body.payment_status;
+    if (body.payment_status !== undefined) {
+        // SEC-010: payment_status can only be set to "paid" via webhook — merchants cannot set it
+        const MERCHANT_ALLOWED_PAYMENT_TRANSITIONS: Record<string, string[]> = {
+            pending:           ["cancelled"],   // merchant can cancel unpaid orders
+            paid:              ["refund_requested"], // merchant can initiate refund
+            refund_requested:  [],
+            refunded:          [],
+            failed:            [],
+            cancelled:         [],
+        };
+        const currentPStatus = (currentOrder as any).payment_status as string ?? "pending";
+        const nextPStatus = body.payment_status as string;
+        const allowedNext = MERCHANT_ALLOWED_PAYMENT_TRANSITIONS[currentPStatus] ?? [];
+        if (!allowedNext.includes(nextPStatus)) {
+            return c.json({ error: `Transition de statut de paiement invalide : ${currentPStatus} → ${nextPStatus}` }, 400);
+        }
+        updateData.payment_status = nextPStatus;
+    }
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.driver_id !== undefined) {
         if (body.driver_id === null || body.driver_id === "") {

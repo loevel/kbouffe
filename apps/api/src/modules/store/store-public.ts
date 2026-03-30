@@ -140,7 +140,7 @@ storePublicRoutes.post("/order", async (c) => {
         // Fetch restaurant settings to compute server-side fees + loyalty
         const { data: restSettings } = await supabase
             .from("restaurants")
-            .select("dine_in_service_fee, corkage_fee_amount, min_order_amount, loyalty_enabled, loyalty_points_per_order, loyalty_point_value")
+            .select("dine_in_service_fee, corkage_fee_amount, min_order_amount, loyalty_enabled, loyalty_points_per_order, loyalty_point_value, delivery_fee, delivery_base_fee")
             .eq("id", body.restaurantId)
             .single();
 
@@ -196,7 +196,7 @@ storePublicRoutes.post("/order", async (c) => {
             return c.json({ error: `Montant minimum de commande : ${restSettings.min_order_amount} FCFA` }, 400);
         }
 
-        // Compute server-side fees using validated subtotal
+        // SEC-008: Compute server-side fees using validated subtotal + server-side delivery fee
         const serviceFee = body.deliveryType === "dine_in"
             ? Math.round(computedSubtotal * dineInServiceFee / 100)
             : 0;
@@ -204,7 +204,11 @@ storePublicRoutes.post("/order", async (c) => {
         const corkageFee = externalDrinksCount > 0
             ? corkageFeeAmount * externalDrinksCount
             : 0;
-        const computedTotal = computedSubtotal + (body.deliveryFee ?? 0) + serviceFee + corkageFee;
+        // Delivery fee: free for dine_in/pickup, otherwise from restaurant config
+        const serverDeliveryFee = (body.deliveryType === "dine_in" || body.deliveryType === "pickup")
+            ? 0
+            : (restSettings?.delivery_fee ?? restSettings?.delivery_base_fee ?? 0);
+        const computedTotal = computedSubtotal + serverDeliveryFee + serviceFee + corkageFee;
 
         // 1. Create the Order
         const { data: order, error: orderError } = await supabase
@@ -216,7 +220,7 @@ storePublicRoutes.post("/order", async (c) => {
                 customer_phone: body.customerPhone.trim(),
                 items: body.items, // Keep JSON for backward compatibility / quick view
                 subtotal: computedSubtotal,
-                delivery_fee: body.deliveryFee ?? 0,
+                delivery_fee: serverDeliveryFee,
                 service_fee: serviceFee,
                 corkage_fee: corkageFee,
                 external_drinks_count: externalDrinksCount,

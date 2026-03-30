@@ -42,16 +42,9 @@ couponValidateRoutes.post("/validate", async (c) => {
         return c.json({ valid: false, error: rpcData.error });
     }
 
-    // Optional: Log in coupon_uses for history/tracking
-    if (customer_id) {
-        await supabase
-            .from("coupon_uses")
-            .insert({
-                coupon_id: rpcData.coupon_id,
-                customer_id,
-                restaurant_id
-            });
-    }
+    // SEC-011: coupon_uses insert removed — the validate_and_use_coupon RPC handles
+    // usage atomically (SELECT FOR UPDATE + counter increment). A separate insert
+    // here would create a race condition and potential double-counting.
 
     return c.json({
         valid: true,
