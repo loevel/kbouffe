@@ -392,12 +392,20 @@ export interface ValidateCouponParams {
     restaurantId: string | null;
     orderTotal: number;
     deliveryType: string;
+    customerId?: string | null;
 }
 
 export async function validateCoupon(params: ValidateCouponParams): Promise<{ discount: number }> {
+    // Map camelCase → snake_case attendu par l'API
     return apiFetch<{ discount: number }>('/api/coupons/validate', {
         method: 'POST',
-        body: JSON.stringify(params),
+        body: JSON.stringify({
+            code:          params.code,
+            restaurant_id: params.restaurantId,
+            order_subtotal: params.orderTotal,
+            delivery_type:  params.deliveryType,
+            customer_id:    params.customerId ?? null,
+        }),
     });
 }
 

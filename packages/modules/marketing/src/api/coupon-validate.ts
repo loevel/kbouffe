@@ -46,10 +46,20 @@ couponValidateRoutes.post("/validate", async (c) => {
     // usage atomically (SELECT FOR UPDATE + counter increment). A separate insert
     // here would create a race condition and potential double-counting.
 
+    // Calculer le montant du rabais pour que le client n'ait pas à le faire
+    const discountType  = rpcData.discount_type  as "percentage" | "fixed";
+    const discountValue = Number(rpcData.discount_value ?? 0);
+    const orderSubtotal = Number(order_subtotal || 0);
+
+    const discount = discountType === "percentage"
+        ? Math.round((orderSubtotal * discountValue) / 100)
+        : discountValue;
+
     return c.json({
         valid: true,
-        coupon_id: rpcData.coupon_id,
-        discount_type: rpcData.discount_type,
-        discount_value: rpcData.discount_value,
+        coupon_id:      rpcData.coupon_id,
+        discount_type:  discountType,
+        discount_value: discountValue,
+        discount,           // montant calculé prêt à afficher
     });
 });

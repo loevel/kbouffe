@@ -55,7 +55,7 @@ const INITIAL_STATE: LoyaltyState = {
 const LoyaltyContext = createContext<LoyaltyContextType | null>(null);
 
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const [state, setState] = useState<LoyaltyState>(INITIAL_STATE);
     const hydrated = useRef(false);
 
@@ -124,22 +124,20 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }) => {
         const normalized = params.code.trim().toUpperCase();
         
-        // Special case for global ONEVIP local check if needed, 
-        // but it's better if backend handles it (it does).
-        
         try {
             const res = await apiValidateCoupon({
-                code: normalized,
+                code:         normalized,
                 restaurantId: params.restaurantId,
-                orderTotal: params.orderTotal,
-                deliveryType: params.deliveryType
+                orderTotal:   params.orderTotal,
+                deliveryType: params.deliveryType,
+                customerId:   user?.id ?? null,
             });
             
             return { valid: true as const, discount: res.discount };
         } catch (error: any) {
             return { valid: false as const, reason: error.message || 'Code invalide' };
         }
-    }, []);
+    }, [user?.id]);
 
 
 
