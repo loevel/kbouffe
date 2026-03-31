@@ -202,7 +202,7 @@ function ProductCard({
                     {product.is_available && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 hover:border-brand-500 hover:bg-brand-500 hover:text-white dark:hover:bg-brand-500 text-surface-700 dark:text-surface-300 text-[12px] font-bold transition-all shadow-sm hover:shadow-md"
+                            className="flex items-center justify-center gap-2 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-full bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 hover:border-brand-500 hover:bg-brand-500 hover:text-white dark:hover:bg-brand-500 text-surface-700 dark:text-surface-300 text-[12px] font-bold transition-all shadow-sm hover:shadow-md"
                         >
                             <Plus size={14} strokeWidth={3} />
                             <span>Ajouter</span>
@@ -212,7 +212,7 @@ function ProductCard({
             </div>
 
             <div className="relative shrink-0">
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl overflow-hidden bg-surface-100 dark:bg-surface-800 border border-surface-100 dark:border-surface-800 shadow-sm group-hover:shadow-md transition-shadow">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-surface-100 dark:bg-surface-800 border border-surface-100 dark:border-surface-800 shadow-sm group-hover:shadow-md transition-shadow">
                     {product.image_url ? (
                         <motion.img
                             whileHover={{ scale: 1.05 }}
@@ -353,17 +353,22 @@ function ProductDetailModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-end sm:items-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             >
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                    initial={{ opacity: 0, y: 60 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 60 }}
+                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                     onClick={(e) => e.stopPropagation()}
-                    className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+                    className="bg-white dark:bg-surface-900 rounded-t-3xl sm:rounded-2xl border border-surface-200 dark:border-surface-800 shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col"
                 >
+                    {/* Drag handle pill — mobile bottom sheet only */}
+                    <div className="flex justify-center pt-3 pb-1 shrink-0 sm:hidden" aria-hidden="true">
+                        <div className="w-12 h-1.5 bg-surface-200 dark:bg-surface-700 rounded-full" />
+                    </div>
+
                     {/* Header image carousel */}
                     <div className="relative h-56 sm:h-72 bg-surface-100 dark:bg-surface-800 shrink-0 overflow-hidden">
                         {allImages.length > 0 ? (
@@ -726,7 +731,7 @@ export function StorePageClient({ slug }: { slug: string }) {
         unzoned_slots: Array<{ time: string; available: boolean; available_count: number; reserved_until: string | null }> | null;
     } | null>(null);
     const [availLoading, setAvailLoading] = useState(false);
-    const { addItem, itemCount } = useCart();
+    const { addItem, itemCount, subtotal } = useCart();
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
     const isScrollingRef = useRef(false);
 
@@ -989,7 +994,7 @@ export function StorePageClient({ slug }: { slug: string }) {
     };
 
     return (
-        <div className="min-h-screen bg-white dark:bg-surface-950 font-sans">
+        <div className="min-h-screen bg-white dark:bg-surface-950 font-sans pb-20 lg:pb-0">
             {/* Tracking Pixels */}
             <TrackingPixels
                 metaPixelId={restaurant.metaPixelId}
@@ -1075,7 +1080,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                     <motion.div 
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 rounded-3xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 shadow-2xl shrink-0 overflow-hidden -mt-20 sm:-mt-24 ring-8 ring-white dark:ring-surface-950"
+                        className="relative z-10 w-20 h-20 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 shadow-2xl shrink-0 overflow-hidden -mt-10 sm:-mt-16 md:-mt-20 ring-4 sm:ring-8 ring-white dark:ring-surface-950"
                     >
                         {restaurant.logoUrl ? (
                             <img src={restaurant.logoUrl} alt={restaurant.name} className="w-full h-full object-cover" />
@@ -1114,7 +1119,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                         </p>
 
                         {/* Horizontal Info Bar */}
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-6 py-4 border-y border-surface-100 dark:border-surface-800/60">
+                        <div className="grid grid-cols-3 items-center gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-3 mt-6 py-4 border-y border-surface-100 dark:border-surface-800/60">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-amber-500/10 rounded-xl">
                                     <Star size={16} className="text-amber-500 fill-amber-500" />
@@ -1776,12 +1781,12 @@ export function StorePageClient({ slug }: { slug: string }) {
                 <div className="flex-1 min-w-0 pt-6">
                     {/* Horizontal scroll for mobile/tablet (kept for all themes) */}
                     {categoriesWithProducts.length > 1 && (
-                        <div className="flex lg:hidden gap-3 overflow-x-auto pb-6 mb-8 scrollbar-hide -mx-4 px-4 sticky top-[64px] z-30 bg-white/80 dark:bg-surface-950/80 backdrop-blur-md pt-2">
+                        <div className="flex lg:hidden gap-3 overflow-x-auto pb-6 mb-8 scrollbar-hide snap-x snap-mandatory -mx-4 px-4 sticky top-[64px] z-30 bg-white/80 dark:bg-surface-950/80 backdrop-blur-md pt-2">
                             {categoriesWithProducts.map(({ cat }) => (
                                 <button
                                     key={cat.id}
                                     onClick={() => scrollToCategory(cat.id)}
-                                    className={`shrink-0 px-5 py-2.5 rounded-2xl text-[13px] font-bold transition-all border ${
+                                    className={`shrink-0 whitespace-nowrap snap-start px-5 py-2.5 rounded-2xl text-[13px] font-bold transition-all border ${
                                         activeCategory === cat.id
                                             ? "bg-surface-900 dark:bg-white text-white dark:text-surface-900 border-surface-900 dark:border-white shadow-lg"
                                             : "bg-surface-50 dark:bg-surface-900 text-surface-500 dark:text-surface-400 border-surface-200 dark:border-surface-800 hover:border-surface-300"
@@ -1872,21 +1877,38 @@ export function StorePageClient({ slug }: { slug: string }) {
                 </div>
             </div>
 
-            {itemCount > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 sm:hidden">
-                    <button
-                        onClick={() => setCartOpen(true)}
-                        className="flex items-center gap-3 pl-4 pr-5 py-3.5 bg-surface-900 dark:bg-white hover:bg-surface-800 dark:hover:bg-surface-100 text-white dark:text-surface-900 font-bold rounded-2xl shadow-2xl transition-colors"
-                        aria-label="Voir le panier"
+            {/* ── Sticky Mobile Cart Bar ─────────────────────────────────────────────
+                 Full-width fixed bottom bar, only on < lg, only when cart has items.
+                 Animates in/out with framer-motion. pb respects iPhone notch. ── */}
+            <AnimatePresence>
+                {itemCount > 0 && (
+                    <motion.div
+                        initial={{ y: 80, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 80, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                        className="fixed bottom-0 left-0 right-0 z-40 lg:hidden"
+                        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
                     >
-                        <span className="w-6 h-6 bg-brand-500 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
-                            {itemCount > 9 ? "9+" : itemCount}
-                        </span>
-                        <span>Voir mon panier</span>
-                        <ShoppingBag size={18} />
-                    </button>
-                </div>
-            )}
+                        <button
+                            onClick={() => setCartOpen(true)}
+                            className="w-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white px-4 py-3.5 flex items-center justify-between transition-colors shadow-[0_-4px_24px_rgba(249,115,22,0.30)]"
+                            aria-label={`Panier — ${itemCount} article${itemCount !== 1 ? "s" : ""}`}
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <ShoppingBag size={20} className="text-white/90" />
+                                <span className="font-bold text-[15px]">
+                                    {itemCount} article{itemCount !== 1 ? "s" : ""}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-extrabold text-[15px]">{formatCFA(subtotal)}</span>
+                                <span className="text-sm font-semibold text-white/80">Voir le panier →</span>
+                            </div>
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
 

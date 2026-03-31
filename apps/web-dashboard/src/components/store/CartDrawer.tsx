@@ -20,6 +20,7 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
+import { motion } from "framer-motion";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,17 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
     const [paymentReferenceId, setPaymentReferenceId] = useState<string | null>(null);
     const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid" | "failed" | null>(null);
     const [paymentError, setPaymentError] = useState<string | null>(null);
+
+    // ── Responsive: detect desktop to switch between bottom-sheet (mobile) and
+    //    side-drawer (lg+) animations without duplicating JSX. ──────────────────
+    const [isDesktop, setIsDesktop] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia("(min-width: 1024px)");
+        setIsDesktop(mq.matches);
+        const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, []);
 
     useEffect(() => {
         const supabase = createClient();
@@ -188,15 +200,29 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                 onClick={onClose}
             />
 
-            {/* Drawer */}
-            <aside
-                className={`fixed inset-y-0 right-0 z-50 flex flex-col w-full max-w-md bg-white dark:bg-surface-900 shadow-2xl transition-transform duration-300 ease-in-out ${
-                    open ? "translate-x-0" : "translate-x-full"
-                }`}
+            {/* Drawer — right-side panel on lg+, bottom sheet that slides up on < lg */}
+            <motion.aside
+                initial={false}
+                animate={
+                    open
+                        ? { y: 0, x: 0 }
+                        : isDesktop
+                        ? { y: 0, x: "100%" }
+                        : { y: "100%", x: 0 }
+                }
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                className="fixed z-50 flex flex-col bg-white dark:bg-surface-900 shadow-2xl
+                    inset-x-0 bottom-0 rounded-t-3xl max-h-[90vh]
+                    lg:inset-x-auto lg:inset-y-0 lg:right-0 lg:rounded-none lg:w-full lg:max-w-md lg:max-h-full"
                 aria-label="Panier"
                 aria-modal="true"
                 role="dialog"
             >
+                {/* Drag handle pill — bottom sheet affordance, hidden on desktop */}
+                <div className="flex justify-center pt-3 pb-1 shrink-0 lg:hidden" aria-hidden="true">
+                    <div className="w-12 h-1.5 bg-surface-200 dark:bg-surface-700 rounded-full" />
+                </div>
+
                 {/* ── Header ── */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200 dark:border-surface-700">
                     <div className="flex items-center gap-2">
@@ -542,7 +568,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                         </button>
                     </div>
                 )}
-            </aside>
+            </motion.aside>
         </>
     );
 }
