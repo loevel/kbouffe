@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
     ChefHat,
     MapPin,
@@ -26,6 +27,7 @@ import {
     ChevronRight,
     ImagePlus,
     Maximize2,
+    Utensils,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
@@ -698,6 +700,8 @@ export function StorePageClient({ slug }: { slug: string }) {
         return "fr";
     });
     const [cartOpen, setCartOpen] = useState(false);
+    const searchParams = useSearchParams();
+    const tableParam = searchParams.get("table");
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [reservationOpen, setReservationOpen] = useState(false);
     const [resSubmitting, setResSubmitting] = useState(false);
@@ -1007,6 +1011,14 @@ export function StorePageClient({ slug }: { slug: string }) {
                     announcements={announcements}
                     restaurantId={restaurant.id}
                 />
+            )}
+
+            {/* Dine-In Table Banner — affiché quand le client arrive via QR code */}
+            {tableParam && (
+                <div className="sticky top-0 z-[60] flex items-center justify-center gap-2 bg-brand-500 text-white text-sm font-semibold px-4 py-2.5 shadow-lg">
+                    <Utensils size={16} className="shrink-0" />
+                    <span>Table {tableParam} — Commandez depuis votre place, c&apos;est plus rapide 🚀</span>
+                </div>
             )}
             {/* Nav */}
             <nav className="sticky top-0 z-50 bg-white/80 dark:bg-surface-950/80 backdrop-blur-xl border-b border-surface-200/50 dark:border-surface-800/50 transition-all">
@@ -1910,7 +1922,12 @@ export function StorePageClient({ slug }: { slug: string }) {
                 )}
             </AnimatePresence>
 
-            <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+            <CartDrawer
+                open={cartOpen}
+                onClose={() => setCartOpen(false)}
+                initialDeliveryType={tableParam ? "dine_in" : undefined}
+                initialTableNumber={tableParam ?? undefined}
+            />
 
             {selectedProduct && (
                 <ProductDetailModal

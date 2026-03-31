@@ -44,20 +44,24 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; icon: React.ReactNode
 interface CartDrawerProps {
     open: boolean;
     onClose: () => void;
+    /** Pré-sélectionne le mode dine_in (passé depuis URL ?table=X) */
+    initialDeliveryType?: DeliveryType;
+    /** Pré-remplit le numéro de table (passé depuis URL ?table=X) */
+    initialTableNumber?: string;
 }
 
-export function CartDrawer({ open, onClose }: CartDrawerProps) {
+export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNumber }: CartDrawerProps) {
     const { restaurant, items, itemCount, subtotal, updateQty, removeItem, clear } = useCart();
 
     // Checkout step: "cart" | "checkout" | "success"
     const [step, setStep] = useState<"cart" | "checkout" | "success">("cart");
 
     // Checkout form state
-    const [deliveryType, setDeliveryType] = useState<DeliveryType>("delivery");
+    const [deliveryType, setDeliveryType] = useState<DeliveryType>(initialDeliveryType ?? "delivery");
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [deliveryAddress, setDeliveryAddress] = useState("");
-    const [tableNumber, setTableNumber] = useState("");
+    const [tableNumber, setTableNumber] = useState(initialTableNumber ?? "");
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);

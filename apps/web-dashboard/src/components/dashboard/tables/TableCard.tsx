@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Users, MoreVertical, QrCode, X, Download, ExternalLink, Clock3 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Users, MoreVertical, QrCode, X, Download, ExternalLink, Clock3, Printer } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import { Card, Badge, Dropdown, Button } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
@@ -53,11 +54,9 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
     }, [statusKey, t.tables.available, t.tables.occupied, t.tables.reserved, t.tables.cleaning]);
 
     const menuUrl = restaurant?.slug
-        ? `https://kbouffe.com/r/${restaurant.slug}/table/${table.number}`
+        ? `https://kbouffe.com/r/${restaurant.slug}?table=${table.number}`
         : null;
-    const qrImageUrl = menuUrl
-        ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(menuUrl)}&size=250x250&margin=10`
-        : null;
+    const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
     const statusActions = [
         { key: "available", label: t.tables.markAvailable },
@@ -130,7 +129,7 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
                 </div>
 
                 {/* QR hint button */}
-                {qrImageUrl && (
+                {menuUrl && (
                     <button
                         onClick={() => setShowQr(true)}
                         className="mt-3 flex items-center gap-1.5 text-xs text-surface-400 hover:text-brand-500 transition-colors"
@@ -142,7 +141,7 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
             </Card>
 
             {/* QR Modal */}
-            {showQr && qrImageUrl && menuUrl && (
+            {showQr && menuUrl && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowQr(false)}>
                     <div className="bg-white dark:bg-surface-900 rounded-2xl shadow-2xl p-6 w-full max-w-xs text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-4">
@@ -154,19 +153,19 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
                             </button>
                         </div>
 
-                        {/* QR Image */}
+                        {/* QR Code généré localement */}
                         <div className="bg-white p-4 rounded-xl inline-block mb-4 shadow-inner">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                src={qrImageUrl}
-                                alt={`QR ${table.number}`}
-                                width={200}
-                                height={200}
-                                className="block"
+                            <QRCodeCanvas
+                                ref={qrCanvasRef}
+                                value={menuUrl}
+                                size={200}
+                                level="H"
+                                includeMargin
                             />
                         </div>
 
-                        <p className="text-xs text-surface-400 mb-4 break-all">{menuUrl}</p>
+                        <p className="text-xs text-surface-400 mb-1">Scanner pour commander</p>
+                        <p className="text-[10px] text-surface-300 mb-4 break-all">{menuUrl}</p>
 
                         <div className="flex gap-2">
                             <Button
@@ -183,8 +182,11 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
                                 size="sm"
                                 className="flex-1 gap-2"
                                 onClick={() => {
+                                    const canvas = qrCanvasRef.current;
+                                    if (!canvas) return;
+                                    const url = canvas.toDataURL("image/png");
                                     const a = document.createElement("a");
-                                    a.href = qrImageUrl;
+                                    a.href = url;
                                     a.download = `qr-table-${table.number}.png`;
                                     a.click();
                                 }}

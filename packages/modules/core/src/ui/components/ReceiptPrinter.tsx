@@ -64,7 +64,10 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                         <div>Date: ${formatDateTime(order.created_at)}</div>
                         <div>Client: ${order.customer_name}</div>
                         <div>Tél: ${order.customer_phone}</div>
-                        <div>Type: ${order.delivery_type === "delivery" ? "LIVRAISON" : "À EMPORTER"}</div>
+                        <div>Type: ${order.delivery_type === "delivery" ? "LIVRAISON" : order.delivery_type === "dine_in" ? "SUR PLACE" : "À EMPORTER"}</div>
+                        ${order.delivery_type === "dine_in" && order.table_number ? `<div class="bold">Table: ${order.table_number}</div>` : ""}
+                        ${order.covers ? `<div>Couverts: ${order.covers}</div>` : ""}
+                        ${order.delivery_type === "delivery" && order.delivery_address ? `<div>Adresse: ${order.delivery_address}</div>` : ""}
                     </div>
                     
                     <div class="divider"></div>
@@ -84,6 +87,8 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                             <td>Livraison</td>
                             <td style="text-align: right;">${formatCFA(order.delivery_fee)}</td>
                         </tr>
+                        ${(order.service_fee > 0) ? `<tr><td>Service</td><td style="text-align: right;">${formatCFA(order.service_fee)}</td></tr>` : ""}
+                        ${(order.tip_amount > 0) ? `<tr><td>Pourboire</td><td style="text-align: right;">${formatCFA(order.tip_amount)}</td></tr>` : ""}
                         <tr class="bold" style="font-size: 14px;">
                             <td>TOTAL</td>
                             <td style="text-align: right;">${formatCFA(order.total)}</td>
