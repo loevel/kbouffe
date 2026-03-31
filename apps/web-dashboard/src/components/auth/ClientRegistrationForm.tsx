@@ -26,7 +26,6 @@ export function ClientRegistrationForm() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-    const [termsAccepted, setTermsAccepted] = useState(false);
 
     const [form, setForm] = useState<FormData>({
         firstName: "",
@@ -55,13 +54,8 @@ export function ClientRegistrationForm() {
             return;
         }
 
-        if (form.password.length < 8) {
+        if (form.password.length < 6) {
             setError(t.auth.passwordMinLength);
-            return;
-        }
-
-        if (!termsAccepted) {
-            setError("Veuillez accepter les CGU et la Politique de confidentialité pour continuer.");
             return;
         }
 
@@ -323,21 +317,12 @@ export function ClientRegistrationForm() {
                             </button>
                         </motion.div>
 
-                        <motion.label variants={itemVariants} className="flex items-start gap-2 cursor-pointer pt-4">
-                            <input
-                                type="checkbox"
-                                checked={termsAccepted}
-                                onChange={(e) => setTermsAccepted(e.target.checked)}
-                                className="mt-0.5 h-4 w-4 rounded border-surface-300 accent-brand-500"
-                            />
-                            <span className="text-xs text-surface-500 dark:text-surface-400">
-                                J'ai lu et j'accepte les{" "}
-                                <Link href="/terms" className="text-brand-500 hover:underline font-medium">Conditions Générales</Link>
-                                {" "}et la{" "}
-                                <Link href="/privacy" className="text-brand-500 hover:underline font-medium">Politique de Confidentialité</Link>
-                                {" "}de KBouffe.
-                            </span>
-                        </motion.label>
+                        <motion.p variants={itemVariants} className="text-xs text-center text-surface-500 dark:text-surface-400 pt-4">
+                            {t.auth.termsAgree}{" "}
+                            <Link href="/terms" className="text-brand-500 hover:underline font-medium">{t.auth.termsLink}</Link>
+                            {" "}{t.auth.andText}{" "}
+                            <Link href="/privacy" className="text-brand-500 hover:underline font-medium">{t.auth.privacyLink}</Link>.
+                        </motion.p>
                     </motion.form>
 
                     {/* Bottom Links */}

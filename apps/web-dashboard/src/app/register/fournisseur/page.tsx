@@ -175,7 +175,6 @@ export default function FournisseurRegisterPage() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [termsAccepted, setTermsAccepted] = useState(false);
 
     function updateField(field: keyof Step1Form, value: string) {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -203,8 +202,8 @@ export default function FournisseurRegisterPage() {
         if (!/^\+237[0-9]{9}$/.test(phone))
             return "Numéro de téléphone invalide. Format : +237 6XX XXX XXX";
 
-        if (form.password.length < 8)
-            return "Le mot de passe doit comporter au moins 8 caractères.";
+        if (form.password.length < 6)
+            return "Le mot de passe doit comporter au moins 6 caractères.";
 
         if (form.password !== form.confirmPassword)
             return "Les mots de passe ne correspondent pas.";
@@ -221,11 +220,6 @@ export default function FournisseurRegisterPage() {
         const validationError = validate();
         if (validationError) {
             setError(validationError);
-            return;
-        }
-
-        if (!termsAccepted) {
-            setError("Veuillez accepter les CGU et la Politique de confidentialité pour continuer.");
             return;
         }
 
@@ -655,28 +649,26 @@ export default function FournisseurRegisterPage() {
                                         </button>
                                     </motion.div>
 
-                                    <motion.label
+                                    <motion.p
                                         variants={itemVariants}
-                                        className="flex items-start gap-2 cursor-pointer pt-2"
+                                        className="text-xs text-center text-surface-500 pt-2"
                                     >
-                                        <input
-                                            type="checkbox"
-                                            checked={termsAccepted}
-                                            onChange={(e) => setTermsAccepted(e.target.checked)}
-                                            className="mt-0.5 h-4 w-4 rounded border-surface-300 accent-brand-500"
-                                        />
-                                        <span className="text-xs text-surface-500">
-                                            J'ai lu et j'accepte les{" "}
-                                            <Link href="/terms" className="text-brand-400 hover:underline font-medium">
-                                                Conditions Générales
-                                            </Link>
-                                            {" "}et la{" "}
-                                            <Link href="/privacy" className="text-brand-400 hover:underline font-medium">
-                                                Politique de Confidentialité
-                                            </Link>
-                                            {" "}de KBouffe.
-                                        </span>
-                                    </motion.label>
+                                        En continuant, vous acceptez nos{" "}
+                                        <Link
+                                            href="/terms"
+                                            className="text-brand-400 hover:underline"
+                                        >
+                                            conditions d'utilisation
+                                        </Link>{" "}
+                                        et la{" "}
+                                        <Link
+                                            href="/privacy"
+                                            className="text-brand-400 hover:underline"
+                                        >
+                                            politique de confidentialité
+                                        </Link>
+                                        .
+                                    </motion.p>
                                 </motion.form>
                             </div>
                         </motion.div>

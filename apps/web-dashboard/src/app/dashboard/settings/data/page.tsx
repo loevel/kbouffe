@@ -104,8 +104,8 @@ export default function DataExportPage() {
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20">
                     <ShieldCheck size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-blue-700 dark:text-blue-300">
-                        <strong>Droit d&apos;accès aux données (Loi n°2010/012 Art.48)</strong><br />
-                        Vous avez le droit d&apos;obtenir une copie de vos données dans un format lisible par machine. Cet export est généré à la demande et contient uniquement vos propres données.
+                        <strong>Droit à la portabilité (RGPD Art. 20)</strong><br />
+                        Vous avez le droit d'obtenir une copie de vos données dans un format lisible par machine. Cet export est généré à la demande et contient uniquement vos propres données.
                     </div>
                 </div>
 

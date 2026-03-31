@@ -402,9 +402,6 @@ export function CheckoutPageClient() {
                                     rows={3}
                                     className="w-full px-4 py-3 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition resize-none"
                                 />
-                                <p className="text-[10px] text-surface-400 mt-1.5 leading-relaxed">
-                                    En utilisant votre position actuelle, vous consentez à la collecte ponctuelle de vos coordonnées GPS pour préremplir l&apos;adresse de livraison. Données non conservées après validation. Base légale : Loi n°2010/012 Art.29.
-                                </p>
                             </section>
                         )}
 

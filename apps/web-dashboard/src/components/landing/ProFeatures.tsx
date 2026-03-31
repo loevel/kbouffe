@@ -2,6 +2,7 @@
 
 import {
     ShoppingBasket,
+    TrendingUp,
     Building2,
     Users,
     Shield,
@@ -35,6 +36,19 @@ export function ProFeatures() {
                     border: "border-emerald-500/20",
                     glow: "group-hover:bg-emerald-500/5",
                     pill: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                },
+                {
+                    icon: TrendingUp,
+                    badge: "KBouffe Capital",
+                    title: "Financez votre croissance via vos données",
+                    description:
+                        "Obtenez un score de crédit basé sur vos commandes réelles (90 jours). KBouffe transmet votre dossier à une banque partenaire (Advans, Express Union, BICEC) — vous gardez 100% du contrôle, aucun risque de surendettement.",
+                    highlight: "Apporteur d'affaires uniquement — pas de prêt direct (COBAC compliant)",
+                    color: "text-blue-400",
+                    bg: "bg-blue-500/10",
+                    border: "border-blue-500/20",
+                    glow: "group-hover:bg-blue-500/5",
+                    pill: "bg-blue-500/15 text-blue-300 border-blue-500/30",
                 },
                 {
                     icon: Building2,
@@ -84,6 +98,19 @@ export function ProFeatures() {
                     border: "border-emerald-500/20",
                     glow: "group-hover:bg-emerald-500/5",
                     pill: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                },
+                {
+                    icon: TrendingUp,
+                    badge: "KBouffe Capital",
+                    title: "Finance your growth with your own data",
+                    description:
+                        "Get a credit score based on your real orders (90 days). KBouffe forwards your file to a partner bank (Advans, Express Union, BICEC) — you keep full control, zero over-indebtedness risk.",
+                    highlight: "Broker only — no direct lending (COBAC compliant)",
+                    color: "text-blue-400",
+                    bg: "bg-blue-500/10",
+                    border: "border-blue-500/20",
+                    glow: "group-hover:bg-blue-500/5",
+                    pill: "bg-blue-500/15 text-blue-300 border-blue-500/30",
                 },
                 {
                     icon: Building2,

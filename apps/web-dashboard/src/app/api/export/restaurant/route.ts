@@ -1,8 +1,7 @@
 /**
  * GET /api/export/restaurant
  * Exports all data belonging to the authenticated restaurant as a JSON file.
- * Conforme à la Loi camerounaise n°2010/012 Art.48 — Droit d'accès aux données personnelles.
- * Voir également Loi n°2019/021 sur le commerce électronique au Cameroun.
+ * GDPR Article 20 — Right to data portability.
  *
  * Includes: restaurant info, products, categories, orders (all),
  *           order items, reviews, team members.
@@ -67,7 +66,7 @@ export async function GET() {
                 exported_at: new Date().toISOString(),
                 restaurant_id: restaurantId,
                 platform: "kBouffe",
-                legal_note: "Export conforme Loi camerounaise n°2010/012 du 21 décembre 2010 Art.48 — Droit d'accès aux données personnelles.",
+                gdpr_note: "Export conforme RGPD — Article 20 portabilité des données.",
             },
             restaurant: restaurantRes.data ?? null,
             statistics: {

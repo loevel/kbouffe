@@ -34,7 +34,6 @@ export function RestaurantOnboardingWizard() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-    const [termsAccepted, setTermsAccepted] = useState(false);
 
     const [form, setForm] = useState<FormData>({
         firstName: "",
@@ -79,13 +78,8 @@ export function RestaurantOnboardingWizard() {
             setError(t.auth.emailRequired);
             return;
         }
-        if (form.password.length < 8) {
+        if (form.password.length < 6) {
             setError(t.auth.passwordMinLength);
-            return;
-        }
-
-        if (!termsAccepted) {
-            setError("Veuillez accepter les CGU et la Politique de confidentialité pour continuer.");
             return;
         }
 
@@ -370,7 +364,8 @@ export function RestaurantOnboardingWizard() {
                                                 value={form.password}
                                                 onChange={(e) => updateField("password", e.target.value)}
                                                 required
-                                                                                                minLength={8}
+                                                minLength={6}
+                                                className="w-full pl-11 pr-12 py-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:ring-2 focus:ring-brand-500 transition-all font-medium"
                                             />
                                             <button
                                                 type="button"
@@ -435,21 +430,12 @@ export function RestaurantOnboardingWizard() {
                         </div>
                         
                         {currentStep === 2 && (
-                            <label className="flex items-start gap-2 cursor-pointer mt-6">
-                                <input
-                                    type="checkbox"
-                                    checked={termsAccepted}
-                                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                                    className="mt-0.5 h-4 w-4 rounded border-surface-300 accent-brand-500"
-                                />
-                                <span className="text-xs text-surface-500 dark:text-surface-400">
-                                    J'ai lu et j'accepte les{" "}
-                                    <Link href="/terms" className="text-brand-500 hover:underline font-medium">Conditions Générales</Link>
-                                    {" "}et la{" "}
-                                    <Link href="/privacy" className="text-brand-500 hover:underline font-medium">Politique de Confidentialité</Link>
-                                    {" "}de KBouffe.
-                                </span>
-                            </label>
+                            <p className="text-xs text-center text-surface-500 dark:text-surface-400 mt-6">
+                                {t.auth.termsAgree}
+                                <Link href="/terms" className="text-brand-500 hover:underline">{t.auth.termsLink}</Link>
+                                {t.auth.andText}
+                                <Link href="/privacy" className="text-brand-500 hover:underline">{t.auth.privacyLink}</Link>.
+                            </p>
                         )}
                     </form>
 

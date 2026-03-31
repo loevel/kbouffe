@@ -8,7 +8,6 @@ import {
     CheckCircle2,
     Circle,
     CreditCard,
-    Download,
     Heart,
     LifeBuoy,
     Lock,
@@ -29,7 +28,6 @@ import { PreferencesPanelReal } from "./PreferencesPanelReal";
 import { ClientNotificationsPanel } from "./ClientNotificationsPanel";
 import { SupportPanelReal } from "./SupportPanelReal";
 import { ReservationsPanelReal } from "./ReservationsPanelReal";
-import { TwoFactorSection } from "@/components/shared/TwoFactorSection";
 
 function PanelShell({
     title,
@@ -60,7 +58,6 @@ export function NotificationsPanel() {
 export function SecurityPanel() {
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [isExporting, setIsExporting] = useState(false);
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -104,35 +101,6 @@ export function SecurityPanel() {
             setMessage({ type: "error", text: err.message });
         } finally {
             setIsLoading(false);
-        }
-    };
-
-    const handleExport = async () => {
-        setIsExporting(true);
-        try {
-            const res = await fetch("/api/export/user");
-
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || "Impossible de générer l'export");
-            }
-
-            // Déclenche le téléchargement depuis le blob renvoyé
-            const blob = await res.blob();
-            const date = new Date().toISOString().split("T")[0];
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement("a");
-            anchor.href = url;
-            anchor.download = `kbouffe-mes-donnees-${date}.json`;
-            document.body.appendChild(anchor);
-            anchor.click();
-            anchor.remove();
-            URL.revokeObjectURL(url);
-        } catch (err: any) {
-            // Afficher l'erreur dans le bandeau du panel
-            setMessage({ type: "error", text: err.message });
-        } finally {
-            setIsExporting(false);
         }
     };
 
@@ -224,8 +192,6 @@ export function SecurityPanel() {
                     )}
                 </div>
 
-                <TwoFactorSection />
-
                 <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-surface-100 dark:bg-surface-800">
@@ -237,43 +203,6 @@ export function SecurityPanel() {
                         </div>
                     </div>
                     <button className="text-sm font-bold text-brand-600 dark:text-brand-400 hover:underline">Voir</button>
-                </div>
-
-                {/* ── Export données personnelles — Loi camerounaise n°2010/012 Art.48 ── */}
-                <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700">
-                    <div className="flex items-start sm:items-center justify-between gap-4 flex-col sm:flex-row">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-surface-100 dark:bg-surface-800">
-                                <Download size={20} className="text-surface-600 dark:text-surface-400" />
-                            </div>
-                            <div>
-                                <p className="font-bold text-surface-900 dark:text-white">
-                                    Mes données personnelles
-                                </p>
-                                <p className="text-xs text-surface-500 leading-relaxed max-w-xs">
-                                    Téléchargez l&apos;ensemble de vos données (commandes, adresses,
-                                    favoris, wallet) au format JSON.
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleExport}
-                            disabled={isExporting}
-                            className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border border-surface-200 dark:border-surface-700 text-sm font-bold text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
-                        >
-                            {isExporting ? (
-                                <>
-                                    <div className="w-3 h-3 border-2 border-surface-300 border-t-surface-600 dark:border-t-surface-300 rounded-full animate-spin" />
-                                    Préparation…
-                                </>
-                            ) : (
-                                <>
-                                    <Download size={14} />
-                                    Télécharger mes données
-                                </>
-                            )}
-                        </button>
-                    </div>
                 </div>
             </div>
         </PanelShell>

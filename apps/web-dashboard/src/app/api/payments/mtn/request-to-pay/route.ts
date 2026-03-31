@@ -53,22 +53,6 @@ export async function POST(request: NextRequest) {
       return apiError("Commande introuvable", 404);
     }
 
-    // Conformité COBAC/BEAC : récupérer le numéro MTN du restaurant.
-    // L'argent doit aller DIRECTEMENT au restaurant — KBouffe ne détient pas les fonds.
-    const { data: paymentSettings } = await (admin as any)
-      .from("restaurant_payment_settings")
-      .select("momo_phone, momo_enabled")
-      .eq("restaurant_id", ctx.restaurantId)
-      .single();
-
-    const payeeMsisdn = (paymentSettings as any)?.momo_phone?.trim() || null;
-    if (!payeeMsisdn) {
-      return apiError(
-        "Ce restaurant n'a pas configuré son numéro MTN Mobile Money. Le paiement ne peut pas être traité.",
-        422
-      );
-    }
-
     const referenceId = crypto.randomUUID();
     const externalId = `order-${order.id}`;
 
@@ -79,8 +63,6 @@ export async function POST(request: NextRequest) {
       reference_id: referenceId,
       external_id: externalId,
       payer_msisdn: body.payerMsisdn.trim(),
-      payee_msisdn: payeeMsisdn,   // traçabilité légale : bénéficiaire direct
-      payment_flow: "direct",
       amount: order.total,
       currency: "XAF",
       status: "pending",
@@ -106,7 +88,6 @@ export async function POST(request: NextRequest) {
         currency: "XAF",
         externalId,
         payerMsisdn: body.payerMsisdn.trim(),
-        payeeMsisdn,                 // argent va directement au numéro MTN du restaurant
         payerMessage: body.payerMessage ?? "Paiement commande Kbouffe",
         payeeNote: body.payeeNote ?? `Commande ${order.id}`,
       });

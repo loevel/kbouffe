@@ -9,10 +9,6 @@ export interface CollectionRequestInput {
     currency: string;
     externalId: string;
     payerMsisdn: string;
-    /** Numéro MTN du restaurant bénéficiaire.
-     *  OBLIGATOIRE pour conformité COBAC : l'argent doit aller directement
-     *  chez le restaurateur, KBouffe ne doit jamais détenir les fonds. */
-    payeeMsisdn: string;
     payerMessage: string;
     payeeNote: string;
 }
@@ -96,9 +92,6 @@ const mtnProvider: MobileMoneyProvider = {
                 currency: params.currency,
                 externalId: params.externalId,
                 payer: { partyIdType: "MSISDN", partyId: params.payerMsisdn },
-                // Paiement DIRECT client → restaurant.
-                // KBouffe ne détient jamais les fonds (conformité COBAC/BEAC).
-                payee: { partyIdType: "MSISDN", partyId: params.payeeMsisdn },
                 payerMessage: params.payerMessage,
                 payeeNote: params.payeeNote,
             }),

@@ -43,28 +43,15 @@ function encodeGeohash(lat: number, lng: number, precision = 6): string {
     return hash;
 }
 
-// Cameroon MSISDN validation — mobile (6[5-9]x) and fixed (2[23]x), E.164 format
-const CAMEROON_PHONE_REGEX = /^\+237(6[56789]\d{7}|2[23]\d{7})$/;
-
-function normalizeAuthPhone(phone: string): string | null {
+function normalizeAuthPhone(phone: string): string {
     const trimmed = phone.trim();
-    if (!trimmed) return null;
+    if (!trimmed) return trimmed;
 
-    // Strip all non-digits to get a clean digit string
-    const digits = trimmed.replace(/\D/g, "");
-
-    let normalized: string;
-    if (digits.startsWith("237")) {
-        // Already has country code: "237677..." or "00237677..."
-        normalized = `+${digits.startsWith("00") ? digits.slice(2) : digits}`;
-    } else if (digits.length >= 8) {
-        // Local format "677123456" or "22312345" — prepend +237
-        normalized = `+237${digits}`;
-    } else {
-        return null;
+    if (trimmed.startsWith("+")) {
+        return `+${trimmed.slice(1).replace(/\D/g, "")}`;
     }
 
-    return CAMEROON_PHONE_REGEX.test(normalized) ? normalized : null;
+    return `+${trimmed.replace(/\D/g, "")}`;
 }
 
 function phoneToAuthEmail(phone: string): string {
@@ -149,7 +136,7 @@ authRoutes.post("/", async (c) => {
                 },
                 saas_plan: saasPlanId || "starter",
                 is_premium: !!isPremium,
-                is_published: false, // Publié après approbation KYC admin (Arrêté MINSANTE n°0007/A)
+                is_published: true,
                 is_verified: false,
                 lat: latitude,
                 lng: longitude,
@@ -201,7 +188,7 @@ authRoutes.post("/register", async (c) => {
         if (!fullName) return c.json({ error: "Nom complet requis" }, 400);
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
             return c.json({ error: "Adresse email invalide" }, 400);
-        if (password.length < 8) return c.json({ error: "Mot de passe trop court (min. 8 caractères)" }, 400);
+        if (password.length < 6) return c.json({ error: "Mot de passe trop court (min. 6 caractères)" }, 400);
 
         const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -228,8 +215,7 @@ authRoutes.post("/register", async (c) => {
             ...(phone ? { phone } : {}),
             role,
             preferred_lang: "fr",
-            notifications_enabled: false,      // Opt-in requis — Loi 2010/012 Art.62
-            sms_notifications_enabled: false,   // SMS campagnes : opt-in explicite uniquement
+            notifications_enabled: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
@@ -264,8 +250,8 @@ authRoutes.post("/customer-register", async (c) => {
         const password = String(body.password ?? "");
 
         if (!fullName) return c.json({ error: "Nom complet requis" }, 400);
-        if (!normalizedPhone) return c.json({ error: "Numéro de téléphone invalide — format attendu : +237 6X XXX XXXX" }, 400);
-        if (password.length < 8) return c.json({ error: "Mot de passe trop court (min. 8 caractères)" }, 400);
+        if (!normalizedPhone || normalizedPhone.length < 8) return c.json({ error: "Numero de telephone invalide" }, 400);
+        if (password.length < 6) return c.json({ error: "Mot de passe trop court" }, 400);
 
         const email = phoneToAuthEmail(normalizedPhone);
         const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -294,8 +280,7 @@ authRoutes.post("/customer-register", async (c) => {
             phone: normalizedPhone,
             role: "customer",
             preferred_lang: "fr",
-            notifications_enabled: false,      // Opt-in requis — Loi 2010/012 Art.62
-            sms_notifications_enabled: false,   // SMS campagnes : opt-in explicite uniquement
+            notifications_enabled: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
@@ -358,7 +343,7 @@ authRoutes.post("/sync", async (c) => {
                     address: "À définir",
                     city: "Douala",
                     country: "CM",
-                    is_published: false, // Publié après approbation KYC admin (Arrêté MINSANTE n°0007/A)
+                    is_published: true,
                     is_verified: false,
                     is_premium: false,
                     cuisine_type: "Autre",
@@ -378,8 +363,7 @@ authRoutes.post("/sync", async (c) => {
             role,
             restaurant_id: restaurantId,
             preferred_lang: "fr",
-            notifications_enabled: false,      // Opt-in requis — Loi 2010/012 Art.62
-            sms_notifications_enabled: false,   // SMS campagnes : opt-in explicite uniquement
+            notifications_enabled: true,
         };
 
         // Insert into Supabase
@@ -465,10 +449,8 @@ authRoutes.get("/me", async (c) => {
 authRoutes.get("/check-phone", async (c) => {
     const phone = c.req.query("phone");
     if (!phone?.trim()) return c.json({ error: "Le parametre phone est requis" }, 400);
-    const normalized = normalizeAuthPhone(phone);
-    if (!normalized) return c.json({ error: "Numéro de téléphone invalide — format attendu : +237 6X XXX XXXX" }, 400);
-    const result = await checkMsisdnActive(c.env, normalized);
-    return c.json({ success: true, phone: normalized, active: result.active });
+    const result = await checkMsisdnActive(c.env, phone.trim());
+    return c.json({ success: true, phone: phone.trim(), active: result.active });
 });
 
 // ── Turnstile ───────────────────────────────────────────────────

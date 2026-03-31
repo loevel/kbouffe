@@ -22,7 +22,6 @@ import {
     ClipboardList,
     UserCog,
     MessageCircle,
-    ShieldCheck,
     LogOut,
     Menu,
     X,
@@ -64,12 +63,6 @@ const NAV_ITEMS = [
         href: "/dashboard/fournisseur/profil",
         label: "Mon profil / KYC",
         icon: UserCog,
-        exact: false,
-    },
-    {
-        href: "/dashboard/fournisseur/securite",
-        label: "Sécurité",
-        icon: ShieldCheck,
         exact: false,
     },
 ] as const;

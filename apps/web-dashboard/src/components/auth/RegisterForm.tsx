@@ -39,7 +39,6 @@ export function RegisterForm({ defaultRole }: RegisterFormProps = {}) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-    const [termsAccepted, setTermsAccepted] = useState(false);
     const [selectedRole, setSelectedRole] = useState<UserRole>(defaultRole || "client");
 
     const [form, setForm] = useState<FormData>({
@@ -73,13 +72,8 @@ export function RegisterForm({ defaultRole }: RegisterFormProps = {}) {
             setError(t.auth.emailRequired);
             return;
         }
-        if (form.password.length < 8) {
+        if (form.password.length < 6) {
             setError(t.auth.passwordMinLength);
-            return;
-        }
-
-        if (!termsAccepted) {
-            setError("Veuillez accepter les CGU et la Politique de confidentialité pour continuer.");
             return;
         }
 
@@ -283,7 +277,8 @@ export function RegisterForm({ defaultRole }: RegisterFormProps = {}) {
                                 value={form.password}
                                 onChange={(e) => updateField("password", e.target.value)}
                                 required
-                                                minLength={8}
+                                minLength={6}
+                                className="w-full pl-11 pr-12 py-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
                             />
                             <button
                                 type="button"
@@ -313,21 +308,12 @@ export function RegisterForm({ defaultRole }: RegisterFormProps = {}) {
                         {loading ? t.auth.registering : t.auth.registerBtn}
                     </button>
 
-                    <label className="flex items-start gap-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={termsAccepted}
-                            onChange={(e) => setTermsAccepted(e.target.checked)}
-                            className="mt-0.5 h-4 w-4 rounded border-surface-300 accent-brand-500"
-                        />
-                        <span className="text-xs text-surface-500 dark:text-surface-400">
-                            J'ai lu et j'accepte les{" "}
-                            <Link href="/terms" className="text-brand-500 hover:underline font-medium">Conditions Générales</Link>
-                            {" "}et la{" "}
-                            <Link href="/privacy" className="text-brand-500 hover:underline font-medium">Politique de Confidentialité</Link>
-                            {" "}de KBouffe.
-                        </span>
-                    </label>
+                    <p className="text-xs text-center text-surface-500 dark:text-surface-400">
+                        {t.auth.termsAgree}
+                        <Link href="/terms" className="text-brand-500 hover:underline">{t.auth.termsLink}</Link>
+                        {t.auth.andText}
+                        <Link href="/privacy" className="text-brand-500 hover:underline">{t.auth.privacyLink}</Link>.
+                    </p>
                 </form>
             </div>
 

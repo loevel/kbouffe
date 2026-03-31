@@ -5,7 +5,6 @@ import { CartProvider } from "@/contexts/cart-context";
 import { ClientAppProvider } from "@/components/providers/ClientAppProvider";
 import { PushNotificationProvider } from "@/components/providers/PushNotificationProvider";
 import { PwaInstallPrompt } from "@/components/shared/PwaInstallPrompt";
-import { CookieBanner } from "@/components/CookieBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -97,7 +96,6 @@ export default function RootLayout({
                 <CartProvider>
                   {children}
                   <PwaInstallPrompt />
-                  <CookieBanner />
                   <ToastProvider />
                 </CartProvider>
               </PushNotificationProvider>
