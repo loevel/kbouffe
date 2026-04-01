@@ -24,6 +24,7 @@ import {
     LifeBuoy,
     Sprout,
     Gift,
+    Banknote,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "../brand/Logo";
 import { cn } from "../../lib/utils";
@@ -31,7 +32,7 @@ import { useLocale } from "../../contexts/LocaleContext";
 import { useDashboard } from "../../contexts/DashboardContext";
 import { NAV_PERMISSIONS } from "../../lib/permissions";
 
-export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "analytics" | "marketplace" | "approvisionnement" | "reviews" | "messages" | "showcase" | "support" | "giftCards";
+export type NavKey = "overview" | "orders" | "menu" | "customers" | "finances" | "caisse" | "settings" | "myStore" | "team" | "tables" | "reservations" | "kitchen" | "marketing" | "reports" | "analytics" | "marketplace" | "approvisionnement" | "reviews" | "messages" | "showcase" | "support" | "giftCards";
 
 export interface NavItem {
     href: string;
@@ -51,6 +52,7 @@ export const navItemsDef: NavItem[] = [
     { href: "/dashboard/reviews", labelKey: "reviews", icon: MessageSquareText },
     { href: "/dashboard/messages", labelKey: "messages", icon: MessageCircle },
     { href: "/dashboard/finances", labelKey: "finances", icon: Wallet },
+    { href: "/dashboard/caisse", labelKey: "caisse", icon: Banknote },
     { href: "/dashboard/reports", labelKey: "reports", icon: BarChart3 },
     { href: "/dashboard/analytics", labelKey: "analytics", icon: Activity },
     { href: "/dashboard/marketing", labelKey: "marketing", icon: Megaphone },

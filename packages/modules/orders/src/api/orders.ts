@@ -1,10 +1,15 @@
 /**
  * Orders routes — migrated from web-dashboard/src/app/api/orders/
  *
- * GET  /orders          — List orders (with filters)
- * POST /orders          — Create a new order
- * GET  /orders/:id      — Get single order
- * PATCH /orders/:id     — Update order status
+ * GET    /orders              — List orders (with filters)
+ * GET    /orders/drafts       — List parked (draft) orders          [Park & Recall]
+ * POST   /orders              — Create a new order
+ * POST   /orders/draft        — Park a new draft order              [Park & Recall]
+ * GET    /orders/:id          — Get single order
+ * PATCH  /orders/:id          — Update order status
+ * PATCH  /orders/:id/recall   — Convert draft → pending             [Park & Recall]
+ * DELETE /orders/:id/draft    — Discard a parked order              [Park & Recall]
+ * POST   /orders/:id/refund   — Refund an order
  */
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
@@ -130,6 +135,133 @@ ordersRoutes.post("/", async (c) => {
 
     return c.json({ success: true, order: data }, 201);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Park & Recall — draft orders
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /orders/drafts — List all parked (draft) orders for the restaurant.
+ * IMPORTANT: must be declared before GET /orders/:id to avoid param conflict.
+ */
+ordersRoutes.get("/drafts", async (c) => {
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
+
+    const { data, error } = await supabase
+        .from("orders")
+        .select("id, customer_name, total, table_number, created_at, items")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "draft" as any)
+        .order("created_at", { ascending: false });
+
+    if (error) {
+        console.error("Drafts query error:", error);
+        return c.json({ error: "Erreur lors de la récupération des commandes garées" }, 500);
+    }
+
+    // Enrich with computed fields (draft_label, operator_member_id, items count)
+    const drafts = (data ?? []).map((row: any) => ({
+        id: row.id,
+        draft_label: row.draft_label ?? null,
+        operator_member_id: row.operator_member_id ?? null,
+        customer_name: row.customer_name,
+        table_number: row.table_number,
+        total: row.total,
+        items_count: Array.isArray(row.items) ? row.items.length : 0,
+        created_at: row.created_at,
+    }));
+
+    return c.json({ drafts });
+});
+
+/**
+ * POST /orders/draft — Park a new draft order.
+ * IMPORTANT: must be declared before any /:id/* routes.
+ */
+ordersRoutes.post("/draft", async (c) => {
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
+    const body = await c.req.json();
+
+    // ── Validation ────────────────────────────────────────────────────────────
+    const { draftLabel, customerName, items, tableNumber, operatorMemberId, notes, covers, payment_method } = body;
+
+    if (!draftLabel || typeof draftLabel !== "string" || !draftLabel.trim()) {
+        return c.json({ error: "Un libellé de commande garée est requis (ex: Table 3)" }, 400);
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+        return c.json({ error: "La commande doit contenir au moins un article" }, 400);
+    }
+
+    // Validate each item: must have id, quantity > 0, and a unit_price
+    for (const item of items) {
+        if (!item.id || typeof item.id !== "string") {
+            return c.json({ error: "Chaque article doit avoir un identifiant valide" }, 400);
+        }
+        const qty = Number(item.quantity ?? item.qty ?? 0);
+        if (!Number.isFinite(qty) || qty <= 0) {
+            return c.json({ error: `Quantité invalide pour l'article ${item.id}` }, 400);
+        }
+        const price = Number(item.unit_price ?? item.price ?? 0);
+        if (!Number.isFinite(price) || price < 0) {
+            return c.json({ error: `Prix invalide pour l'article ${item.id}` }, 400);
+        }
+    }
+
+    // ── Calculate totals ─────────────────────────────────────────────────────
+    const subtotal = items.reduce((sum: number, item: any) => {
+        const qty = Number(item.quantity ?? item.qty ?? 1);
+        const price = Number(item.unit_price ?? item.price ?? 0);
+        return sum + qty * price;
+    }, 0);
+    const total = subtotal; // no delivery fee for dine-in drafts
+
+    // ── Invoice number ────────────────────────────────────────────────────────
+    const now = new Date();
+    const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const invoiceNumber = `DRF-${yyyymm}-${Date.now().toString(36).toUpperCase()}`;
+
+    // ── Insert draft order ────────────────────────────────────────────────────
+    const orderData: Record<string, unknown> = {
+        restaurant_id: restaurantId,
+        customer_name: customerName ?? draftLabel,
+        customer_phone: "",
+        items,
+        subtotal,
+        delivery_fee: 0,
+        service_fee: 0,
+        corkage_fee: 0,
+        tip_amount: 0,
+        total,
+        status: "draft",
+        delivery_type: "dine_in",
+        payment_method: payment_method ?? "cash",
+        payment_status: "pending",
+        notes: notes ?? null,
+        table_number: tableNumber ?? null,
+        covers: covers ?? null,
+        draft_label: draftLabel.trim(),
+        operator_member_id: operatorMemberId ?? null,
+        invoice_number: invoiceNumber,
+    };
+
+    const { data, error } = await supabase
+        .from("orders")
+        .insert(orderData as any)
+        .select("id, draft_label, total, items, table_number, created_at")
+        .single();
+
+    if (error) {
+        console.error("Create draft order error:", error);
+        return c.json({ error: "Erreur lors de la création de la commande garée" }, 500);
+    }
+
+    return c.json({ success: true, order: data }, 201);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /** GET /orders/:id — Get a single order */
 ordersRoutes.get("/:id", async (c) => {
@@ -278,6 +410,108 @@ ordersRoutes.patch("/:id", async (c) => {
 
     return c.json({ success: true, order: data });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Park & Recall — recall / discard routes (must come before generic /:id/refund)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * PATCH /orders/:id/recall — Convert a draft order into a real pending order.
+ * Requires paymentMethod in the body.
+ */
+ordersRoutes.patch("/:id/recall", async (c) => {
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
+    const id = c.req.param("id");
+    const body = await c.req.json();
+
+    // 1. Fetch the draft
+    const { data: order, error: fetchError } = await supabase
+        .from("orders")
+        .select("id, status, total")
+        .eq("id", id)
+        .eq("restaurant_id", restaurantId)
+        .single();
+
+    if (fetchError || !order) {
+        return c.json({ error: "Commande non trouvée" }, 404);
+    }
+
+    if ((order as any).status !== "draft") {
+        return c.json({ error: "Seules les commandes garées peuvent être rappelées" }, 400);
+    }
+
+    if (!body.paymentMethod || typeof body.paymentMethod !== "string") {
+        return c.json({ error: "Le mode de paiement est requis pour finaliser la commande" }, 400);
+    }
+
+    // 2. Update: draft → pending
+    const { data: updated, error: updateError } = await supabase
+        .from("orders")
+        .update({
+            status: "pending" as any,
+            payment_method: body.paymentMethod as any,
+            draft_label: null,
+            updated_at: new Date().toISOString(),
+        } as any)
+        .eq("id", id)
+        .eq("restaurant_id", restaurantId)
+        .select("id, status, total, payment_method")
+        .single();
+
+    if (updateError) {
+        console.error("Recall order error:", updateError);
+        return c.json({ error: "Erreur lors du rappel de la commande" }, 500);
+    }
+
+    return c.json({ success: true, order: updated });
+});
+
+/**
+ * DELETE /orders/:id/draft — Discard a parked order (set status to cancelled).
+ * Keeps an audit trail rather than hard-deleting.
+ */
+ordersRoutes.delete("/:id/draft", async (c) => {
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
+    const id = c.req.param("id");
+
+    // 1. Verify the order exists and is a draft
+    const { data: order, error: fetchError } = await supabase
+        .from("orders")
+        .select("id, status")
+        .eq("id", id)
+        .eq("restaurant_id", restaurantId)
+        .single();
+
+    if (fetchError || !order) {
+        return c.json({ error: "Commande non trouvée" }, 404);
+    }
+
+    if ((order as any).status !== "draft") {
+        return c.json({ error: "Seules les commandes garées peuvent être supprimées via cette route" }, 400);
+    }
+
+    // 2. Mark as cancelled (audit trail preserved)
+    const { error: updateError } = await supabase
+        .from("orders")
+        .update({
+            status: "cancelled" as any,
+            draft_label: null,
+            updated_at: new Date().toISOString(),
+        } as any)
+        .eq("id", id)
+        .eq("restaurant_id", restaurantId);
+
+    if (updateError) {
+        console.error("Discard draft error:", updateError);
+        return c.json({ error: "Erreur lors de la suppression de la commande garée" }, 500);
+    }
+
+    return c.json({ success: true });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /** POST /orders/:id/refund — Refund an order (Loi 2015/003 Art.33 — restitution effective) */
 ordersRoutes.post("/:id/refund", async (c) => {

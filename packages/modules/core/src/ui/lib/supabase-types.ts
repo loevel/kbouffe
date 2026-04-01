@@ -15,6 +15,7 @@ export type Json =
     | Json[];
 
 export type OrderStatus =
+    | "draft"       // Parked order — Park & Recall feature
     | "pending"
     | "accepted"
     | "preparing"

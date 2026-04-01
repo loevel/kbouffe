@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Loader2, MapPin, QrCode, Search, Shuffle } from "lucide-react";
+import { Plus, Loader2, MapPin, QrCode, Search, ParkingSquare } from "lucide-react";
 import { Card, Button, Badge, Modal, ModalFooter, Input, Select, EmptyState, toast } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
-import { createClient } from "@/lib/supabase/client";
+import { authFetch } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
+import { createClient } from "@/lib/supabase/client";
 import { TableCard } from "./TableCard";
 import { ZoneManager } from "./ZoneManager";
+import { ParkedOrdersPanel } from "@/components/pos/ParkedOrdersPanel";
+import { usePosOperator } from "@/contexts/PosOperatorContext";
 
 interface TableZone {
     id: string;
@@ -39,6 +42,7 @@ interface RestaurantTable {
 export function TablesManager() {
     const { t } = useLocale();
     const { can } = useDashboard();
+    const { operator } = usePosOperator();
     const [tables, setTables] = useState<RestaurantTable[]>([]);
     const [zones, setZones] = useState<TableZone[]>([]);
     const [loading, setLoading] = useState(true);
@@ -47,6 +51,10 @@ export function TablesManager() {
     const [filterZone, setFilterZone] = useState("all");
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState<"status" | "capacity" | "number">("status");
+    // ── Park & Recall ──────────────────────────────────────────────────────
+    const [showParkedPanel, setShowParkedPanel] = useState(false);
+    const [parkedCount, setParkedCount] = useState(0);
+    const [showParkModal, setShowParkModal] = useState(false);
 
     const authFetch = useCallback(async (url: string, options: RequestInit = {}) => {
         const supabase = createClient();
@@ -79,10 +87,16 @@ export function TablesManager() {
     }, [fetchData]);
 
     const handleStatusChange = async (tableId: string, newStatus: string) => {
+        // Include the PDV operator in the payload when occupying a table
+        const payload: Record<string, unknown> = { status: newStatus };
+        if (newStatus === "occupied" && operator?.memberId) {
+            payload.operator_member_id = operator.memberId;
+        }
+
         const res = await authFetch(`/api/tables/${tableId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: newStatus }),
+            body: JSON.stringify(payload),
         });
         if (!res.ok) {
             const data = await res.json();
@@ -230,6 +244,20 @@ export function TablesManager() {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
+                {/* Park & Recall — Commandes Garées button */}
+                <button
+                    onClick={() => setShowParkedPanel(true)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors text-sm font-medium"
+                >
+                    <ParkingSquare size={16} />
+                    <span>Commandes Garées</span>
+                    {parkedCount > 0 && (
+                        <span className="px-1.5 py-0.5 text-xs font-bold rounded-full bg-amber-500 text-white">
+                            {parkedCount}
+                        </span>
+                    )}
+                </button>
+
                 <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700 w-full md:w-auto">
                     <Search size={16} className="text-surface-400" />
                     <input
@@ -266,6 +294,16 @@ export function TablesManager() {
                         </Button>
                     </>
                 )}
+                {/* Garer une commande — secondary action */}
+                <Button
+                    size="sm"
+                    variant="outline"
+                    leftIcon={<ParkingSquare size={16} />}
+                    onClick={() => setShowParkModal(true)}
+                    className="text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-900/20"
+                >
+                    Garer une commande
+                </Button>
             </div>
 
             {/* Tables grid */}
@@ -299,6 +337,28 @@ export function TablesManager() {
                 onClose={() => setShowZones(false)}
                 zones={zones}
                 onUpdated={fetchData}
+            />
+
+            {/* Park & Recall — Parked orders drawer */}
+            <ParkedOrdersPanel
+                isOpen={showParkedPanel}
+                onClose={() => setShowParkedPanel(false)}
+                onCountChange={setParkedCount}
+            />
+
+            {/* Park & Recall — Park new order modal */}
+            <ParkOrderModal
+                isOpen={showParkModal}
+                onClose={() => setShowParkModal(false)}
+                zones={zones}
+                tables={tables}
+                operatorMemberId={operator?.memberId}
+                onParked={() => {
+                    setShowParkModal(false);
+                    // refresh count via ParkedOrdersPanel auto-refresh (next 30s tick)
+                    // optimistically increment count
+                    setParkedCount((n) => n + 1);
+                }}
             />
         </>
     );
@@ -438,3 +498,240 @@ function AddTableModal({
         </Modal>
     );
 }
+
+// ─── Park Order Modal ───────────────────────────────────────────────────────
+/**
+ * Modal for a server to create a new parked (draft) order on the spot.
+ * The server enters a label (e.g. "Table 3 - Moussa"), selects a table,
+ * and adds items manually before parking the order.
+ */
+function ParkOrderModal({
+    isOpen,
+    onClose,
+    zones,
+    tables,
+    operatorMemberId,
+    onParked,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    zones: TableZone[];
+    tables: RestaurantTable[];
+    operatorMemberId?: string;
+    onParked: () => void;
+}) {
+    const [draftLabel, setDraftLabel] = useState("");
+    const [tableNumber, setTableNumber] = useState("");
+    const [customerName, setCustomerName] = useState("");
+    const [notes, setNotes] = useState("");
+    const [items, setItems] = useState<Array<{ id: string; name: string; unit_price: number; quantity: number }>>([]);
+    const [loading, setLoading] = useState(false);
+
+    // Reset on open
+    useEffect(() => {
+        if (!isOpen) return;
+        setDraftLabel("");
+        setTableNumber("");
+        setCustomerName("");
+        setNotes("");
+        setItems([{ id: crypto.randomUUID(), name: "", unit_price: 0, quantity: 1 }]);
+    }, [isOpen]);
+
+    const addItem = () => {
+        setItems((prev) => [...prev, { id: crypto.randomUUID(), name: "", unit_price: 0, quantity: 1 }]);
+    };
+
+    const removeItem = (idx: number) => {
+        setItems((prev) => prev.filter((_, i) => i !== idx));
+    };
+
+    const updateItem = (idx: number, field: string, value: string | number) => {
+        setItems((prev) =>
+            prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item))
+        );
+    };
+
+    const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+
+    const handleSubmit = async () => {
+        if (!draftLabel.trim()) {
+            toast.error("Le libellé de commande garée est requis");
+            return;
+        }
+        const validItems = items.filter((it) => it.name.trim() && it.quantity > 0);
+        if (validItems.length === 0) {
+            toast.error("Ajoutez au moins un article avec un nom et une quantité");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await authFetch("/api/orders/draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    draftLabel: draftLabel.trim(),
+                    customerName: customerName.trim() || draftLabel.trim(),
+                    tableNumber: tableNumber.trim() || null,
+                    notes: notes.trim() || null,
+                    operatorMemberId: operatorMemberId ?? null,
+                    items: validItems.map((it) => ({
+                        id: it.id,
+                        name: it.name.trim(),
+                        unit_price: it.unit_price,
+                        quantity: it.quantity,
+                    })),
+                }),
+            });
+
+            const data = await res.json() as { success?: boolean; error?: string };
+            if (!res.ok) {
+                toast.error(data.error ?? "Erreur lors de la mise en attente");
+                return;
+            }
+
+            toast.success("Commande garée ✓");
+            onParked();
+        } catch {
+            toast.error("Erreur réseau");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Garer une commande"
+            description="Enregistrez une commande en cours sans paiement immédiat"
+            size="lg"
+        >
+            <div className="space-y-4">
+                {/* Label */}
+                <Input
+                    label="Libellé de commande *"
+                    placeholder="Ex: Table 3 - Moussa"
+                    value={draftLabel}
+                    onChange={(e) => setDraftLabel(e.target.value)}
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Table number */}
+                    <div>
+                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                            Numéro de table
+                        </label>
+                        <select
+                            value={tableNumber}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setTableNumber(val);
+                                if (val && !draftLabel) setDraftLabel(`Table ${val}`);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        >
+                            <option value="">— Aucune —</option>
+                            {tables.map((tb) => (
+                                <option key={tb.id} value={tb.number}>
+                                    Table {tb.number}{tb.table_zones ? ` (${tb.table_zones.name})` : ""}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Customer name */}
+                    <Input
+                        label="Nom du client (optionnel)"
+                        placeholder="Ex: Moussa"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                    />
+                </div>
+
+                {/* Items */}
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-surface-700 dark:text-surface-300">
+                            Articles
+                        </label>
+                        <button
+                            type="button"
+                            onClick={addItem}
+                            className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-medium"
+                        >
+                            + Ajouter un article
+                        </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                        {items.map((item, idx) => (
+                            <div key={item.id} className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Nom de l'article"
+                                    value={item.name}
+                                    onChange={(e) => updateItem(idx, "name", e.target.value)}
+                                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 min-w-0"
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Prix"
+                                    min={0}
+                                    value={item.unit_price || ""}
+                                    onChange={(e) => updateItem(idx, "unit_price", Number(e.target.value))}
+                                    className="w-24 px-3 py-2 text-sm rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Qté"
+                                    min={1}
+                                    value={item.quantity}
+                                    onChange={(e) => updateItem(idx, "quantity", Math.max(1, Number(e.target.value)))}
+                                    className="w-16 px-3 py-2 text-sm rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                                {items.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => removeItem(idx)}
+                                        className="p-1.5 text-surface-400 hover:text-red-500 transition-colors"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {subtotal > 0 && (
+                        <p className="text-right text-sm font-bold text-surface-900 dark:text-white mt-2">
+                            Sous-total : {new Intl.NumberFormat("fr-CM", { style: "currency", currency: "XAF", minimumFractionDigits: 0 }).format(subtotal)}
+                        </p>
+                    )}
+                </div>
+
+                {/* Notes */}
+                <Input
+                    label="Notes (optionnel)"
+                    placeholder="Allergies, préférences..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                />
+            </div>
+
+            <ModalFooter>
+                <Button variant="outline" onClick={onClose} disabled={loading}>
+                    Annuler
+                </Button>
+                <Button
+                    onClick={handleSubmit}
+                    isLoading={loading}
+                    leftIcon={<ParkingSquare size={16} />}
+                >
+                    Garer la commande
+                </Button>
+            </ModalFooter>
+        </Modal>
+    );
+}
+

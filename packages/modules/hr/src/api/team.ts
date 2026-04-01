@@ -1,7 +1,84 @@
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
-import { hasPermission, canManageRole, ASSIGNABLE_ROLES, type TeamRole, type Permission } from "./permissions";
+import { hasPermission, canManageRole, ASSIGNABLE_ROLES, ROLE_HIERARCHY, type TeamRole, type Permission } from "./permissions";
+
+// ── PIN crypto helpers (PBKDF2 via Web Crypto API — Cloudflare Workers compatible) ──
+
+async function hashPin(pin: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(pin),
+        "PBKDF2",
+        false,
+        ["deriveBits"],
+    );
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const bits = await crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
+        keyMaterial,
+        256,
+    );
+    const hashArray = Array.from(new Uint8Array(bits));
+    const saltArray = Array.from(salt);
+    return `${saltArray.map((b) => b.toString(16).padStart(2, "0")).join("")}:${hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+async function verifyPin(pin: string, stored: string): Promise<boolean> {
+    try {
+        const [saltHex, hashHex] = stored.split(":");
+        if (!saltHex || !hashHex) return false;
+        const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+        const encoder = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+            "raw",
+            encoder.encode(pin),
+            "PBKDF2",
+            false,
+            ["deriveBits"],
+        );
+        const bits = await crypto.subtle.deriveBits(
+            { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
+            keyMaterial,
+            256,
+        );
+        const hashArray = Array.from(new Uint8Array(bits));
+        const computedHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+        return computedHash === hashHex;
+    } catch {
+        return false;
+    }
+}
+
+// ── Simple in-process PIN attempt rate limiter (per restaurant) ──
+// TODO: Replace with Cloudflare KV or Durable Objects for multi-instance deployments
+const _pinAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function checkPinRateLimit(restaurantId: string): boolean {
+    const now = Date.now();
+    const rec = _pinAttempts.get(restaurantId);
+    if (!rec || now > rec.resetAt) {
+        _pinAttempts.set(restaurantId, { count: 1, resetAt: now + 60_000 });
+        return true; // allowed
+    }
+    rec.count++;
+    return rec.count <= 5;
+}
+
+function recordPinFailure(restaurantId: string): void {
+    const now = Date.now();
+    const rec = _pinAttempts.get(restaurantId);
+    if (!rec || now > rec.resetAt) {
+        _pinAttempts.set(restaurantId, { count: 1, resetAt: now + 60_000 });
+    } else {
+        rec.count++;
+    }
+}
+
+function resetPinAttempts(restaurantId: string): void {
+    _pinAttempts.delete(restaurantId);
+}
 
 export const teamRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -78,7 +155,8 @@ teamRoutes.get("/", async (c) => {
                 status,
                 created_at,
                 accepted_at,
-                invited_by
+                invited_by,
+                pin_hash
             `)
             .eq("restaurant_id", restaurantId);
 
@@ -99,6 +177,7 @@ teamRoutes.get("/", async (c) => {
                     created_at: restaurant.created_at,
                     accepted_at: restaurant.created_at,
                     invited_by: null,
+                    pin_hash: null,
                 },
                 ...membersRaw,
             ];
@@ -113,6 +192,7 @@ teamRoutes.get("/", async (c) => {
             createdAt: m.created_at,
             acceptedAt: m.accepted_at,
             invitedBy: m.invited_by,
+            hasPin: m.pin_hash != null,
             email: "",
             fullName: null,
             avatarUrl: null,
@@ -137,6 +217,7 @@ teamRoutes.get("/", async (c) => {
                         createdAt: m.created_at,
                         acceptedAt: m.accepted_at,
                         invitedBy: m.invited_by,
+                        hasPin: m.pin_hash != null,
                         email: u?.email || "",
                         fullName: u?.full_name || null,
                         avatarUrl: u?.avatar_url || null,
@@ -456,6 +537,184 @@ teamRoutes.post("/accept", async (c) => {
         return c.json({ success: true });
     } catch (error) {
         console.error("POST /team/accept error:", error);
+        return c.json({ error: "Erreur interne" }, 500);
+    }
+});
+
+/**
+ * POST /team/verify-pin
+ * Vérifie un PIN et retourne les informations du membre correspondant.
+ * Utilisé par les tablettes PDV — requiert uniquement un JWT restaurant valide.
+ *
+ * IMPORTANT: Cette route doit être enregistrée AVANT /:memberId/pin pour éviter
+ * les conflits de paramètre de route.
+ */
+teamRoutes.post("/verify-pin", async (c) => {
+    try {
+        const userId = c.var.userId;
+        const restaurantId = c.var.restaurantId;
+        if (!userId || !restaurantId) {
+            return c.json({ error: "Non authentifié ou restaurant non spécifié" }, 401);
+        }
+
+        const body = await c.req.json().catch(() => ({})) as {
+            pin?: string;
+            requiredRole?: string;
+        };
+        const { pin, requiredRole } = body;
+
+        if (!pin || !/^\d{4}$/.test(pin)) {
+            return c.json({ error: "Le PIN doit être composé de 4 chiffres" }, 400);
+        }
+
+        // Rate limiting — max 5 failed attempts per restaurant per minute
+        if (!checkPinRateLimit(restaurantId)) {
+            return c.json(
+                { error: "Trop de tentatives. Réessayez dans 1 minute." },
+                429,
+            );
+        }
+
+        const adminDb = getAdminClient(c);
+
+        // Fetch all active members with a PIN set
+        const { data: membersWithPin, error: membersError } = await adminDb
+            .from("restaurant_members")
+            .select("id, user_id, role, pin_hash")
+            .eq("restaurant_id", restaurantId)
+            .eq("status", "active")
+            .not("pin_hash", "is", null);
+
+        if (membersError) {
+            return c.json({ error: "Erreur interne" }, 500);
+        }
+
+        // Try each member's PIN — do NOT short-circuit to avoid timing attacks
+        let matchedMember: { id: string; userId: string; role: string } | null = null;
+
+        for (const member of membersWithPin ?? []) {
+            // eslint-disable-next-line no-await-in-loop
+            const ok = await verifyPin(pin, member.pin_hash as string);
+            if (ok && matchedMember === null) {
+                matchedMember = {
+                    id: member.id,
+                    userId: member.user_id,
+                    role: member.role,
+                };
+            }
+        }
+
+        if (!matchedMember) {
+            recordPinFailure(restaurantId);
+            return c.json({ success: false, error: "PIN incorrect" }, 401);
+        }
+
+        // Check role hierarchy if requiredRole provided
+        if (requiredRole) {
+            const memberLevel = ROLE_HIERARCHY[matchedMember.role as TeamRole] ?? 0;
+            const requiredLevel = ROLE_HIERARCHY[requiredRole as TeamRole] ?? 0;
+            if (memberLevel < requiredLevel) {
+                recordPinFailure(restaurantId);
+                return c.json(
+                    { success: false, error: "Permissions insuffisantes pour cette action" },
+                    403,
+                );
+            }
+        }
+
+        // Fetch the member's name from users table
+        const { data: userRecord } = await adminDb
+            .from("users")
+            .select("full_name, email")
+            .eq("id", matchedMember.userId)
+            .maybeSingle();
+
+        const name =
+            userRecord?.full_name ||
+            userRecord?.email ||
+            "Membre";
+
+        // Successful verification — reset rate limit counter
+        resetPinAttempts(restaurantId);
+
+        return c.json({
+            success: true,
+            member: {
+                id: matchedMember.id,
+                name,
+                role: matchedMember.role,
+            },
+        });
+    } catch (error) {
+        console.error("POST /team/verify-pin error:", error);
+        return c.json({ error: "Erreur interne" }, 500);
+    }
+});
+
+/**
+ * POST /team/:memberId/pin
+ * Définit ou met à jour le PIN PDV d'un membre.
+ * Autorisé : owner/manager (team:manage_roles) OU le membre lui-même.
+ */
+teamRoutes.post("/:memberId/pin", async (c) => {
+    try {
+        const memberId = c.req.param("memberId");
+        const userId = c.var.userId;
+        const restaurantId = c.var.restaurantId;
+
+        if (!userId || !restaurantId) {
+            return c.json({ error: "Non authentifié ou restaurant non spécifié" }, 401);
+        }
+
+        const body = await c.req.json().catch(() => ({})) as { pin?: string };
+        const { pin } = body;
+
+        if (!pin || !/^\d{4}$/.test(pin)) {
+            return c.json({ error: "Le PIN doit être composé de 4 chiffres" }, 400);
+        }
+
+        const adminDb = getAdminClient(c);
+
+        // Fetch target member
+        const { data: target, error: targetError } = await adminDb
+            .from("restaurant_members")
+            .select("id, user_id, role, status")
+            .eq("id", memberId)
+            .eq("restaurant_id", restaurantId)
+            .maybeSingle();
+
+        if (targetError || !target) {
+            return c.json({ error: "Membre introuvable" }, 404);
+        }
+
+        // Authorization: member setting their own PIN, or manager/owner setting any PIN
+        const isSelf = target.user_id === userId;
+
+        if (!isSelf) {
+            // Caller must have team:manage_roles permission
+            const auth = await getCallerRole(c, "team:manage_roles");
+            if (auth instanceof Response) return auth;
+        }
+
+        // Hash and store the PIN
+        const pinHash = await hashPin(pin);
+
+        const { error: updateError } = await adminDb
+            .from("restaurant_members")
+            .update({
+                pin_hash: pinHash,
+                pin_set_at: new Date().toISOString(),
+            })
+            .eq("id", memberId);
+
+        if (updateError) {
+            console.error("PIN update error:", updateError);
+            return c.json({ error: "Erreur lors de la mise à jour du PIN" }, 500);
+        }
+
+        return c.json({ success: true, message: "PIN défini avec succès" });
+    } catch (error) {
+        console.error("POST /team/:memberId/pin error:", error);
         return c.json({ error: "Erreur interne" }, 500);
     }
 });

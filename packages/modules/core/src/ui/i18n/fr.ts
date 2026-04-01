@@ -70,6 +70,7 @@ export const fr = {
         messages: "Messages",
         finances: "Finances",
         marketing: "Marketing",
+        caisse: "Caisse",
         giftCards: "Cartes Cadeaux",
         reports: "Rapports",
         analytics: "Analytiques",

@@ -75,7 +75,7 @@ const ROLE_PERMISSIONS: Record<TeamRole, readonly Permission[]> = {
     ],
 };
 
-const ROLE_HIERARCHY: Record<TeamRole, number> = {
+export const ROLE_HIERARCHY: Record<TeamRole, number> = {
     owner: 100,
     manager: 80,
     cashier: 30,

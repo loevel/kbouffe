@@ -17,6 +17,7 @@ export interface TeamMember {
     fullName: string | null;
     avatarUrl: string | null;
     phone: string | null;
+    hasPin?: boolean;
 }
 
 interface MemberRowProps {

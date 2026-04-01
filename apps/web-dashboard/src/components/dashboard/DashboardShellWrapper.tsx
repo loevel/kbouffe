@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { DashboardShell } from "@kbouffe/module-core/ui";
 import { usePendingOrderCount } from "@/hooks/use-data";
 import { useDashboardNotifications } from "@/hooks/use-dashboard-notifications";
+import { PosOperatorProvider } from "@/contexts/PosOperatorContext";
 
 /**
  * DashboardShellWrapper
@@ -28,8 +29,12 @@ export function DashboardShellWrapper({ children }: { children: React.ReactNode 
     );
 
     if (isExcluded) {
-        return <>{children}</>;
+        return <PosOperatorProvider>{children}</PosOperatorProvider>;
     }
 
-    return <DashboardShell pendingOrderCount={pendingCount}>{children}</DashboardShell>;
+    return (
+        <PosOperatorProvider>
+            <DashboardShell pendingOrderCount={pendingCount}>{children}</DashboardShell>
+        </PosOperatorProvider>
+    );
 }

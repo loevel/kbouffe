@@ -40,7 +40,7 @@ const NAV_GROUPS = [
     },
     {
         label: "Analyse & Gestion",
-        hrefs: ["/dashboard/finances", "/dashboard/reports", "/dashboard/analytics", "/dashboard/store", "/dashboard/showcase"],
+        hrefs: ["/dashboard/finances", "/dashboard/caisse", "/dashboard/reports", "/dashboard/analytics", "/dashboard/store", "/dashboard/showcase"],
     },
     {
         label: "Administration",

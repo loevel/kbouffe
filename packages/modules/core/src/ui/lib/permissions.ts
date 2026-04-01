@@ -155,6 +155,7 @@ export const NAV_PERMISSIONS: Record<string, Permission> = {
     "/dashboard/menu":              "menu:read",
     "/dashboard/customers":         "customers:read",
     "/dashboard/finances":          "finances:read",
+    "/dashboard/caisse":            "finances:read",
     "/dashboard/store":             "store:manage",
     "/dashboard/settings":          "settings:manage",
     "/dashboard/tables":            "tables:manage",

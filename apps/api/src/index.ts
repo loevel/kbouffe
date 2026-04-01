@@ -33,7 +33,7 @@ import { cuisineCategoriesPublicRoutes } from "./modules/cuisine-categories";
 
 // ── Authenticated routes ─────────────────────────────────────────────
 import { ordersApi } from "@kbouffe/module-orders";
-const { ordersRoutes, paymentRoutes, paymentWebhookRoutes } = ordersApi;
+const { ordersRoutes, paymentRoutes, paymentWebhookRoutes, caisseRoutes } = ordersApi;
 import { zonesRoutes as deliveryZonesRoutes } from "@kbouffe/module-orders";
 import { reservationsApi } from "@kbouffe/module-reservations";
 const { reservationsRoutes, publicReservationsRoutes, tablesRoutes, zonesRoutes: tableZonesRoutes } = reservationsApi;
@@ -218,6 +218,7 @@ const merchantPaths = [
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
     "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
+    "/caisse",
 ] as const;
 
 // Marketplace merchant routes (trace + product management) require auth
@@ -269,6 +270,7 @@ api.use("/admin", adminMiddleware);
 
 // ── Merchant routes ──────────────────────────────────────────────────
 api.route("/orders", ordersRoutes);
+api.route("/caisse", caisseRoutes);
 api.route("/categories", categoriesRoutes);
 api.route("/products", productsRoutes);
 api.route("/reservations", reservationsRoutes);
