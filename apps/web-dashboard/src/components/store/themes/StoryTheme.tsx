@@ -4,14 +4,17 @@ import Image from "next/image";
 import { Plus, ShoppingBag } from "lucide-react";
 import type { ThemeProps } from "./types";
 import { ScarcityBadge } from "./ScarcityBadge";
+import { FeaturedSection } from "./FeaturedSection";
 
 /**
  * Story / Instagram-like theme.
  * Full-screen cards, overlay text, horizontal category scroll, bold modern typography.
  */
 export function StoryTheme({
+    restaurant,
     categories,
     products,
+    featuredProducts = [],
     activeCategory,
     onCategoryChange,
     onAddToCart,
@@ -19,8 +22,19 @@ export function StoryTheme({
     formatPrice,
     sectionRefs,
 }: ThemeProps) {
+    const primaryColor = restaurant.primaryColor ?? "var(--brand-primary, #f97316)";
+
     return (
         <div className="space-y-6">
+            {/* Featured products section */}
+            <FeaturedSection
+                products={featuredProducts}
+                onAdd={onAddToCart}
+                onClick={onProductClick}
+                formatPrice={formatPrice}
+                primaryColor={primaryColor}
+            />
+
             {/* Horizontal scrollable categories — pill style */}
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
                 {categories.map((cat) => (
@@ -29,9 +43,14 @@ export function StoryTheme({
                         onClick={() => onCategoryChange(cat.id)}
                         className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
                             activeCategory === cat.id
-                                ? "bg-surface-900 dark:bg-white text-white dark:text-surface-900 shadow-lg scale-105"
+                                ? "text-white shadow-lg scale-105"
                                 : "bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-700"
                         }`}
+                        style={
+                            activeCategory === cat.id
+                                ? { backgroundColor: primaryColor }
+                                : {}
+                        }
                     >
                         {cat.name}
                     </button>
@@ -124,7 +143,8 @@ export function StoryTheme({
                                                         e.stopPropagation();
                                                         onAddToCart(product);
                                                     }}
-                                                    className="p-3 rounded-full bg-white text-surface-900 shadow-xl hover:scale-110 transition-transform"
+                                                    className="p-3 rounded-full text-white shadow-xl hover:scale-110 transition-transform"
+                                                    style={{ backgroundColor: primaryColor }}
                                                 >
                                                     <Plus size={20} strokeWidth={3} />
                                                 </button>

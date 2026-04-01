@@ -153,7 +153,7 @@ productsRoutes.patch("/:id", async (c) => {
 
     const allowedFields = [
         "name", "description", "price", "compare_at_price",
-        "category_id", "image_url", "is_available", "sort_order", "options",
+        "category_id", "image_url", "is_available", "is_featured", "sort_order", "options",
         "is_halal", "is_vegan", "is_gluten_free", "allergens",
         "is_dine_in_only", "is_no_delivery", "dine_in_price", "prep_time", "calories", "tags",
         "is_limited_edition", "stock_quantity", "available_until",

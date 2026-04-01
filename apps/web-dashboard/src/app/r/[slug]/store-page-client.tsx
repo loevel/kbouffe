@@ -100,6 +100,7 @@ interface Product {
     image_url: string | null;
     images?: string[];
     is_available: boolean;
+    is_featured?: boolean;
     category_id: string | null;
     sort_order: number;
 }
@@ -121,6 +122,7 @@ interface StoreData {
     restaurant: Restaurant;
     categories: Category[];
     products: Product[];
+    featuredProducts?: Product[];
     reviews: Review[];
     announcements?: Announcement[];
 }
@@ -833,17 +835,22 @@ export function StorePageClient({ slug }: { slug: string }) {
         return () => { cancelled = true; };
     }, [resDate, resPartySize, reservationOpen, slug]);
 
-    // ── PWA White-Label: dynamic theme-color meta ──
+    // ── PWA White-Label: dynamic theme-color meta + CSS custom properties ──
     useEffect(() => {
-        if (data?.restaurant?.primaryColor) {
-            let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-            if (!meta) {
-                meta = document.createElement("meta");
-                meta.setAttribute("name", "theme-color");
-                document.head.appendChild(meta);
-            }
-            meta.setAttribute("content", data.restaurant.primaryColor);
+        const color = data?.restaurant?.primaryColor ?? "#f97316";
+
+        let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+        if (!meta) {
+            meta = document.createElement("meta");
+            meta.setAttribute("name", "theme-color");
+            document.head.appendChild(meta);
         }
+        meta.setAttribute("content", color);
+
+        // CSS custom properties on :root for theme components
+        document.documentElement.style.setProperty("--brand-primary", color);
+        // 10% opacity variant for hover/light states
+        document.documentElement.style.setProperty("--brand-primary-light", color + "20");
     }, [data?.restaurant?.primaryColor]);
 
     const submitReservation = useCallback(async (restaurantSlug: string) => {
@@ -939,6 +946,7 @@ export function StorePageClient({ slug }: { slug: string }) {
     }
 
     const { restaurant, categories, products, reviews, announcements } = data;
+    const featuredProducts = data.featuredProducts ?? [];
     const avgRating = restaurant.rating?.toFixed(1) ?? "—";
 
     const categoriesWithProducts = categories
@@ -1835,6 +1843,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                         restaurant={restaurant}
                         categories={localizedCategories}
                         products={localizedProducts}
+                        featuredProducts={featuredProducts}
                         activeCategory={activeCategory ?? ""}
                         onCategoryChange={scrollToCategory}
                         onAddToCart={handleAddToCart}

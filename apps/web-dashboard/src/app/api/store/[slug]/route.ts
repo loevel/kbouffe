@@ -42,7 +42,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
                 .order("sort_order"),
             supabase
                 .from("products")
-                .select("id, name, description, price, compare_at_price, image_url, is_available, category_id, sort_order, is_limited_edition, stock_quantity, available_until, product_images(url, display_order)")
+                .select("id, name, description, price, compare_at_price, image_url, is_available, category_id, sort_order, is_featured, is_limited_edition, stock_quantity, available_until, product_images(url, display_order)")
                 .eq("restaurant_id", rest.id)
                 .eq("is_available", true)
                 .order("sort_order"),
@@ -166,6 +166,17 @@ export async function GET(_request: NextRequest, { params }: Params) {
                 const { product_images: _, ...product } = p;
                 return { ...product, images };
             }),
+            featuredProducts: (productsRes.data ?? [])
+                .filter((p: any) => p.is_featured && p.is_available)
+                .slice(0, 6)
+                .map((p: any) => {
+                    const extraImages: string[] = (p.product_images ?? [])
+                        .sort((a: any, b: any) => a.display_order - b.display_order)
+                        .map((img: any) => img.url);
+                    const images = p.image_url ? [p.image_url, ...extraImages] : extraImages;
+                    const { product_images: _, ...product } = p;
+                    return { ...product, images };
+                }),
             reviews: reviewData.map((r: any) => ({
                 id: r.id,
                 rating: r.rating,

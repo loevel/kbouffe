@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Edit, Trash2, Copy, UtensilsCrossed, Eye, EyeOff, Beer, GlassWater, CupSoda, Zap, Image as ImageIcon, ExternalLink, ArrowUp10, ArrowDown10, ArrowUpAZ, MoreHorizontal } from "lucide-react";
+import { Search, Edit, Trash2, Copy, UtensilsCrossed, Eye, EyeOff, Beer, GlassWater, CupSoda, Zap, Image as ImageIcon, ExternalLink, ArrowUp10, ArrowDown10, ArrowUpAZ, MoreHorizontal, Star } from "lucide-react";
 import { Card, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Toggle, Badge, EmptyState, Dropdown, Button, toast, useLocale, formatCFA } from "@kbouffe/module-core/ui";
 
 import { useProducts, useCategories, updateProduct, deleteProduct as apiDeleteProduct, createProduct } from "../hooks/use-catalog";
@@ -112,6 +112,41 @@ export function ProductsTable({ restaurantId, isAdmin = false }: { restaurantId?
         if (error) { toast.error(error); return; }
         mutateProducts();
         toast.success(t.menu.availabilityUpdated);
+    };
+
+    const toggleFeatured = async (productId: string) => {
+        const product = products.find((p: Product) => p.id === productId);
+        if (!product) return;
+
+        const newFeatured = !(product as any).is_featured;
+
+        // Guard: max 6 featured products
+        if (newFeatured) {
+            const currentFeaturedCount = products.filter((p: Product) => (p as any).is_featured).length;
+            if (currentFeaturedCount >= 6) {
+                toast.error("Maximum 6 produits vedettes");
+                return;
+            }
+        }
+
+        // Optimistic update
+        const updatedProducts = products.map((p: Product) =>
+            p.id === productId ? { ...p, is_featured: newFeatured } : p
+        );
+        mutateProducts(
+            { products: updatedProducts, total: products.length } as any,
+            { revalidate: false }
+        );
+
+        const { error } = await updateProduct(productId, { is_featured: newFeatured } as any, isAdmin);
+        if (error) {
+            // Revert on error
+            mutateProducts();
+            toast.error(error);
+            return;
+        }
+        mutateProducts();
+        toast.success(newFeatured ? "Produit mis en vedette ⭐" : "Produit retiré des vedettes");
     };
 
     const toggleSelect = (productId: string) => {
@@ -302,6 +337,7 @@ export function ProductsTable({ restaurantId, isAdmin = false }: { restaurantId?
                                 <TableHead>{t.menu.price}</TableHead>
                                 <TableHead>{t.menu.options}</TableHead>
                                 <TableHead>{t.common.available}</TableHead>
+                                <TableHead><span title="Produits vedettes (max 6)">⭐ Vedette</span></TableHead>
                                 <TableHead className="text-right">{t.common.actions}</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -374,6 +410,22 @@ export function ProductsTable({ restaurantId, isAdmin = false }: { restaurantId?
                                             checked={product.is_available}
                                             onChange={() => toggleAvailability(product.id)}
                                         />
+                                    </TableCell>
+                                    <TableCell>
+                                        <button
+                                            onClick={() => toggleFeatured(product.id)}
+                                            title={(product as any).is_featured ? "Retirer des vedettes" : "Mettre en vedette"}
+                                            className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                                        >
+                                            <Star
+                                                size={18}
+                                                className={
+                                                    (product as any).is_featured
+                                                        ? "fill-yellow-400 text-yellow-400"
+                                                        : "text-surface-300 dark:text-surface-600"
+                                                }
+                                            />
+                                        </button>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Dropdown

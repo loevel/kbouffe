@@ -5,6 +5,7 @@ import { formatCFA } from "@kbouffe/module-core/ui";
 import { motion } from "framer-motion";
 import type { ThemeProps } from "./types";
 import { ScarcityBadge } from "./ScarcityBadge";
+import { FeaturedSection } from "./FeaturedSection";
 
 /**
  * Grid / Fast-Food theme — the default layout.
@@ -16,11 +17,15 @@ function ProductCard({
     product,
     onAdd,
     onClick,
+    primaryColor,
 }: {
     product: { id: string; name: string; description: string | null; price: number; compare_at_price: number | null; image_url: string | null; images?: string[]; is_available: boolean; is_limited_edition?: boolean; stock_quantity?: number | null; available_until?: string | null };
     onAdd: () => void;
     onClick: () => void;
+    primaryColor?: string;
 }) {
+    const brandColor = primaryColor ?? "var(--brand-primary, #f97316)";
+
     return (
         <motion.div
             layout
@@ -76,7 +81,8 @@ function ProductCard({
                                 e.stopPropagation();
                                 onAdd();
                             }}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 hover:border-brand-500 hover:bg-brand-500 hover:text-white dark:hover:bg-brand-500 text-surface-700 dark:text-surface-300 text-[12px] font-bold transition-all shadow-sm hover:shadow-md"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-[12px] font-bold transition-opacity hover:opacity-90 shadow-sm hover:shadow-md"
+                            style={{ backgroundColor: brandColor }}
                         >
                             <Plus size={14} strokeWidth={3} />
                             <span>Ajouter</span>
@@ -113,14 +119,18 @@ function ProductCard({
 }
 
 export function GridTheme({
+    restaurant,
     categories,
     products,
+    featuredProducts = [],
     activeCategory,
     onCategoryChange,
     onAddToCart,
     onProductClick,
     sectionRefs,
 }: ThemeProps) {
+    const primaryColor = restaurant.primaryColor ?? "var(--brand-primary, #f97316)";
+
     const categoriesWithProducts = categories
         .map((cat) => ({ cat, items: products.filter((p) => p.category_id === cat.id) }))
         .filter((g) => g.items.length > 0);
@@ -140,6 +150,15 @@ export function GridTheme({
 
     return (
         <div className="space-y-10">
+            {/* Featured products section */}
+            <FeaturedSection
+                products={featuredProducts}
+                onAdd={onAddToCart}
+                onClick={onProductClick}
+                formatPrice={formatCFA}
+                primaryColor={primaryColor}
+            />
+
             {categoriesWithProducts.map(({ cat, items }) => (
                 <section
                     key={cat.id}
@@ -164,6 +183,7 @@ export function GridTheme({
                                 product={product}
                                 onClick={() => onProductClick(product)}
                                 onAdd={() => onAddToCart(product)}
+                                primaryColor={primaryColor}
                             />
                         ))}
                     </div>
@@ -179,6 +199,7 @@ export function GridTheme({
                                 product={product}
                                 onClick={() => onProductClick(product)}
                                 onAdd={() => onAddToCart(product)}
+                                primaryColor={primaryColor}
                             />
                         ))}
                     </div>

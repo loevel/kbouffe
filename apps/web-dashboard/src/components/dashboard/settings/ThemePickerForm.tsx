@@ -1,11 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, LayoutGrid, GalleryVertical, BookImage, Check } from "lucide-react";
+import { Save, LayoutGrid, GalleryVertical, BookImage, Check, Palette } from "lucide-react";
 import { Card, Button } from "@kbouffe/module-core/ui";
 import { toast } from "@kbouffe/module-core/ui";
 import { useDashboard } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
+
+const COLOR_PRESETS = [
+    { id: "orange", label: "Orange",  color: "#f97316" },
+    { id: "green",  label: "Vert",    color: "#16a34a" },
+    { id: "red",    label: "Rouge",   color: "#dc2626" },
+    { id: "blue",   label: "Bleu",    color: "#2563eb" },
+    { id: "purple", label: "Violet",  color: "#7c3aed" },
+];
 
 const THEMES = [
     {
@@ -72,11 +80,13 @@ export function ThemePickerForm() {
     const { restaurant, updateRestaurant, loading: dashboardLoading } = useDashboard();
     const { t } = useLocale();
     const [selected, setSelected] = useState<"grid" | "luxury" | "story">("grid");
+    const [selectedColor, setSelectedColor] = useState<string>("#f97316");
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (restaurant) {
             setSelected((restaurant as any).theme_layout ?? "grid");
+            setSelectedColor((restaurant as any).primary_color ?? "#f97316");
         }
     }, [restaurant]);
 
@@ -86,7 +96,8 @@ export function ThemePickerForm() {
 
         const { error } = await updateRestaurant({
             theme_layout: selected,
-        });
+            primary_color: selectedColor,
+        } as any);
 
         if (error) {
             toast.error(`Erreur: ${error}`);
@@ -164,6 +175,64 @@ export function ThemePickerForm() {
                             </button>
                         );
                     })}
+                </div>
+
+                {/* ── Couleur de marque ── */}
+                <div className="mt-8 pt-6 border-t border-surface-200 dark:border-surface-700">
+                    <div className="flex items-center gap-2 mb-1">
+                        <Palette size={16} className="text-surface-500" />
+                        <h3 className="font-semibold text-surface-900 dark:text-white">
+                            Couleur de marque
+                        </h3>
+                    </div>
+                    <p className="text-sm text-surface-500 mb-4">
+                        Personnalisez la couleur principale de votre vitrine : boutons, prix en vedette, onglets actifs.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Preset palettes */}
+                        {COLOR_PRESETS.map((preset) => {
+                            const isActive = selectedColor.toLowerCase() === preset.color.toLowerCase();
+                            return (
+                                <button
+                                    key={preset.id}
+                                    type="button"
+                                    title={preset.label}
+                                    onClick={() => setSelectedColor(preset.color)}
+                                    className={`relative w-10 h-10 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 ${isActive ? "ring-2 ring-offset-2 scale-110" : ""}`}
+                                    style={{
+                                        backgroundColor: preset.color,
+                                        boxShadow: isActive ? `0 0 0 2px white, 0 0 0 4px ${preset.color}` : undefined,
+                                    }}
+                                >
+                                    {isActive && (
+                                        <Check size={16} className="absolute inset-0 m-auto text-white" strokeWidth={3} />
+                                    )}
+                                    <span className="sr-only">{preset.label}</span>
+                                </button>
+                            );
+                        })}
+
+                        {/* Custom color picker */}
+                        <label className="relative w-10 h-10 rounded-full overflow-hidden cursor-pointer border-2 border-dashed border-surface-300 dark:border-surface-600 hover:border-surface-400 transition-colors flex items-center justify-center" title="Couleur personnalisée">
+                            <span className="text-[10px] font-bold text-surface-400 leading-none text-center">+<br/>Custom</span>
+                            <input
+                                type="color"
+                                value={selectedColor}
+                                onChange={(e) => setSelectedColor(e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                        </label>
+
+                        {/* Live preview badge */}
+                        <span
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold text-white shadow-sm transition-colors"
+                            style={{ backgroundColor: selectedColor }}
+                        >
+                            <Check size={13} strokeWidth={3} />
+                            Aperçu
+                        </span>
+                    </div>
                 </div>
 
                 <div className="mt-6 flex justify-end">

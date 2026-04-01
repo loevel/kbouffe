@@ -4,14 +4,17 @@ import Image from "next/image";
 import { Plus } from "lucide-react";
 import type { ThemeProps } from "./types";
 import { ScarcityBadge } from "./ScarcityBadge";
+import { FeaturedSection } from "./FeaturedSection";
 
 /**
  * Luxury / Gastronomic theme.
  * Full-width images, serif typography, elegant pricing, 1-column layout.
  */
 export function LuxuryTheme({
+    restaurant,
     categories,
     products,
+    featuredProducts = [],
     activeCategory,
     onCategoryChange,
     onAddToCart,
@@ -19,8 +22,19 @@ export function LuxuryTheme({
     formatPrice,
     sectionRefs,
 }: ThemeProps) {
+    const primaryColor = restaurant.primaryColor ?? "var(--brand-primary, #f97316)";
+
     return (
         <div className="space-y-8">
+            {/* Featured products section */}
+            <FeaturedSection
+                products={featuredProducts}
+                onAdd={onAddToCart}
+                onClick={onProductClick}
+                formatPrice={formatPrice}
+                primaryColor={primaryColor}
+            />
+
             {/* Category navigation — elegant minimal */}
             <nav className="flex gap-6 overflow-x-auto pb-2 border-b border-surface-200 dark:border-surface-700">
                 {categories.map((cat) => (
@@ -29,9 +43,14 @@ export function LuxuryTheme({
                         onClick={() => onCategoryChange(cat.id)}
                         className={`text-sm font-serif tracking-wide whitespace-nowrap pb-2 transition-colors border-b-2 ${
                             activeCategory === cat.id
-                                ? "border-surface-900 dark:border-white text-surface-900 dark:text-white"
+                                ? "border-current"
                                 : "border-transparent text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
                         }`}
+                        style={
+                            activeCategory === cat.id
+                                ? { borderBottomColor: primaryColor, color: primaryColor }
+                                : {}
+                        }
                     >
                         {cat.name}
                     </button>
@@ -108,7 +127,8 @@ export function LuxuryTheme({
                                                     e.stopPropagation();
                                                     onAddToCart(product);
                                                 }}
-                                                className="p-2.5 rounded-full border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                                                className="p-2.5 rounded-full text-white transition-opacity hover:opacity-90"
+                                                style={{ backgroundColor: primaryColor }}
                                             >
                                                 <Plus size={18} />
                                             </button>

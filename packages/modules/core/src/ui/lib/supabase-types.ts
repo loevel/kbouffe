@@ -254,6 +254,7 @@ export interface Tables {
             compare_at_price: number | null;
             image_url: string | null;
             is_available: boolean;
+            is_featured: boolean;
             sort_order: number;
             options: Json | null;
             is_dine_in_only: boolean;
@@ -278,6 +279,7 @@ export interface Tables {
             compare_at_price?: number | null;
             image_url?: string | null;
             is_available?: boolean;
+            is_featured?: boolean;
             sort_order?: number;
             options?: Json | null;
             is_dine_in_only?: boolean;
@@ -294,6 +296,7 @@ export interface Tables {
             compare_at_price?: number | null;
             image_url?: string | null;
             is_available?: boolean;
+            is_featured?: boolean;
             sort_order?: number;
             options?: Json | null;
             is_dine_in_only?: boolean;

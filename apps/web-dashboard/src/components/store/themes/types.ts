@@ -7,6 +7,7 @@ export interface ThemeProduct {
     image_url: string | null;
     images?: string[];
     is_available: boolean;
+    is_featured?: boolean;
     category_id: string | null;
     sort_order: number;
     // Scarcity / Limited edition
@@ -32,6 +33,7 @@ export interface ThemeProps {
     restaurant: ThemeRestaurant;
     categories: ThemeCategory[];
     products: ThemeProduct[];
+    featuredProducts?: ThemeProduct[];
     activeCategory: string;
     onCategoryChange: (categoryId: string) => void;
     onAddToCart: (product: ThemeProduct) => void;
