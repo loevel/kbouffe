@@ -6,6 +6,15 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, apiError } from "@/lib/api/helpers";
+import { createAdminClient } from "@/lib/supabase/server";
+
+// Map frontend payment method keys → DB enum values
+const PAYMENT_METHOD_MAP: Record<string, string> = {
+  cash: "cash",
+  mtn_momo: "mobile_money_mtn",
+  orange_money: "mobile_money_orange",
+  mixed: "mixed",
+};
 
 export async function PATCH(
   request: NextRequest,
@@ -26,8 +35,13 @@ export async function PATCH(
       );
     }
 
+    const dbPaymentMethod = PAYMENT_METHOD_MAP[body.paymentMethod] ?? body.paymentMethod;
+
+    // Use admin client so staff members (cashiers, managers) can also recall orders
+    const admin = await createAdminClient();
+
     // 1. Verify the order exists, belongs to restaurant, and is a draft
-    const { data: order, error: fetchError } = await ctx.supabase
+    const { data: order, error: fetchError } = await admin
       .from("orders")
       .select("id, status, total")
       .eq("id", id)
@@ -46,11 +60,11 @@ export async function PATCH(
     }
 
     // 2. Update: draft → pending, confirm payment method, clear draft_label
-    const { data: updated, error: updateError } = await ctx.supabase
+    const { data: updated, error: updateError } = await admin
       .from("orders")
       .update({
         status: "pending" as any,
-        payment_method: body.paymentMethod as any,
+        payment_method: dbPaymentMethod as any,
         draft_label: null,
         updated_at: new Date().toISOString(),
       } as any)

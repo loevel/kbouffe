@@ -8,6 +8,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, apiError } from "@/lib/api/helpers";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export async function DELETE(
   _request: NextRequest,
@@ -19,8 +20,10 @@ export async function DELETE(
     const { ctx } = auth;
     const { id } = await params;
 
+    const admin = await createAdminClient();
+
     // 1. Verify the order exists, belongs to restaurant, and is a draft
-    const { data: order, error: fetchError } = await ctx.supabase
+    const { data: order, error: fetchError } = await admin
       .from("orders")
       .select("id, status")
       .eq("id", id)
@@ -39,7 +42,7 @@ export async function DELETE(
     }
 
     // 2. Set to cancelled (audit trail preserved — no hard delete)
-    const { error: updateError } = await ctx.supabase
+    const { error: updateError } = await admin
       .from("orders")
       .update({
         status: "cancelled" as any,

@@ -8,6 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { withAuth, apiError } from "@/lib/api/helpers";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
@@ -15,9 +16,11 @@ export async function GET() {
     if (auth.error) return auth.error;
     const { ctx } = auth;
 
-    const { data, error } = await ctx.supabase
+    const admin = await createAdminClient();
+
+    const { data, error } = await admin
       .from("orders")
-      .select("id, customer_name, total, table_number, created_at, items")
+      .select("id, customer_name, draft_label, total, table_number, created_at, items")
       .eq("restaurant_id", ctx.restaurantId)
       .eq("status", "draft" as any)
       .order("created_at", { ascending: false });
