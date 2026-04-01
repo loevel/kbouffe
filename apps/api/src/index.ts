@@ -45,6 +45,8 @@ const {
     adsRoutes,
     couponsRoutes,
     couponValidateRoutes,
+    giftCardRoutes,
+    giftCardPublicRoutes,
     smsRoutes,
 } = marketingApi;
 import { hrApi } from "@kbouffe/module-hr";
@@ -125,6 +127,7 @@ const api = new Hono<{ Bindings: Env; Variables: Variables }>();
 api.route("/stores", storesRoutes);
 api.route("/menu", menuRoutes);
 api.route("/store", storePublicRoutes);                   // guest orders
+api.route("/store/gift-cards", giftCardPublicRoutes);     // validation carte cadeau (public checkout)
 api.route("/store", publicReservationsRoutes);             // public reservation booking
 api.route("/store", publicProductReviewRoutes);            // public product reviews
 api.route("/store", publicRestaurantReviewRoutes);          // public restaurant reviews
@@ -209,7 +212,7 @@ api.use("/auth", authRateLimiter);
 // ── Auth middleware for merchant routes ───────────────────────────────
 const merchantPaths = [
     "/orders", "/categories", "/products", "/reservations",
-    "/dashboard", "/coupons", "/tables", "/restaurant",
+    "/dashboard", "/coupons", "/gift-cards", "/tables", "/restaurant",
     "/customers", "/account", "/security", "/register-restaurant",
     "/marketing", "/notifications", "/payouts", "/sms",
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
@@ -249,6 +252,7 @@ const moduleRequirements: Record<string, string> = {
     "/orders/zones": "orders",
     "/marketing": "marketing",
     "/coupons": "marketing",
+    "/gift-cards": "marketing",
     "/ads": "marketing",
     "/team": "hr",
     "/payouts": "hr",
@@ -286,6 +290,7 @@ api.route("/ads", adsRoutes);
 api.route("/team", teamRoutes);
 api.route("/upload", uploadRoutes);
 api.route("/sms", smsRoutes);
+api.route("/gift-cards", giftCardRoutes);
 api.route("/chat", chatRoutes);
 api.route("/reviews", customerReviewRoutes);
 

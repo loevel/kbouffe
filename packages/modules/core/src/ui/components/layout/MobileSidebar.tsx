@@ -36,7 +36,7 @@ const NAV_GROUPS = [
     },
     {
         label: "Clients & Ventes",
-        hrefs: ["/dashboard/customers", "/dashboard/reviews", "/dashboard/messages", "/dashboard/marketing", "/dashboard/marketplace", "/dashboard/approvisionnement"],
+        hrefs: ["/dashboard/customers", "/dashboard/reviews", "/dashboard/messages", "/dashboard/marketing", "/dashboard/gift-cards", "/dashboard/marketplace", "/dashboard/approvisionnement"],
     },
     {
         label: "Analyse & Gestion",

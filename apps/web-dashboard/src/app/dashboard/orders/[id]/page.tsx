@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Phone, User, Truck, Store, StickyNote, KeyRound } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, User, Truck, Store, StickyNote, KeyRound, RotateCcw } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const DeliveryTracker = dynamic(
@@ -11,8 +11,9 @@ const DeliveryTracker = dynamic(
     { ssr: false }
 );
 import { Card, Badge, Button } from "@kbouffe/module-core/ui";
+import { SplitPaymentPanel } from "@/components/orders/SplitPaymentPanel";
 import { ordersUi } from "@kbouffe/module-orders";
-import { useOrder, type OrderStatus } from "@kbouffe/module-orders/ui";
+import { useOrder, type OrderStatus, RefundModal, type RefundResult } from "@kbouffe/module-orders/ui";
 const { OrderStatusBadge, OrderTimeline, OrderActions, OrderChat, AssignDriver } = ordersUi;
 import { formatCFA, formatDateTime, formatOrderId, formatPhone, getPaymentLabel, getPaymentStatusLabel, type OrderItemData, ReceiptPrinter } from "@kbouffe/module-core/ui";
 import { useLocale, useDashboard } from "@kbouffe/module-core/ui";
@@ -24,6 +25,7 @@ export default function OrderDetailPage() {
     const orderId = params.id as string;
     const { order, isLoading, mutate } = useOrder(orderId);
     const [status, setStatus] = useState<OrderStatus | null>(null);
+    const [showRefundModal, setShowRefundModal] = useState(false);
 
     // Use local status if changed, otherwise use API data
     const currentStatus = status ?? order?.status ?? "pending";
@@ -68,9 +70,25 @@ export default function OrderDetailPage() {
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{formatOrderId(order.id)}</h1>
                         <OrderStatusBadge status={currentStatus} />
+                        {order.payment_status === "refunded" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-full">
+                                <RotateCcw size={11} />
+                                Remboursé
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <ReceiptPrinter order={order} restaurant={restaurant} />
+                        {order.payment_status === "paid" && order.status !== "cancelled" && (
+                            <button
+                                onClick={() => setShowRefundModal(true)}
+                                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-colors"
+                                aria-label="Rembourser cette commande"
+                            >
+                                <RotateCcw size={15} />
+                                Rembourser
+                            </button>
+                        )}
                         <OrderActions orderId={orderId} status={currentStatus} onStatusChange={handleStatusChange} />
                     </div>
                 </div>
@@ -206,21 +224,60 @@ export default function OrderDetailPage() {
                     )}
 
                     <Card>
-                        <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.orders.payment}</h3>
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-surface-500">{t.orders.paymentMode}</span>
-                                <span className="text-sm font-medium text-surface-900 dark:text-white">
-                                    {getPaymentLabel(order.payment_method)}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-surface-500">{t.orders.paymentStatus}</span>
-                                <Badge variant={order.payment_status === "paid" ? "success" : order.payment_status === "pending" ? "warning" : "danger"}>
-                                    {getPaymentStatusLabel(order.payment_status)}
-                                </Badge>
-                            </div>
-                        </div>
+                        {order.payment_method === "mixed" || (order as any).split_payment_mode ? (
+                            <SplitPaymentPanel
+                                orderId={orderId}
+                                orderTotal={order.total}
+                                orderPaymentStatus={order.payment_status}
+                                splitPaymentMode={(order as any).split_payment_mode}
+                                onPaymentStatusChange={(newStatus) => {
+                                    mutate();
+                                }}
+                            />
+                        ) : (
+                            <>
+                                <h3 className="font-semibold text-surface-900 dark:text-white mb-4">{t.orders.payment}</h3>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-surface-500">{t.orders.paymentMode}</span>
+                                        <span className="text-sm font-medium text-surface-900 dark:text-white">
+                                            {getPaymentLabel(order.payment_method)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-surface-500">{t.orders.paymentStatus}</span>
+                                        <Badge variant={order.payment_status === "paid" ? "success" : order.payment_status === "refunded" ? "danger" : order.payment_status === "pending" ? "warning" : "danger"}>
+                                            {getPaymentStatusLabel(order.payment_status)}
+                                        </Badge>
+                                    </div>
+                                    {/* Bouton Rembourser */}
+                                    {order.payment_status === "paid" && order.status !== "cancelled" && (
+                                        <div className="pt-3 border-t border-surface-100 dark:border-surface-800">
+                                            <button
+                                                onClick={() => setShowRefundModal(true)}
+                                                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-colors"
+                                                aria-label="Rembourser cette commande"
+                                            >
+                                                <RotateCcw size={15} />
+                                                Rembourser le client
+                                            </button>
+                                        </div>
+                                    )}
+                                    {/* Allow splitting any unpaid order */}
+                                    {order.payment_status !== "paid" && (
+                                        <div className="pt-3 border-t border-surface-100 dark:border-surface-800">
+                                            <SplitPaymentPanel
+                                                orderId={orderId}
+                                                orderTotal={order.total}
+                                                orderPaymentStatus={order.payment_status}
+                                                splitPaymentMode={null}
+                                                onPaymentStatusChange={() => mutate()}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </Card>
 
                     <Card>
@@ -229,6 +286,22 @@ export default function OrderDetailPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Refund modal */}
+            <RefundModal
+                open={showRefundModal}
+                onClose={() => setShowRefundModal(false)}
+                order={{
+                    id: order.id,
+                    total: order.total,
+                    payment_method: order.payment_method,
+                    payment_status: order.payment_status,
+                }}
+                onSuccess={(_result: RefundResult) => {
+                    setShowRefundModal(false);
+                    mutate(); // Revalide les données de la commande
+                }}
+            />
         </>
     );
 }

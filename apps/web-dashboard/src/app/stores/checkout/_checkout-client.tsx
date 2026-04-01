@@ -17,6 +17,9 @@ import {
     ShoppingBag,
     Smartphone,
     Utensils,
+    Users,
+    Plus,
+    Trash2,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
@@ -122,6 +125,11 @@ export function CheckoutPageClient() {
     const [submitting, setSubmitting]         = useState(false);
     const [error, setError]                   = useState<string | null>(null);
     const [isLocating, setIsLocating]         = useState(false);
+
+    // ── Split payment state ──────────────────────────────────────────────
+    const [isSplitPayment, setIsSplitPayment] = useState(false);
+    const [splitCount, setSplitCount]         = useState(2);
+    const [splitDrafts, setSplitDrafts]       = useState<{ label: string; amount: string; method: PaymentMethod }[]>([]);
 
     // ── Load user data on mount ────────────────────────────────────────────
     useEffect(() => {
@@ -253,6 +261,38 @@ export function CheckoutPageClient() {
         return true;
     };
 
+    // ── Split payment helpers ────────────────────────────────────────────
+    const buildEqualSplits = (count: number) => {
+        const base = Math.floor(total / count);
+        const remainder = total - base * count;
+        return Array.from({ length: count }, (_, i) => ({
+            label: `Personne ${i + 1}`,
+            amount: String(base + (i === 0 ? remainder : 0)),
+            method: "cash" as PaymentMethod,
+        }));
+    };
+
+    const toggleSplitPayment = (enabled: boolean) => {
+        setIsSplitPayment(enabled);
+        if (enabled) {
+            setSplitDrafts(buildEqualSplits(splitCount));
+        } else {
+            setSplitDrafts([]);
+        }
+    };
+
+    const updateSplitCount = (count: number) => {
+        setSplitCount(count);
+        setSplitDrafts(buildEqualSplits(count));
+    };
+
+    const updateSplitDraft = (idx: number, field: "label" | "amount" | "method", value: string) => {
+        setSplitDrafts((prev) => prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d)));
+    };
+
+    const splitDraftTotal = splitDrafts.reduce((sum, d) => sum + (parseInt(d.amount) || 0), 0);
+    const isSplitValid = isSplitPayment ? (splitDraftTotal === total && splitDrafts.every((d) => parseInt(d.amount) > 0)) : true;
+
     // ── Submit order ───────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!restaurant) { setError("Restaurant introuvable."); return; }
@@ -267,7 +307,7 @@ export function CheckoutPageClient() {
                 tableNumber:     deliveryType === "dine_in"  ? tableNumber.trim() : undefined,
                 customerName:    customerName.trim(),
                 customerPhone:   customerPhone.trim(),
-                paymentMethod,
+                paymentMethod:   isSplitPayment ? "cash" : paymentMethod,
                 subtotal,
                 deliveryFee,
                 total,
@@ -284,6 +324,22 @@ export function CheckoutPageClient() {
                 return;
             }
             const orderId = data.order?.id ?? data.id ?? data.orderId;
+
+            // Create split payments if enabled (fire-and-forget — restaurant will manage confirmation)
+            if (isSplitPayment && orderId) {
+                fetch(`/api/orders/${orderId}/splits`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        split_mode: "split_equal",
+                        splits: splitDrafts.map((d) => ({
+                            label: d.label,
+                            amount: parseInt(d.amount),
+                            payment_method: d.method,
+                        })),
+                    }),
+                }).catch(() => {}); // Non-blocking — splits can be managed from dashboard
+            }
             // Persister dans le store local pour le suivi
             if (orderId && restaurant) {
                 addOrder({
@@ -440,45 +496,132 @@ export function CheckoutPageClient() {
                 {/* ── Step 2 : Payment ──────────────────────────────────── */}
                 {step === "payment" && (
                     <div className="space-y-4">
-                        <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
-                            <h2 className="font-bold text-surface-900 dark:text-white mb-4">Mode de paiement</h2>
-                            <div className="space-y-2">
-                                {PAYMENT_OPTIONS.map((opt) => (
-                                    <button
-                                        key={opt.id}
-                                        onClick={() => setPaymentMethod(opt.id)}
-                                        className={`w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${
-                                            paymentMethod === opt.id
-                                                ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
-                                                : "border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600"
-                                        }`}
-                                    >
-                                        <span className={paymentMethod === opt.id ? "text-brand-500" : "text-surface-400"}>
-                                            {opt.icon}
-                                        </span>
-                                        <div className="flex-1">
-                                            <p className={`font-semibold text-sm ${paymentMethod === opt.id ? "text-brand-700 dark:text-brand-300" : "text-surface-900 dark:text-white"}`}>
-                                                {opt.label}
-                                            </p>
-                                            <p className="text-xs text-surface-500 dark:text-surface-400">{opt.desc}</p>
+                        {/* Single payment method (when not splitting) */}
+                        {!isSplitPayment && (
+                            <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
+                                <h2 className="font-bold text-surface-900 dark:text-white mb-4">Mode de paiement</h2>
+                                <div className="space-y-2">
+                                    {PAYMENT_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => setPaymentMethod(opt.id)}
+                                            className={`w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${
+                                                paymentMethod === opt.id
+                                                    ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+                                                    : "border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600"
+                                            }`}
+                                        >
+                                            <span className={paymentMethod === opt.id ? "text-brand-500" : "text-surface-400"}>
+                                                {opt.icon}
+                                            </span>
+                                            <div className="flex-1">
+                                                <p className={`font-semibold text-sm ${paymentMethod === opt.id ? "text-brand-700 dark:text-brand-300" : "text-surface-900 dark:text-white"}`}>
+                                                    {opt.label}
+                                                </p>
+                                                <p className="text-xs text-surface-500 dark:text-surface-400">{opt.desc}</p>
+                                            </div>
+                                            <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                paymentMethod === opt.id ? "border-brand-500" : "border-surface-300 dark:border-surface-600"
+                                            }`}>
+                                                {paymentMethod === opt.id && (
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-brand-500" />
+                                                )}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Split payment UI */}
+                        {isSplitPayment && (
+                            <section className="bg-white dark:bg-surface-900 rounded-2xl border border-brand-200 dark:border-brand-500/20 p-5">
+                                <h2 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <Users size={16} className="text-brand-500" />
+                                    Partager l&apos;addition
+                                </h2>
+
+                                {/* Person count */}
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-sm text-surface-600 dark:text-surface-400">Nombre de personnes</span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => updateSplitCount(Math.max(2, splitCount - 1))}
+                                            className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 font-bold hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
+                                        >
+                                            -
+                                        </button>
+                                        <span className="w-8 text-center font-bold text-surface-900 dark:text-white">{splitCount}</span>
+                                        <button
+                                            onClick={() => updateSplitCount(Math.min(8, splitCount + 1))}
+                                            className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 font-bold hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Split rows */}
+                                <div className="space-y-2">
+                                    {splitDrafts.map((draft, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 p-3 rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700">
+                                            <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center text-brand-600 dark:text-brand-400 text-xs font-bold shrink-0">
+                                                {idx + 1}
+                                            </div>
+                                            <input
+                                                value={draft.label}
+                                                onChange={(e) => updateSplitDraft(idx, "label", e.target.value)}
+                                                className="flex-1 h-8 px-2 rounded-lg bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                            />
+                                            <span className="font-mono font-bold text-sm text-surface-900 dark:text-white whitespace-nowrap">
+                                                {formatCFA(parseInt(draft.amount) || 0)}
+                                            </span>
+                                            <select
+                                                value={draft.method}
+                                                onChange={(e) => updateSplitDraft(idx, "method", e.target.value)}
+                                                className="h-8 px-2 rounded-lg bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                            >
+                                                {PAYMENT_OPTIONS.map((pm) => (
+                                                    <option key={pm.id} value={pm.id}>{pm.label}</option>
+                                                ))}
+                                            </select>
                                         </div>
-                                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                            paymentMethod === opt.id ? "border-brand-500" : "border-surface-300 dark:border-surface-600"
-                                        }`}>
-                                            {paymentMethod === opt.id && (
-                                                <span className="w-2.5 h-2.5 rounded-full bg-brand-500" />
-                                            )}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        </section>
+                                    ))}
+                                </div>
+
+                                {/* Total indicator */}
+                                <div className={`mt-3 flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold ${
+                                    splitDraftTotal === total
+                                        ? "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400"
+                                        : "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                }`}>
+                                    <span>Total</span>
+                                    <span>{formatCFA(splitDraftTotal)} / {formatCFA(total)}</span>
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Toggle split payment */}
+                        {deliveryType === "dine_in" && (
+                            <button
+                                onClick={() => toggleSplitPayment(!isSplitPayment)}
+                                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
+                                    isSplitPayment
+                                        ? "border-surface-300 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:border-surface-400"
+                                        : "border-brand-200 dark:border-brand-500/30 text-brand-600 dark:text-brand-400 bg-brand-50/50 dark:bg-brand-500/5 hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                                }`}
+                            >
+                                <Users size={16} />
+                                {isSplitPayment ? "Revenir au paiement unique" : "Partager l\u2019addition entre plusieurs personnes"}
+                            </button>
+                        )}
 
                         <button
-                            onClick={() => setStep("review")}
-                            className="w-full h-13 py-3.5 flex items-center justify-center bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-2xl shadow-lg shadow-brand-500/25 transition-colors"
+                            onClick={() => { if (isSplitValid) setStep("review"); else setError("Le total des parts doit correspondre au total de la commande."); }}
+                            disabled={!isSplitValid}
+                            className="w-full h-13 py-3.5 flex items-center justify-center bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-bold rounded-2xl shadow-lg shadow-brand-500/25 transition-colors"
                         >
-                            Continuer → Récapitulatif
+                            Continuer &rarr; R&eacute;capitulatif
                         </button>
                     </div>
                 )}
@@ -514,8 +657,36 @@ export function CheckoutPageClient() {
                             <Detail label="Téléphone" value={customerPhone} />
                             {deliveryType === "delivery" && <Detail label="Adresse" value={deliveryAddress} />}
                             {deliveryType === "dine_in" && tableNumber && <Detail label="Table" value={tableNumber} />}
-                            <Detail label="Paiement" value={PAYMENT_OPTIONS.find((p) => p.id === paymentMethod)?.label ?? paymentMethod} />
+                            <Detail
+                                label="Paiement"
+                                value={isSplitPayment
+                                    ? `Partage (${splitDrafts.length} personnes)`
+                                    : PAYMENT_OPTIONS.find((p) => p.id === paymentMethod)?.label ?? paymentMethod
+                                }
+                            />
                         </section>
+
+                        {/* Split payment summary */}
+                        {isSplitPayment && splitDrafts.length > 0 && (
+                            <section className="bg-white dark:bg-surface-900 rounded-2xl border border-brand-200 dark:border-brand-500/20 p-5">
+                                <h2 className="font-bold text-surface-900 dark:text-white mb-3 flex items-center gap-2">
+                                    <Users size={16} className="text-brand-500" />
+                                    R&eacute;partition du paiement
+                                </h2>
+                                <div className="space-y-2">
+                                    {splitDrafts.map((draft, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-sm">
+                                            <span className="text-surface-600 dark:text-surface-400">
+                                                {draft.label} &middot; {PAYMENT_OPTIONS.find((p) => p.id === draft.method)?.label}
+                                            </span>
+                                            <span className="font-semibold text-surface-900 dark:text-white">
+                                                {formatCFA(parseInt(draft.amount) || 0)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
 
                         {/* Totals */}
                         <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">

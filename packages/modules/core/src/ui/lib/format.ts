@@ -36,9 +36,12 @@ export function formatPhone(phone: string): string {
 export function getPaymentLabel(method: string): string {
     const labels: Record<string, string> = {
         orange_money: "Orange Money",
+        mobile_money_orange: "Orange Money",
         mtn_mobile_money: "MTN MoMo",
+        mobile_money_mtn: "MTN MoMo",
         cash: "Espèces",
         card: "Carte bancaire",
+        mixed: "Paiement partagé",
     };
     return labels[method] || method;
 }

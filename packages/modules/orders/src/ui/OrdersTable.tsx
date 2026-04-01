@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, Eye, ArrowUpDown, Download } from "lucide-react";
-import { Badge, Button, Card, Dropdown, EmptyState, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Tabs, toast, useLocale, formatDate, formatCFA, formatDateTime, formatOrderId } from "@kbouffe/module-core/ui";
+import { Search, Eye, ArrowUpDown, Download, RotateCcw } from "lucide-react";
+import { Badge, Button, Card, Dropdown, EmptyState, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Tabs, toast, useLocale, formatDate, formatCFA, formatDateTime, formatOrderId, type Order } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "./OrderStatusBadge";
 import { useOrders } from "../hooks/use-orders";
+import { RefundModal } from "./components/RefundModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -17,6 +18,8 @@ export function OrdersTable() {
     const [deliveryFilter, setDeliveryFilter] = useState("all");
     const [sortBy, setSortBy] = useState("newest");
     const [page, setPage] = useState(1);
+    // Refund modal state
+    const [orderToRefund, setOrderToRefund] = useState<Order | null>(null);
 
     const { orders, total, isLoading } = useOrders({
         status: activeTab,
@@ -116,6 +119,7 @@ export function OrdersTable() {
     const paginated = filtered;
 
     return (
+        <>
         <Card padding="none">
             <div className="p-4 pb-0">
                 <Tabs tabs={statusTabs} activeTab={activeTab} onTabChange={(t) => { setActiveTab(t); setPage(1); }} />
@@ -179,13 +183,33 @@ export function OrdersTable() {
                                     <TableCell><OrderStatusBadge status={order.status} /></TableCell>
                                     <TableCell className="text-surface-500">{formatDateTime(order.created_at)}</TableCell>
                                     <TableCell className="text-right">
-                                        <Link
-                                            href={`/dashboard/orders/${order.id}`}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors"
-                                        >
-                                            <Eye size={16} />
-                                            {t.orders.view}
-                                        </Link>
+                                        <div className="inline-flex items-center gap-2 justify-end">
+                                            {/* Badge "Remboursé" */}
+                                            {order.payment_status === "refunded" && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg">
+                                                    <RotateCcw size={11} />
+                                                    Remboursé
+                                                </span>
+                                            )}
+                                            {/* Bouton Rembourser */}
+                                            {order.payment_status === "paid" && order.status !== "cancelled" && (
+                                                <button
+                                                    onClick={() => setOrderToRefund(order)}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                                                    aria-label={`Rembourser la commande ${formatOrderId(order.id)}`}
+                                                >
+                                                    <RotateCcw size={12} />
+                                                    Rembourser
+                                                </button>
+                                            )}
+                                            <Link
+                                                href={`/dashboard/orders/${order.id}`}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors"
+                                            >
+                                                <Eye size={16} />
+                                                {t.orders.view}
+                                            </Link>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -197,5 +221,24 @@ export function OrdersTable() {
                 </>
             )}
         </Card>
+
+        {/* Refund modal — rendered outside the Card to avoid z-index issues */}
+        {orderToRefund && (
+            <RefundModal
+                open={!!orderToRefund}
+                onClose={() => setOrderToRefund(null)}
+                order={{
+                    id: orderToRefund.id,
+                    total: orderToRefund.total,
+                    payment_method: orderToRefund.payment_method,
+                    payment_status: orderToRefund.payment_status,
+                }}
+                onSuccess={() => {
+                    setOrderToRefund(null);
+                    // SWR global revalidation est géré dans RefundModal via authFetch
+                }}
+            />
+        )}
+        </>
     );
 }

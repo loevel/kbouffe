@@ -72,6 +72,7 @@ export const en: TranslationKeys = {
         messages: "Messages",
         finances: "Finances",
         marketing: "Marketing",
+        giftCards: "Gift Cards",
         reports: "Reports",
         analytics: "Analytics",
         settings: "Settings",

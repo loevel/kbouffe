@@ -89,6 +89,7 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                         </tr>
                         ${(order.service_fee > 0) ? `<tr><td>Service</td><td style="text-align: right;">${formatCFA(order.service_fee)}</td></tr>` : ""}
                         ${(order.tip_amount > 0) ? `<tr><td>Pourboire</td><td style="text-align: right;">${formatCFA(order.tip_amount)}</td></tr>` : ""}
+                        ${(order.gift_card_amount > 0) ? `<tr><td>Carte cadeau</td><td style="text-align: right;">-${formatCFA(order.gift_card_amount)}</td></tr>` : ""}
                         <tr class="bold" style="font-size: 14px;">
                             <td>TOTAL</td>
                             <td style="text-align: right;">${formatCFA(order.total)}</td>
@@ -96,6 +97,15 @@ export function ReceiptPrinter({ order, restaurant }: ReceiptPrinterProps) {
                     </table>
                     
                     <div class="divider"></div>
+                    
+                    ${order.payment_status === "refunded" ? `
+                    <div style="text-align: center; margin: 10px 0;">
+                        <div style="border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 6px 0; margin: 4px 0;">
+                            <div class="bold" style="font-size: 13px; letter-spacing: 1px;">⚠️ COMMANDE REMBOURSÉE</div>
+                        </div>
+                    </div>
+                    <div class="divider"></div>
+                    ` : ""}
                     
                     <div class="text-center footer">
                         <p>Merci de votre confiance !</p>

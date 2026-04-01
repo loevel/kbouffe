@@ -86,7 +86,7 @@ export default function UpsellsPage() {
         try {
             const [rulesRes, productsRes, categoriesRes] = await Promise.all([
                 fetch("/api/upsell-rules"),
-                fetch("/api/products"),
+                fetch("/api/menu/products"),
                 fetch("/api/categories"),
             ]);
 
@@ -94,9 +94,9 @@ export default function UpsellsPage() {
             const productsData = await productsRes.json();
             const categoriesData = await categoriesRes.json();
 
-            setRules(rulesData.rules ?? []);
-            setProducts(productsData.products ?? productsData ?? []);
-            setCategories(categoriesData.categories ?? categoriesData ?? []);
+            setRules(Array.isArray(rulesData.rules) ? rulesData.rules : []);
+            setProducts(Array.isArray(productsData.products) ? productsData.products : Array.isArray(productsData) ? productsData : []);
+            setCategories(Array.isArray(categoriesData.categories) ? categoriesData.categories : Array.isArray(categoriesData) ? categoriesData : []);
         } catch {
             setError("Erreur lors du chargement");
         } finally {

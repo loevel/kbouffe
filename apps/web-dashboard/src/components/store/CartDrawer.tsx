@@ -16,6 +16,8 @@ import {
     Package,
     Utensils,
     KeyRound,
+    Gift,
+    AlertCircle,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
@@ -72,6 +74,15 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
     const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid" | "failed" | null>(null);
     const [paymentError, setPaymentError] = useState<string | null>(null);
 
+    // Gift card state
+    const [giftCardCode, setGiftCardCode] = useState("");
+    const [giftCardApplied, setGiftCardApplied] = useState(false);
+    const [giftCardBalance, setGiftCardBalance] = useState(0);
+    const [giftCardAmount, setGiftCardAmount] = useState(0);
+    const [giftCardId, setGiftCardId] = useState<string | null>(null);
+    const [giftCardError, setGiftCardError] = useState<string | null>(null);
+    const [giftCardLoading, setGiftCardLoading] = useState(false);
+
     // ── Responsive: detect desktop to switch between bottom-sheet (mobile) and
     //    side-drawer (lg+) animations without duplicating JSX. ──────────────────
     const [isDesktop, setIsDesktop] = useState(false);
@@ -99,7 +110,50 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
     }, [open]);
 
     const deliveryFee = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.fee ?? 0;
-    const total = subtotal + deliveryFee;
+    const total = subtotal + deliveryFee - giftCardAmount;
+
+    const handleApplyGiftCard = async () => {
+        if (!giftCardCode.trim()) return;
+        setGiftCardError(null);
+        setGiftCardLoading(true);
+        try {
+            const orderTotal = subtotal + deliveryFee;
+            const res = await fetch("/api/store/gift-cards/validate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    code: giftCardCode.trim().toUpperCase(),
+                    restaurant_id: restaurant!.id,
+                    order_total: orderTotal,
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.valid) {
+                setGiftCardError(json.error ?? "Code invalide");
+                setGiftCardApplied(false);
+                setGiftCardAmount(0);
+                setGiftCardId(null);
+                return;
+            }
+            setGiftCardApplied(true);
+            setGiftCardBalance(json.current_balance);
+            setGiftCardAmount(json.amount_applicable);
+            setGiftCardId(json.gift_card_id);
+        } catch {
+            setGiftCardError("Erreur lors de la validation. Réessayez.");
+        } finally {
+            setGiftCardLoading(false);
+        }
+    };
+
+    const handleRemoveGiftCard = () => {
+        setGiftCardCode("");
+        setGiftCardApplied(false);
+        setGiftCardBalance(0);
+        setGiftCardAmount(0);
+        setGiftCardId(null);
+        setGiftCardError(null);
+    };
 
     const handleSubmitOrder = async () => {
         setError(null);
@@ -137,6 +191,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                     deliveryFee,
                     total,
                     customerId: userId ?? undefined,
+                    giftCardCode: giftCardApplied ? giftCardCode.trim().toUpperCase() : undefined,
                 }),
             });
 
@@ -440,6 +495,69 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                 </div>
                             </div>
 
+                            {/* Gift card */}
+                            <div>
+                                <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                                    <Gift size={13} />
+                                    Carte Cadeau
+                                </p>
+
+                                {giftCardApplied ? (
+                                    <div className="rounded-xl border border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-500/10 p-3 space-y-1.5">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle2 size={15} className="text-green-500 shrink-0" />
+                                            <p className="text-sm font-semibold text-green-700 dark:text-green-400">
+                                                Carte valide — solde : {formatCFA(giftCardBalance)}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-xs text-green-600 dark:text-green-400">
+                                                Réduction appliquée : -{formatCFA(giftCardAmount)}
+                                            </p>
+                                            <button
+                                                onClick={handleRemoveGiftCard}
+                                                className="text-xs text-surface-400 hover:text-red-500 transition-colors underline"
+                                            >
+                                                Retirer
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="KBGFT-XXXX-XXXX"
+                                                value={giftCardCode}
+                                                onChange={(e) => {
+                                                    setGiftCardCode(e.target.value.toUpperCase());
+                                                    setGiftCardError(null);
+                                                }}
+                                                onKeyDown={(e) => e.key === "Enter" && handleApplyGiftCard()}
+                                                className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:border-brand-500 font-mono tracking-widest uppercase"
+                                            />
+                                            <button
+                                                onClick={handleApplyGiftCard}
+                                                disabled={giftCardLoading || !giftCardCode.trim()}
+                                                className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                                            >
+                                                {giftCardLoading ? (
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                ) : (
+                                                    "Appliquer"
+                                                )}
+                                            </button>
+                                        </div>
+                                        {giftCardError && (
+                                            <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                                <AlertCircle size={13} className="shrink-0" />
+                                                {giftCardError}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Order summary */}
                             <div className="rounded-xl bg-surface-50 dark:bg-surface-800 p-4 space-y-2 text-sm">
                                 <div className="flex justify-between text-surface-600 dark:text-surface-400">
@@ -450,6 +568,15 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                     <span>Livraison</span>
                                     <span>{deliveryFee === 0 ? "Gratuit" : formatCFA(deliveryFee)}</span>
                                 </div>
+                                {giftCardApplied && giftCardAmount > 0 && (
+                                    <div className="flex justify-between text-green-600 dark:text-green-400">
+                                        <span className="flex items-center gap-1">
+                                            <Gift size={13} />
+                                            Carte cadeau
+                                        </span>
+                                        <span>-{formatCFA(giftCardAmount)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between font-bold text-surface-900 dark:text-white pt-2 border-t border-surface-200 dark:border-surface-700">
                                     <span>Total</span>
                                     <span className="text-brand-500">{formatCFA(total)}</span>
@@ -554,7 +681,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                     {submitting ? (
                                         <><Loader2 size={16} className="animate-spin" /> En cours…</>
                                     ) : (
-                                        `Confirmer — ${formatCFA(total)}`
+                                        `Confirmer — ${formatCFA(Math.max(0, total))}`
                                     )}
                                 </button>
                             </div>

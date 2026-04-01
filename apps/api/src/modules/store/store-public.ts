@@ -125,6 +125,7 @@ storePublicRoutes.post("/order", async (c) => {
             total: number;
             notes?: string;
             externalDrinksCount?: number;
+            giftCardCode?: string;
         }>();
 
         // ── Validation ────────────────────────────────────────────
@@ -210,6 +211,44 @@ storePublicRoutes.post("/order", async (c) => {
             : (restSettings?.delivery_fee ?? restSettings?.delivery_base_fee ?? 0);
         const computedTotal = computedSubtotal + serverDeliveryFee + serviceFee + corkageFee;
 
+        // ── Validation carte cadeau (si fournie) ──────────────────────────
+        let giftCardId: string | null = null;
+        let giftCardAmount = 0;
+        let finalTotal = computedTotal;
+
+        if (body.giftCardCode?.trim()) {
+            const giftCardCode = body.giftCardCode.trim().toUpperCase();
+
+            const { data: giftCard, error: gcError } = await supabase
+                .from("gift_cards")
+                .select("id, current_balance, expires_at, is_active")
+                .eq("restaurant_id", body.restaurantId)
+                .eq("code", giftCardCode)
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (gcError) {
+                console.error("[POST /store/order] Gift card query error:", gcError);
+                return c.json({ error: "Erreur lors de la validation de la carte cadeau" }, 500);
+            }
+
+            if (!giftCard) {
+                return c.json({ error: "Code carte cadeau invalide ou inactif" }, 400);
+            }
+
+            if (giftCard.expires_at && new Date(giftCard.expires_at) < new Date()) {
+                return c.json({ error: "Cette carte cadeau a expiré" }, 400);
+            }
+
+            if (giftCard.current_balance <= 0) {
+                return c.json({ error: "Le solde de cette carte cadeau est épuisé" }, 400);
+            }
+
+            giftCardId = giftCard.id as string;
+            giftCardAmount = Math.min(giftCard.current_balance as number, computedTotal);
+            finalTotal = computedTotal - giftCardAmount;
+        }
+
         // 1. Create the Order
         const { data: order, error: orderError } = await supabase
             .from("orders")
@@ -224,7 +263,9 @@ storePublicRoutes.post("/order", async (c) => {
                 service_fee: serviceFee,
                 corkage_fee: corkageFee,
                 external_drinks_count: externalDrinksCount,
-                total: computedTotal,
+                total: finalTotal,
+                gift_card_id: giftCardId,
+                gift_card_amount: giftCardAmount,
                 loyalty_points_earned: 0,
                 status: "pending",
                 delivery_type: body.deliveryType,
@@ -295,7 +336,44 @@ storePublicRoutes.post("/order", async (c) => {
             }
         }
 
-        // 3. Award loyalty points if program is enabled and customer is identified
+        // 3. Déduire le solde de la carte cadeau et enregistrer le mouvement
+        if (giftCardId && giftCardAmount > 0) {
+            // Récupérer le solde actuel pour calculer le solde restant
+            const { data: gcCurrent } = await supabase
+                .from("gift_cards")
+                .select("current_balance")
+                .eq("id", giftCardId)
+                .single();
+
+            const balanceBefore = (gcCurrent?.current_balance as number) ?? giftCardAmount;
+            const balanceAfter = balanceBefore - giftCardAmount;
+
+            // Décrémenter le solde
+            await supabase
+                .from("gift_cards")
+                .update({
+                    current_balance: balanceAfter,
+                    is_active: balanceAfter > 0, // désactiver si épuisée
+                    updated_at: new Date().toISOString(),
+                } as any)
+                .eq("id", giftCardId);
+
+            // Enregistrer le mouvement
+            await supabase
+                .from("gift_card_movements")
+                .insert({
+                    id: crypto.randomUUID(),
+                    gift_card_id: giftCardId,
+                    order_id: orderId,
+                    amount: -giftCardAmount,
+                    balance_after: balanceAfter,
+                    type: "redeem",
+                    note: `Commande ${orderId}`,
+                    created_at: new Date().toISOString(),
+                } as any);
+        }
+
+        // 4. Award loyalty points if program is enabled and customer is identified
         let loyaltyPointsEarned = 0;
         if (
             restSettings?.loyalty_enabled &&
@@ -425,7 +503,7 @@ storePublicRoutes.post("/order", async (c) => {
             }
         }
 
-        return c.json({ success: true, orderId, serviceFee, corkageFee, total: computedTotal, loyaltyPointsEarned, payment }, 201);
+        return c.json({ success: true, orderId, serviceFee, corkageFee, total: finalTotal, giftCardAmount, loyaltyPointsEarned, payment }, 201);
     } catch (error) {
         console.error("[POST /store/order] Unexpected error:", error);
         return c.json({ error: "Erreur serveur" }, 500);

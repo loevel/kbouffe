@@ -83,30 +83,60 @@ export async function POST(request: NextRequest) {
       .eq("id", tx.id);
 
     if (tx.order_id) {
-      const orderPaymentStatus =
-        mappedStatus === "paid"
-          ? "paid"
-          : mappedStatus === "failed"
-          ? "failed"
-          : "pending";
+      // Check if this transaction is linked to a payment split
+      const { data: linkedSplit } = await admin
+        .from("order_payment_splits" as any)
+        .select("id")
+        .eq("payment_transaction_id", tx.id)
+        .maybeSingle();
+
+      if (linkedSplit) {
+        // Update the split status
+        await admin
+          .from("order_payment_splits" as any)
+          .update({
+            payment_status: mappedStatus,
+            updated_at: new Date().toISOString(),
+          } as never)
+          .eq("id", (linkedSplit as any).id);
+
+        // Recalculate aggregate order payment status from all splits
+        await admin.rpc("recalculate_order_payment_status" as any, {
+          p_order_id: tx.order_id,
+        });
+      } else {
+        // Standard (non-split) order: update directly
+        const orderPaymentStatus =
+          mappedStatus === "paid"
+            ? "paid"
+            : mappedStatus === "failed"
+            ? "failed"
+            : "pending";
+
+        await admin
+          .from("orders")
+          .update({
+            payment_status: orderPaymentStatus,
+            updated_at: new Date().toISOString(),
+          } as never)
+          .eq("id", tx.order_id)
+          .eq("restaurant_id", tx.restaurant_id);
+      }
 
       const { data: orderData } = await admin
         .from("orders")
-        .update({
-          payment_status: orderPaymentStatus,
-          updated_at: new Date().toISOString(),
-        } as never)
+        .select("customer_id, total, restaurant_id, payment_status")
         .eq("id", tx.order_id)
-        .eq("restaurant_id", tx.restaurant_id)
-        .select("customer_id, total, restaurant_id")
         .single();
+
+      const finalPaymentStatus = (orderData as any)?.payment_status;
 
       // Push au client sur confirmation / échec paiement
       if (orderData) {
         const order = orderData as any;
         const shortRef = `#KB-${String(tx.order_id).slice(-4).toUpperCase()}`;
 
-        if (mappedStatus === "paid" && order.customer_id) {
+        if (finalPaymentStatus === "paid" && order.customer_id) {
           const total = new Intl.NumberFormat("fr-FR").format(Number(order.total ?? 0));
           sendPushToUser(admin, order.customer_id, {
             title: `✅ Paiement confirmé`,
