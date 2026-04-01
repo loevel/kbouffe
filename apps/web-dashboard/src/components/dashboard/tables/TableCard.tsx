@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Users, MoreVertical, QrCode, X, Download, ExternalLink, Clock3, Printer } from "lucide-react";
+import { Users, MoreVertical, QrCode, X, Download, ExternalLink, Clock3, Printer, Plus } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Card, Badge, Dropdown, Button } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -19,6 +19,7 @@ interface TableCardProps {
     canManage: boolean;
     onStatusChange: (id: string, status: string) => void;
     onDelete: (id: string) => void;
+    onOrderClick?: (tableNumber: string, tableId: string) => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,7 +36,7 @@ const STATUS_BADGE: Record<string, "success" | "default" | "warning" | "info" | 
     cleaning: "info",
 };
 
-export function TableCard({ table, canManage, onStatusChange, onDelete }: TableCardProps) {
+export function TableCard({ table, canManage, onStatusChange, onDelete, onOrderClick }: TableCardProps) {
     const { t } = useLocale();
     const { restaurant } = useDashboard();
     const [showQr, setShowQr] = useState(false);
@@ -136,6 +137,18 @@ export function TableCard({ table, canManage, onStatusChange, onDelete }: TableC
                     >
                         <QrCode size={13} />
                         <span>{t.tables.showQr ?? "Code QR"}</span>
+                    </button>
+                )}
+
+                {/* Prendre commande */}
+                {onOrderClick && (
+                    <button
+                        onClick={() => onOrderClick(table.number, table.id)}
+                        className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: "var(--brand-primary, #f97316)" }}
+                    >
+                        <Plus size={13} strokeWidth={3} />
+                        Prendre commande
                     </button>
                 )}
             </Card>

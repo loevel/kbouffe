@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TableCard } from "./TableCard";
 import { ZoneManager } from "./ZoneManager";
 import { ParkedOrdersPanel } from "@/components/pos/ParkedOrdersPanel";
+import { PosOrderPanel } from "@/components/pos/PosOrderPanel";
 import { usePosOperator } from "@/contexts/PosOperatorContext";
 
 interface TableZone {
@@ -55,6 +56,16 @@ export function TablesManager() {
     const [showParkedPanel, setShowParkedPanel] = useState(false);
     const [parkedCount, setParkedCount] = useState(0);
     const [showParkModal, setShowParkModal] = useState(false);
+    // ── POS Order Panel ────────────────────────────────────────────────────
+    const [posOpen, setPosOpen] = useState(false);
+    const [posTable, setPosTable] = useState<{ tableNumber: string; tableId: string } | null>(null);
+    const [posEditingDraft, setPosEditingDraft] = useState<{
+        orderId: string;
+        draftLabel: string;
+        items: Array<{ id: string; name: string; unit_price?: number; price?: number; quantity: number; notes?: string }>;
+        covers?: number | null;
+        notes?: string | null;
+    } | null>(null);
 
     const authFetch = useCallback(async (url: string, options: RequestInit = {}) => {
         const supabase = createClient();
@@ -116,6 +127,27 @@ export function TablesManager() {
         }
         toast.success(t.tables.tableDeleted);
         fetchData();
+    };
+
+    // ── POS handlers ──────────────────────────────────────────────────────
+    const handleOpenPos = (tableNumber: string, tableId: string) => {
+        setPosTable({ tableNumber, tableId });
+        setPosEditingDraft(null);
+        setPosOpen(true);
+    };
+
+    const handleEditDraft = async (draftId: string, draftLabel: string) => {
+        try {
+            const res = await authFetch(`/api/orders/${draftId}`);
+            if (!res.ok) { toast.error("Impossible de charger la commande"); return; }
+            const data = await res.json() as { items?: any[]; covers?: number | null; notes?: string | null; table_number?: string | null };
+            const rawItems: Array<{ id: string; name: string; unit_price?: number; price?: number; quantity: number; notes?: string }> = Array.isArray(data.items) ? data.items : [];
+            setPosEditingDraft({ orderId: draftId, draftLabel, items: rawItems, covers: data.covers, notes: data.notes });
+            setPosTable(data.table_number ? { tableNumber: data.table_number, tableId: "" } : null);
+            setPosOpen(true);
+        } catch {
+            toast.error("Erreur réseau");
+        }
     };
 
     const filteredTables = useMemo(() => {
@@ -318,6 +350,7 @@ export function TablesManager() {
                             canManage={can("tables:manage")}
                             onStatusChange={handleStatusChange}
                             onDelete={handleDelete}
+                            onOrderClick={handleOpenPos}
                         />
                     ))}
                 </div>
@@ -344,6 +377,7 @@ export function TablesManager() {
                 isOpen={showParkedPanel}
                 onClose={() => setShowParkedPanel(false)}
                 onCountChange={setParkedCount}
+                onEditDraft={handleEditDraft}
             />
 
             {/* Park & Recall — Park new order modal */}
@@ -355,8 +389,20 @@ export function TablesManager() {
                 operatorMemberId={operator?.memberId}
                 onParked={() => {
                     setShowParkModal(false);
-                    // refresh count via ParkedOrdersPanel auto-refresh (next 30s tick)
-                    // optimistically increment count
+                    setParkedCount((n) => n + 1);
+                }}
+            />
+
+            {/* POS Order Panel */}
+            <PosOrderPanel
+                isOpen={posOpen}
+                tableNumber={posTable?.tableNumber ?? ""}
+                tableId={posTable?.tableId}
+                existingDraft={posEditingDraft}
+                onClose={() => {
+                    setPosOpen(false);
+                    setPosTable(null);
+                    setPosEditingDraft(null);
                     setParkedCount((n) => n + 1);
                 }}
             />

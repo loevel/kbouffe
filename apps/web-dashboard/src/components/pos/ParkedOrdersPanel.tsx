@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X, Clock, Trash2, ArrowUpRight, ParkingSquare } from "lucide-react";
+import { X, Clock, Trash2, ArrowUpRight, ParkingSquare, Pencil } from "lucide-react";
 import { Button, toast } from "@kbouffe/module-core/ui";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { formatCFA } from "@kbouffe/module-core/ui";
@@ -27,11 +27,13 @@ interface ParkedOrdersPanelProps {
     onClose: () => void;
     /** Called when a draft is recalled or discarded, so the parent can refresh the count */
     onCountChange?: (count: number) => void;
+    /** Called when the user wants to edit a parked draft in the POS panel */
+    onEditDraft?: (draftId: string, draftLabel: string) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ParkedOrdersPanel({ isOpen, onClose, onCountChange }: ParkedOrdersPanelProps) {
+export function ParkedOrdersPanel({ isOpen, onClose, onCountChange, onEditDraft }: ParkedOrdersPanelProps) {
     const [drafts, setDrafts] = useState<DraftOrder[]>([]);
     const [loading, setLoading] = useState(false);
     const [discarding, setDiscarding] = useState<string | null>(null);
@@ -204,6 +206,16 @@ export function ParkedOrdersPanel({ isOpen, onClose, onCountChange }: ParkedOrde
                                     >
                                         Rappeler
                                     </Button>
+                                    {onEditDraft && (
+                                        <button
+                                            onClick={() => { onEditDraft(draft.id, draft.draft_label ?? draft.customer_name); onClose(); }}
+                                            className="p-2 rounded-lg text-surface-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+                                            aria-label="Modifier la commande"
+                                            title="Modifier"
+                                        >
+                                            <Pencil size={15} />
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => handleDiscard(draft)}
                                         disabled={discarding === draft.id}
