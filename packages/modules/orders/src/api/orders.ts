@@ -120,6 +120,7 @@ ordersRoutes.post("/", async (c) => {
         external_drinks_count: body.external_drinks_count ?? 0,
         scheduled_for: body.scheduled_for ?? null,
         invoice_number: invoiceNumber,
+        operator_member_id: body.operator_member_id ?? null,
     };
 
     const { data, error } = await supabase

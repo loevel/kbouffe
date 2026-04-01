@@ -4,6 +4,7 @@ import { Badge, useLocale, type OrderStatus } from "@kbouffe/module-core/ui";
 
 
 const statusConfig: Record<OrderStatus, { variant: "warning" | "info" | "brand" | "success" | "danger"; dot?: boolean }> = {
+    draft: { variant: "info" },
     pending: { variant: "warning", dot: true },
     accepted: { variant: "info" },
     preparing: { variant: "brand" },

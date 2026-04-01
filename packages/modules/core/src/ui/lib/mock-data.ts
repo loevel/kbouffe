@@ -132,7 +132,8 @@ const dineInDefaults = {
     is_vegan: false,
     is_gluten_free: false,
     calories: null,
-    prep_time: 15
+    prep_time: 15,
+    is_featured: false,
 } as const;
 
 type ProductWithoutDineIn = Omit<Product, keyof typeof dineInDefaults>;
