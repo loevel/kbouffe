@@ -28,6 +28,7 @@ import {
     ImagePlus,
     Maximize2,
     Utensils,
+    Search,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
@@ -737,6 +738,7 @@ export function StorePageClient({ slug }: { slug: string }) {
         unzoned_slots: Array<{ time: string; available: boolean; available_count: number; reserved_until: string | null }> | null;
     } | null>(null);
     const [availLoading, setAvailLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
     const { addItem, itemCount, subtotal } = useCart();
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
     const isScrollingRef = useRef(false);
@@ -978,6 +980,23 @@ export function StorePageClient({ slug }: { slug: string }) {
         luxury: LuxuryTheme,
         story: StoryTheme,
     }[restaurant.themeLayout ?? "grid"] ?? GridTheme;
+
+    // ── Search filter ──
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const filteredProducts = normalizedQuery
+        ? localizedProducts.filter(
+              (p) =>
+                  p.name.toLowerCase().includes(normalizedQuery) ||
+                  p.description?.toLowerCase().includes(normalizedQuery),
+          )
+        : localizedProducts;
+    const filteredFeaturedProducts = normalizedQuery
+        ? featuredProducts.filter(
+              (p) =>
+                  p.name.toLowerCase().includes(normalizedQuery) ||
+                  (p.description?.toLowerCase().includes(normalizedQuery) ?? false),
+          )
+        : featuredProducts;
 
     const handleAddToCart = (product: { id: string; name: string; price: number; image_url: string | null }) => {
         addItem(
@@ -1838,12 +1857,52 @@ export function StorePageClient({ slug }: { slug: string }) {
                         </div>
                     )}
 
+                    {/* Barre de recherche de produits */}
+                    <div className="mb-5">
+                        <div className="flex items-center gap-2.5 px-4 py-3 bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-2xl focus-within:border-brand-400 dark:focus-within:border-brand-500 transition-colors">
+                            <Search size={16} className="text-surface-400 shrink-0" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Rechercher un plat…"
+                                className="flex-1 bg-transparent text-sm text-surface-900 dark:text-white placeholder-surface-400 outline-none"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                    aria-label="Effacer la recherche"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        {normalizedQuery && (
+                            <p className="mt-1.5 text-xs text-surface-400 px-1">
+                                {filteredProducts.length} résultat{filteredProducts.length !== 1 ? "s" : ""} pour «&nbsp;{searchQuery}&nbsp;»
+                            </p>
+                        )}
+                    </div>
+
                     {/* Theme-driven menu rendering */}
+                    {normalizedQuery && filteredProducts.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-3 text-surface-400">
+                            <ChefHat size={40} className="opacity-40" />
+                            <p className="text-sm font-medium">Aucun plat trouvé pour «&nbsp;{searchQuery}&nbsp;»</p>
+                            <button
+                                onClick={() => setSearchQuery("")}
+                                className="text-sm text-brand-500 hover:underline"
+                            >
+                                Effacer la recherche
+                            </button>
+                        </div>
+                    ) : (
                     <ThemeComponent
                         restaurant={restaurant}
                         categories={localizedCategories}
-                        products={localizedProducts}
-                        featuredProducts={featuredProducts}
+                        products={filteredProducts}
+                        featuredProducts={filteredFeaturedProducts}
                         activeCategory={activeCategory ?? ""}
                         onCategoryChange={scrollToCategory}
                         onAddToCart={handleAddToCart}
@@ -1851,6 +1910,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                         formatPrice={formatCFA}
                         sectionRefs={sectionRefs}
                     />
+                    )}
 
                     {reviews.length > 0 && (
                         <section className="mt-12 pt-8 border-t border-surface-100 dark:border-surface-800">
