@@ -1,37 +1,27 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-        },
-      }
-    );
-
+    // Use anon-key client to read the user session from cookies
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
     const body = await request.json();
     const { token, platform, deviceInfo } = body;
 
     if (!token) {
-      return NextResponse.json({ error: 'Token missing' }, { status: 400 });
+      return NextResponse.json({ error: 'Token manquant' }, { status: 400 });
     }
 
-    // Upsert into push_tokens table (multi-device support)
-    const { error: dbError } = await supabase
+    // Use service-role client for DB write (bypasses RLS)
+    const adminSupabase = await createAdminClient();
+
+    const { error: dbError } = await adminSupabase
       .from('push_tokens')
       .upsert(
         {
@@ -44,18 +34,11 @@ export async function POST(request: Request) {
         { onConflict: 'token' }
       );
 
-    if (dbError) {
-      // Fallback: try legacy users.fcm_token column
-      await supabase
-        .from('users')
-        .update({ fcm_token: token })
-        .eq('id', user.id);
-    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error.message || 'Error updating FCM token' },
+      { error: error.message || 'Erreur lors de l\'enregistrement du token' },
       { status: 500 }
     );
   }
