@@ -7,17 +7,19 @@ import {
     ShoppingBag,
     Wallet,
     TrendingUp,
-    TrendingDown,
-    AlertTriangle,
-    Star,
-    Truck,
     ArrowUpRight,
     Activity,
     Shield,
-    Zap,
     LayoutDashboard,
     Brain,
     Package,
+    Sparkles,
+    Loader2,
+    AlertTriangle,
+    CheckCircle2,
+    RefreshCw,
+    Lightbulb,
+    Truck,
 } from "lucide-react";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
@@ -94,6 +96,25 @@ export default function AdminDashboardPage() {
     const { adminRole } = useAdmin();
     const [stats, setStats] = useState<PlatformStats | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // Executive Brief state
+    const [brief, setBrief] = useState<{
+        summary: string;
+        highlights: string[];
+        risks: string[];
+        actions: { priority: string; action: string; reason: string }[];
+        generatedAt: string;
+    } | null>(null);
+    const [briefLoading, setBriefLoading] = useState(false);
+
+    const generateBrief = async () => {
+        setBriefLoading(true);
+        try {
+            const res = await adminFetch("/api/admin/ai/executive-brief", { method: "POST" });
+            if (res.ok) setBrief(await res.json());
+        } catch { /* */ }
+        finally { setBriefLoading(false); }
+    };
 
     useEffect(() => {
         (async () => {
@@ -242,6 +263,118 @@ export default function AdminDashboardPage() {
                             <p className="text-xs text-surface-400 mt-1">appels Gemini</p>
                         </motion.div>
                     </div>
+
+                    {/* Executive Brief IA */}
+                    <motion.div variants={itemVariants} className="mb-10">
+                        <div className="bg-gradient-to-br from-violet-950/60 to-surface-900 rounded-[2rem] border border-violet-500/20 overflow-hidden">
+                            <div className="flex items-center justify-between px-8 py-5 border-b border-violet-500/10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                                        <Brain size={20} className="text-violet-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white">Executive Brief IA</h3>
+                                        <p className="text-xs text-violet-400">Analyse stratégique générée par Gemini</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={generateBrief}
+                                    disabled={briefLoading}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 hover:text-white text-sm font-semibold transition-all disabled:opacity-50"
+                                >
+                                    {briefLoading
+                                        ? <><Loader2 size={14} className="animate-spin" /> Génération…</>
+                                        : brief
+                                        ? <><RefreshCw size={14} /> Régénérer</>
+                                        : <><Sparkles size={14} /> Générer le brief</>
+                                    }
+                                </button>
+                            </div>
+
+                            {!brief && !briefLoading && (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <Brain size={40} className="text-violet-800 mb-3" />
+                                    <p className="text-surface-400 text-sm max-w-sm">
+                                        Gemini analyse vos KPIs en temps réel et génère un résumé exécutif avec les risques et actions prioritaires.
+                                    </p>
+                                </div>
+                            )}
+
+                            {briefLoading && (
+                                <div className="flex items-center justify-center py-12 gap-3 text-violet-400">
+                                    <Loader2 size={20} className="animate-spin" />
+                                    <span className="text-sm">Analyse des indicateurs plateforme…</span>
+                                </div>
+                            )}
+
+                            {brief && !briefLoading && (
+                                <div className="p-8 space-y-6">
+                                    {/* Summary */}
+                                    <div className="p-4 rounded-2xl bg-violet-500/10 border border-violet-500/20">
+                                        <p className="text-sm text-violet-100 leading-relaxed">{brief.summary}</p>
+                                        <p className="text-[10px] text-violet-500 mt-2 font-mono">
+                                            Généré le {new Date(brief.generatedAt).toLocaleString("fr-FR")}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        {/* Highlights */}
+                                        <div>
+                                            <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                                <CheckCircle2 size={12} /> Points positifs
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {brief.highlights.map((h, i) => (
+                                                    <li key={i} className="text-sm text-surface-300 flex items-start gap-2">
+                                                        <span className="text-emerald-500 mt-0.5 shrink-0">✓</span>
+                                                        {h}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+
+                                        {/* Risks */}
+                                        <div>
+                                            <h4 className="text-xs font-black text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                                <AlertTriangle size={12} /> Points d'attention
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {brief.risks.map((r, i) => (
+                                                    <li key={i} className="text-sm text-surface-300 flex items-start gap-2">
+                                                        <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                                                        {r}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div>
+                                            <h4 className="text-xs font-black text-brand-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                                <Lightbulb size={12} /> Actions prioritaires
+                                            </h4>
+                                            <ul className="space-y-2.5">
+                                                {brief.actions.map((a, i) => (
+                                                    <li key={i} className="space-y-0.5">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={cn(
+                                                                "text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase",
+                                                                a.priority === "high" ? "bg-red-500/20 text-red-400" :
+                                                                a.priority === "medium" ? "bg-amber-500/20 text-amber-400" :
+                                                                "bg-blue-500/20 text-blue-400"
+                                                            )}>{a.priority}</span>
+                                                            <p className="text-sm font-semibold text-white">{a.action}</p>
+                                                        </div>
+                                                        <p className="text-xs text-surface-500 pl-8">{a.reason}</p>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
 
                     {/* Content Row */}
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
