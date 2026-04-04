@@ -29,6 +29,7 @@ import {
     Maximize2,
     Utensils,
     Search,
+    Heart,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
@@ -264,13 +265,16 @@ function ProductDetailModal({
     restaurant,
     onClose,
     onAdd,
+    relatedProducts = [],
 }: {
     product: Product;
     restaurant: { id: string; name: string; slug: string };
     onClose: () => void;
     onAdd: () => void;
+    relatedProducts?: Product[];
 }) {
     const [quantity, setQuantity] = useState(1);
+    const [note, setNote] = useState("");
     const [reviews, setReviews] = useState<ProductReview[]>([]);
     const [stats, setStats] = useState<ProductReviewStats>({ count: 0, average: 0 });
     const [loadingReviews, setLoadingReviews] = useState(true);
@@ -355,10 +359,11 @@ function ProductDetailModal({
     return (
         <AnimatePresence>
             <motion.div
+                key="modal"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-end sm:items-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             >
                 <motion.div
@@ -375,7 +380,7 @@ function ProductDetailModal({
                     </div>
 
                     {/* Header image carousel */}
-                    <div className="relative h-56 sm:h-72 bg-surface-100 dark:bg-surface-800 shrink-0 overflow-hidden">
+                    <div className="relative h-56 sm:h-72 bg-surface-100 dark:bg-surface-800 shrink-0 overflow-hidden flex items-center justify-center">
                         {allImages.length > 0 ? (
                             <>
                                 <AnimatePresence mode="wait">
@@ -387,7 +392,7 @@ function ProductDetailModal({
                                         transition={{ duration: 0.25 }}
                                         src={allImages[activeImg]}
                                         alt={`${product.name} — photo ${activeImg + 1}`}
-                                        className="w-full h-full object-cover cursor-zoom-in"
+                                        className="max-w-full max-h-full object-contain cursor-zoom-in"
                                         onClick={() => setFullscreen(true)}
                                     />
                                 </AnimatePresence>
@@ -515,6 +520,72 @@ function ProductDetailModal({
                                 </div>
                             )}
 
+                            {/* Special instructions */}
+                            <div className="mb-5 border-t border-surface-100 dark:border-surface-800 pt-5">
+                                <h3 className="text-base font-bold text-surface-900 dark:text-white mb-2">
+                                    Instructions particulières
+                                </h3>
+                                <textarea
+                                    value={note}
+                                    onChange={(e) => setNote(e.target.value)}
+                                    placeholder="Ajouter une remarque"
+                                    rows={3}
+                                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 px-4 py-3 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 resize-none transition"
+                                />
+                                <p className="text-xs text-surface-400 mt-1.5">Des frais pourraient vous être facturés pour les ajouts.</p>
+                            </div>
+
+                            {/* Souvent achetés ensemble */}
+                            {relatedProducts.length > 0 && (
+                                <div className="mb-5 border-t border-surface-100 dark:border-surface-800 pt-5">
+                                    <h3 className="text-base font-bold text-surface-900 dark:text-white mb-3">
+                                        Souvent achetés ensemble
+                                    </h3>
+                                    <div className="rounded-2xl border border-surface-200 dark:border-surface-800 overflow-visible">
+                                        {(() => {
+                                            const pairs: Product[][] = [];
+                                            for (let i = 0; i < relatedProducts.length; i += 2) pairs.push(relatedProducts.slice(i, i + 2));
+                                            return pairs.map((pair, rowIdx) => (
+                                                <div
+                                                    key={rowIdx}
+                                                    className={`flex ${rowIdx < pairs.length - 1 ? "border-b border-surface-100 dark:border-surface-800" : ""}`}
+                                                >
+                                                    {pair.map((p, colIdx) => (
+                                                        <div
+                                                            key={p.id}
+                                                            className={`flex-1 min-w-0 flex items-start gap-2.5 p-3 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/30 transition-colors ${colIdx === 0 && pair.length === 2 ? "border-r border-surface-100 dark:border-surface-800" : ""}`}
+                                                            onClick={() => { onClose(); }}
+                                                        >
+                                                            <div className="flex-1 min-w-0 pt-0.5">
+                                                                <p className="text-[13px] font-semibold text-surface-900 dark:text-white leading-snug line-clamp-2">{p.name}</p>
+                                                                <p className="text-[12px] text-surface-500 dark:text-surface-400 mt-0.5">{formatCFA(p.price)}</p>
+                                                            </div>
+                                                            <div className="relative shrink-0">
+                                                                <div className="w-20 h-20 rounded-xl overflow-hidden bg-surface-100 dark:bg-surface-800">
+                                                                    {p.image_url
+                                                                        ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                                                                        : <div className="w-full h-full flex items-center justify-center"><ChefHat size={20} className="text-surface-300 dark:text-surface-600" /></div>
+                                                                    }
+                                                                </div>
+                                                                {p.is_available && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); onAdd(); }}
+                                                                        className="absolute -bottom-2.5 -right-2.5 w-7 h-7 rounded-full bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 shadow-md flex items-center justify-center hover:scale-110 transition-transform"
+                                                                    >
+                                                                        <Plus size={14} strokeWidth={2.5} className="text-surface-900 dark:text-white" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {pair.length === 1 && <div className="flex-1" />}
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Reviews section */}
                             <div className="border-t border-surface-100 dark:border-surface-800 pt-5">
                                 <h3 className="text-base font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
@@ -610,6 +681,7 @@ function ProductDetailModal({
             {/* ── Fullscreen lightbox ── */}
             {fullscreen && allImages.length > 0 && (
                 <motion.div
+                    key="lightbox"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -685,6 +757,151 @@ function ProductDetailModal({
                 </motion.div>
             )}
         </AnimatePresence>
+    );
+}
+
+// ── Explore More Section ────────────────────────────────────────────────
+interface ExploreItem {
+    id: string; name: string; slug: string;
+    coverUrl: string | null; logoUrl: string | null;
+    cuisineType: string; rating: number | null;
+    reviewCount: number | null; orderCount: number | null;
+    isPremium: boolean; isSponsored: boolean;
+}
+
+const EXPLORE_GRADIENTS = [
+    "from-orange-400 to-red-500", "from-green-400 to-emerald-500",
+    "from-amber-400 to-orange-500", "from-purple-400 to-indigo-500",
+    "from-rose-400 to-pink-500", "from-sky-400 to-blue-500",
+];
+const exploreGradient = (id: string) =>
+    EXPLORE_GRADIENTS[id.charCodeAt(0) % EXPLORE_GRADIENTS.length];
+
+function ExploreMoreSection({ currentId, cuisineType }: { currentId: string; cuisineType: string }) {
+    const [items, setItems] = useState<ExploreItem[]>([]);
+    const [liked, setLiked] = useState<Set<string>>(new Set());
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const params = new URLSearchParams({ sort: "recommended", limit: "12" });
+        if (cuisineType) params.set("cuisine", cuisineType);
+        fetch(`/api/stores?${params}`)
+            .then((r) => r.json())
+            .then((data) => {
+                const others: ExploreItem[] = (data.restaurants ?? [])
+                    .filter((r: ExploreItem) => r.id !== currentId)
+                    .slice(0, 10);
+                setItems(others);
+            })
+            .catch(() => {});
+    }, [currentId, cuisineType]);
+
+    if (items.length === 0) return null;
+
+    const scroll = (dir: "left" | "right") => {
+        scrollRef.current?.scrollBy({ left: dir === "right" ? 280 : -280, behavior: "smooth" });
+    };
+
+    const toggleLike = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        setLiked((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    return (
+        <section className="border-t border-surface-100 dark:border-surface-800 bg-white dark:bg-surface-950 py-10">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                    <h2 className="text-xl font-bold text-surface-900 dark:text-white">Plus à explorer</h2>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => scroll("left")}
+                            className="w-8 h-8 rounded-full border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                        >
+                            <ChevronLeft size={16} className="text-surface-600 dark:text-surface-400" />
+                        </button>
+                        <button
+                            onClick={() => scroll("right")}
+                            className="w-8 h-8 rounded-full border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                        >
+                            <ChevronRight size={16} className="text-surface-600 dark:text-surface-400" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Scrollable row */}
+                <div
+                    ref={scrollRef}
+                    className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide -mx-4 sm:-mx-6 px-4 sm:px-6"
+                >
+                    {items.map((r) => {
+                        const rating = r.rating?.toFixed(1) ?? null;
+                        const eta = (r.orderCount ?? 0) > 300 ? "13 min" : (r.orderCount ?? 0) > 100 ? "28 min" : "45 min";
+                        const isLiked = liked.has(r.id);
+
+                        return (
+                            <Link
+                                key={r.id}
+                                href={`/r/${r.slug}`}
+                                className="shrink-0 w-56 group block"
+                            >
+                                {/* Cover */}
+                                <div className="relative h-36 rounded-2xl overflow-hidden mb-2.5 bg-surface-100 dark:bg-surface-800 border border-surface-100 dark:border-surface-800">
+                                    {r.coverUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={r.coverUrl}
+                                            alt={r.name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                        />
+                                    ) : (
+                                        <div className={`w-full h-full bg-gradient-to-br ${exploreGradient(r.id)} flex items-center justify-center`}>
+                                            <span className="text-5xl font-black text-white/20">{r.name.charAt(0)}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Promo badge top-left */}
+                                    {r.isSponsored && (
+                                        <div className="absolute top-2 left-2 max-w-[70%] bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg truncate">
+                                            Meilleure offre
+                                        </div>
+                                    )}
+
+                                    {/* Heart top-right */}
+                                    <button
+                                        onClick={(e) => toggleLike(r.id, e)}
+                                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 dark:bg-surface-900/90 flex items-center justify-center shadow hover:scale-110 transition-transform"
+                                        aria-label={isLiked ? "Retirer des favoris" : "Ajouter aux favoris"}
+                                    >
+                                        <Heart
+                                            size={13}
+                                            className={isLiked ? "text-red-500 fill-red-500" : "text-surface-500"}
+                                        />
+                                    </button>
+
+                                    {/* Rating badge bottom-right */}
+                                    {rating && (
+                                        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white dark:bg-surface-900 shadow flex flex-col items-center justify-center">
+                                            <span className="text-[10px] font-black text-surface-900 dark:text-white leading-none">{rating}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Info */}
+                                <p className="text-sm font-semibold text-surface-900 dark:text-white truncate leading-snug">{r.name}</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">
+                                    Livraison dès 1 500 FCFA · {eta}
+                                </p>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </div>
+        </section>
     );
 }
 
@@ -2004,8 +2221,11 @@ export function StorePageClient({ slug }: { slug: string }) {
                     restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
                     onClose={() => setSelectedProduct(null)}
                     onAdd={() => handleAddToCart(selectedProduct)}
+                    relatedProducts={products.filter((p) => p.id !== selectedProduct.id && p.is_available).slice(0, 6)}
                 />
             )}
+
+            <ExploreMoreSection currentId={restaurant.id} cuisineType={restaurant.cuisineType} />
 
             <footer className="border-t border-surface-100 dark:border-surface-800 bg-white dark:bg-surface-950 py-8">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">

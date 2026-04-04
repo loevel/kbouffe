@@ -10,16 +10,35 @@ import {
     Eye,
     EyeOff,
     Store,
-    User,
     Filter,
-    ArrowUpRight,
     ShieldCheck,
-    AlertCircle,
     MoreHorizontal,
     ThumbsUp,
+    Brain,
+    Sparkles,
+    Loader2,
+    Copy,
+    Check,
+    ShieldAlert,
+    ShieldOff,
 } from "lucide-react";
 import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
+
+// ── AI Review Analysis ────────────────────────────────────────────────────────
+interface ReviewAIResult {
+    toxicityScore: number;
+    sentiment: "positive" | "neutral" | "negative";
+    flags: string[];
+    suggestedResponse: string | null;
+    recommendation: "keep" | "review" | "hide";
+}
+
+function ToxicityBadge({ score }: { score: number }) {
+    if (score < 0.3) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">✓ Sain ({Math.round(score * 100)}%)</span>;
+    if (score < 0.65) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">⚠ Ambigu ({Math.round(score * 100)}%)</span>;
+    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">🚨 Toxique ({Math.round(score * 100)}%)</span>;
+}
 
 interface ReviewRow {
     id: string;
@@ -69,6 +88,34 @@ export default function AdminModerationPage() {
     const [ratingFilter, setRatingFilter] = useState("all");
     const [visibleFilter, setVisibleFilter] = useState("all");
     const [toggling, setToggling] = useState<string | null>(null);
+
+    // AI moderation state per review
+    const [aiResults, setAiResults] = useState<Record<string, ReviewAIResult>>({});
+    const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+    const [expandedAi, setExpandedAi] = useState<string | null>(null);
+    const [copiedResponse, setCopiedResponse] = useState<string | null>(null);
+
+    const analyzeReview = async (r: ReviewRow) => {
+        if (!r.comment) return;
+        setAiLoading((prev) => ({ ...prev, [r.id]: true }));
+        setExpandedAi(r.id);
+        try {
+            const res = await adminFetch("/api/admin/ai/moderate-review", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rating: r.rating, comment: r.comment, restaurantName: r.restaurantName }),
+            });
+            const data = await res.json();
+            setAiResults((prev) => ({ ...prev, [r.id]: data }));
+        } catch { /* */ }
+        finally { setAiLoading((prev) => ({ ...prev, [r.id]: false })); }
+    };
+
+    const copyResponse = (id: string, text: string) => {
+        navigator.clipboard.writeText(text).catch(() => {});
+        setCopiedResponse(id);
+        setTimeout(() => setCopiedResponse(null), 2000);
+    };
 
     const fetchReviews = useCallback(async (page = 1) => {
         setLoading(true);
@@ -299,11 +346,97 @@ export default function AdminModerationPage() {
                                                 <Eye size={22} />
                                             )}
                                         </button>
-                                        <button className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-surface-100 dark:bg-surface-800 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 transition-all flex items-center justify-center">
-                                            <MoreHorizontal size={20} />
-                                        </button>
+                                        {r.comment && (
+                                            <button
+                                                onClick={() => expandedAi === r.id && aiResults[r.id] ? setExpandedAi(null) : analyzeReview(r)}
+                                                disabled={aiLoading[r.id]}
+                                                className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-all flex items-center justify-center"
+                                                title="Analyser avec l'IA"
+                                            >
+                                                {aiLoading[r.id] ? <Loader2 size={18} className="animate-spin" /> : <Brain size={18} />}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
+
+                                {/* AI Analysis Panel */}
+                                <AnimatePresence>
+                                    {expandedAi === r.id && (aiLoading[r.id] || aiResults[r.id]) && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="mt-4 pt-4 border-t border-violet-100 dark:border-violet-900/40">
+                                                {aiLoading[r.id] ? (
+                                                    <div className="flex items-center gap-2 text-violet-500 text-sm">
+                                                        <Loader2 size={14} className="animate-spin" />
+                                                        Analyse Gemini en cours…
+                                                    </div>
+                                                ) : aiResults[r.id] ? (() => {
+                                                    const ai = aiResults[r.id];
+                                                    return (
+                                                        <div className="space-y-3">
+                                                            <div className="flex items-center gap-3 flex-wrap">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Brain size={13} className="text-violet-500" />
+                                                                    <span className="text-xs font-semibold text-violet-600 dark:text-violet-400">Analyse IA</span>
+                                                                </div>
+                                                                <ToxicityBadge score={ai.toxicityScore} />
+                                                                <span className={cn(
+                                                                    "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                                                                    ai.sentiment === "positive" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                                                    ai.sentiment === "negative" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                                                                    "bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400"
+                                                                )}>
+                                                                    {ai.sentiment === "positive" ? "😊 Positif" : ai.sentiment === "negative" ? "😞 Négatif" : "😐 Neutre"}
+                                                                </span>
+                                                                {ai.recommendation === "hide" && (
+                                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 flex items-center gap-1">
+                                                                        <ShieldOff size={10} /> Masquer recommandé
+                                                                    </span>
+                                                                )}
+                                                                {ai.recommendation === "review" && (
+                                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1">
+                                                                        <ShieldAlert size={10} /> À examiner
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {ai.flags.length > 0 && (
+                                                                <div className="flex gap-1.5 flex-wrap">
+                                                                    {ai.flags.map((f) => (
+                                                                        <span key={f} className="text-[10px] px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-medium border border-red-200 dark:border-red-800">
+                                                                            {f.replace(/_/g, " ")}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {ai.suggestedResponse && (
+                                                                <div className="bg-violet-50 dark:bg-violet-900/20 rounded-xl p-3 border border-violet-100 dark:border-violet-800">
+                                                                    <div className="flex items-center justify-between mb-1.5">
+                                                                        <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wide flex items-center gap-1">
+                                                                            <Sparkles size={10} /> Réponse suggérée
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => copyResponse(r.id, ai.suggestedResponse!)}
+                                                                            className="flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700 transition-colors"
+                                                                        >
+                                                                            {copiedResponse === r.id ? <Check size={11} /> : <Copy size={11} />}
+                                                                            {copiedResponse === r.id ? "Copié" : "Copier"}
+                                                                        </button>
+                                                                    </div>
+                                                                    <p className="text-sm text-violet-800 dark:text-violet-200 italic">"{ai.suggestedResponse}"</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })() : null}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </motion.div>
                         ))
                     )}

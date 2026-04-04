@@ -20,6 +20,9 @@ import {
     RefreshCw,
     ChevronRight,
     AlertTriangle,
+    Brain,
+    Copy,
+    Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "@kbouffe/module-core/ui";
@@ -126,6 +129,15 @@ export default function AdminBroadcastPage() {
     const [targetValue, setTargetValue] = useState("");
     const [packs, setPacks] = useState<Pack[]>([]);
 
+    // AI drafting state
+    const [aiIntent, setAiIntent] = useState("");
+    const [aiDrafting, setAiDrafting] = useState(false);
+    const [aiVariants, setAiVariants] = useState<{
+        variantA: { title: string; body: string };
+        variantB: { title: string; body: string };
+    } | null>(null);
+    const [copiedVariant, setCopiedVariant] = useState<"A" | "B" | null>(null);
+
     // Send state
     const [sending, setSending] = useState(false);
     const [sendResult, setSendResult] = useState<{ success: boolean; message: string; tokensSent: number } | null>(null);
@@ -150,6 +162,32 @@ export default function AdminBroadcastPage() {
     }, []);
 
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+    async function draftWithAI() {
+        if (!aiIntent.trim()) return;
+        setAiDrafting(true);
+        setAiVariants(null);
+        try {
+            const res = await fetch("/api/admin/ai/draft-broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ intent: aiIntent, template: selectedTemplate, targetType }),
+            });
+            const data = await res.json();
+            if (data.variantA) setAiVariants(data);
+        } catch { /* */ }
+        finally { setAiDrafting(false); }
+    }
+
+    function applyVariant(variant: "A" | "B") {
+        if (!aiVariants) return;
+        const v = variant === "A" ? aiVariants.variantA : aiVariants.variantB;
+        setTitle(v.title);
+        setBody(v.body);
+        setSelectedTemplate("custom");
+        setCopiedVariant(variant);
+        setTimeout(() => setCopiedVariant(null), 2000);
+    }
 
     function applyTemplate(key: string) {
         setSelectedTemplate(key);
@@ -242,6 +280,68 @@ export default function AdminBroadcastPage() {
                                 );
                             })}
                         </div>
+                    </div>
+
+                    {/* AI Drafting */}
+                    <div className="bg-violet-950/40 border border-violet-500/20 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Brain size={16} className="text-violet-400" />
+                            <h3 className="text-sm font-semibold text-violet-300">✨ Rédiger avec Gemini</h3>
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                value={aiIntent}
+                                onChange={e => setAiIntent(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && draftWithAI()}
+                                placeholder="Ex: Rappeler aux marchands inactifs de mettre à jour leur menu…"
+                                className="flex-1 bg-surface-800/60 border border-violet-500/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-surface-500 focus:outline-none focus:border-violet-400 transition-colors"
+                            />
+                            <Button
+                                onClick={draftWithAI}
+                                disabled={!aiIntent.trim() || aiDrafting}
+                                className="gap-1.5 bg-violet-600 hover:bg-violet-500 text-white border-none shrink-0"
+                            >
+                                {aiDrafting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                {aiDrafting ? "…" : "Générer"}
+                            </Button>
+                        </div>
+
+                        <AnimatePresence>
+                            {aiVariants && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -8 }}
+                                    className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                                >
+                                    {(["A", "B"] as const).map((v) => {
+                                        const variant = v === "A" ? aiVariants.variantA : aiVariants.variantB;
+                                        const applied = copiedVariant === v;
+                                        return (
+                                            <div key={v} className="bg-surface-800/60 rounded-lg p-3 border border-surface-700 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Variante {v}</span>
+                                                    <button
+                                                        onClick={() => applyVariant(v)}
+                                                        className={cn(
+                                                            "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium transition-colors",
+                                                            applied
+                                                                ? "bg-emerald-500/20 text-emerald-400"
+                                                                : "bg-violet-500/20 text-violet-300 hover:bg-violet-500/40"
+                                                        )}
+                                                    >
+                                                        {applied ? <Check size={11} /> : <Copy size={11} />}
+                                                        {applied ? "Appliqué" : "Utiliser"}
+                                                    </button>
+                                                </div>
+                                                <p className="text-sm font-semibold text-white">{variant.title}</p>
+                                                <p className="text-xs text-surface-400 leading-relaxed">{variant.body}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Message */}

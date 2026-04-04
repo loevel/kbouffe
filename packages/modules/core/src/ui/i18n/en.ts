@@ -96,6 +96,7 @@ export const en: TranslationKeys = {
         audits: "Audit Logs",
         marketing: "Marketing",
         support: "Support Tickets",
+        homepage: "Store Homepage",
         cuisineCategories: "Cuisine Categories",
         aiUsage: "AI Usage",
         subscriptions: "SaaS Subscriptions",

@@ -43,7 +43,26 @@ export async function GET(request: NextRequest) {
             query = query.eq("has_reservations", true);
         }
         if (q) {
-            query = query.or(`name.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%`);
+            // Search products (name + description) to find matching restaurants
+            const { data: prodRows } = await supabase
+                .from("products")
+                .select("restaurant_id")
+                .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+                .eq("is_available", true)
+                .limit(100);
+
+            const productRestaurantIds = [
+                ...new Set((prodRows ?? []).map((p: any) => p.restaurant_id).filter(Boolean))
+            ];
+
+            if (productRestaurantIds.length > 0) {
+                // Restaurants matching by name/city/cuisine OR that contain a matching product
+                query = query.or(
+                    `name.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%,id.in.(${productRestaurantIds.join(",")})`
+                );
+            } else {
+                query = query.or(`name.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%`);
+            }
         }
 
         const { data: rows, error } = await query
@@ -73,6 +92,31 @@ export async function GET(request: NextRequest) {
             });
         }
 
+        // When searching by keyword, fetch matching products for each restaurant in results
+        let matchedProductsByRestaurant: Record<string, { id: string; name: string; price: number; image_url: string | null }[]> = {};
+        if (q && results.length > 0) {
+            const restaurantIds = results.map((r: any) => r.id);
+            const { data: matchedProds } = await supabase
+                .from("products")
+                .select("id, name, price, image_url, restaurant_id")
+                .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+                .eq("is_available", true)
+                .in("restaurant_id", restaurantIds)
+                .limit(50);
+
+            for (const p of (matchedProds ?? [])) {
+                if (!matchedProductsByRestaurant[p.restaurant_id]) {
+                    matchedProductsByRestaurant[p.restaurant_id] = [];
+                }
+                matchedProductsByRestaurant[p.restaurant_id].push({
+                    id: p.id,
+                    name: p.name,
+                    price: p.price,
+                    image_url: p.image_url,
+                });
+            }
+        }
+
         // Map back to expected PascalCase/CamelCase fields if needed (optional but good for compatibility)
         const mappedResults = results.map(row => ({
             ...row,
@@ -86,7 +130,8 @@ export async function GET(request: NextRequest) {
             isPremium: row.is_premium,
             isSponsored: row.is_sponsored,
             hasDineIn: row.has_dine_in,
-            hasReservations: row.has_reservations
+            hasReservations: row.has_reservations,
+            matchedProducts: matchedProductsByRestaurant[row.id] ?? [],
         }));
 
         return NextResponse.json({ restaurants: mappedResults, total: mappedResults.length });

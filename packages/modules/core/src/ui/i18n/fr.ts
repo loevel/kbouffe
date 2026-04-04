@@ -94,6 +94,7 @@ export const fr = {
         audits: "Logs d'audit",
         marketing: "Marketing",
         support: "Tickets Support",
+        homepage: "Page d'accueil store",
         cuisineCategories: "Catégories cuisine",
         aiUsage: "Usage IA",
         subscriptions: "Abonnements SaaS",

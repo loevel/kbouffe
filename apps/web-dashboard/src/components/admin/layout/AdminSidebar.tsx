@@ -22,6 +22,7 @@ import {
     Share2,
     HardDrive,
     Leaf,
+    LayoutTemplate,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,7 @@ import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion } from "framer-motion";
 import { type AdminPermission } from "@/lib/admin-permissions";
 
-export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories" | "aiUsage" | "subscriptions" | "onboarding" | "broadcast" | "socialMonitor" | "backup" | "suppliers";
+export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories" | "aiUsage" | "subscriptions" | "onboarding" | "broadcast" | "socialMonitor" | "backup" | "suppliers" | "homepage";
 
 export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any; permission?: AdminPermission }[] = [
     { href: "/admin", labelKey: "dashboard", icon: LayoutDashboard },
@@ -47,6 +48,7 @@ export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any;
     { href: "/admin/ai-usage", labelKey: "aiUsage", icon: Brain, permission: "admin:settings:manage" },
     { href: "/admin/broadcast", labelKey: "broadcast", icon: Bell, permission: "admin:settings:manage" },
     { href: "/admin/social-monitor", labelKey: "socialMonitor", icon: Share2, permission: "admin:settings:manage" },
+    { href: "/admin/homepage", labelKey: "homepage", icon: LayoutTemplate, permission: "admin:settings:manage" },
     { href: "/admin/cuisine-categories", labelKey: "cuisineCategories", icon: UtensilsCrossed, permission: "admin:settings:manage" },
     { href: "/admin/support", labelKey: "support", icon: LifeBuoy, permission: "admin:support:manage" },
     { href: "/admin/audits", labelKey: "audits", icon: ShieldAlert, permission: "admin:settings:manage" },

@@ -18,6 +18,13 @@ import { formatCFA } from "@kbouffe/module-core/ui";
 import { useSearchStore } from "@/store/client-store";
 
 // ── Types ────────────────────────────────────────────────────────────────────
+interface MatchedProduct {
+    id: string;
+    name: string;
+    price: number;
+    image_url: string | null;
+}
+
 interface RestaurantItem {
     id: string;
     name: string;
@@ -32,6 +39,7 @@ interface RestaurantItem {
     city: string;
     isVerified?: boolean;
     isPremium?: boolean;
+    matchedProducts?: MatchedProduct[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -125,6 +133,34 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
                 Livraison dès {formatCFA(1500)}
             </p>
         </Link>
+    );
+}
+
+// ── Matched products strip ────────────────────────────────────────────────────
+function MatchedProductsStrip({ products, restaurantSlug }: { products: MatchedProduct[]; restaurantSlug: string }) {
+    return (
+        <div className="mt-2 space-y-1.5">
+            {products.map((p) => (
+                <Link
+                    key={p.id}
+                    href={`/r/${restaurantSlug}`}
+                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-100 dark:border-surface-700 hover:border-brand-400 hover:shadow-sm transition-all group"
+                >
+                    <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-surface-100 dark:bg-surface-700">
+                        {p.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-lg">🍽️</div>
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-surface-900 dark:text-white truncate">{p.name}</p>
+                        <p className="text-xs text-surface-400">{p.price.toLocaleString("fr-FR")} FCFA</p>
+                    </div>
+                </Link>
+            ))}
+        </div>
     );
 }
 
@@ -399,13 +435,28 @@ export function SearchPageClient() {
                     <div className="grid">
                         <EmptyState query={inputValue} />
                     </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-                        {results.map((r) => (
-                            <RestaurantCard key={r.id} r={r} />
-                        ))}
-                    </div>
-                )}
+                ) : (() => {
+                    const hasProductMatches = results.some((r) => r.matchedProducts && r.matchedProducts.length > 0);
+                    return hasProductMatches ? (
+                        // List layout when products are shown — gives strips more horizontal space
+                        <div className="space-y-6">
+                            {results.map((r) => (
+                                <div key={r.id}>
+                                    <RestaurantCard r={r} />
+                                    {r.matchedProducts && r.matchedProducts.length > 0 && (
+                                        <MatchedProductsStrip products={r.matchedProducts} restaurantSlug={r.slug} />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+                            {results.map((r) => (
+                                <RestaurantCard key={r.id} r={r} />
+                            ))}
+                        </div>
+                    );
+                })()}
             </main>
         </div>
     );
