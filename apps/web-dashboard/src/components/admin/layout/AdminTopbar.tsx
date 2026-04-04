@@ -2,6 +2,7 @@
 
 import { Menu, Sun, Moon, Monitor, Globe, Shield } from "lucide-react";
 import { AdminNotificationBell } from "./AdminNotificationBell";
+import { AdminCopilot } from "@/components/admin/AdminCopilot";
 import { Dropdown } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
 import { useTheme, type Theme } from "@kbouffe/module-core/ui";
@@ -62,6 +63,8 @@ export function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
 
             {/* Right */}
             <div className="flex items-center gap-1">
+                <AdminCopilot />
+
                 {/* Language toggle */}
                 <Dropdown
                     items={([

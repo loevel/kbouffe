@@ -16,6 +16,7 @@ import { adminAiUsageRoutes } from "./ai-usage";
 import { adminSubscriptionsRoutes } from "./subscriptions";
 import { adminOnboardingRoutes } from "./onboarding";
 import { adminSocialMonitorRoutes } from "./social-monitor";
+import { adminCopilotRoutes } from "./copilot";
 import { createClient } from "@supabase/supabase-js";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -139,5 +140,6 @@ adminRoutes.route("/ai-usage", adminAiUsageRoutes);
 adminRoutes.route("/subscriptions", adminSubscriptionsRoutes);
 adminRoutes.route("/onboarding", adminOnboardingRoutes);
 adminRoutes.route("/social-monitor", adminSocialMonitorRoutes);
+adminRoutes.route("/copilot", adminCopilotRoutes);
 // For backward compatibility on /admin/audit
 adminRoutes.route("/audit", adminSystemRoutes);

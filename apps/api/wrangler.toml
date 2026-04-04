@@ -44,6 +44,10 @@ dead_letter_queue = "kbouffe-sms-dlq"
 # MTN_KYC_SUBSCRIPTION_KEY
 
 
+# ── Workers AI ────────────────────────────────────────────────────
+[ai]
+binding = "AI"
+
 # ── Scheduled data purge (1st of each month, 2am UTC) ──────────────
 [triggers]
 crons = ["0 2 1 * *"]

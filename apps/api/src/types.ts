@@ -41,6 +41,9 @@ export interface Env {
 
     /** Deployment environment — set to "production" in prod wrangler vars */
     ENVIRONMENT?: string;
+
+    /** Cloudflare Workers AI binding */
+    AI?: Ai;
 }
 
 /**
