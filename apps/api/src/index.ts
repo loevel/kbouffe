@@ -45,6 +45,7 @@ const {
     adsRoutes,
     couponsRoutes,
     couponValidateRoutes,
+    emailTemplatesRoutes,
     giftCardRoutes,
     giftCardPublicRoutes,
     smsRoutes,
@@ -287,6 +288,7 @@ api.route("/register-restaurant", authRoutes);
 api.route("/kyc", authRoutes);
 api.route("/upload", uploadRoutes);
 api.route("/marketing", marketingRoutes);
+api.route("/email-templates", emailTemplatesRoutes);
 api.route("/notifications", notificationsRoutes);
 api.route("/payouts", payoutsRoutes);
 api.route("/payments/mtn", paymentRoutes);

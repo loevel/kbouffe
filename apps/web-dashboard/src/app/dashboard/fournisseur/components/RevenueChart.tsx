@@ -14,7 +14,6 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    type TooltipProps,
 } from "recharts";
 
 interface RevenueChartProps {
@@ -26,7 +25,7 @@ function formatFCFA(amount: number): string {
     return new Intl.NumberFormat("fr-FR").format(amount) + " FCFA";
 }
 
-function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
     if (!active || !payload || !payload[0]) return null;
     return (
         <div className="bg-surface-800 border border-white/10 rounded-xl px-3 py-2 shadow-xl">
@@ -92,10 +91,10 @@ export function RevenueChart({ orders }: RevenueChartProps) {
                         <Line
                             type="monotone"
                             dataKey="revenue"
-                            stroke="#10b981"
+                            stroke="var(--color-brand-500, #f97316)"
                             strokeWidth={2}
                             dot={false}
-                            activeDot={{ r: 4, fill: "#10b981", stroke: "#064e3b", strokeWidth: 2 }}
+                            activeDot={{ r: 4, fill: "var(--color-brand-500, #f97316)", stroke: "var(--color-brand-700, #c2410c)", strokeWidth: 2 }}
                         />
                     </LineChart>
                 </ResponsiveContainer>

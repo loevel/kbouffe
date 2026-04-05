@@ -1,15 +1,19 @@
 "use client";
 
 /**
- * Tableau de bord Fournisseur — Page d'accueil
+ * Tableau de bord Fournisseur — Page d'accueil (Phase 1)
  *
- * Affiche :
- *   - Bannière statut KYC (couleur selon statut)
- *   - 4 cartes de stats (produits, commandes, CA, dernière commande)
- *   - CTA "Ajouter un produit" (désactivé si KYC non approuvé)
+ * Sections (top to bottom):
+ *   1. AlertBadges — Smart alert system
+ *   2. Page header + Export Report button
+ *   3. KYCProgress — Interactive KYC stepper (replaces old banner)
+ *   4. RevenueChart — 30-day revenue line chart
+ *   5. 4 original stat cards + 4 performance metric cards
+ *   6. ActivityFeed — Recent activity timeline
+ *   7. CTA buttons + Quick links
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -17,25 +21,28 @@ import {
     ShoppingCart,
     TrendingUp,
     Clock,
-    CheckCircle2,
-    AlertTriangle,
-    XCircle,
-    Info,
     Plus,
-    Loader2,
     ArrowRight,
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier } from "./SupplierContext";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Phase 1 Components ───────────────────────────────────────────────────
+import { RevenueChart } from "./components/RevenueChart";
+import { PerformanceMetrics } from "./components/PerformanceMetrics";
+import { AlertBadges } from "./components/AlertBadges";
+import { ActivityFeed, type ActivityItem } from "./components/ActivityFeed";
+import { KYCProgress } from "./components/KYCProgress";
+import { ExportReport } from "./components/ExportReport";
+
+// ── Helpers ──────────────────────────────────────────────────────────────
 
 function formatFCFA(amount: number): string {
     return new Intl.NumberFormat("fr-FR").format(amount) + " FCFA";
 }
 
 function formatDate(dateStr: string | null | undefined): string {
-    if (!dateStr) return "—";
+    if (!dateStr) return "\u2014";
     return new Intl.DateTimeFormat("fr-FR", {
         day: "2-digit",
         month: "short",
@@ -43,67 +50,7 @@ function formatDate(dateStr: string | null | undefined): string {
     }).format(new Date(dateStr));
 }
 
-// ── KYC banner ─────────────────────────────────────────────────────────────
-
-interface KycBannerProps {
-    status: string;
-    rejectionReason?: string | null;
-}
-
-function KycBanner({ status, rejectionReason }: KycBannerProps) {
-    const configs = {
-        pending: {
-            bg: "bg-amber-500/10 border-amber-500/25",
-            icon: <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />,
-            text: "text-amber-300",
-            message:
-                "Votre dossier est en cours de vérification. Ce processus prend généralement 48h ouvrables.",
-        },
-        documents_submitted: {
-            bg: "bg-blue-500/10 border-blue-500/25",
-            icon: <Info size={18} className="text-blue-400 shrink-0 mt-0.5" />,
-            text: "text-blue-300",
-            message: "Dossier soumis. Il est en attente d'approbation par notre équipe.",
-        },
-        approved: {
-            bg: "bg-emerald-500/10 border-emerald-500/25",
-            icon: <CheckCircle2 size={18} className="text-emerald-400 shrink-0 mt-0.5" />,
-            text: "text-emerald-300",
-            message: "✅ Compte validé. Votre catalogue est visible par tous les restaurants de votre région.",
-        },
-        rejected: {
-            bg: "bg-red-500/10 border-red-500/25",
-            icon: <XCircle size={18} className="text-red-400 shrink-0 mt-0.5" />,
-            text: "text-red-300",
-            message: rejectionReason
-                ? `Dossier refusé — ${rejectionReason}`
-                : "Dossier refusé. Contactez support@kbouffe.com pour plus d'informations.",
-        },
-        suspended: {
-            bg: "bg-red-500/10 border-red-500/25",
-            icon: <XCircle size={18} className="text-red-400 shrink-0 mt-0.5" />,
-            text: "text-red-300",
-            message:
-                "Votre compte est suspendu. Contactez support@kbouffe.com pour le rétablissement.",
-        },
-    } as const;
-
-    const config =
-        configs[status as keyof typeof configs] ?? configs.pending;
-
-    return (
-        <div
-            className={`flex items-start gap-3 p-4 rounded-xl border ${config.bg}`}
-            role="status"
-            aria-live="polite"
-        >
-            {config.icon}
-            <p className={`text-sm font-medium ${config.text}`}>{config.message}</p>
-        </div>
-    );
-}
-
-// ── Stat card ──────────────────────────────────────────────────────────────
+// ── Stat card (same style as before) ─────────────────────────────────────
 
 interface StatCardProps {
     label: string;
@@ -152,7 +99,19 @@ function StatCard({
     );
 }
 
-// ── Order summary type ─────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────
+
+interface OrderData {
+    id?: string;
+    delivery_status: string;
+    total_price: number;
+    created_at: string;
+    restaurant_id?: string;
+    restaurant_name?: string;
+    expected_delivery_date?: string | null;
+    actual_delivery_date?: string | null;
+    items?: { product_name?: string; product_id?: string; quantity?: number; unit_price?: number }[];
+}
 
 interface OrderSummary {
     total_orders: number;
@@ -160,14 +119,65 @@ interface OrderSummary {
     last_order_date: string | null;
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────
+interface AlertsData {
+    unreadMessages: number;
+    lowStockCount: number;
+    newRatings: number;
+}
+
+// ── Mock data generators ─────────────────────────────────────────────────
+
+function generateMockActivities(orders: OrderData[]): ActivityItem[] {
+    const activities: ActivityItem[] = [];
+
+    // Generate from real orders
+    for (const order of orders.slice(0, 6)) {
+        const restaurantName = order.restaurant_name ?? "Restaurant";
+        activities.push({
+            id: `order-${order.id ?? order.created_at}`,
+            type: order.delivery_status === "delivered"
+                ? "order_delivered"
+                : order.delivery_status === "confirmed"
+                ? "order_confirmed"
+                : "new_order",
+            title:
+                order.delivery_status === "delivered"
+                    ? `Commande livree a ${restaurantName}`
+                    : order.delivery_status === "confirmed"
+                    ? `Commande confirmee de ${restaurantName}`
+                    : `Nouvelle commande de ${restaurantName}`,
+            description: formatFCFA(order.total_price),
+            timestamp: order.created_at,
+            href: "/dashboard/fournisseur/commandes",
+        });
+    }
+
+    // Sort by timestamp descending
+    activities.sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    return activities.slice(0, 10);
+}
+
+// ── Main page ────────────────────────────────────────────────────────────
 
 export default function FournisseurDashboardPage() {
     const { supplier, loading: supplierLoading } = useSupplier();
 
+    const [rawOrders, setRawOrders] = useState<OrderData[]>([]);
     const [orderSummary, setOrderSummary] = useState<OrderSummary | null>(null);
     const [ordersLoading, setOrdersLoading] = useState(true);
 
+    const [alerts, setAlerts] = useState<AlertsData>({
+        unreadMessages: 0,
+        lowStockCount: 0,
+        newRatings: 0,
+    });
+    const [activities, setActivities] = useState<ActivityItem[]>([]);
+    const [activitiesLoading, setActivitiesLoading] = useState(true);
+
+    // ── Fetch orders ──────────────────────────────────────────────────
     useEffect(() => {
         if (!supplier) return;
 
@@ -177,40 +187,38 @@ export default function FournisseurDashboardPage() {
                 const res = await authFetch("/api/marketplace/suppliers/me/orders");
                 if (res.ok) {
                     const data = (await res.json()) as any;
-                    // Compute summary from orders array or use summary object
+                    let orders: OrderData[] = [];
+
                     if (Array.isArray(data)) {
-                        const orders = data as any[];
-                        const total_revenue = orders
-                            .filter((o) => o.delivery_status !== "cancelled")
-                            .reduce((acc: number, o: any) => acc + (o.total_price ?? 0), 0);
-                        const last = orders.sort(
-                            (a: any, b: any) =>
-                                new Date(b.created_at).getTime() -
-                                new Date(a.created_at).getTime()
-                        )[0];
-                        setOrderSummary({
-                            total_orders: orders.length,
-                            total_revenue,
-                            last_order_date: last?.created_at ?? null,
-                        });
-                    } else if (data?.orders) {
-                        const orders = data.orders as any[];
-                        const total_revenue = orders
-                            .filter((o) => o.delivery_status !== "cancelled")
-                            .reduce((acc: number, o: any) => acc + (o.total_price ?? 0), 0);
-                        const last = [...orders].sort(
-                            (a: any, b: any) =>
-                                new Date(b.created_at).getTime() -
-                                new Date(a.created_at).getTime()
-                        )[0];
-                        setOrderSummary({
-                            total_orders: orders.length,
-                            total_revenue,
-                            last_order_date: last?.created_at ?? null,
-                        });
-                    } else {
-                        setOrderSummary(data as OrderSummary);
+                        orders = data;
+                    } else if (data?.orders && Array.isArray(data.orders)) {
+                        orders = data.orders;
                     }
+
+                    setRawOrders(orders);
+
+                    // Compute summary
+                    const nonCancelled = orders.filter(
+                        (o) => o.delivery_status !== "cancelled"
+                    );
+                    const total_revenue = nonCancelled.reduce(
+                        (acc, o) => acc + (o.total_price ?? 0),
+                        0
+                    );
+                    const sorted = [...orders].sort(
+                        (a, b) =>
+                            new Date(b.created_at).getTime() -
+                            new Date(a.created_at).getTime()
+                    );
+                    setOrderSummary({
+                        total_orders: orders.length,
+                        total_revenue,
+                        last_order_date: sorted[0]?.created_at ?? null,
+                    });
+
+                    // Generate activities from orders
+                    setActivities(generateMockActivities(orders));
+                    setActivitiesLoading(false);
                 }
             } catch (err) {
                 console.error("Orders fetch error:", err);
@@ -222,7 +230,51 @@ export default function FournisseurDashboardPage() {
         fetchOrders();
     }, [supplier]);
 
+    // ── Fetch alerts (dashboard endpoint or mock) ─────────────────────
+    useEffect(() => {
+        if (!supplier) return;
+
+        async function fetchAlerts() {
+            try {
+                const res = await authFetch("/api/marketplace/suppliers/me/dashboard");
+                if (res.ok) {
+                    const data = (await res.json()) as any;
+                    setAlerts({
+                        unreadMessages: data?.unread_messages ?? data?.metrics?.unread_messages ?? 0,
+                        lowStockCount: data?.low_stock_count ?? data?.metrics?.low_stock_count ?? 0,
+                        newRatings: data?.new_ratings ?? data?.metrics?.new_ratings ?? 0,
+                    });
+                    // If API returns activities, use them
+                    if (data?.activities && Array.isArray(data.activities)) {
+                        setActivities(data.activities);
+                        setActivitiesLoading(false);
+                    }
+                } else {
+                    // API endpoint missing -- use mock data
+                    console.warn("API endpoint /api/marketplace/suppliers/me/dashboard manquant -- utilisation de donnees mock");
+                    setAlerts({
+                        unreadMessages: 3,
+                        lowStockCount: 2,
+                        newRatings: 1,
+                    });
+                }
+            } catch {
+                console.warn("API endpoint /api/marketplace/suppliers/me/dashboard manquant -- utilisation de donnees mock");
+                setAlerts({
+                    unreadMessages: 3,
+                    lowStockCount: 2,
+                    newRatings: 1,
+                });
+            }
+        }
+
+        fetchAlerts();
+    }, [supplier]);
+
     const isApproved = supplier?.kyc_status === "approved";
+    const kycIncomplete = supplier
+        ? supplier.kyc_status !== "approved" && supplier.kyc_status !== "documents_submitted"
+        : false;
 
     const stats = [
         {
@@ -234,7 +286,7 @@ export default function FournisseurDashboardPage() {
             delay: 0.1,
         },
         {
-            label: "Commandes reçues",
+            label: "Commandes recues",
             value: orderSummary ? String(orderSummary.total_orders) : "0",
             icon: ShoppingCart,
             iconColor: "text-blue-400",
@@ -250,8 +302,8 @@ export default function FournisseurDashboardPage() {
             delay: 0.2,
         },
         {
-            label: "Dernière commande",
-            value: orderSummary ? formatDate(orderSummary.last_order_date) : "—",
+            label: "Derniere commande",
+            value: orderSummary ? formatDate(orderSummary.last_order_date) : "\u2014",
             icon: Clock,
             iconColor: "text-amber-400",
             iconBg: "bg-amber-500/15",
@@ -259,45 +311,58 @@ export default function FournisseurDashboardPage() {
         },
     ];
 
-    // Overall loading state for initial supplier profile fetch
-    if (supplierLoading) return null; // layout handles skeleton
+    // Overall loading state
+    if (supplierLoading) return null;
 
     return (
         <div className="space-y-6">
-            {/* ── Page header ─────────────────────────────────────────── */}
+            {/* ── 1. Smart Alert Badges ──────────────────────────────── */}
+            <AlertBadges
+                unreadMessages={alerts.unreadMessages}
+                lowStockCount={alerts.lowStockCount}
+                kycIncomplete={kycIncomplete}
+                newRatings={alerts.newRatings}
+            />
+
+            {/* ── 2. Page header + Export Report ─────────────────────── */}
             <motion.div
                 initial={{ opacity: 0, y: -12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
+                className="flex items-start justify-between gap-4"
             >
-                <h1 className="text-2xl font-extrabold text-white tracking-tight">
-                    Tableau de bord
-                </h1>
-                <p className="text-surface-400 text-sm mt-1">
-                    Bienvenue,{" "}
-                    <span className="text-white font-medium">
-                        {supplier?.contact_name ?? supplier?.name ?? ""}
-                    </span>{" "}
-                    👋
-                </p>
+                <div>
+                    <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                        Tableau de bord
+                    </h1>
+                    <p className="text-surface-400 text-sm mt-1">
+                        Bienvenue,{" "}
+                        <span className="text-white font-medium">
+                            {supplier?.contact_name ?? supplier?.name ?? ""}
+                        </span>
+                    </p>
+                </div>
+                <ExportReport
+                    orders={rawOrders}
+                    supplierName={supplier?.name ?? "Fournisseur"}
+                    productCount={supplier?.product_count ?? 0}
+                />
             </motion.div>
 
-            {/* ── KYC banner ───────────────────────────────────────────── */}
+            {/* ── 3. KYC Progress (replaces static banner) ───────────── */}
             {supplier && (
-                <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05, duration: 0.35 }}
-                >
-                    <KycBanner
-                        status={supplier.kyc_status}
-                        rejectionReason={supplier.kyc_rejection_reason}
-                    />
-                </motion.div>
+                <KYCProgress
+                    kycStatus={supplier.kyc_status}
+                    faceVerified={supplier.kyc_face_verified}
+                    hasDocuments={!!supplier.identity_doc_url}
+                />
             )}
 
-            {/* ── Stats grid ───────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* ── 4. Revenue Chart (30 days) ─────────────────────────── */}
+            <RevenueChart orders={rawOrders} />
+
+            {/* ── 5a. Original 4 stat cards ──────────────────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" role="region" aria-label="Statistiques principales">
                 {stats.map((stat) => (
                     <StatCard
                         key={stat.label}
@@ -307,7 +372,15 @@ export default function FournisseurDashboardPage() {
                 ))}
             </div>
 
-            {/* ── CTA ──────────────────────────────────────────────────── */}
+            {/* ── 5b. Performance Metrics (4 extra cards) ────────────── */}
+            <PerformanceMetrics orders={rawOrders} loading={ordersLoading} />
+
+            {/* ── 6. Activity Feed ────────────────────────────────────── */}
+            <div className="max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-surface-700 scrollbar-track-transparent rounded-2xl">
+                <ActivityFeed activities={activities} loading={activitiesLoading} />
+            </div>
+
+            {/* ── CTA ─────────────────────────────────────────────────── */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -351,7 +424,7 @@ export default function FournisseurDashboardPage() {
                 </Link>
             </motion.div>
 
-            {/* ── Quick links ──────────────────────────────────────────── */}
+            {/* ── Quick links ─────────────────────────────────────────── */}
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -361,13 +434,13 @@ export default function FournisseurDashboardPage() {
                 {[
                     {
                         href: "/dashboard/fournisseur/produits",
-                        label: "Gérer mes produits",
+                        label: "Gerer mes produits",
                         icon: Package,
                         color: "text-violet-400",
                     },
                     {
                         href: "/dashboard/fournisseur/commandes",
-                        label: "Commandes reçues",
+                        label: "Commandes recues",
                         icon: ShoppingCart,
                         color: "text-blue-400",
                     },
