@@ -72,6 +72,11 @@ interface ClosedSession {
     closed_at: string;
 }
 
+interface SessionDetail {
+    session: ClosedSession;
+    movements: CashMovement[];
+}
+
 type ActiveTab = "session" | "history";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -494,6 +499,7 @@ function CloseSessionModal({
     onClosed: () => void;
 }) {
     const [amount, setAmount] = useState("");
+    const [notes, setNotes] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -513,7 +519,10 @@ function CloseSessionModal({
             const res = await authFetch("/api/caisse/close", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ closingAmount: Math.round(parsedAmount) }),
+                body: JSON.stringify({ 
+                    closingAmount: Math.round(parsedAmount),
+                    notes: notes.trim() || null 
+                }),
             });
             if (!res.ok) {
                 const data = await res.json();
@@ -628,6 +637,23 @@ function CloseSessionModal({
                             </span>
                         </div>
                     )}
+
+                    {/* Notes field */}
+                    <div>
+                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                            Notes de clôture (optionnel)
+                        </label>
+                        <textarea
+                            placeholder="Ex: Livraison effectuée, client remboursé..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition resize-none"
+                            rows={3}
+                        />
+                        <p className="mt-1.5 text-xs text-surface-400 dark:text-surface-500">
+                            Documentez les écarts ou événements importants
+                        </p>
+                    </div>
 
                     {error && (
                         <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm">
@@ -846,10 +872,205 @@ function OpenSessionView({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Modal: Session Details
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SessionDetailModal({
+    detail,
+    onClose,
+}: {
+    detail: SessionDetail;
+    onClose: () => void;
+}) {
+    const { session, movements } = detail;
+    const hasDiscrepancy = (session.discrepancy ?? 0) !== 0;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="sticky top-0 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-surface-900 dark:text-white">
+                            Détails de la session
+                        </h2>
+                        <p className="text-xs text-surface-500 mt-1">
+                            {formatDateTime(session.opened_at)}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 flex items-center justify-center text-surface-400 transition-colors"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-6">
+                    {/* Session Summary */}
+                    <div className="space-y-3">
+                        <h3 className="font-semibold text-surface-900 dark:text-white text-sm">
+                            Récapitulatif
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-surface-50 dark:bg-surface-800 rounded-lg p-3">
+                                <p className="text-xs text-surface-500 mb-1">Montant d'ouverture</p>
+                                <p className="font-semibold text-surface-900 dark:text-white">
+                                    {formatCFA(session.opening_amount)}
+                                </p>
+                            </div>
+                            <div className="bg-surface-50 dark:bg-surface-800 rounded-lg p-3">
+                                <p className="text-xs text-surface-500 mb-1">Montant compté</p>
+                                <p className="font-semibold text-surface-900 dark:text-white">
+                                    {session.closing_amount !== null ? formatCFA(session.closing_amount) : "—"}
+                                </p>
+                            </div>
+                            <div className="bg-surface-50 dark:bg-surface-800 rounded-lg p-3">
+                                <p className="text-xs text-surface-500 mb-1">Montant attendu</p>
+                                <p className="font-semibold text-surface-900 dark:text-white">
+                                    {session.expected_amount !== null ? formatCFA(session.expected_amount) : "—"}
+                                </p>
+                            </div>
+                            <div className={`rounded-lg p-3 ${
+                                !hasDiscrepancy
+                                    ? "bg-green-50 dark:bg-green-500/10"
+                                    : (session.discrepancy ?? 0) < 0
+                                    ? "bg-red-50 dark:bg-red-500/10"
+                                    : "bg-amber-50 dark:bg-amber-500/10"
+                            }`}>
+                                <p className={`text-xs mb-1 ${
+                                    !hasDiscrepancy
+                                        ? "text-green-600 dark:text-green-400"
+                                        : (session.discrepancy ?? 0) < 0
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-amber-600 dark:text-amber-400"
+                                }`}>
+                                    Écart
+                                </p>
+                                <p className={`font-semibold ${
+                                    !hasDiscrepancy
+                                        ? "text-green-700 dark:text-green-300"
+                                        : (session.discrepancy ?? 0) < 0
+                                        ? "text-red-700 dark:text-red-300"
+                                        : "text-amber-700 dark:text-amber-300"
+                                }`}>
+                                    {session.discrepancy !== null ? (
+                                        <>
+                                            {session.discrepancy > 0 ? "+" : ""}
+                                            {formatCFA(session.discrepancy)}
+                                        </>
+                                    ) : (
+                                        "—"
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Notes */}
+                    {session.notes && (
+                        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg p-3">
+                            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
+                                Notes
+                            </p>
+                            <p className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap">
+                                {session.notes}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Movements */}
+                    <div className="space-y-3">
+                        <h3 className="font-semibold text-surface-900 dark:text-white text-sm">
+                            Mouvements ({movements.length})
+                        </h3>
+                        {movements.length === 0 ? (
+                            <p className="text-xs text-surface-500 text-center py-4">
+                                Aucun mouvement manuel enregistré
+                            </p>
+                        ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {movements.map((m) => {
+                                    const config = MOVEMENT_CONFIG[m.type] || {
+                                        label: m.type,
+                                        icon: null,
+                                        colorClass: "text-surface-400",
+                                        sign: "+",
+                                    };
+                                    return (
+                                        <div
+                                            key={m.id}
+                                            className="flex items-center justify-between p-2 rounded-lg bg-surface-50 dark:bg-surface-800 text-sm"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className={`flex items-center justify-center w-6 h-6 rounded-full bg-surface-200 dark:bg-surface-700 ${config.colorClass}`}>
+                                                    {config.icon}
+                                                </span>
+                                                <div>
+                                                    <p className="font-medium text-surface-900 dark:text-white">
+                                                        {config.label}
+                                                    </p>
+                                                    {m.note && (
+                                                        <p className="text-xs text-surface-500">
+                                                            {m.note}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <span className={`font-semibold ${config.colorClass}`}>
+                                                {config.sign}{formatCFA(m.amount)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Timestamps */}
+                    <div className="pt-4 border-t border-surface-200 dark:border-surface-700 space-y-2 text-xs">
+                        <div className="flex items-center justify-between text-surface-600 dark:text-surface-400">
+                            <span>Ouverture:</span>
+                            <span>{formatDateTime(session.opened_at)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-surface-600 dark:text-surface-400">
+                            <span>Clôture:</span>
+                            <span>{formatDateTime(session.closed_at)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-surface-600 dark:text-surface-400">
+                            <span>Durée:</span>
+                            <span>{formatDuration(session.opened_at, session.closed_at)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Close button */}
+                <div className="sticky bottom-0 bg-white dark:bg-surface-900 border-t border-surface-200 dark:border-surface-700 px-6 py-4">
+                    <button
+                        onClick={onClose}
+                        className="w-full px-4 py-2.5 rounded-xl bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-white text-sm font-medium hover:bg-surface-200 dark:hover:bg-surface-700 transition"
+                    >
+                        Fermer
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // State C — History view
 // ─────────────────────────────────────────────────────────────────────────────
 
-function HistoryView({ sessions }: { sessions: ClosedSession[] }) {
+function HistoryView({
+    sessions,
+    onViewDetails,
+}: {
+    sessions: ClosedSession[];
+    onViewDetails: (sessionId: string) => void;
+}) {
     if (sessions.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -944,6 +1165,14 @@ function HistoryView({ sessions }: { sessions: ClosedSession[] }) {
                                     {formatDateTime(s.closed_at)}
                                 </p>
                             </div>
+
+                            {/* View Details Button */}
+                            <button
+                                onClick={() => onViewDetails(s.id)}
+                                className="shrink-0 px-3 py-2 text-xs font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition"
+                            >
+                                Détails
+                            </button>
                         </div>
                     );
                 })}
@@ -974,6 +1203,7 @@ export default function CaissePage() {
     const [showOpenModal, setShowOpenModal] = useState(false);
     const [showAddMovementModal, setShowAddMovementModal] = useState(false);
     const [showCloseModal, setShowCloseModal] = useState(false);
+    const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
 
     // ── Fetch current session ───────────────────────────────────────────
     const fetchCurrent = useCallback(async () => {
@@ -1025,6 +1255,21 @@ export default function CaissePage() {
         }
     }, [activeTab, fetchHistory]);
 
+    // ── Fetch session details ───────────────────────────────────────────
+    const fetchSessionDetail = useCallback(async (sessionId: string) => {
+        try {
+            const res = await authFetch(`/api/caisse/${sessionId}/report`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setSessionDetail({
+                session: data.session,
+                movements: data.movements ?? [],
+            });
+        } catch {
+            // silent
+        }
+    }, []);
+
     // ── Handlers ────────────────────────────────────────────────────────
     function handleSessionOpened() {
         fetchCurrent();
@@ -1042,6 +1287,10 @@ export default function CaissePage() {
 
     function handleMovementAdded() {
         fetchCurrent();
+    }
+
+    async function handleViewDetails(sessionId: string) {
+        await fetchSessionDetail(sessionId);
     }
 
     // ── Render ──────────────────────────────────────────────────────────
@@ -1119,7 +1368,7 @@ export default function CaissePage() {
                             <Loader2 size={32} className="animate-spin text-brand-500" />
                         </div>
                     ) : (
-                        <HistoryView sessions={history} />
+                        <HistoryView sessions={history} onViewDetails={handleViewDetails} />
                     )}
                 </>
             )}
@@ -1144,6 +1393,13 @@ export default function CaissePage() {
                     expectedAmount={summary.expectedAmount}
                     onClose={() => setShowCloseModal(false)}
                     onClosed={handleSessionClosed}
+                />
+            )}
+
+            {sessionDetail && (
+                <SessionDetailModal
+                    detail={sessionDetail}
+                    onClose={() => setSessionDetail(null)}
                 />
             )}
         </div>

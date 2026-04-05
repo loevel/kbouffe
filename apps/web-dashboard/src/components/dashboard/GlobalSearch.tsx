@@ -141,8 +141,25 @@ export function GlobalSearch() {
                         );
                     })}
                     {!query && (
-                        <div className="p-4 text-xs text-surface-400 text-center">
-                            Tapez le n° de commande, nom d'un produit ou d'un client
+                        <div className="p-6 space-y-4">
+                            <div className="text-xs text-surface-400 text-center font-medium">EXEMPLES DE RECHERCHE</div>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-xs text-surface-500 px-2">
+                                    <ShoppingBag size={12} />
+                                    <span>N° commande : #12345</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-surface-500 px-2">
+                                    <UtensilsCrossed size={12} />
+                                    <span>Produit : Pizza, Burger</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-surface-500 px-2">
+                                    <Users size={12} />
+                                    <span>Client : Jean, Alice</span>
+                                </div>
+                            </div>
+                            <div className="text-xs text-surface-500 text-center pt-2 border-t border-surface-100 dark:border-surface-800">
+                                Raccourci clavier : <kbd className="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-xs">⌘K</kbd>
+                            </div>
                         </div>
                     )}
                 </div>
