@@ -1058,6 +1058,7 @@ export function StorePageClient({ slug }: { slug: string }) {
     useEffect(() => {
         const color = data?.restaurant?.primaryColor ?? "#f97316";
 
+        // PWA theme-color meta tag
         let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
         if (!meta) {
             meta = document.createElement("meta");
@@ -1068,8 +1069,40 @@ export function StorePageClient({ slug }: { slug: string }) {
 
         // CSS custom properties on :root for theme components
         document.documentElement.style.setProperty("--brand-primary", color);
-        // 10% opacity variant for hover/light states
         document.documentElement.style.setProperty("--brand-primary-light", color + "20");
+
+        // ── Override Tailwind brand classes with restaurant's primary color ──
+        // Tailwind compiles bg-brand-500 etc. at build time with a fixed color.
+        // We inject a <style> tag at runtime to override these with the restaurant color.
+        let styleTag = document.getElementById("kbouffe-brand-override") as HTMLStyleElement | null;
+        if (!styleTag) {
+            styleTag = document.createElement("style");
+            styleTag.id = "kbouffe-brand-override";
+            document.head.appendChild(styleTag);
+        }
+        // Build a slightly darker shade for hover states (multiply each channel by 0.85)
+        const hex = color.replace("#", "");
+        const r = Math.round(parseInt(hex.substring(0, 2), 16) * 0.85).toString(16).padStart(2, "0");
+        const g = Math.round(parseInt(hex.substring(2, 4), 16) * 0.85).toString(16).padStart(2, "0");
+        const b = Math.round(parseInt(hex.substring(4, 6), 16) * 0.85).toString(16).padStart(2, "0");
+        const darker = `#${r}${g}${b}`;
+
+        styleTag.textContent = `
+            .bg-brand-500  { background-color: ${color}  !important; }
+            .bg-brand-600  { background-color: ${darker} !important; }
+            .text-brand-500, .text-brand-600 { color: ${color} !important; }
+            .text-brand-400 { color: ${color}cc !important; }
+            .border-brand-500 { border-color: ${color} !important; }
+            .hover\\:bg-brand-500:hover  { background-color: ${color}  !important; }
+            .hover\\:bg-brand-600:hover  { background-color: ${darker} !important; }
+            .hover\\:text-brand-500:hover { color: ${color} !important; }
+            .hover\\:border-brand-500:hover { border-color: ${color} !important; }
+            .ring-brand-500\\/20 { --tw-ring-color: ${color}33 !important; }
+            .ring-brand-500\\/40 { --tw-ring-color: ${color}66 !important; }
+            .shadow-brand-500\\/20 { --tw-shadow-color: ${color}33 !important; }
+            .bg-brand-100 { background-color: ${color}1a !important; }
+            .bg-brand-50  { background-color: ${color}0d !important; }
+        `;
     }, [data?.restaurant?.primaryColor]);
 
     const submitReservation = useCallback(async (restaurantSlug: string) => {
