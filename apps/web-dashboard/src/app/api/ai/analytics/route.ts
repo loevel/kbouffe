@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
                 .single(),
             db
                 .from("products")
-                .select("id, name, price, compare_at_price, is_available, is_limited_edition, category_id, created_at")
+                .select("id, name, price, compare_at_price, is_available, is_limited_edition, category_id, image_url, created_at")
                 .eq("restaurant_id", restaurantId)
                 .order("price", { ascending: false }),
             db
