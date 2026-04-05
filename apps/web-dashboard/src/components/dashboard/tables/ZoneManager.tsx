@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Plus, Trash2, Edit3, X, Check, ImagePlus } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Plus, Trash2, Edit3, X, Check, ImagePlus, CheckCircle2, Loader2 } from "lucide-react";
 import { Modal, ModalFooter, Button, Input, Select, toast } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
+
+interface GalleryPhoto {
+    id: string;
+    photo_url: string;
+    alt_text: string | null;
+}
 
 interface TableZone {
     id: string;
@@ -67,6 +73,9 @@ export function ZoneManager({ isOpen, onClose, zones, onUpdated }: ZoneManagerPr
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
+    const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>([]);
+    const [galleryLoading, setGalleryLoading] = useState(false);
+
     const authFetch = useCallback(async (url: string, options: RequestInit = {}) => {
         const supabase = createClient();
         const headers: Record<string, string> = { ...(options.headers as any) };
@@ -78,6 +87,26 @@ export function ZoneManager({ isOpen, onClose, zones, onUpdated }: ZoneManagerPr
         }
         return fetch(url, { ...options, headers });
     }, []);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setGalleryLoading(true);
+        authFetch("/api/gallery")
+            .then((r) => r.json())
+            .then((data) => {
+                setGalleryPhotos(Array.isArray(data) ? data : (data.photos ?? []));
+            })
+            .catch(() => setGalleryPhotos([]))
+            .finally(() => setGalleryLoading(false));
+    }, [isOpen, authFetch]);
+
+    const toggleGalleryPhoto = (photoUrl: string) => {
+        setImageUrls((prev) => {
+            if (prev.includes(photoUrl)) return prev.filter((u) => u !== photoUrl);
+            if (prev.length >= 5) return prev;
+            return [...prev, photoUrl];
+        });
+    };
 
     const resetForm = () => {
         setName("");
@@ -263,52 +292,69 @@ export function ZoneManager({ isOpen, onClose, zones, onUpdated }: ZoneManagerPr
                     />
                 </div>
 
-                {/* Row 2: Images (up to 5) */}
+                {/* Row 2: Images — Gallery Picker */}
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-xs font-medium text-surface-600 dark:text-surface-400">
-                            Photos ({imageUrls.filter(Boolean).length}/5)
+                        <p className="text-xs font-medium text-surface-600 dark:text-surface-400 flex items-center gap-1.5">
+                            <ImagePlus size={12} />
+                            Photos de la galerie ({imageUrls.filter(Boolean).length}/5 sélectionnées)
                         </p>
-                        {imageUrls.length < 5 && (
+                        {imageUrls.filter(Boolean).length > 0 && (
                             <button
                                 type="button"
-                                onClick={() => setImageUrls((prev) => [...prev, ""])}
-                                className="text-xs text-brand-500 hover:text-brand-600 flex items-center gap-1 font-medium transition-colors"
+                                onClick={() => setImageUrls([])}
+                                className="text-xs text-red-400 hover:text-red-600 transition-colors font-medium"
                             >
-                                <ImagePlus size={12} /> Ajouter
+                                Tout retirer
                             </button>
                         )}
                     </div>
-                    {imageUrls.length === 0 ? (
-                        <button
-                            type="button"
-                            onClick={() => setImageUrls([""])}
-                            className="w-full border-2 border-dashed border-surface-200 dark:border-surface-700 rounded-xl py-2.5 text-xs text-surface-400 hover:border-brand-300 hover:text-brand-500 transition-colors flex items-center justify-center gap-1.5"
-                        >
-                            <ImagePlus size={13} /> Ajouter une photo (optionnel)
-                        </button>
+
+                    {galleryLoading ? (
+                        <div className="flex items-center justify-center py-6 text-surface-400">
+                            <Loader2 size={18} className="animate-spin mr-2" />
+                            <span className="text-xs">Chargement de la galerie…</span>
+                        </div>
+                    ) : galleryPhotos.length === 0 ? (
+                        <div className="border-2 border-dashed border-surface-200 dark:border-surface-700 rounded-xl py-4 text-center text-xs text-surface-400">
+                            <ImagePlus size={18} className="mx-auto mb-1.5 opacity-50" />
+                            Aucune photo dans la galerie. Ajoutez des photos via la section Galerie.
+                        </div>
                     ) : (
-                        <div className="space-y-2">
-                            {imageUrls.map((url, idx) => (
-                                <div key={idx} className="flex items-center gap-2">
-                                    <Input
-                                        placeholder={`URL photo ${idx + 1}`}
-                                        value={url}
-                                        onChange={(e) => {
-                                            const updated = [...imageUrls];
-                                            updated[idx] = e.target.value;
-                                            setImageUrls(updated);
-                                        }}
-                                    />
+                        <div className="grid grid-cols-5 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                            {galleryPhotos.map((photo) => {
+                                const isSelected = imageUrls.includes(photo.photo_url);
+                                const selIndex = imageUrls.indexOf(photo.photo_url);
+                                const isDisabled = !isSelected && imageUrls.filter(Boolean).length >= 5;
+                                return (
                                     <button
+                                        key={photo.id}
                                         type="button"
-                                        onClick={() => setImageUrls((prev) => prev.filter((_, i) => i !== idx))}
-                                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors shrink-0"
+                                        onClick={() => !isDisabled && toggleGalleryPhoto(photo.photo_url)}
+                                        disabled={isDisabled}
+                                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all focus:outline-none ${
+                                            isSelected
+                                                ? "border-brand-500 ring-2 ring-brand-300 dark:ring-brand-700"
+                                                : isDisabled
+                                                ? "border-surface-200 dark:border-surface-700 opacity-40 cursor-not-allowed"
+                                                : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-600 cursor-pointer"
+                                        }`}
                                     >
-                                        <X size={13} />
+                                        <img
+                                            src={photo.photo_url}
+                                            alt={photo.alt_text ?? ""}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        {isSelected && (
+                                            <div className="absolute inset-0 bg-brand-500/30 flex items-center justify-center">
+                                                <div className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-[10px]">
+                                                    {selIndex + 1}
+                                                </div>
+                                            </div>
+                                        )}
                                     </button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
