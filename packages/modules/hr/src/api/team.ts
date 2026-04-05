@@ -675,11 +675,49 @@ teamRoutes.post("/:memberId/pin", async (c) => {
 
         const adminDb = getAdminClient(c);
 
-        // Fetch target member
+        // Handle virtual owner ID (format: "owner-{userId}")
+        // The owner may not have a restaurant_members row yet — create one on the fly.
+        let resolvedMemberId = memberId;
+        if (memberId.startsWith("owner-")) {
+            const ownerUserId = memberId.replace("owner-", "");
+
+            // Check if a real row exists for this owner
+            const { data: existing } = await adminDb
+                .from("restaurant_members")
+                .select("id")
+                .eq("user_id", ownerUserId)
+                .eq("restaurant_id", restaurantId)
+                .maybeSingle();
+
+            if (existing) {
+                resolvedMemberId = existing.id;
+            } else {
+                // Create the missing restaurant_members row for the owner
+                const { data: inserted, error: insertError } = await adminDb
+                    .from("restaurant_members")
+                    .insert({
+                        user_id: ownerUserId,
+                        restaurant_id: restaurantId,
+                        role: "owner",
+                        status: "active",
+                        invited_by: null,
+                    })
+                    .select("id")
+                    .single();
+
+                if (insertError || !inserted) {
+                    console.error("Owner member row insert error:", insertError);
+                    return c.json({ error: "Impossible de créer l'entrée membre pour le propriétaire" }, 500);
+                }
+                resolvedMemberId = inserted.id;
+            }
+        }
+
+        // Fetch target member using the resolved (real) ID
         const { data: target, error: targetError } = await adminDb
             .from("restaurant_members")
             .select("id, user_id, role, status")
-            .eq("id", memberId)
+            .eq("id", resolvedMemberId)
             .eq("restaurant_id", restaurantId)
             .maybeSingle();
 
@@ -705,7 +743,7 @@ teamRoutes.post("/:memberId/pin", async (c) => {
                 pin_hash: pinHash,
                 pin_set_at: new Date().toISOString(),
             })
-            .eq("id", memberId);
+            .eq("id", resolvedMemberId);
 
         if (updateError) {
             console.error("PIN update error:", updateError);
