@@ -21,6 +21,7 @@ interface TableZone {
     sort_order: number;
     is_active: boolean;
     image_url: string | null;
+    image_urls: string[] | null;
     color: string | null;
     capacity: number;
     min_party_size: number;
@@ -233,18 +234,32 @@ export function TablesManager() {
                                     }`}
                                 >
                                     {/* Zone image or color header */}
-                                    <div
-                                        className="h-16 relative"
-                                        style={{ backgroundColor: zone.color ?? "#6366f1" }}
-                                    >
-                                        {zone.image_url && (
-                                            <img src={zone.image_url} alt={zone.name} className="w-full h-full object-cover absolute inset-0" />
-                                        )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                                        <div className="absolute bottom-2 left-3 right-3">
-                                            <p className="text-sm font-bold text-white truncate">{zone.name}</p>
-                                        </div>
-                                    </div>
+                                    {(() => {
+                                        const heroImg = zone.image_urls?.find(Boolean) ?? zone.image_url ?? null;
+                                        return (
+                                            <div
+                                                className="h-20 relative"
+                                                style={{ backgroundColor: zone.color ?? "#6366f1" }}
+                                            >
+                                                {heroImg && (
+                                                    <img
+                                                        src={heroImg}
+                                                        alt={zone.name}
+                                                        className="w-full h-full object-cover absolute inset-0"
+                                                    />
+                                                )}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                                <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between gap-2">
+                                                    <p className="text-sm font-bold text-white truncate">{zone.name}</p>
+                                                    {zone.image_urls && zone.image_urls.filter(Boolean).length > 1 && (
+                                                        <span className="text-[10px] text-white/70 shrink-0">
+                                                            {zone.image_urls.filter(Boolean).length} photos
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="p-3 bg-white dark:bg-surface-900">
                                         <div className="flex items-center justify-between text-xs">
                                             <span className="text-surface-500">

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         // Fetch zones
         const { data: zones, error: zonesError } = await ctx.supabase
             .from("table_zones")
-            .select("id, name, type, description, sort_order, is_active")
+            .select("id, name, type, description, sort_order, is_active, image_url, image_urls, color, capacity, min_party_size, amenities, pricing_note")
             .eq("restaurant_id", ctx.restaurantId)
             .order("sort_order", { ascending: true });
 
