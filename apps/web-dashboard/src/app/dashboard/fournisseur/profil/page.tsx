@@ -31,6 +31,9 @@ import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier, type SupplierProfile } from "../SupplierContext";
 import { FaceLivenessKYC, type KYCResult } from "@/components/kyc/FaceLivenessKYC";
 import { ProfileEditor } from "./ProfileEditor";
+import { BusinessMetrics } from "./components/BusinessMetrics";
+import { ProfilePreview } from "./components/ProfilePreview";
+import { VerificationBadges } from "./components/VerificationBadges";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -625,14 +628,24 @@ export default function ProfilPage() {
     return (
         <div className="space-y-6 max-w-3xl">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-extrabold text-white tracking-tight">
-                    Mon profil & KYC
-                </h1>
-                <p className="text-surface-400 text-sm mt-1">
-                    Gérez vos informations, photos, présence en ligne et suivez l'état de votre vérification
-                </p>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                        Mon profil & KYC
+                    </h1>
+                    <p className="text-surface-400 text-sm mt-1">
+                        Gérez vos informations, photos, présence en ligne et suivez l'état de votre vérification
+                    </p>
+                </div>
+                {/* Profile Preview button */}
+                <ProfilePreview supplier={supplier} />
             </div>
+
+            {/* ── Business Metrics (4 cards with sparklines) ── */}
+            <BusinessMetrics />
+
+            {/* ── Verification Badges + Upgrade Prompt ── */}
+            <VerificationBadges supplier={supplier} />
 
             {/* ── Profile editor (5 sections) ── */}
             <ProfileEditor supplier={supplier} />

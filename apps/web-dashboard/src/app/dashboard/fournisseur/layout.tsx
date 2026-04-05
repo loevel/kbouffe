@@ -14,7 +14,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     LayoutDashboard,
@@ -22,15 +22,15 @@ import {
     ClipboardList,
     UserCog,
     MessageCircle,
-    LogOut,
     Menu,
-    X,
     Wheat,
     Loader2,
+    Shield,
 } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { SupplierProvider, useSupplier } from "./SupplierContext";
+import { NotificationBell } from "./components/NotificationBell";
+import { UserMenu } from "./components/UserMenu";
 
 // ── Nav items ──────────────────────────────────────────────────────────────
 
@@ -81,6 +81,12 @@ const NAV_ITEMS = [
         href: "/dashboard/fournisseur/profil",
         label: "Mon profil / KYC",
         icon: UserCog,
+        exact: false,
+    },
+    {
+        href: "/dashboard/fournisseur/securite",
+        label: "Securite",
+        icon: Shield,
         exact: false,
     },
 ] as const;
@@ -150,17 +156,7 @@ function NavLink({
 // ── Sidebar content ────────────────────────────────────────────────────────
 
 function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
-    const router = useRouter();
     const { supplier } = useSupplier();
-
-    async function handleLogout() {
-        const supabase = createBrowserClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-        await supabase.auth.signOut();
-        router.replace("/login");
-    }
 
     return (
         <div className="flex flex-col h-full">
@@ -199,16 +195,12 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
                 ))}
             </nav>
 
-            {/* Logout */}
-            <div className="px-3 py-4 border-t border-white/5">
-                <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-400 hover:text-red-300 hover:bg-red-500/8 transition-all"
-                    aria-label="Se déconnecter"
-                >
-                    <LogOut size={18} className="shrink-0" />
-                    <span>Déconnexion</span>
-                </button>
+            {/* Notification + User Menu (sidebar bottom) */}
+            <div className="px-3 py-3 border-t border-white/5 space-y-2">
+                <div className="flex items-center justify-between px-1">
+                    <NotificationBell />
+                    <UserMenu />
+                </div>
             </div>
         </div>
     );
@@ -292,6 +284,10 @@ function FournisseurLayoutInner({ children }: { children: ReactNode }) {
                     <span className="text-xs text-emerald-400 font-medium ml-1">
                         Fournisseur
                     </span>
+                    <div className="ml-auto flex items-center gap-1">
+                        <NotificationBell />
+                        <UserMenu />
+                    </div>
                 </header>
 
                 {/* Page content — pb-24 sur mobile pour la bottom nav */}

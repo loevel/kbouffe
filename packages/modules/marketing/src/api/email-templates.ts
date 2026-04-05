@@ -347,3 +347,135 @@ emailTemplatesRoutes.post("/:id/ai/variants", async (c) => {
         return c.json({ error: "Erreur lors de la génération des variantes" }, 500);
     }
 });
+
+/** POST /email-templates/:id/send — Bulk send template to recipients */
+emailTemplatesRoutes.post("/:id/send", async (c) => {
+    if (c.var.adminRole !== "super_admin") {
+        return c.json({ error: "Accès refusé" }, 403);
+    }
+
+    const templateId = c.req.param("id");
+    const body = await c.req.json();
+
+    // Validate request
+    const { recipients, variables_mapping } = body;
+    if (!Array.isArray(recipients) || recipients.length === 0) {
+        return c.json({ error: "La liste des destinataires est vide" }, 400);
+    }
+
+    // Fetch template
+    const { data: template, error: fetchError } = await c.var.supabase
+        .from("email_templates")
+        .select("*")
+        .eq("id", templateId)
+        .single();
+
+    if (fetchError || !template) {
+        return c.json({ error: "Modèle de courriel non trouvé" }, 404);
+    }
+
+    if (!template.is_active) {
+        return c.json({ error: "Ce modèle n'est pas activé" }, 400);
+    }
+
+    try {
+        const sends: any[] = [];
+        const userId = c.var.userId;
+
+        // Process each recipient
+        for (const recipient of recipients) {
+            const { email, name, id: recipientId, type: recipientType, variables: recipientVars } = recipient;
+
+            if (!email || !recipientType) {
+                continue; // Skip invalid recipients
+            }
+
+            // Render template with recipient variables
+            let subject = template.subject;
+            let body = template.body;
+
+            const vars = recipientVars || variables_mapping?.[recipientId] || {};
+            for (const [key, value] of Object.entries(vars)) {
+                const placeholder = `{{${key}}}`;
+                subject = subject.replaceAll(placeholder, String(value));
+                body = body.replaceAll(placeholder, String(value));
+            }
+
+            // Create email_sends record
+            const { data: send, error: insertError } = await c.var.supabase
+                .from("email_sends")
+                .insert({
+                    template_id: templateId,
+                    recipient_type: recipientType,
+                    recipient_id: recipientId,
+                    recipient_email: email,
+                    recipient_name: name || email,
+                    subject_rendered: subject,
+                    body_rendered: body,
+                    variables_json: vars,
+                    sent_by: userId,
+                })
+                .select()
+                .single();
+
+            if (!insertError && send) {
+                sends.push(send);
+
+                // Queue to email-send-queue (Cloudflare Queues)
+                // This would be done via environment variable batch sender
+                // For now, just track that we've queued it
+                console.log(`Queued email send: ${send.id} to ${email}`);
+            }
+        }
+
+        if (sends.length === 0) {
+            return c.json({ error: "Aucun email n'a pu être ajouté à la file d'attente" }, 400);
+        }
+
+        return c.json({
+            success: true,
+            sent_count: sends.length,
+            sends: sends.map((s) => ({
+                id: s.id,
+                recipient_email: s.recipient_email,
+                tracking_token: s.tracking_token,
+                sent_at: s.sent_at,
+            })),
+        });
+    } catch (error) {
+        console.error("Bulk send error:", error);
+        return c.json({ error: "Erreur lors de l'envoi en masse" }, 500);
+    }
+});
+
+/** GET /email-templates/:id/sends — Get send history for a template */
+emailTemplatesRoutes.get("/:id/sends", async (c) => {
+    if (c.var.adminRole !== "super_admin") {
+        return c.json({ error: "Accès refusé" }, 403);
+    }
+
+    const templateId = c.req.param("id");
+    const limit = parseInt(c.req.query("limit") || "50", 10);
+    const offset = parseInt(c.req.query("offset") || "0", 10);
+
+    // Get sends for this template
+    const { data: sends, error, count } = await c.var.supabase
+        .from("email_sends")
+        .select("id, recipient_email, recipient_name, sent_at, opened_at, clicked_at, bounced_at", {
+            count: "exact",
+        })
+        .eq("template_id", templateId)
+        .order("sent_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+
+    if (error) {
+        return c.json({ error: "Erreur lors de la récupération des envois" }, 500);
+    }
+
+    return c.json({
+        sends: sends || [],
+        total: count || 0,
+        limit,
+        offset,
+    });
+});

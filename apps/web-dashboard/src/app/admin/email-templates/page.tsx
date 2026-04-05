@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Plus, Edit2, Trash2, Eye, Copy, Search, Filter, Loader2, AlertCircle, Wand2, Zap, Globe, BarChart3 } from "lucide-react";
+import { Mail, Plus, Edit2, Trash2, Eye, Copy, Search, Filter, Loader2, AlertCircle, Wand2, Zap, Globe, BarChart3, Send } from "lucide-react";
 import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -42,8 +42,10 @@ export default function EmailTemplatesPage() {
     const [showEditModal, setShowEditModal] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [showGenerateModal, setShowGenerateModal] = useState(false);
+    const [showSendModal, setShowSendModal] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
     const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
+    const [sendingTemplate, setSendingTemplate] = useState<EmailTemplate | null>(null);
 
     // Fetch templates
     const fetchTemplates = useCallback(async () => {
@@ -278,6 +280,18 @@ export default function EmailTemplatesPage() {
                                             >
                                                 <Copy size={18} className="text-purple-500" />
                                             </button>
+                                            {template.is_active && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSendingTemplate(template);
+                                                        setShowSendModal(true);
+                                                    }}
+                                                    className="p-2 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors"
+                                                    title="Envoyer"
+                                                >
+                                                    <Send size={18} className="text-emerald-500" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleDelete(template.id)}
                                                 className="p-2 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors"
@@ -329,6 +343,21 @@ export default function EmailTemplatesPage() {
                     onSuccess={() => {
                         setShowGenerateModal(false);
                         fetchTemplates();
+                    }}
+                />
+            )}
+
+            {showSendModal && sendingTemplate && (
+                <SendTemplateModal
+                    template={sendingTemplate}
+                    onClose={() => {
+                        setShowSendModal(false);
+                        setSendingTemplate(null);
+                    }}
+                    onSuccess={() => {
+                        setShowSendModal(false);
+                        setSendingTemplate(null);
+                        alert("Emails ajoutés à la file d'attente avec succès!");
                     }}
                 />
             )}
@@ -1273,6 +1302,201 @@ function AIVariantsResultsModal({ variants, onClose }: AIVariantsResultsModalPro
                         Fermer
                     </button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Send Template Modal ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SendTemplateModalProps {
+    template: EmailTemplate;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function SendTemplateModal({ template, onClose, onSuccess }: SendTemplateModalProps) {
+    const [recipients, setRecipients] = useState<string>("");
+    const [recipientType, setRecipientType] = useState<"restaurant" | "supplier" | "client">(template.category);
+    const [variableMapping, setVariableMapping] = useState<Record<string, Record<string, string>>>({});
+    const [isSending, setIsSending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [step, setStep] = useState<"input" | "preview">("input");
+
+    const parseRecipients = (text: string) => {
+        const lines = text.trim().split("\n").filter((l) => l.trim());
+        return lines
+            .map((line) => {
+                const [email, name, ...vars] = line.split(",").map((s) => s.trim());
+                return { email, name: name || email, id: email, type: recipientType, variables: {} };
+            })
+            .filter((r) => r.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email));
+    };
+
+    const handleSend = async () => {
+        const recipientList = parseRecipients(recipients);
+
+        if (recipientList.length === 0) {
+            setError("Veuillez entrer au moins un email valide");
+            return;
+        }
+
+        setIsSending(true);
+        setError(null);
+
+        try {
+            const res = await adminFetch(`/api/email-templates/${template.id}/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    recipients: recipientList,
+                    variables_mapping: variableMapping,
+                }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setError(data.error ?? "Erreur lors de l'envoi");
+                return;
+            }
+
+            const data = await res.json();
+            console.log(`${data.sent_count} emails envoyés`);
+            onSuccess();
+        } catch (err) {
+            console.error("Send error:", err);
+            setError("Erreur lors de l'envoi");
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const recipientList = parseRecipients(recipients);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-4 flex items-center gap-2">
+                    <Send size={20} className="text-emerald-600 dark:text-emerald-400" />
+                    <h2 className="text-xl font-bold text-surface-900 dark:text-white">
+                        Envoyer: {template.name}
+                    </h2>
+                </div>
+
+                {step === "input" ? (
+                    <div className="p-6 space-y-4">
+                        {error && (
+                            <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-lg flex items-start gap-3">
+                                <AlertCircle size={20} className="text-rose-500 flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                                Type de destinataire
+                            </label>
+                            <select
+                                value={recipientType}
+                                onChange={(e) => setRecipientType(e.target.value as any)}
+                                className="w-full px-4 py-2 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white"
+                            >
+                                <option value="restaurant">Restaurants</option>
+                                <option value="supplier">Fournisseurs</option>
+                                <option value="client">Clients</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                                Destinataires (email, nom par ligne)
+                            </label>
+                            <textarea
+                                value={recipients}
+                                onChange={(e) => setRecipients(e.target.value)}
+                                className="w-full px-4 py-2 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white font-mono text-sm"
+                                placeholder="exemple@test.com, Exemple Restaurant
+autre@test.com, Autre Restaurant"
+                                rows={10}
+                            />
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-2">
+                                {recipientList.length} email(s) valide(s)
+                            </p>
+                        </div>
+
+                        {template.variables.length > 0 && (
+                            <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-lg">
+                                <p className="text-sm text-blue-600 dark:text-blue-400 font-semibold mb-2">
+                                    Variables détectées : {template.variables.join(", ")}
+                                </p>
+                                <p className="text-xs text-blue-600/70 dark:text-blue-400/70">
+                                    Les variables seront remplacées par les valeurs fournies ou conservées si non définies.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700">
+                            <button
+                                onClick={onClose}
+                                className="px-6 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={() => setStep("preview")}
+                                disabled={recipientList.length === 0}
+                                className="px-6 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 transition-colors"
+                            >
+                                Aperçu
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="p-6 space-y-4">
+                        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-lg">
+                            <p className="text-sm text-amber-600 dark:text-amber-400">
+                                ⚠️ Vous allez envoyer {recipientList.length} email(s)
+                            </p>
+                        </div>
+
+                        {recipientList.slice(0, 3).map((recipient, idx) => (
+                            <div key={idx} className="border border-surface-200 dark:border-surface-700 rounded-lg p-3">
+                                <p className="text-sm font-medium text-surface-900 dark:text-white mb-2">
+                                    {recipient.name} ({recipient.email})
+                                </p>
+                                <p className="text-xs text-surface-600 dark:text-surface-400">
+                                    <strong>Objet:</strong> {template.subject}
+                                </p>
+                            </div>
+                        ))}
+
+                        {recipientList.length > 3 && (
+                            <p className="text-sm text-surface-600 dark:text-surface-400">
+                                + {recipientList.length - 3} autre(s)...
+                            </p>
+                        )}
+
+                        <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700">
+                            <button
+                                onClick={() => setStep("input")}
+                                className="px-6 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                            >
+                                Retour
+                            </button>
+                            <button
+                                onClick={handleSend}
+                                disabled={isSending}
+                                className="px-6 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 transition-colors flex items-center gap-2"
+                            >
+                                {isSending && <Loader2 size={16} className="animate-spin" />}
+                                Envoyer {recipientList.length} email(s)
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

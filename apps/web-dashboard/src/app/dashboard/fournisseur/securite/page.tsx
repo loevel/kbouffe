@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { Shield, Lock } from "lucide-react";
 import { TwoFactorSection } from "@/components/shared/TwoFactorSection";
 import { useState } from "react";
+import { LoginActivityLog } from "./components/LoginActivityLog";
+import { ActiveSessions } from "./components/ActiveSessions";
 
 const itemVariants = {
     hidden: { opacity: 0, y: 12 },
@@ -142,6 +144,16 @@ export default function FournisseurSecuritePage() {
             {/* Double authentification */}
             <motion.div variants={itemVariants} className="rounded-2xl bg-surface-900 border border-white/8 p-6">
                 <TwoFactorSection />
+            </motion.div>
+
+            {/* Active Sessions */}
+            <motion.div variants={itemVariants}>
+                <ActiveSessions />
+            </motion.div>
+
+            {/* Login Activity Log */}
+            <motion.div variants={itemVariants}>
+                <LoginActivityLog />
             </motion.div>
         </motion.div>
     );

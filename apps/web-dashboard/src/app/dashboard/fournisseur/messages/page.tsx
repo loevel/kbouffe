@@ -33,6 +33,9 @@ import {
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier } from "../SupplierContext";
+import { MessageTemplates } from "./components/MessageTemplates";
+import { MessageSearch } from "./components/MessageSearch";
+import { QuickReplies } from "./components/QuickReplies";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -261,7 +264,16 @@ function MessageModal({
                     {/* Formulaire de réponse */}
                     {msg.status !== "replied" && msg.status !== "archived" && (
                         <div className="space-y-3">
-                            <label className="text-sm font-medium text-surface-300">Votre réponse</label>
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-surface-300">Votre réponse</label>
+                                <MessageTemplates
+                                    onInsert={(text) =>
+                                        setReplyText((prev) =>
+                                            prev ? prev + "\n" + text : text
+                                        )
+                                    }
+                                />
+                            </div>
                             <textarea
                                 rows={4}
                                 value={replyText}
@@ -269,6 +281,44 @@ function MessageModal({
                                 placeholder="Répondez directement ici (tarif, disponibilité, délai…)"
                                 className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-white/8 text-white placeholder:text-surface-500 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 resize-none"
                             />
+
+                            {/* Quick replies & auto-suggestions */}
+                            <QuickReplies
+                                messageType={msg.message_type}
+                                onInsert={(text) =>
+                                    setReplyText((prev) =>
+                                        prev ? prev + "\n" + text : text
+                                    )
+                                }
+                                onAutoSend={async (text) => {
+                                    setReplyText(text);
+                                    // Auto-send: directly submit reply
+                                    setSending(true);
+                                    setErr(null);
+                                    try {
+                                        const res = await authFetch(
+                                            `/api/marketplace/messages/${msg.id}`,
+                                            {
+                                                method: "PATCH",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                    status: "replied",
+                                                    reply_body: text.trim(),
+                                                }),
+                                            }
+                                        );
+                                        if (!res.ok) throw new Error("Erreur lors de l'envoi");
+                                        const data = await res.json();
+                                        onUpdated(data.message);
+                                        onClose();
+                                    } catch (e: any) {
+                                        setErr(e.message);
+                                    } finally {
+                                        setSending(false);
+                                    }
+                                }}
+                            />
+
                             {err && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} />{err}</p>}
                         </div>
                     )}
@@ -311,6 +361,8 @@ export default function MessagesPage() {
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("all");
     const [selectedMsg, setSelectedMsg] = useState<SupplierMessage | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [threadView, setThreadView] = useState(false);
 
     async function fetchMessages() {
         setLoading(true);
@@ -344,12 +396,24 @@ export default function MessagesPage() {
         { key: "archived", label: "Archivés",  icon: Archive   },
     ];
 
-    const filtered = useMemo(() =>
+    const tabFiltered = useMemo(() =>
         activeTab === "all"
             ? messages
             : messages.filter((m) => m.status === activeTab),
         [messages, activeTab]
     );
+
+    const filtered = useMemo(() => {
+        if (!searchQuery.trim()) return tabFiltered;
+        const q = searchQuery.toLowerCase();
+        return tabFiltered.filter(
+            (m) =>
+                (m.restaurants?.name ?? "").toLowerCase().includes(q) ||
+                (m.subject ?? "").toLowerCase().includes(q) ||
+                m.body.toLowerCase().includes(q) ||
+                (m.product_id ?? "").toLowerCase().includes(q)
+        );
+    }, [tabFiltered, searchQuery]);
 
     const unreadCount = useMemo(() => messages.filter((m) => m.status === "unread").length, [messages]);
 
@@ -412,6 +476,16 @@ export default function MessagesPage() {
                     })}
                 </div>
 
+                {/* Search + Threading */}
+                <MessageSearch
+                    messages={tabFiltered}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    threadView={threadView}
+                    onToggleThreadView={() => setThreadView(!threadView)}
+                    onSelectMessage={setSelectedMsg}
+                />
+
                 {/* Error */}
                 {error && (
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
@@ -420,8 +494,8 @@ export default function MessagesPage() {
                     </div>
                 )}
 
-                {/* Liste */}
-                <div className="bg-surface-900 rounded-2xl border border-white/8 overflow-hidden">
+                {/* Liste (hidden when thread view is active) */}
+                {!threadView && <div className="bg-surface-900 rounded-2xl border border-white/8 overflow-hidden">
                     {loading ? (
                         <div className="flex items-center justify-center py-16">
                             <Loader2 size={24} className="text-brand-400 animate-spin" />
@@ -491,7 +565,7 @@ export default function MessagesPage() {
                             ))}
                         </ul>
                     )}
-                </div>
+                </div>}
             </div>
 
             {/* Modal */}
