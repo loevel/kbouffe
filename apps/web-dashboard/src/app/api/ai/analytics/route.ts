@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
                 .order("price", { ascending: false }),
             db
                 .from("orders")
-                .select("id, total_amount, status, delivery_method, created_at")
+                .select("id, total, status, delivery_method, created_at")
                 .eq("restaurant_id", restaurantId)
                 .order("created_at", { ascending: false })
                 .limit(200),
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
             : 0;
 
         const completedOrders = orders?.filter((o: any) => o.status === "delivered" || o.status === "completed") ?? [];
-        const totalRevenue = completedOrders.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
+        const totalRevenue = completedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
         const avgOrderValue = completedOrders.length > 0 ? Math.round(totalRevenue / completedOrders.length) : 0;
 
         const now = new Date();
@@ -97,10 +97,10 @@ export async function POST(request: NextRequest) {
         // Revenue trends
         const thisWeekRevenue = recentOrders
             .filter((o: any) => o.status === "delivered" || o.status === "completed")
-            .reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+            .reduce((s: number, o: any) => s + (o.total || 0), 0);
         const prevWeekRevenue = prevWeekOrders
             .filter((o: any) => o.status === "delivered" || o.status === "completed")
-            .reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+            .reduce((s: number, o: any) => s + (o.total || 0), 0);
         const revenueGrowth = prevWeekRevenue > 0
             ? Math.round(((thisWeekRevenue - prevWeekRevenue) / prevWeekRevenue) * 100)
             : 0;
