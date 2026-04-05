@@ -54,6 +54,12 @@ const NAV_ITEMS = [
         exact: false,
     },
     {
+        href: "/dashboard/fournisseur/profitability",
+        label: "Profitabilité",
+        icon: Package,
+        exact: false,
+    },
+    {
         href: "/dashboard/fournisseur/produits",
         label: "Mes produits",
         icon: Package,

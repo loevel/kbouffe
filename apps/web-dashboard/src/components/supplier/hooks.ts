@@ -262,3 +262,91 @@ export function useCOGSAnalysis(supplierId: string) {
 
   return { analysis: data || [], error, isLoading };
 }
+
+/**
+ * Phase 3 — Profitability Hooks
+ */
+
+interface MarginHeatmapCell {
+  buyerId: string;
+  buyerName: string;
+  productId: string;
+  productName: string;
+  margin: number;
+  revenue: number;
+  profit: number;
+  orders: number;
+}
+
+interface PricingRule {
+  id: string;
+  productId: string;
+  productName: string;
+  costPerUnit: number;
+  targetMarginPercent: number;
+  minPrice: number;
+  maxPrice: number;
+  calculatedPrice: number;
+  autoApply: boolean;
+}
+
+interface CrossSellOpportunity {
+  primaryProductId: string;
+  primaryProductName: string;
+  bundleProductId: string;
+  bundleProductName: string;
+  coSellFrequency: number;
+  coSellRate: number;
+  recommendedBuyerSegment: string;
+  bundleMargin: number;
+}
+
+interface MarketIntelligence {
+  categoryName: string;
+  yourAvgPrice: number;
+  marketAvgPrice: number;
+  pricePosition: "premium" | "competitive" | "budget";
+  volumeGap: number;
+  growthTrend: number;
+  recommendation: string;
+}
+
+export function useMarginHeatmap(supplierId: string) {
+  const { data, error, isLoading } = useSWR<MarginHeatmapCell[]>(
+    supplierId ? `/api/supplier/margin-heatmap?supplierId=${supplierId}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 120000 }
+  );
+
+  return { heatmap: data || [], error, isLoading };
+}
+
+export function usePricingRules(supplierId: string) {
+  const { data, error, isLoading } = useSWR<PricingRule[]>(
+    supplierId ? `/api/supplier/pricing-rules?supplierId=${supplierId}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 120000 }
+  );
+
+  return { rules: data || [], error, isLoading };
+}
+
+export function useCrossSellRecommendations(supplierId: string) {
+  const { data, error, isLoading } = useSWR<CrossSellOpportunity[]>(
+    supplierId ? `/api/supplier/cross-sell?supplierId=${supplierId}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 120000 }
+  );
+
+  return { recommendations: data || [], error, isLoading };
+}
+
+export function useMarketIntelligence(supplierId: string) {
+  const { data, error, isLoading } = useSWR<MarketIntelligence[]>(
+    supplierId ? `/api/supplier/market-intelligence?supplierId=${supplierId}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 120000 }
+  );
+
+  return { intelligence: data || [], error, isLoading };
+}

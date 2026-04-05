@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { createAdminClient } from "@kbouffe/module-core/api";
-import type { Context } from "hono";
+import { createClient } from "@supabase/supabase-js";
+import type { Env, Variables } from "../../types";
 
 /**
  * Supplier Predictions & Automation Routes
@@ -12,7 +12,7 @@ import type { Context } from "hono";
  * - COGS tracking & margin calculations
  */
 
-const router = new Hono();
+const router = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 interface DemandForecast {
   productId: string;
@@ -63,17 +63,17 @@ interface CogsPriceData {
  * GET /api/supplier/forecast
  * 30-day demand forecast + reorder suggestions
  */
-router.get("/forecast", async (c: Context) => {
+router.get("/forecast", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
 
     // Get all products
-    const { data: products } = await db
+    const { data: products } = await supabase
       .from("products")
       .select("id, name, available_quantity")
       .eq("restaurant_id", supplierId);
@@ -86,15 +86,15 @@ router.get("/forecast", async (c: Context) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Get order history for demand calculation
-    const { data: orderItems } = await db
+    const { data: orderItems } = await supabase
       .from("order_items")
       .select("product_id, quantity, created_at")
-      .in("product_id", products.map((p) => p.id))
+      .in("product_id", products.map((p: any) => p.id))
       .gte("created_at", thirtyDaysAgo.toISOString());
 
     const productDemand = new Map<string, number[]>();
 
-    orderItems?.forEach((item) => {
+    orderItems?.forEach((item: any) => {
       if (!productDemand.has(item.product_id)) {
         productDemand.set(item.product_id, []);
       }
@@ -136,7 +136,7 @@ router.get("/forecast", async (c: Context) => {
  * GET /api/supplier/price-suggestions
  * Auto price recommendations based on margin target
  */
-router.get("/price-suggestions", async (c: Context) => {
+router.get("/price-suggestions", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     const targetMargin = parseFloat(c.req.query("targetMargin") || "30");
@@ -145,11 +145,11 @@ router.get("/price-suggestions", async (c: Context) => {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
 
     // Get products with COGS (from products table)
     // NOTE: COGS would come from a supplier_costs table in Phase 2 migration
-    const { data: products } = await db
+    const { data: products } = await supabase
       .from("products")
       .select("id, name, price")
       .eq("restaurant_id", supplierId);
@@ -192,7 +192,7 @@ router.get("/price-suggestions", async (c: Context) => {
  * GET /api/supplier/margin-alerts
  * Products with margins below target
  */
-router.get("/margin-alerts", async (c: Context) => {
+router.get("/margin-alerts", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     const targetMargin = parseFloat(c.req.query("targetMargin") || "30");
@@ -201,10 +201,10 @@ router.get("/margin-alerts", async (c: Context) => {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
 
     // Get products
-    const { data: products } = await db
+    const { data: products } = await supabase
       .from("products")
       .select("id, name, price")
       .eq("restaurant_id", supplierId);
@@ -217,15 +217,15 @@ router.get("/margin-alerts", async (c: Context) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Get recent order items to calc actual margins
-    const { data: orderItems } = await db
+    const { data: orderItems } = await supabase
       .from("order_items")
       .select("product_id, subtotal, quantity")
-      .in("product_id", products.map((p) => p.id))
+      .in("product_id", products.map((p: any) => p.id))
       .gte("created_at", thirtyDaysAgo.toISOString());
 
     const productStats = new Map<string, { revenue: number; units: number }>();
 
-    orderItems?.forEach((item) => {
+    orderItems?.forEach((item: any) => {
       if (!productStats.has(item.product_id)) {
         productStats.set(item.product_id, { revenue: 0, units: 0 });
       }
@@ -284,17 +284,17 @@ router.get("/margin-alerts", async (c: Context) => {
  * GET /api/supplier/cogs-analysis
  * COGS tracking with margin calculations (placeholder until supplier_costs table exists)
  */
-router.get("/cogs-analysis", async (c: Context) => {
+router.get("/cogs-analysis", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
 
     // Get products
-    const { data: products } = await db
+    const { data: products } = await supabase
       .from("products")
       .select("id, name, price")
       .eq("restaurant_id", supplierId);
@@ -307,10 +307,10 @@ router.get("/cogs-analysis", async (c: Context) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Get sales data
-    const { data: orderItems } = await db
+    const { data: orderItems } = await supabase
       .from("order_items")
       .select("product_id, quantity, subtotal")
-      .in("product_id", products.map((p) => p.id))
+      .in("product_id", products.map((p: any) => p.id))
       .gte("created_at", thirtyDaysAgo.toISOString());
 
     const productStats = new Map<
@@ -318,7 +318,7 @@ router.get("/cogs-analysis", async (c: Context) => {
       { revenue: number; units: number; product: any }
     >();
 
-    products.forEach((p) => {
+    products.forEach((p: any) => {
       productStats.set(p.id, {
         revenue: 0,
         units: 0,
@@ -326,7 +326,7 @@ router.get("/cogs-analysis", async (c: Context) => {
       });
     });
 
-    orderItems?.forEach((item) => {
+    orderItems?.forEach((item: any) => {
       const stat = productStats.get(item.product_id);
       if (stat) {
         stat.revenue += item.subtotal || 0;
@@ -371,22 +371,22 @@ router.get("/cogs-analysis", async (c: Context) => {
  * POST /api/supplier/apply-price-change
  * Bulk apply price recommendations (requires auth + supplier verification)
  */
-router.post("/apply-price-change", async (c: Context) => {
+router.post("/apply-price-change", async (c) => {
   try {
     const supplierId = c.req.query("supplierId");
-    const body = await c.req.json<{
+    const body = await c.req.json() as {
       products: Array<{ productId: string; newPrice: number }>;
-    }>();
+    };
 
     if (!supplierId || !body.products || body.products.length === 0) {
       return c.json({ error: "Invalid request" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
 
     // Bulk update prices
-    const updates = body.products.map((p) =>
-      db
+    const updates = body.products.map((p: any) =>
+      supabase
         .from("products")
         .update({ price: p.newPrice, updated_at: new Date().toISOString() })
         .eq("id", p.productId)

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { createAdminClient } from "@kbouffe/module-core/api";
-import type { Context } from "hono";
+import { createClient } from "@supabase/supabase-js";
+import type { Env, Variables } from "../../types";
 
 /**
  * Supplier Analytics Routes
@@ -14,7 +14,7 @@ import type { Context } from "hono";
  * - GET /api/supplier/stock — Inventory levels + low stock alerts
  */
 
-const router = new Hono();
+const router = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 interface SupplierMetrics {
   totalSales: number;
@@ -65,20 +65,20 @@ interface SalesVelocity {
  * GET /api/supplier/metrics
  * Overview KPIs for supplier dashboard
  */
-router.get("/metrics", async (c: Context) => {
+router.get("/metrics", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
 
     // Get total sales & orders (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { data: orders } = await db
+    const { data: orders } = await supabase
       .from("orders")
       .select("id, total_amount, restaurant_id, status, created_at")
       .eq("restaurant_id", supplierId)
@@ -90,13 +90,13 @@ router.get("/metrics", async (c: Context) => {
     const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
     // Get unique customers
-    const { data: customers } = await db
+    const { data: customers } = await supabase
       .from("orders")
       .select("user_id")
       .eq("restaurant_id", supplierId)
       .gte("created_at", thirtyDaysAgo.toISOString());
 
-    const uniqueCustomers = new Set(customers?.map((c) => c.user_id) || []).size;
+    const uniqueCustomers = new Set(customers?.map((c: any) => c.user_id) || []).size;
 
     // Calculate average margin (placeholder: 25% default for now)
     const avgMargin = 25;
@@ -121,19 +121,19 @@ router.get("/metrics", async (c: Context) => {
  * GET /api/supplier/products
  * Product performance metrics
  */
-router.get("/products", async (c: Context) => {
+router.get("/products", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Get products for this supplier with order stats
-    const { data: products } = await db
+    const { data: products } = await supabase
       .from("products")
       .select(
         `
@@ -150,8 +150,8 @@ router.get("/products", async (c: Context) => {
     }
 
     // Fetch order items for these products
-    const productIds = products.map((p) => p.id);
-    const { data: orderItems } = await db
+    const productIds = products.map((p: any) => p.id);
+    const { data: orderItems } = await supabase
       .from("order_items")
       .select("product_id, quantity, subtotal, created_at")
       .in("product_id", productIds)
@@ -162,7 +162,7 @@ router.get("/products", async (c: Context) => {
       { revenue: number; units: number; trend: number }
     >();
 
-    orderItems?.forEach((item) => {
+    orderItems?.forEach((item: any) => {
       if (!productStats.has(item.product_id)) {
         productStats.set(item.product_id, { revenue: 0, units: 0, trend: 0 });
       }
@@ -171,7 +171,7 @@ router.get("/products", async (c: Context) => {
       stat.units += item.quantity || 0;
     });
 
-    const result: ProductPerformance[] = products.map((p) => {
+    const result: ProductPerformance[] = products.map((p: any) => {
       const stat = productStats.get(p.id) || { revenue: 0, units: 0, trend: 0 };
       return {
         id: p.id,
@@ -196,19 +196,19 @@ router.get("/products", async (c: Context) => {
  * GET /api/supplier/buyers
  * Buyer segments with repeat rate, LTV, churn risk
  */
-router.get("/buyers", async (c: Context) => {
+router.get("/buyers", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Get all orders from this supplier
-    const { data: orders } = await db
+    const { data: orders } = await supabase
       .from("orders")
       .select("user_id, total_amount, created_at")
       .eq("restaurant_id", supplierId)
@@ -220,7 +220,7 @@ router.get("/buyers", async (c: Context) => {
       { orders: number; total: number; lastOrder: string; dates: string[] }
     >();
 
-    orders?.forEach((order) => {
+    orders?.forEach((order: any) => {
       if (!buyerMap.has(order.user_id)) {
         buyerMap.set(order.user_id, {
           orders: 0,
@@ -238,12 +238,12 @@ router.get("/buyers", async (c: Context) => {
 
     // Get user names
     const userIds = Array.from(buyerMap.keys());
-    const { data: users } = await db
+    const { data: users } = await supabase
       .from("users")
       .select("id, full_name")
       .in("id", userIds);
 
-    const userMap = new Map(users?.map((u) => [u.id, u.full_name]) || []);
+    const userMap = new Map(users?.map((u: any) => [u.id, u.full_name]) || []);
 
     const result: BuyerSegment[] = Array.from(buyerMap.entries()).map(
       ([userId, data]) => {
@@ -281,19 +281,19 @@ router.get("/buyers", async (c: Context) => {
  * GET /api/supplier/categories
  * Category performance breakdown
  */
-router.get("/categories", async (c: Context) => {
+router.get("/categories", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Get all products with categories
-    const { data: products } = await db
+    const { data: products } = await supabase
       .from("products")
       .select("id, category_id, categories(name)")
       .eq("restaurant_id", supplierId);
@@ -302,10 +302,10 @@ router.get("/categories", async (c: Context) => {
       return c.json([]);
     }
 
-    const productIds = products.map((p) => p.id);
+    const productIds = products.map((p: any) => p.id);
 
     // Get sales by product
-    const { data: orderItems } = await db
+    const { data: orderItems } = await supabase
       .from("order_items")
       .select("product_id, subtotal")
       .in("product_id", productIds)
@@ -313,7 +313,7 @@ router.get("/categories", async (c: Context) => {
 
     const categoryMap = new Map<string, { sales: number; products: Set<string> }>();
 
-    products.forEach((p) => {
+    products.forEach((p: any) => {
       const catName = p.categories?.name || "Général";
       if (!categoryMap.has(catName)) {
         categoryMap.set(catName, { sales: 0, products: new Set() });
@@ -321,10 +321,10 @@ router.get("/categories", async (c: Context) => {
       categoryMap.get(catName)!.products.add(p.id);
     });
 
-    orderItems?.forEach((item) => {
-      const product = products.find((p) => p.id === item.product_id);
+    orderItems?.forEach((item: any) => {
+      const product = products.find((p: any) => p.id === item.product_id);
       if (product) {
-        const catName = product.categories?.name || "Général";
+        const catName = (product as any).categories?.name || "Général";
         const cat = categoryMap.get(catName);
         if (cat) {
           cat.sales += item.subtotal || 0;
@@ -358,7 +358,7 @@ router.get("/categories", async (c: Context) => {
  * GET /api/supplier/sales-velocity
  * Orders trend over time (daily/weekly/monthly)
  */
-router.get("/sales-velocity", async (c: Context) => {
+router.get("/sales-velocity", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     const period = c.req.query("period") || "daily"; // daily, weekly, monthly
@@ -367,12 +367,12 @@ router.get("/sales-velocity", async (c: Context) => {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
     const daysBack = period === "monthly" ? 90 : period === "weekly" ? 30 : 7;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    const { data: orders } = await db
+    const { data: orders } = await supabase
       .from("orders")
       .select("id, total_amount, created_at")
       .eq("restaurant_id", supplierId)
@@ -381,7 +381,7 @@ router.get("/sales-velocity", async (c: Context) => {
 
     const velocityMap = new Map<string, { orders: number; revenue: number }>();
 
-    orders?.forEach((order) => {
+    orders?.forEach((order: any) => {
       let dateKey: string;
 
       if (period === "monthly") {
@@ -430,18 +430,18 @@ router.get("/sales-velocity", async (c: Context) => {
  * GET /api/supplier/stock
  * Inventory levels + low stock alerts
  */
-router.get("/stock", async (c: Context) => {
+router.get("/stock", async (c: any) => {
   try {
     const supplierId = c.req.query("supplierId");
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const db = createAdminClient();
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
 
     // Get all products (NOTE: schema doesn't have stock levels yet)
     // This is a placeholder for future inventory feature
-    const { data: products } = await db
+    const { data: products } = await supabase
       .from("products")
       .select("id, name, available_quantity")
       .eq("restaurant_id", supplierId)
@@ -449,7 +449,7 @@ router.get("/stock", async (c: Context) => {
 
     return c.json({
       lowStockProducts: products || [],
-      totalProducts: (await db.from("products").select("id").eq("restaurant_id", supplierId))
+      totalProducts: (await supabase.from("products").select("id").eq("restaurant_id", supplierId))
         .data?.length || 0,
     });
   } catch (error) {
