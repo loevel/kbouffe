@@ -364,8 +364,11 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
     const [aiLoading, setAiLoading] = useState(false);
     const [showImproveModal, setShowImproveModal] = useState(false);
     const [showVariantsModal, setShowVariantsModal] = useState(false);
+    const [showTranslateModal, setShowTranslateModal] = useState(false);
     const [improveResults, setImproveResults] = useState<any>(null);
     const [variantsResults, setVariantsResults] = useState<any>(null);
+    const [translateResults, setTranslateResults] = useState<any>(null);
+    const [translateTarget, setTranslateTarget] = useState<"en" | "fr">("en");
 
     const isCreateMode = !template;
 
@@ -428,6 +431,39 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
         } catch (err) {
             console.error("AI variants error:", err);
             setError("Erreur lors de la génération");
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    // AI: Translate template
+    const handleTranslate = async (toLang: "en" | "fr") => {
+        if (!template?.id) {
+            setError("Veuillez d'abord créer le modèle");
+            return;
+        }
+
+        setAiLoading(true);
+        setTranslateTarget(toLang);
+        try {
+            const res = await adminFetch(`/api/email-templates/${template.id}/ai/translate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ toLang }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setError(data.error ?? "Erreur lors de la traduction");
+                return;
+            }
+
+            const data = await res.json();
+            setTranslateResults(data.template);
+            setShowTranslateModal(true);
+        } catch (err) {
+            console.error("AI translate error:", err);
+            setError("Erreur lors de la traduction");
         } finally {
             setAiLoading(false);
         }
@@ -632,6 +668,15 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
                                     {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <BarChart3 size={14} />}
                                     Variantes
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleTranslate(formData.subject?.toLowerCase().includes("dear") || formData.body?.toLowerCase().includes("dear") ? "fr" : "en")}
+                                    disabled={aiLoading}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50 transition-colors"
+                                >
+                                    {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />}
+                                    Traduire
+                                </button>
                             </div>
                         </div>
                     )}
@@ -668,6 +713,14 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
                     <AIVariantsResultsModal
                         variants={variantsResults}
                         onClose={() => setShowVariantsModal(false)}
+                    />
+                )}
+
+                {showTranslateModal && translateResults && (
+                    <AITranslateResultsModal
+                        template={translateResults}
+                        targetLang={translateTarget}
+                        onClose={() => setShowTranslateModal(false)}
                     />
                 )}
             </div>
@@ -778,6 +831,62 @@ function PreviewTemplateModal({ template, onClose }: PreviewTemplateModalProps) 
                             Fermer
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── AI Translate Results Modal ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AITranslateResultsModalProps {
+    template: any;
+    targetLang: "en" | "fr";
+    onClose: () => void;
+}
+
+function AITranslateResultsModal({ template, targetLang, onClose }: AITranslateResultsModalProps) {
+    const langName = targetLang === "en" ? "Anglais" : "Français";
+    
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-4 flex items-center gap-2">
+                    <Globe size={20} className="text-emerald-600 dark:text-emerald-400" />
+                    <h2 className="text-xl font-bold text-surface-900 dark:text-white">
+                        Traduction vers {langName}
+                    </h2>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    <div className="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 space-y-3">
+                        <div>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold mb-1">Objet :</p>
+                            <p className="text-surface-700 dark:text-surface-300 font-medium">{template.subject}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold mb-1">Corps :</p>
+                            <div
+                                className="prose dark:prose-invert max-w-none text-sm text-surface-700 dark:text-surface-300 bg-white dark:bg-surface-900 p-3 rounded border border-surface-200 dark:border-surface-700"
+                                dangerouslySetInnerHTML={{ __html: template.body }}
+                            />
+                        </div>
+                    </div>
+                    <p className="text-sm text-surface-600 dark:text-surface-400 italic">
+                        Les variables {{"{variable}"}} ont été préservées.
+                    </p>
+                </div>
+
+                <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700 px-6 py-4">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                    >
+                        Fermer
+                    </button>
                 </div>
             </div>
         </div>
