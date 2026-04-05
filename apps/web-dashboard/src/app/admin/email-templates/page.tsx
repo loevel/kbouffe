@@ -41,6 +41,7 @@ export default function EmailTemplatesPage() {
     // Modal state
     const [showEditModal, setShowEditModal] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
     const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
 
@@ -135,6 +136,14 @@ export default function EmailTemplatesPage() {
                         Gérez les modèles d'email pour les restaurants, fournisseurs et clients
                     </p>
                 </div>
+            <div className="flex items-center gap-2">
+                <Button
+                    onClick={() => setShowGenerateModal(true)}
+                    className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white"
+                >
+                    <Wand2 size={18} />
+                    Générer avec IA
+                </Button>
                 <Button
                     onClick={() => {
                         setEditingTemplate(null);
@@ -310,6 +319,16 @@ export default function EmailTemplatesPage() {
                     onClose={() => {
                         setShowPreviewModal(false);
                         setPreviewTemplate(null);
+                    }}
+                />
+            )}
+
+            {showGenerateModal && (
+                <GenerateTemplateModal
+                    onClose={() => setShowGenerateModal(false)}
+                    onSuccess={() => {
+                        setShowGenerateModal(false);
+                        fetchTemplates();
                     }}
                 />
             )}
@@ -760,6 +779,242 @@ function PreviewTemplateModal({ template, onClose }: PreviewTemplateModalProps) 
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Generate Template Modal ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface GenerateTemplateModalProps {
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function GenerateTemplateModal({ onClose, onSuccess }: GenerateTemplateModalProps) {
+    const [category, setCategory] = useState<"restaurant" | "supplier" | "client">("restaurant");
+    const [topic, setTopic] = useState("");
+    const [tone, setTone] = useState<"professional" | "friendly" | "casual">("professional");
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generatedTemplate, setGeneratedTemplate] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleGenerate = async () => {
+        if (!topic.trim()) {
+            setError("Veuillez entrer un sujet");
+            return;
+        }
+
+        setIsGenerating(true);
+        setError(null);
+
+        try {
+            const res = await adminFetch("/api/email-templates/ai/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ category, topic: topic.trim(), tone }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setError(data.error ?? "Erreur lors de la génération");
+                return;
+            }
+
+            const data = await res.json();
+            setGeneratedTemplate(data.template);
+        } catch (err) {
+            console.error("Generate error:", err);
+            setError("Erreur lors de la génération");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!generatedTemplate) return;
+
+        setIsGenerating(true);
+        try {
+            const res = await adminFetch("/api/email-templates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: `${category} - ${topic}`,
+                    category,
+                    subject: generatedTemplate.subject,
+                    body: generatedTemplate.body,
+                    variables: generatedTemplate.variables ?? [],
+                    is_active: false,
+                }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setError(data.error ?? "Erreur lors de la sauvegarde");
+                return;
+            }
+
+            onSuccess();
+        } catch (err) {
+            console.error("Save error:", err);
+            setError("Erreur lors de la sauvegarde");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    if (generatedTemplate) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+                <div className="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <div className="sticky top-0 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-4 flex items-center gap-2">
+                        <Wand2 size={20} className="text-indigo-600 dark:text-indigo-400" />
+                        <h2 className="text-xl font-bold text-surface-900 dark:text-white">
+                            Modèle généré
+                        </h2>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                        {error && (
+                            <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-lg flex items-start gap-3">
+                                <AlertCircle size={20} className="text-rose-500 flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
+                            </div>
+                        )}
+
+                        <div className="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 space-y-3">
+                            <div>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold mb-1">Objet :</p>
+                                <p className="text-surface-700 dark:text-surface-300 font-medium">{generatedTemplate.subject}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold mb-1">Corps :</p>
+                                <div
+                                    className="prose dark:prose-invert max-w-none text-sm text-surface-700 dark:text-surface-300 bg-white dark:bg-surface-900 p-3 rounded border border-surface-200 dark:border-surface-700"
+                                    dangerouslySetInnerHTML={{ __html: generatedTemplate.body }}
+                                />
+                            </div>
+                            {generatedTemplate.variables?.length > 0 && (
+                                <div>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold mb-2">Variables :</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {generatedTemplate.variables.map((v: string) => (
+                                            <span key={v} className="text-xs px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded">
+                                                {v}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700 px-6 py-4">
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={isGenerating}
+                            className="px-6 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50 transition-colors flex items-center gap-2"
+                        >
+                            {isGenerating && <Loader2 size={16} className="animate-spin" />}
+                            Sauvegarder le modèle
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl w-full max-w-2xl">
+                <div className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-4 flex items-center gap-2">
+                    <Wand2 size={20} className="text-indigo-600 dark:text-indigo-400" />
+                    <h2 className="text-xl font-bold text-surface-900 dark:text-white">
+                        Générer un modèle avec IA
+                    </h2>
+                </div>
+
+                <form className="p-6 space-y-4">
+                    {error && (
+                        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-lg flex items-start gap-3">
+                            <AlertCircle size={20} className="text-rose-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                            Catégorie
+                        </label>
+                        <select
+                            value={category}
+                            onChange={(e) => setCategory(e.target.value as any)}
+                            className="w-full px-4 py-2 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white"
+                        >
+                            <option value="restaurant">Restaurants</option>
+                            <option value="supplier">Fournisseurs</option>
+                            <option value="client">Clients</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                            Sujet / Description
+                        </label>
+                        <textarea
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                            className="w-full px-4 py-2 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white"
+                            placeholder="Ex: Email de bienvenue pour les nouveaux restaurants"
+                            rows={4}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                            Ton
+                        </label>
+                        <select
+                            value={tone}
+                            onChange={(e) => setTone(e.target.value as any)}
+                            className="w-full px-4 py-2 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white"
+                        >
+                            <option value="professional">Professionnel</option>
+                            <option value="friendly">Amical</option>
+                            <option value="casual">Décontracté</option>
+                        </select>
+                    </div>
+
+                    <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-6 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleGenerate}
+                            disabled={isGenerating || !topic.trim()}
+                            className="px-6 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 transition-colors flex items-center gap-2"
+                        >
+                            {isGenerating && <Loader2 size={16} className="animate-spin" />}
+                            Générer
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
