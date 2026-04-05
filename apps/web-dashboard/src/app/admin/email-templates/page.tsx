@@ -138,6 +138,8 @@ export default function EmailTemplatesPage() {
                         Gérez les modèles d'email pour les restaurants, fournisseurs et clients
                     </p>
                 </div>
+            </div>
+
             <div className="flex items-center gap-2">
                 <Button
                     onClick={() => setShowGenerateModal(true)}
@@ -905,7 +907,7 @@ function AITranslateResultsModal({ template, targetLang, onClose }: AITranslateR
                         </div>
                     </div>
                     <p className="text-sm text-surface-600 dark:text-surface-400 italic">
-                        Les variables {{"{variable}"}} ont été préservées.
+                        Les variables {"{'{variable}'}"} ont été préservées.
                     </p>
                 </div>
 
@@ -1310,12 +1312,6 @@ function AIVariantsResultsModal({ variants, onClose }: AIVariantsResultsModalPro
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Send Template Modal ────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
-
-interface SendTemplateModalProps {
-    template: EmailTemplate;
-    onClose: () => void;
-    onSuccess: () => void;
-}
 
 function SendTemplateModal({ template, onClose, onSuccess }: SendTemplateModalProps) {
     const [recipients, setRecipients] = useState<string>("");
