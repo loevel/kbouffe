@@ -1608,23 +1608,27 @@ export function StorePageClient({ slug }: { slug: string }) {
                                                                                     if (imgs.length === 1) return (
                                                                                         <div className="relative group w-full h-28">
                                                                                             <img src={imgs[0]} alt={zone.name} className="w-full h-full object-cover" />
-                                                                                            <button
-                                                                                                type="button"
+                                                                                            <div
+                                                                                                role="button"
+                                                                                                tabIndex={0}
                                                                                                 onClick={(e) => { e.stopPropagation(); setLightbox({ images: imgs, index: 0 }); }}
-                                                                                                className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-all"
+                                                                                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setLightbox({ images: imgs, index: 0 }); } }}
+                                                                                                className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-all cursor-pointer"
                                                                                             >
                                                                                                 <Maximize2 size={22} className="text-white opacity-0 group-hover:opacity-100 drop-shadow transition-opacity" />
-                                                                                            </button>
+                                                                                            </div>
                                                                                         </div>
                                                                                     );
                                                                                     return (
                                                                                         <div className="flex gap-0.5 w-full h-28">
                                                                                             {imgs.slice(0, 5).map((src, i) => (
-                                                                                                <button
+                                                                                                <div
                                                                                                     key={i}
-                                                                                                    type="button"
+                                                                                                    role="button"
+                                                                                                    tabIndex={0}
                                                                                                     onClick={(e) => { e.stopPropagation(); setLightbox({ images: imgs, index: i }); }}
-                                                                                                    className={`relative group flex-1 min-w-0 overflow-hidden ${i === 0 ? "rounded-l-none" : ""} ${i === imgs.slice(0, 5).length - 1 ? "rounded-r-none" : ""}`}
+                                                                                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setLightbox({ images: imgs, index: i }); } }}
+                                                                                                    className={`relative group flex-1 min-w-0 overflow-hidden cursor-pointer ${i === 0 ? "rounded-l-none" : ""} ${i === imgs.slice(0, 5).length - 1 ? "rounded-r-none" : ""}`}
                                                                                                 >
                                                                                                     <img src={src} alt={`${zone.name} ${i + 1}`} className="w-full h-full object-cover" />
                                                                                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all">
@@ -1635,7 +1639,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                                                                                                             <span className="text-white font-bold text-sm">+{imgs.length - 5}</span>
                                                                                                         </div>
                                                                                                     )}
-                                                                                                </button>
+                                                                                                </div>
                                                                                             ))}
                                                                                         </div>
                                                                                     );
