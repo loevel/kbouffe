@@ -61,6 +61,7 @@ import {
     publicProductReviewRoutes,
     publicRestaurantReviewRoutes,
 } from "./modules/reviews";
+import supplierAnalyticsRouter from "./modules/supplier/analytics";
 
 // ── Admin routes ─────────────────────────────────────────────────────
 import { adminRoutes } from "./modules/admin";
@@ -218,7 +219,7 @@ const merchantPaths = [
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
     "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
-    "/caisse",
+    "/caisse", "/supplier",
 ] as const;
 
 // Marketplace merchant routes (trace + product management) require auth
@@ -299,6 +300,9 @@ api.route("/reviews", customerReviewRoutes);
 // ── Merchant review management (uses authMiddleware via /restaurant path) ──
 api.route("/restaurant/reviews", merchantReviewRoutes);
 api.route("/restaurant/product-reviews", merchantProductReviewRoutes);
+
+// ── Supplier Analytics (dashboard metrics) ────────────────────────────────
+api.route("/supplier", supplierAnalyticsRouter);
 
 // ── Dark Kitchens / Multi-Marques + KYC ─────────────────────────────
 api.route("/restaurant/brands", brandsRoutes);
