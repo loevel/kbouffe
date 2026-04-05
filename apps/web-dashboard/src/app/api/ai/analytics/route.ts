@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         ] = await Promise.all([
             db
                 .from("restaurants")
-                .select("name, description, is_published, primary_color, delivery_fee, minimum_order, created_at")
+                .select("name, description, is_published, primary_color, delivery_fee, min_order_amount, created_at")
                 .eq("id", restaurantId)
                 .single(),
             db
@@ -183,7 +183,7 @@ Commandes (dernieres 200):
 
 Configuration:
 - Frais de livraison: ${restaurant?.delivery_fee ?? "N/A"} FCFA
-- Commande minimum: ${restaurant?.minimum_order ?? "N/A"} FCFA
+- Commande minimum: ${restaurant?.min_order_amount ?? "N/A"} FCFA
 - Boutique publiee: ${restaurant?.is_published ? "Oui" : "Non"}
 - Inscrit depuis: ${restaurant?.created_at ? new Date(restaurant.created_at).toLocaleDateString("fr-FR") : "N/A"}
 `;
