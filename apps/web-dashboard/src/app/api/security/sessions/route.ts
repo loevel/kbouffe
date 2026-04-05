@@ -1,73 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+        if (!user) {
+            return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // TODO: Fetch from user_sessions table once created
+        // For now, return mock data
+        const sessions = [
+            {
+                id: "session-1",
+                device: "Chrome on macOS",
+                ip_address: "192.168.1.1",
+                user_agent: "Mozilla/5.0...",
+                login_at: new Date().toISOString(),
+                last_activity: new Date().toISOString(),
+                is_current: true,
+            },
+        ];
+
+        return Response.json({ sessions });
+    } catch (error) {
+        console.error("Error fetching sessions:", error);
+        return Response.json({ sessions: [] });
     }
-
-    const sessions = [
-      {
-        id: "current",
-        device: "Session actuelle",
-        location: "Inconnue",
-        lastActive: "Maintenant",
-        current: true,
-      },
-    ];
-
-    return NextResponse.json({ sessions });
-  } catch (error) {
-    console.error("GET /api/security/sessions error:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération des sessions" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const body = (await request.json().catch(() => ({}))) as {
-      action?: string;
-    };
-
-    if (body.action !== "revoke_all") {
-      return NextResponse.json({ error: "Action invalide" }, { status: 400 });
-    }
-
-    const { error } = await supabase.auth.signOut({ scope: "global" });
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message || "Impossible de déconnecter toutes les sessions" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("POST /api/security/sessions error:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la révocation des sessions" },
-      { status: 500 }
-    );
-  }
 }

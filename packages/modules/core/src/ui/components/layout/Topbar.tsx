@@ -10,6 +10,7 @@
  */
 
 import { type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Menu, ExternalLink, Sun, Moon, Monitor, Globe } from "lucide-react";
 import { NotificationBell } from "./NotificationBell";
 import { Dropdown } from "../Dropdown";
@@ -33,6 +34,7 @@ export function Topbar({ onMenuClick, searchSlot }: TopbarProps) {
     const { user, restaurant, signOut } = useDashboard();
     const { theme, setTheme } = useTheme();
     const { locale, t, setLocale } = useLocale();
+    const router = useRouter();
 
     const currentThemeIcon = themeOptions.find((o) => o.value === theme)?.icon ?? Monitor;
     const ThemeIcon = currentThemeIcon;
@@ -118,7 +120,9 @@ export function Topbar({ onMenuClick, searchSlot }: TopbarProps) {
                 {/* Avatar + menu utilisateur */}
                 <Dropdown
                     items={[
-                        { label: t.topbar.myProfile, onClick: () => { } },
+                        { label: t.topbar.myProfile, onClick: () => router.push("/dashboard/profile") },
+                        { label: t.topbar.security || "Sécurité", onClick: () => router.push("/dashboard/security") },
+                        { label: t.topbar.help || "Aide", onClick: () => {} }, // TODO: Open help modal
                         // Sélecteur thème dans le dropdown sur mobile
                         ...themeOptions.map((opt) => ({
                             label: t.theme[opt.value],

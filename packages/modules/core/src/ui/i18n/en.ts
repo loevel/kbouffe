@@ -76,6 +76,7 @@ export const en: TranslationKeys = {
         giftCards: "Gift Cards",
         reports: "Reports",
         analytics: "Analytics",
+        security: "Security",
         settings: "Settings",
         myStore: "My store",
         team: "Team",
@@ -119,6 +120,8 @@ export const en: TranslationKeys = {
         myProfile: "My profile",
         signOut: "Sign out",
         myRestaurant: "My restaurant",
+        security: "Security",
+        help: "Help",
     },
 
     dashboard: {

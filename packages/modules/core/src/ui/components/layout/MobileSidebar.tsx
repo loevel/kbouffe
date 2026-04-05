@@ -45,7 +45,7 @@ const NAV_GROUPS = [
     },
     {
         label: "Administration",
-        hrefs: ["/dashboard/team", "/dashboard/settings", "/dashboard/support"],
+        hrefs: ["/dashboard/team", "/dashboard/security", "/dashboard/settings", "/dashboard/support"],
     },
 ] as const;
 

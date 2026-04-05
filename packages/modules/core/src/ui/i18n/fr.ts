@@ -74,6 +74,7 @@ export const fr = {
         giftCards: "Cartes Cadeaux",
         reports: "Rapports",
         analytics: "Analytiques",
+        security: "Sécurité",
         settings: "Parametres",
         myStore: "Ma boutique",
         team: "Equipe",
@@ -117,6 +118,8 @@ export const fr = {
         myProfile: "Mon profil",
         signOut: "Deconnexion",
         myRestaurant: "Mon restaurant",
+        security: "Sécurité",
+        help: "Aide",
     },
 
     dashboard: {
