@@ -162,7 +162,7 @@ export function CustomersTable() {
                         </TableHeader>
                         <TableBody>
                             {paginated.map((customer) => (
-                                <TableRow key={customer.phone}>
+                                <TableRow key={customer.id}>
                                     <TableCell>
                                         <Link href={`/dashboard/customers/${encodeURIComponent(customer.id)}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                                             <div className="w-9 h-9 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-brand-600 dark:text-brand-400 text-sm font-bold">
