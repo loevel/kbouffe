@@ -130,11 +130,19 @@ categoriesRoutes.get("/available-packs", async (c) => {
         // Fallback to built-in packs if database is empty
         console.log("[Available Packs] No packs in database, using built-in packs");
         const builtInPacks = [
-            { id: "boissons", slug: "boissons", name: "🥤 Boissons", description: "Bières, sodas, jus" },
-            { id: "braiserie", slug: "braiserie", name: "🍖 Braiserie", description: "Poissons et viandes braisés" },
+            // ── Boissons — pack complet ──
+            { id: "boissons", slug: "boissons", name: "🥤 Boissons (pack complet)", description: "Bières + Sodas + Eaux + Jus + Energisantes (42 produits)" },
+            // ── Boissons — catégories individuelles ──
+            { id: "boissons_bieres",       slug: "boissons_bieres",       name: "🍺 Bières",                description: "14 bières locales et importées (33 Export, Castel, Mutzig, Kadji...)" },
+            { id: "boissons_gazeuses",     slug: "boissons_gazeuses",     name: "🥤 Boissons Gazeuses",    description: "18 sodas et soft drinks (Top, World Cola, Orangina, Razzl, Spécial...)" },
+            { id: "boissons_eaux",         slug: "boissons_eaux",         name: "💧 Eaux",                 description: "5 eaux minérales et purifiées (Tangui, Supermont, Vitale, Madiba...)" },
+            { id: "boissons_jus",          slug: "boissons_jus",          name: "🍹 Jus Naturels",         description: "5 jus frais artisanaux (Foléré, Gingembre, Baobab, Corossol...)" },
+            { id: "boissons_energisantes", slug: "boissons_energisantes", name: "⚡ Boissons Energisantes", description: "Boissons énergisantes (KIQ par UCB)" },
+            // ── Cuisine ──
+            { id: "braiserie",    slug: "braiserie",    name: "🍖 Braiserie",              description: "Poissons et viandes braisés" },
             { id: "traditionnel", slug: "traditionnel", name: "🥘 Cuisine Traditionnelle", description: "Ndole, Eru, Sauces" },
-            { id: "streetfood", slug: "streetfood", name: "🌮 Street Food", description: "Beignets et sandwichs" },
-            { id: "petitdej", slug: "petitdej", name: "🥐 Petit Déjeuner", description: "Café, thé, viennoiseries" },
+            { id: "streetfood",   slug: "streetfood",   name: "🌮 Street Food",            description: "Beignets et sandwichs" },
+            { id: "petitdej",     slug: "petitdej",     name: "🥐 Petit Déjeuner",         description: "Café, thé, viennoiseries" },
         ];
 
         return c.json({ packs: builtInPacks });
@@ -227,6 +235,91 @@ const LEGACY_PACKS = {
             { category_id: "cat_energisantes", name: "KIQ", description: "Boisson énergisante UCB, formule audacieuse avec vitamines, minéraux et caféine. Lancée en 2024", price: 600, sort_order: 0, is_available: false, image_url: "https://www.sa-ucb.com/sous-sites-marque/kiq/assets/imgs/Bottle-768x2388.webp", options: _temperature },
         ]
     },
+
+    // ── Packs individuels par catégorie boisson ──────────────────────────────
+    boissons_bieres: {
+        categories: [
+            { id: "cat_bieres", name: "Bières", description: "Bières locales et importées — Source: boissonsducameroun.com, sa-ucb.com", sort_order: 0, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_bieres", name: "33 Export",         description: "Bière blonde lager camerounaise, légère et rafraîchissante. La bière du supporter numéro 1 du football", price: 800,  sort_order: 0,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/01/33.png",                                                                    options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Castel Beer",       description: "Bière blonde premium, goût équilibré et amertume subtile. Une référence camerounaise",                              price: 800,  sort_order: 1,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/02/cantel.png",                                                                 options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Mutzig",            description: "Bière forte premium au goût prononcé et généreux. L'audace à la camerounaise",                                      price: 900,  sort_order: 2,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/02/mutsic.png",                                                                options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Beaufort Lager",    description: "Bière blonde classique au goût authentique. Le style Beaufort",                                                     price: 700,  sort_order: 3,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/01/beaufort-lager.png",                                                          options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Beaufort Light",    description: "Bière légère et moins calorique, pour les moments de détente",                                                      price: 700,  sort_order: 4,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/02/beaufort-light.png",                                                         options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Heineken",          description: "Bière blonde internationale premium, qualité constante depuis 1873",                                                price: 1000, sort_order: 5,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/02/heineken.png",                                                               options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Doppel Munich",     description: "Bière brune forte de type Munich, saveurs maltées et caramélisées",                                                 price: 900,  sort_order: 6,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/doppel.png",                                                                options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Castle Milk Stout", description: "Bière noire onctueuse aux notes de chocolat et café, douceur unique",                                              price: 1000, sort_order: 7,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/01/CASTLE-milk-stout-1.webp",                                                    options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Isenberg",          description: "Bière blonde de type pilsner, fraîche et désaltérante",                                                            price: 800,  sort_order: 8,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/02/isenberg.png",                                                               options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Chill",             description: "Bière blonde légère et rafraîchissante, idéale pour se détendre",                                                  price: 800,  sort_order: 9,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/chill.png",                                                                 options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Manyan",            description: "Bière traditionnelle camerounaise, goût riche et corsé",                                                           price: 700,  sort_order: 10, is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/02/manyan.png",                                                               options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Kadji Beer",        description: "Bière originale 100% maltée, fine, onctueuse et élégante. La référence UCB",                                       price: 800,  sort_order: 11, is_available: false, image_url: "https://www.sa-ucb.com/sous-sites-marque/kadji-beer/assets/imgs/Bouteille-kadji-beer.webp",                                       options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "K44",               description: "Bière blonde ronde et onctueuse, 5% alcool. Premium brassée par UCB",                                             price: 900,  sort_order: 12, is_available: false, image_url: "https://www.sa-ucb.com/sous-sites-marque/k44/assets/imgs/k44.webp",                                                              options: [..._volumeBiere, ..._temperature] },
+            { category_id: "cat_bieres", name: "Bissé",             description: "La bière du partage, 4.7% alcool. Nouvelle sensation brassicole camerounaise",                                    price: 800,  sort_order: 13, is_available: false, image_url: "https://www.sa-ucb.com/sous-sites-marque/bisse/assets/imgs/Image-btle-BISSE.png",                                                 options: [..._volumeBiere, ..._temperature] },
+        ]
+    },
+
+    boissons_gazeuses: {
+        categories: [
+            { id: "cat_gazeuses", name: "Boissons Gazeuses", description: "Sodas et boissons gazeuses — Source: boissonsducameroun.com, sa-ucb.com", sort_order: 0, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_gazeuses", name: "Top Ananas",             description: "Boisson gazeuse à l'ananas, pétillante et fruitée. Un classique camerounais",         price: 400, sort_order: 0,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/top-ananas.png",                                              options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Top Orange",             description: "Boisson gazeuse à l'orange, fraîche et vitaminée",                                     price: 400, sort_order: 1,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/top-orange.png",                                              options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Top Grenadine",          description: "Boisson gazeuse à la grenadine, suave et désaltérante",                                price: 400, sort_order: 2,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/top-grenadine.png",                                           options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Top Pamplemousse",       description: "Boisson gazeuse au pamplemousse, acidulée et rafraîchissante",                         price: 400, sort_order: 3,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/top-pamplemous.png",                                        options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Top Tonic",              description: "Boisson tonic gazeuse, amertume subtile et bulles fines",                              price: 400, sort_order: 4,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/tonic.png",                                                  options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "World Cola",             description: "Cola camerounais au goût unique, bascule dans un monde rafraîchissant",                price: 400, sort_order: 5,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/word-cola-50cl.png",                                        options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Orangina",               description: "Boisson à l'orange avec pulpe, la recette originale pétillante",                      price: 500, sort_order: 6,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/orangina.png",                                              options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "D'Jino Mangue-Goyave",   description: "Boisson aux fruits tropicaux, saveur mangue et goyave intense",                       price: 400, sort_order: 7,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/07/djino-mangue-goyave-60cl.png",                               options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Youzou",                 description: "Boisson énergisante et fruitée, dynamique et pétillante",                             price: 400, sort_order: 8,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/youzou.png",                                                options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Vinto",                  description: "Boisson au raisin, douce et fruitée avec une touche pétillante",                      price: 400, sort_order: 9,  is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/vinto.png",                                                options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Spécial Pamplemousse",   description: "Boisson gazeuse pamplemousse par UCB. Formats cassable 65cl/33cl, PET 1.5L/1L/33cl", price: 400, sort_order: 10, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20SPECIAL%20BG%20-%20PAMPLEMOUSSE.jpg",             options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Spécial Orange Passion", description: "Boisson gazeuse orange passion par UCB. Saveur fruitée et pétillante",               price: 400, sort_order: 11, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20SPECIAL%20BG%20-%20ORANGE%20PASSION.jpg",          options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Spécial Cocktail",       description: "Boisson gazeuse cocktail de fruits par UCB. Mélange unique et rafraîchissant",        price: 400, sort_order: 12, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20SPECIAL%20BG%20-%20COCKTAIL.jpg",               options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Spécial Fruits Rouges",  description: "Boisson gazeuse fruits rouges par UCB. Intense et fruitée",                          price: 400, sort_order: 13, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20SPECIAL%20BG%20-%20FRUITS%20ROUGES.jpg",           options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Razzl Limonade",         description: "Limonade pétillante Razzl par UCB. 250 FCFA (33cl), 500 FCFA (1L)",                  price: 250, sort_order: 14, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20RAZZL%20-%20LIMO.jpg",                            options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Razzl Orange",           description: "Boisson gazeuse orange Razzl par UCB. Fruitée et accessible",                        price: 250, sort_order: 15, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20RAZZL%20-%20ORANGE.jpg",                          options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Razzl Grenadine",        description: "Boisson gazeuse grenadine Razzl par UCB. Douce et pétillante",                       price: 250, sort_order: 16, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20RAZZL%20-%20GRENADINE.jpg",                       options: _volumeSoda },
+            { category_id: "cat_gazeuses", name: "Razzl Cola",             description: "Cola Razzl par UCB. Alternative locale et rafraîchissante",                          price: 250, sort_order: 17, is_available: false, image_url: "https://www.sa-ucb.com/assets/imgs/new/Visuel%20-%20400x500%20-%20RAZZL%20-%20COLA.jpg",                            options: _volumeSoda },
+        ]
+    },
+
+    boissons_eaux: {
+        categories: [
+            { id: "cat_eaux", name: "Eaux", description: "Eaux minérales et purifiées — Source: boissonsducameroun.com, sa-ucb.com", sort_order: 0, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_eaux", name: "Tangui",     description: "Eau minérale naturelle camerounaise, source naturelle de qualité",                          price: 300, sort_order: 0, is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/tangui-1l.png",                                     options: _volumeEau },
+            { category_id: "cat_eaux", name: "Supermont",  description: "Eau minérale naturelle plate, pureté et fraîcheur",                                         price: 300, sort_order: 1, is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/tangui-13l.png",                                    options: _volumeEau },
+            { category_id: "cat_eaux", name: "Vitale",     description: "Eau purifiée premium, légère et équilibrée en minéraux",                                    price: 250, sort_order: 2, is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/vitale.png",                                        options: _volumeEau },
+            { category_id: "cat_eaux", name: "Aqua Belle", description: "Eau de source naturelle filtrée, fraîche et cristalline",                                   price: 250, sort_order: 3, is_available: false, image_url: "https://boissonsducameroun.com/wp-content/uploads/2024/03/aqua-belle.png",                                    options: _volumeEau },
+            { category_id: "cat_eaux", name: "Madiba",     description: "Eau minérale naturelle UCB, puisée en profondeur et distillée 5 fois. Pour un corps sain", price: 300, sort_order: 4, is_available: false, image_url: "https://www.sa-ucb.com/sous-sites-marque/eau-madiba/assets/imgs/MADIBA-0.5L.webp",                          options: _volumeEau },
+        ]
+    },
+
+    boissons_jus: {
+        categories: [
+            { id: "cat_jus", name: "Jus Naturels", description: "Jus frais et boissons artisanales faits maison", sort_order: 0, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_jus", name: "Jus de Foléré",     description: "Jus d'hibiscus frais fait maison, rafraîchissant et naturel", price: 500, sort_order: 0, is_available: false, image_url: null, options: _taille },
+            { category_id: "cat_jus", name: "Jus de Gingembre",  description: "Jus de gingembre pimenté, tonifiant et énergisant",           price: 500, sort_order: 1, is_available: false, image_url: null, options: _taille },
+            { category_id: "cat_jus", name: "Jus de Baobab",     description: "Jus de fruit de baobab (bouye), riche en vitamines",          price: 600, sort_order: 2, is_available: false, image_url: null, options: _taille },
+            { category_id: "cat_jus", name: "Jus de Corossol",   description: "Jus onctueux de corossol frais, sucré naturellement",         price: 700, sort_order: 3, is_available: false, image_url: null, options: _taille },
+            { category_id: "cat_jus", name: "Citronnade Maison", description: "Limonade aux citrons verts frais et menthe",                  price: 400, sort_order: 4, is_available: false, image_url: null, options: _taille },
+        ]
+    },
+
+    boissons_energisantes: {
+        categories: [
+            { id: "cat_energisantes", name: "Boissons Energisantes", description: "Boissons énergisantes — Source: sa-ucb.com", sort_order: 0, is_active: true },
+        ],
+        products: [
+            { category_id: "cat_energisantes", name: "KIQ", description: "Boisson énergisante UCB, formule audacieuse avec vitamines, minéraux et caféine. Lancée en 2024", price: 600, sort_order: 0, is_available: false, image_url: "https://www.sa-ucb.com/sous-sites-marque/kiq/assets/imgs/Bottle-768x2388.webp", options: _temperature },
+        ]
+    },
+
     braiserie: {
         categories: [
             { id: "cat_poissons", name: "Poissons Braisés", description: "Le meilleur du poisson frais", sort_order: 1, is_active: true },
