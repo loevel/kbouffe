@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Plus, Edit2, Trash2, Eye, Copy, Search, Filter, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Plus, Edit2, Trash2, Eye, Copy, Search, Filter, Loader2, AlertCircle, Wand2, Zap, Globe, BarChart3 } from "lucide-react";
 import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -341,7 +341,78 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
     const [error, setError] = useState<string | null>(null);
     const [newVariable, setNewVariable] = useState("");
 
+    // AI state
+    const [aiLoading, setAiLoading] = useState(false);
+    const [showImproveModal, setShowImproveModal] = useState(false);
+    const [showVariantsModal, setShowVariantsModal] = useState(false);
+    const [improveResults, setImproveResults] = useState<any>(null);
+    const [variantsResults, setVariantsResults] = useState<any>(null);
+
     const isCreateMode = !template;
+
+    // AI: Improve template
+    const handleImprove = async () => {
+        if (!template?.id) {
+            setError("Veuillez d'abord créer le modèle");
+            return;
+        }
+        
+        setAiLoading(true);
+        try {
+            const res = await adminFetch(`/api/email-templates/${template.id}/ai/improve`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setError(data.error ?? "Erreur lors de l'amélioration");
+                return;
+            }
+
+            const data = await res.json();
+            setImproveResults(data.suggestions);
+            setShowImproveModal(true);
+        } catch (err) {
+            console.error("AI improve error:", err);
+            setError("Erreur lors de l'amélioration");
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    // AI: Generate variants
+    const handleVariants = async () => {
+        if (!template?.id) {
+            setError("Veuillez d'abord créer le modèle");
+            return;
+        }
+
+        setAiLoading(true);
+        try {
+            const res = await adminFetch(`/api/email-templates/${template.id}/ai/variants`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setError(data.error ?? "Erreur lors de la génération");
+                return;
+            }
+
+            const data = await res.json();
+            setVariantsResults(data.variants);
+            setShowVariantsModal(true);
+        } catch (err) {
+            console.error("AI variants error:", err);
+            setError("Erreur lors de la génération");
+        } finally {
+            setAiLoading(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -516,6 +587,36 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
                         </label>
                     </div>
 
+                    {/* AI Features */}
+                    {!isCreateMode && (
+                        <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Wand2 size={18} className="text-indigo-600 dark:text-indigo-400" />
+                                <h3 className="font-semibold text-surface-700 dark:text-surface-300">Fonctionnalités IA</h3>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleImprove}
+                                    disabled={aiLoading}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-500/30 disabled:opacity-50 transition-colors"
+                                >
+                                    {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                                    Améliorer
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleVariants}
+                                    disabled={aiLoading}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-purple-500/20 hover:bg-purple-500/30 text-purple-600 dark:text-purple-400 rounded-lg border border-purple-500/30 disabled:opacity-50 transition-colors"
+                                >
+                                    {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <BarChart3 size={14} />}
+                                    Variantes
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700">
                         <button
@@ -535,6 +636,21 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
                         </button>
                     </div>
                 </form>
+
+                {/* AI Modals */}
+                {showImproveModal && improveResults && (
+                    <AIImproveResultsModal
+                        suggestions={improveResults}
+                        onClose={() => setShowImproveModal(false)}
+                    />
+                )}
+
+                {showVariantsModal && variantsResults && (
+                    <AIVariantsResultsModal
+                        variants={variantsResults}
+                        onClose={() => setShowVariantsModal(false)}
+                    />
+                )}
             </div>
         </div>
     );
@@ -643,6 +759,155 @@ function PreviewTemplateModal({ template, onClose }: PreviewTemplateModalProps) 
                             Fermer
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── AI Improve Results Modal ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AIImproveResultsModalProps {
+    suggestions: any[];
+    onClose: () => void;
+}
+
+function AIImproveResultsModal({ suggestions, onClose }: AIImproveResultsModalProps) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+                {/* Header */}
+                <div className="sticky top-0 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-4 flex items-center gap-2">
+                    <Zap size={20} className="text-indigo-600 dark:text-indigo-400" />
+                    <h2 className="text-xl font-bold text-surface-900 dark:text-white">
+                        Suggestions d'amélioration IA
+                    </h2>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-4">
+                    {suggestions && suggestions.length > 0 ? (
+                        suggestions.map((suggestion, idx) => (
+                            <div key={idx} className="border border-surface-200 dark:border-surface-700 rounded-lg p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-semibold rounded-full">
+                                        {suggestion.type === "tone" && "📌 Ton"}
+                                        {suggestion.type === "clarity" && "✨ Clarté"}
+                                        {suggestion.type === "length" && "📏 Longueur"}
+                                        {suggestion.type === "engagement" && "💫 Engagement"}
+                                    </span>
+                                </div>
+                                <div className="space-y-2 text-sm">
+                                    <div>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold">Actuel :</p>
+                                        <p className="text-surface-700 dark:text-surface-300">{suggestion.current}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold">Suggéré :</p>
+                                        <p className="text-surface-700 dark:text-surface-300 bg-emerald-500/10 border border-emerald-500/30 p-2 rounded">
+                                            {suggestion.suggested}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold">Raison :</p>
+                                        <p className="text-surface-600 dark:text-surface-400 text-xs">{suggestion.reason}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-surface-600 dark:text-surface-400">Aucune suggestion d'amélioration disponible.</p>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700 px-6 py-4">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                    >
+                        Fermer
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── AI Variants Results Modal ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AIVariantsResultsModalProps {
+    variants: any[];
+    onClose: () => void;
+}
+
+function AIVariantsResultsModal({ variants, onClose }: AIVariantsResultsModalProps) {
+    const tones = [
+        { key: "conservative", label: "Conservateur", icon: "⚖️" },
+        { key: "aggressive", label: "Agressif", icon: "⚡" },
+        { key: "neutral", label: "Neutre", icon: "😊" },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto">
+                {/* Header */}
+                <div className="sticky top-0 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-4 flex items-center gap-2">
+                    <BarChart3 size={20} className="text-purple-600 dark:text-purple-400" />
+                    <h2 className="text-xl font-bold text-surface-900 dark:text-white">
+                        Variantes A/B Testing
+                    </h2>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-6">
+                    {variants && Object.keys(variants).length > 0 ? (
+                        tones.map(({ key, label, icon }) => {
+                            const variant = variants[key as keyof typeof variants];
+                            if (!variant) return null;
+                            return (
+                                <div key={key} className="border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
+                                    <div className="bg-surface-50 dark:bg-surface-800 px-4 py-3 border-b border-surface-200 dark:border-surface-700">
+                                        <h3 className="font-semibold text-surface-900 dark:text-white flex items-center gap-2">
+                                            <span>{icon}</span>
+                                            {label}
+                                        </h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div>
+                                            <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold mb-1">Objet :</p>
+                                            <p className="text-surface-700 dark:text-surface-300 font-medium">{variant.subject}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-surface-500 dark:text-surface-400 font-semibold mb-1">Corps :</p>
+                                            <div
+                                                className="prose dark:prose-invert max-w-none text-sm text-surface-700 dark:text-surface-300 bg-surface-50 dark:bg-surface-800 p-3 rounded border border-surface-200 dark:border-surface-700"
+                                                dangerouslySetInnerHTML={{ __html: variant.body }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <p className="text-surface-600 dark:text-surface-400">Aucune variante générée.</p>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 justify-end pt-4 border-t border-surface-200 dark:border-surface-700 px-6 py-4">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                    >
+                        Fermer
+                    </button>
                 </div>
             </div>
         </div>
