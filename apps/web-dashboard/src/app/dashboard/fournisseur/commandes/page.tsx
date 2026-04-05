@@ -26,6 +26,9 @@ import {
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier } from "../SupplierContext";
+import { OrderTimelineExpand } from "./components/OrderTimelineExpand";
+import { PaymentStatusBadge } from "./components/PaymentStatusBadge";
+import { RatingStars } from "./components/RatingStars";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +46,14 @@ interface Order {
     actual_delivery_date: string | null;
     notes: string | null;
     created_at: string;
+    // Phase 2 fields
+    confirmed_at?: string | null;
+    prepared_at?: string | null;
+    shipped_at?: string | null;
+    delivered_at?: string | null;
+    payment_status?: "pending" | "paid" | "failed" | "refunded" | null;
+    restaurant_rating?: number | null;
+    rating_count?: number;
     // Joined
     product?: { id: string; name: string; category: string; unit: string };
     supplier?: { id: string; name: string };
@@ -433,7 +444,7 @@ export default function CommandesPage() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[680px]">
+                        <table className="w-full min-w-[960px]">
                             <thead>
                                 <tr className="border-b border-white/8">
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
@@ -443,7 +454,7 @@ export default function CommandesPage() {
                                         Produit
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden sm:table-cell">
-                                        Qté
+                                        Qte
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden md:table-cell">
                                         Restaurant
@@ -453,6 +464,15 @@ export default function CommandesPage() {
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
                                         Statut
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden lg:table-cell">
+                                        Timeline
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden lg:table-cell">
+                                        Paiement
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden lg:table-cell">
+                                        Note
                                     </th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-surface-500 uppercase tracking-wider">
                                         Action
@@ -518,6 +538,35 @@ export default function CommandesPage() {
                                         {/* Status */}
                                         <td className="px-4 py-3.5">
                                             <StatusBadge status={order.delivery_status} />
+                                        </td>
+
+                                        {/* Timeline */}
+                                        <td className="px-4 py-3.5 hidden lg:table-cell">
+                                            <OrderTimelineExpand
+                                                deliveryStatus={order.delivery_status}
+                                                createdAt={order.created_at}
+                                                confirmedAt={order.confirmed_at}
+                                                preparedAt={order.prepared_at}
+                                                shippedAt={order.shipped_at}
+                                                deliveredAt={order.delivered_at}
+                                                expectedDeliveryDate={order.expected_delivery_date}
+                                                actualDeliveryDate={order.actual_delivery_date}
+                                            />
+                                        </td>
+
+                                        {/* Payment status */}
+                                        <td className="px-4 py-3.5 hidden lg:table-cell">
+                                            <PaymentStatusBadge status={order.payment_status} />
+                                        </td>
+
+                                        {/* Rating */}
+                                        <td className="px-4 py-3.5 hidden lg:table-cell">
+                                            <RatingStars
+                                                orderId={order.id}
+                                                rating={order.restaurant_rating ?? null}
+                                                ratingCount={order.rating_count ?? 0}
+                                                restaurantName={order.restaurant?.name}
+                                            />
                                         </td>
 
                                         {/* Action */}

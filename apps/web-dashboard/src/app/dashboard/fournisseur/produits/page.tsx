@@ -11,7 +11,7 @@
  *   - Désactivé si kyc_status !== 'approved'
  */
 
-import { useState, useEffect, useCallback, useRef, type FormEvent } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUploadImage } from "@/hooks/use-upload-image";
 import {
@@ -30,10 +30,14 @@ import {
     Save,
     ImagePlus,
     Camera,
+    BarChart3,
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { CAMEROON_REGIONS } from "@kbouffe/module-marketplace/lib";
 import { useSupplier } from "../SupplierContext";
+import { ProductFilters, DEFAULT_FILTERS, type ProductFilterState } from "./components/ProductFilters";
+import { ProductAnalytics } from "./components/ProductAnalytics";
+import { StockAlertBadge } from "./components/StockAlertBadge";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -805,11 +809,11 @@ function ProductRow({
                 <span className="text-surface-500 font-normal ml-0.5">/{product.unit}</span>
             </td>
             <td className="px-4 py-3.5 hidden md:table-cell">
-                <span className="text-sm text-surface-400">
-                    {product.available_quantity != null
-                        ? `${product.available_quantity} ${product.unit}`
-                        : "—"}
-                </span>
+                <StockAlertBadge
+                    availableQty={product.available_quantity}
+                    minOrderQty={product.min_order_quantity}
+                    unit={product.unit}
+                />
             </td>
             <td className="px-4 py-3.5">
                 <StatusBadge active={product.is_active} />
@@ -858,6 +862,21 @@ function ProductRow({
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
+// ── Tab type ──────────────────────────────────────────────────────────────
+
+type ProductTab = "list" | "analytics";
+
+// ── Stock-level helper for filtering ──────────────────────────────────────
+
+function getStockLevel(available: number | null, minOrder: number): "low" | "good" | "excess" | "unknown" {
+    if (available == null) return "unknown";
+    if (available < minOrder) return "low";
+    if (available > minOrder * 5) return "excess";
+    return "good";
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────
+
 export default function ProduitsPage() {
     const { supplier } = useSupplier();
     const isApproved = supplier?.kyc_status === "approved";
@@ -867,7 +886,8 @@ export default function ProduitsPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editProduct, setEditProduct] = useState<Product | null>(null);
     const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
-    const [search, setSearch] = useState("");
+    const [activeTab, setActiveTab] = useState<ProductTab>("list");
+    const [filters, setFilters] = useState<ProductFilterState>(DEFAULT_FILTERS);
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -909,9 +929,37 @@ export default function ProduitsPage() {
         setProducts((prev) => prev.filter((p) => p.id !== id));
     }
 
-    const filtered = products.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase())
-    );
+    // Apply all filters
+    const filtered = useMemo(() => {
+        return products.filter((p) => {
+            // Search
+            if (filters.search && !p.name.toLowerCase().includes(filters.search.toLowerCase())) {
+                return false;
+            }
+            // Category
+            if (filters.category && p.category !== filters.category) {
+                return false;
+            }
+            // Region
+            if (filters.region && p.origin_region !== filters.region) {
+                return false;
+            }
+            // Type (bio / conventional)
+            if (filters.type === "bio" && !p.is_organic) return false;
+            if (filters.type === "conventional" && p.is_organic) return false;
+            // Status (active / inactive)
+            if (filters.status === "active" && !p.is_active) return false;
+            if (filters.status === "inactive" && p.is_active) return false;
+            // Stock level
+            if (filters.stock !== "all") {
+                const level = getStockLevel(p.available_quantity, p.min_order_quantity);
+                if (filters.stock === "low" && level !== "low") return false;
+                if (filters.stock === "good" && level !== "good") return false;
+                if (filters.stock === "excess" && level !== "excess") return false;
+            }
+            return true;
+        });
+    }, [products, filters]);
 
     return (
         <div className="space-y-6">
@@ -938,7 +986,7 @@ export default function ProduitsPage() {
                     </button>
                     {!isApproved && (
                         <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-surface-800 text-white text-xs rounded-lg border border-white/10 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl z-10">
-                            Validez votre KYC d'abord
+                            Validez votre KYC d&apos;abord
                         </div>
                     )}
                 </div>
@@ -954,9 +1002,9 @@ export default function ProduitsPage() {
                 >
                     <AlertTriangle size={17} className="shrink-0 mt-0.5" />
                     <div>
-                        <p className="font-semibold">Catalogue désactivé</p>
+                        <p className="font-semibold">Catalogue desactive</p>
                         <p className="text-amber-400/80 text-xs mt-0.5">
-                            Votre KYC doit être approuvé avant de pouvoir ajouter ou modifier des
+                            Votre KYC doit etre approuve avant de pouvoir ajouter ou modifier des
                             produits. Statut actuel :{" "}
                             <strong className="text-amber-300">{supplier.kyc_status}</strong>
                         </p>
@@ -964,90 +1012,132 @@ export default function ProduitsPage() {
                 </motion.div>
             )}
 
-            {/* Search */}
-            {products.length > 0 && (
-                <div className="relative">
-                    <Search
-                        size={16}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-500 pointer-events-none"
-                    />
-                    <input
-                        type="search"
-                        placeholder="Rechercher un produit…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full max-w-xs pl-10 pr-4 py-2.5 rounded-xl bg-surface-900 border border-white/8 text-white placeholder:text-surface-500 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition-all"
-                    />
+            {/* Tabs: Tous les produits | Analytics */}
+            <div className="flex items-center gap-1 border-b border-white/8" role="tablist" aria-label="Onglets produits">
+                <button
+                    role="tab"
+                    aria-selected={activeTab === "list"}
+                    aria-controls="panel-list"
+                    onClick={() => setActiveTab("list")}
+                    className={`px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px ${
+                        activeTab === "list"
+                            ? "border-brand-500 text-brand-300"
+                            : "border-transparent text-surface-500 hover:text-white"
+                    }`}
+                >
+                    <span className="inline-flex items-center gap-1.5">
+                        <Package size={15} />
+                        Tous les produits
+                    </span>
+                </button>
+                <button
+                    role="tab"
+                    aria-selected={activeTab === "analytics"}
+                    aria-controls="panel-analytics"
+                    onClick={() => setActiveTab("analytics")}
+                    className={`px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px ${
+                        activeTab === "analytics"
+                            ? "border-brand-500 text-brand-300"
+                            : "border-transparent text-surface-500 hover:text-white"
+                    }`}
+                >
+                    <span className="inline-flex items-center gap-1.5">
+                        <BarChart3 size={15} />
+                        Analytics
+                    </span>
+                </button>
+            </div>
+
+            {/* Tab panels */}
+            {activeTab === "list" && (
+                <div id="panel-list" role="tabpanel" className="space-y-4">
+                    {/* Advanced filters */}
+                    {products.length > 0 && (
+                        <ProductFilters
+                            filters={filters}
+                            onChange={setFilters}
+                            resultCount={filtered.length}
+                            totalCount={products.length}
+                        />
+                    )}
+
+                    {/* Products table */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1, duration: 0.4 }}
+                        className="bg-surface-900 rounded-2xl border border-white/8 overflow-hidden"
+                    >
+                        {loading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 size={24} className="text-brand-400 animate-spin" />
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                                <div className="w-14 h-14 rounded-2xl bg-surface-800 border border-white/8 flex items-center justify-center mb-4">
+                                    <Package size={24} className="text-surface-500" />
+                                </div>
+                                <p className="text-white font-semibold mb-1">
+                                    {filters.search || filters.category || filters.region || filters.type !== "all" || filters.status !== "all" || filters.stock !== "all"
+                                        ? "Aucun resultat"
+                                        : "Aucun produit"}
+                                </p>
+                                <p className="text-sm text-surface-500 max-w-xs">
+                                    {filters.search
+                                        ? `Aucun produit ne correspond aux filtres appliques.`
+                                        : isApproved
+                                        ? "Commencez par ajouter votre premier produit au catalogue."
+                                        : "Votre catalogue sera active une fois votre KYC approuve."}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[560px]">
+                                    <thead>
+                                        <tr className="border-b border-white/8">
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
+                                                Produit
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden sm:table-cell">
+                                                Categorie
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
+                                                Prix
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden md:table-cell">
+                                                Stock
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
+                                                Statut
+                                            </th>
+                                            <th className="px-4 py-3 text-right text-xs font-semibold text-surface-500 uppercase tracking-wider">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtered.map((product) => (
+                                            <ProductRow
+                                                key={product.id}
+                                                product={product}
+                                                onToggle={handleToggle}
+                                                onEdit={setEditProduct}
+                                                onDelete={setDeleteProduct}
+                                            />
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </motion.div>
                 </div>
             )}
 
-            {/* Table */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-                className="bg-surface-900 rounded-2xl border border-white/8 overflow-hidden"
-            >
-                {loading ? (
-                    <div className="flex items-center justify-center py-16">
-                        <Loader2 size={24} className="text-brand-400 animate-spin" />
-                    </div>
-                ) : filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                        <div className="w-14 h-14 rounded-2xl bg-surface-800 border border-white/8 flex items-center justify-center mb-4">
-                            <Package size={24} className="text-surface-500" />
-                        </div>
-                        <p className="text-white font-semibold mb-1">
-                            {search ? "Aucun résultat" : "Aucun produit"}
-                        </p>
-                        <p className="text-sm text-surface-500 max-w-xs">
-                            {search
-                                ? `Aucun produit ne correspond à "${search}".`
-                                : isApproved
-                                ? "Commencez par ajouter votre premier produit au catalogue."
-                                : "Votre catalogue sera activé une fois votre KYC approuvé."}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[560px]">
-                            <thead>
-                                <tr className="border-b border-white/8">
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
-                                        Produit
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden sm:table-cell">
-                                        Catégorie
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
-                                        Prix
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider hidden md:table-cell">
-                                        Stock
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">
-                                        Statut
-                                    </th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-surface-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.map((product) => (
-                                    <ProductRow
-                                        key={product.id}
-                                        product={product}
-                                        onToggle={handleToggle}
-                                        onEdit={setEditProduct}
-                                        onDelete={setDeleteProduct}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </motion.div>
+            {activeTab === "analytics" && (
+                <div id="panel-analytics" role="tabpanel">
+                    <ProductAnalytics products={products} />
+                </div>
+            )}
 
             {/* Add product modal */}
             <AnimatePresence>

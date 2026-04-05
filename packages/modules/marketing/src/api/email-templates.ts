@@ -6,12 +6,20 @@
  * POST /email-templates            — Create template (super_admin only)
  * PUT  /email-templates/:id        — Update template (super_admin only)
  * DELETE /email-templates/:id      — Delete template (super_admin only)
+ * POST /email-templates/:id/ai/improve — Improve template with AI
+ * POST /email-templates/ai/generate    — Generate new template with AI
+ * POST /email-templates/:id/ai/translate — Translate template
+ * POST /email-templates/:id/ai/variants  — Generate A/B testing variants
  */
 
 import { Hono } from "hono";
 import { CoreEnv as Env, CoreVariables as Variables } from "@kbouffe/module-core";
+import { improveTemplate, generateTemplate, translateTemplate, generateVariants } from "./email-ai";
 
 export const emailTemplatesRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+// Type helper to access AI from environment
+const getAI = (c: any) => (c.env as any).AI;
 
 type EmailTemplate = {
     id: string;
@@ -188,4 +196,154 @@ emailTemplatesRoutes.delete("/:id", async (c) => {
     }
 
     return c.json({ success: true }, 200);
+});
+
+/** POST /email-templates/:id/ai/improve — Improve template with AI */
+emailTemplatesRoutes.post("/:id/ai/improve", async (c) => {
+    if (c.var.adminRole !== "super_admin") {
+        return c.json({ error: "Accès refusé. Super admin uniquement." }, 403);
+    }
+
+    const id = c.req.param("id");
+    const body = await c.req.json() as any;
+
+    // Fetch template
+    const { data: template, error: fetchError } = await c.var.supabase
+        .from("email_templates")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+    if (fetchError || !template) {
+        return c.json({ error: "Modèle de courriel non trouvé" }, 404);
+    }
+
+    try {
+        const ai = getAI(c);
+        if (!ai) {
+            return c.json({ error: "Service d'IA non disponible" }, 503);
+        }
+        const suggestions = await improveTemplate(ai, {
+            subject: template.subject,
+            body: template.body,
+            category: template.category,
+        });
+
+        return c.json({ suggestions });
+    } catch (error) {
+        console.error("AI improve error:", error);
+        return c.json({ error: "Erreur lors de l'amélioration du modèle avec l'IA" }, 500);
+    }
+});
+
+/** POST /email-templates/ai/generate — Generate new template with AI */
+emailTemplatesRoutes.post("/ai/generate", async (c) => {
+    if (c.var.adminRole !== "super_admin") {
+        return c.json({ error: "Accès refusé. Super admin uniquement." }, 403);
+    }
+
+    const body = await c.req.json() as any;
+
+    if (!body.category || !["restaurant", "supplier", "client"].includes(body.category)) {
+        return c.json({ error: "Catégorie invalide" }, 400);
+    }
+
+    if (!body.topic?.trim()) {
+        return c.json({ error: "Le sujet est requis" }, 400);
+    }
+
+    try {
+        const ai = getAI(c);
+        if (!ai) {
+            return c.json({ error: "Service d'IA non disponible" }, 503);
+        }
+        const generated = await generateTemplate(ai, {
+            category: body.category,
+            topic: body.topic.trim(),
+            tone: body.tone ?? "professional",
+        });
+
+        return c.json({ template: generated });
+    } catch (error) {
+        console.error("AI generate error:", error);
+        return c.json({ error: "Erreur lors de la génération du modèle avec l'IA" }, 500);
+    }
+});
+
+/** POST /email-templates/:id/ai/translate — Translate template */
+emailTemplatesRoutes.post("/:id/ai/translate", async (c) => {
+    if (c.var.adminRole !== "super_admin") {
+        return c.json({ error: "Accès refusé. Super admin uniquement." }, 403);
+    }
+
+    const id = c.req.param("id");
+    const body = await c.req.json() as any;
+
+    if (!["en", "fr"].includes(body.toLang)) {
+        return c.json({ error: "Langue cible invalide (en, fr)" }, 400);
+    }
+
+    // Fetch template
+    const { data: template, error: fetchError } = await c.var.supabase
+        .from("email_templates")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+    if (fetchError || !template) {
+        return c.json({ error: "Modèle de courriel non trouvé" }, 404);
+    }
+
+    try {
+        const ai = getAI(c);
+        if (!ai) {
+            return c.json({ error: "Service d'IA non disponible" }, 503);
+        }
+        const fromLang = body.fromLang ?? "fr";
+
+        const translated = await translateTemplate(ai, {
+            subject: template.subject,
+            body: template.body,
+            fromLang: fromLang as any,
+            toLang: body.toLang,
+        });
+
+        return c.json({ template: translated });
+    } catch (error) {
+        console.error("AI translate error:", error);
+        return c.json({ error: "Erreur lors de la traduction du modèle" }, 500);
+    }
+});
+
+/** POST /email-templates/:id/ai/variants — Generate A/B testing variants */
+emailTemplatesRoutes.post("/:id/ai/variants", async (c) => {
+    if (c.var.adminRole !== "super_admin") {
+        return c.json({ error: "Accès refusé. Super admin uniquement." }, 403);
+    }
+
+    const id = c.req.param("id");
+
+    // Fetch template
+    const { data: template, error: fetchError } = await c.var.supabase
+        .from("email_templates")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+    if (fetchError || !template) {
+        return c.json({ error: "Modèle de courriel non trouvé" }, 404);
+    }
+
+    try {
+        const ai = getAI(c);
+        if (!ai) {
+            return c.json({ error: "Service d'IA non disponible" }, 503);
+        }
+        const variants = await generateVariants(ai, template.subject, template.body, template.category);
+
+        return c.json({ variants });
+    } catch (error) {
+        console.error("AI variants error:", error);
+        return c.json({ error: "Erreur lors de la génération des variantes" }, 500);
+    }
 });
