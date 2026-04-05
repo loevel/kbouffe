@@ -62,6 +62,7 @@ import {
     publicRestaurantReviewRoutes,
 } from "./modules/reviews";
 import supplierAnalyticsRouter from "./modules/supplier/analytics";
+import { predictionsRouter } from "./modules/supplier";
 
 // ── Admin routes ─────────────────────────────────────────────────────
 import { adminRoutes } from "./modules/admin";
@@ -303,6 +304,7 @@ api.route("/restaurant/product-reviews", merchantProductReviewRoutes);
 
 // ── Supplier Analytics (dashboard metrics) ────────────────────────────────
 api.route("/supplier", supplierAnalyticsRouter);
+api.route("/supplier", predictionsRouter);
 
 // ── Dark Kitchens / Multi-Marques + KYC ─────────────────────────────
 api.route("/restaurant/brands", brandsRoutes);

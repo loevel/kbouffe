@@ -48,6 +48,12 @@ const NAV_ITEMS = [
         exact: false,
     },
     {
+        href: "/dashboard/fournisseur/automation",
+        label: "Automatisation",
+        icon: Package,
+        exact: false,
+    },
+    {
         href: "/dashboard/fournisseur/produits",
         label: "Mes produits",
         icon: Package,

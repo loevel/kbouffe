@@ -173,3 +173,92 @@ export function getChurnRiskBg(risk: "low" | "medium" | "high"): string {
       return "bg-red-500/10 border-red-500/25";
   }
 }
+
+/**
+ * Phase 2 — Predictions Hooks
+ */
+
+interface DemandForecast {
+  productId: string;
+  productName: string;
+  currentStock: number;
+  historicalAvgPerDay: number;
+  forecast30d: number;
+  suggestedReorderQty: number;
+  reorderUrgency: "low" | "medium" | "high";
+  daysUntilStockout: number;
+}
+
+interface PriceRecommendation {
+  productId: string;
+  productName: string;
+  currentPrice: number;
+  suggestedPrice: number;
+  priceDelta: number;
+  targetMarginPercent: number;
+  estimatedMargin: number;
+  confidence: number;
+}
+
+interface MarginAlert {
+  productId: string;
+  productName: string;
+  currentMargin: number;
+  targetMargin: number;
+  daysAboveTarget: number;
+  recommendation: string;
+  severity: "info" | "warning" | "critical";
+}
+
+interface CogsPriceData {
+  productId: string;
+  productName: string;
+  costPerUnit: number;
+  sellingPrice: number;
+  unitsSoldLast30d: number;
+  totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
+  marginPercent: number;
+  roiPercent: number;
+}
+
+export function useDemandForecast(supplierId: string) {
+  const { data, error, isLoading } = useSWR<DemandForecast[]>(
+    supplierId ? `/api/supplier/forecast?supplierId=${supplierId}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+
+  return { forecast: data || [], error, isLoading };
+}
+
+export function usePriceSuggestions(supplierId: string, targetMargin: number = 30) {
+  const { data, error, isLoading } = useSWR<PriceRecommendation[]>(
+    supplierId ? `/api/supplier/price-suggestions?supplierId=${supplierId}&targetMargin=${targetMargin}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+
+  return { suggestions: data || [], error, isLoading };
+}
+
+export function useMarginAlerts(supplierId: string, targetMargin: number = 30) {
+  const { data, error, isLoading } = useSWR<MarginAlert[]>(
+    supplierId ? `/api/supplier/margin-alerts?supplierId=${supplierId}&targetMargin=${targetMargin}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+
+  return { alerts: data || [], error, isLoading };
+}
+
+export function useCOGSAnalysis(supplierId: string) {
+  const { data, error, isLoading } = useSWR<CogsPriceData[]>(
+    supplierId ? `/api/supplier/cogs-analysis?supplierId=${supplierId}` : null,
+    (url) => authFetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+
+  return { analysis: data || [], error, isLoading };
+}
