@@ -21,7 +21,7 @@ import {
     RefreshCw,
     Sparkles,
 } from "lucide-react";
-import { Card, Button, toast } from "@kbouffe/module-core/ui";
+import { Card, Button, toast, authFetch } from "@kbouffe/module-core/ui";
 import { usePremiumCheck } from "@/hooks/use-premium";
 import { PremiumUpgradeCard } from "@/components/dashboard/PremiumUpgradeCard";
 
@@ -78,7 +78,7 @@ function AIAdvisorContent() {
     const analyze = useCallback(async (q?: string) => {
         setLoading(true);
         try {
-            const res = await fetch("/api/ai/analytics", {
+            const res = await authFetch("/api/ai/analytics", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ question: q ?? question }),
