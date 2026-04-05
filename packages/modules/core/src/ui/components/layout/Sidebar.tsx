@@ -73,17 +73,21 @@ export const MODULE_REQUIREMENTS: Record<string, string> = {
 
 interface SidebarProps {
     pendingOrderCount?: number;
+    badgeCounts?: Record<string, number>;
 }
 
-export function Sidebar({ pendingOrderCount = 0 }: SidebarProps) {
+export function Sidebar({ pendingOrderCount = 0, badgeCounts = {} }: SidebarProps) {
     const pathname = usePathname();
     const { t } = useLocale();
     const { can, hasModule } = useDashboard();
 
     const allNavItems: NavItem[] = [
-        ...navItemsDef.map(item =>
-            item.labelKey === "orders" ? { ...item, badge: pendingOrderCount } : item
-        )
+        ...navItemsDef.map(item => {
+            if (item.labelKey === "orders") return { ...item, badge: (badgeCounts["orders"] ?? pendingOrderCount) || undefined };
+            if (item.labelKey === "messages") return { ...item, badge: badgeCounts["messages"] || undefined };
+            if (item.labelKey === "reviews") return { ...item, badge: badgeCounts["reviews"] || undefined };
+            return item;
+        })
     ];
 
     const navItems = allNavItems.filter((item) => {

@@ -9,6 +9,7 @@
  * Sur mobile on allège la barre car la BottomNavBar gère la navigation principale.
  */
 
+import { type ReactNode } from "react";
 import { Menu, ExternalLink, Sun, Moon, Monitor, Globe } from "lucide-react";
 import { NotificationBell } from "./NotificationBell";
 import { Dropdown } from "../Dropdown";
@@ -19,6 +20,7 @@ import type { Locale } from "../../i18n";
 
 interface TopbarProps {
     onMenuClick: () => void;
+    searchSlot?: ReactNode;
 }
 
 const themeOptions: { value: Theme; icon: any }[] = [
@@ -27,7 +29,7 @@ const themeOptions: { value: Theme; icon: any }[] = [
     { value: "system", icon: Monitor },
 ];
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+export function Topbar({ onMenuClick, searchSlot }: TopbarProps) {
     const { user, restaurant, signOut } = useDashboard();
     const { theme, setTheme } = useTheme();
     const { locale, t, setLocale } = useLocale();
@@ -68,6 +70,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
             {/* ── Droite ── */}
             <div className="flex items-center gap-0.5 lg:gap-1 shrink-0">
+
+                {/* Recherche rapide — slot injecté depuis DashboardShell */}
+                {searchSlot && <div className="hidden sm:block mr-1">{searchSlot}</div>}
 
                 {/* Lien "Voir ma boutique" — desktop + tablet */}
                 <a

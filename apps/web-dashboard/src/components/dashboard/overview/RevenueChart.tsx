@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Download } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@kbouffe/module-core/ui";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -45,6 +46,18 @@ export function RevenueChart() {
         : revenueChart;
     const chartMax = Math.max(...chartData.map((d) => d.value), 1);
 
+    const exportCSV = () => {
+        const rows = [["Période", "Chiffre d'affaires (FCFA)"], ...chartData.map((d) => [d.label, d.value])];
+        const csv = rows.map((r) => r.join(";")).join("\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `chiffre-affaires-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -65,6 +78,13 @@ export function RevenueChart() {
                                 {opt.label}
                             </button>
                         ))}
+                        <button
+                            onClick={exportCSV}
+                            title="Exporter en CSV"
+                            className="ml-1 p-1.5 rounded-lg text-surface-400 hover:text-brand-500 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                        >
+                            <Download size={14} />
+                        </button>
                     </div>
                     <span className="text-lg font-bold text-surface-900 dark:text-white w-full sm:w-auto">
                         {formatCFA(total)}

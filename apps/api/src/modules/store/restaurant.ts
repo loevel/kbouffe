@@ -196,3 +196,192 @@ restaurantRoutes.get("/alerts", async (c) => {
     if (error) return c.json({ error: error.message }, 500);
     return c.json({ alerts: data });
 });
+
+/** GET /restaurant/activity — Last 10 activity events (orders + reviews + messages) */
+restaurantRoutes.get("/activity", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const supabase = c.var.supabase;
+
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [ordersRes, reviewsRes, messagesRes] = await Promise.all([
+        supabase
+            .from("orders")
+            .select("id, status, total, customer_name, created_at")
+            .eq("restaurant_id", restaurantId)
+            .gte("created_at", since)
+            .order("created_at", { ascending: false })
+            .limit(10),
+        supabase
+            .from("reviews")
+            .select("id, rating, comment, customer_name, created_at")
+            .eq("restaurant_id", restaurantId)
+            .gte("created_at", since)
+            .order("created_at", { ascending: false })
+            .limit(5),
+        supabase
+            .from("conversations")
+            .select("id, type, subject, updated_at")
+            .eq("restaurant_id", restaurantId)
+            .gte("updated_at", since)
+            .order("updated_at", { ascending: false })
+            .limit(5),
+    ]);
+
+    type ActivityEvent = {
+        id: string;
+        type: "order_new" | "order_completed" | "review_new" | "message_new" | "payment_received" | "customer_new";
+        title: string;
+        description: string;
+        created_at: string;
+        meta?: { amount?: number; rating?: number };
+    };
+
+    const events: ActivityEvent[] = [];
+
+    for (const order of ordersRes.data ?? []) {
+        const shortId = (order.id as string).slice(-6).toUpperCase();
+        events.push({
+            id: `order-${order.id}`,
+            type: order.status === "delivered" || order.status === "completed" ? "order_completed" : "order_new",
+            title: order.status === "delivered" || order.status === "completed"
+                ? `Commande #${shortId} livrée`
+                : `Nouvelle commande #${shortId}`,
+            description: order.customer_name
+                ? `${order.customer_name} — ${order.total?.toLocaleString("fr-FR")} FCFA`
+                : `${order.total?.toLocaleString("fr-FR")} FCFA`,
+            created_at: order.created_at as string,
+            meta: { amount: order.total },
+        });
+    }
+
+    for (const review of reviewsRes.data ?? []) {
+        const stars = "⭐".repeat(Math.max(1, Math.min(5, review.rating ?? 0)));
+        events.push({
+            id: `review-${review.id}`,
+            type: "review_new",
+            title: `Nouvel avis ${stars}`,
+            description: review.comment?.slice(0, 60) ?? (review.customer_name ?? ""),
+            created_at: review.created_at as string,
+            meta: { rating: review.rating },
+        });
+    }
+
+    for (const msg of messagesRes.data ?? []) {
+        events.push({
+            id: `msg-${msg.id}`,
+            type: "message_new",
+            title: "Nouveau message",
+            description: msg.subject ?? (msg.type === "support" ? "Ticket support" : "Message client"),
+            created_at: msg.updated_at as string,
+        });
+    }
+
+    // Sort by date desc and cap at 15
+    events.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return c.json({ events: events.slice(0, 15) });
+});
+
+/** GET /restaurant/badges — Unread counts for nav badges */
+restaurantRoutes.get("/badges", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const userId = c.var.userId;
+    const supabase = c.var.supabase;
+
+    const [ordersRes, msgsRes, reviewsRes] = await Promise.all([
+        supabase
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("restaurant_id", restaurantId)
+            .in("status", ["pending", "confirmed"]),
+        // Count messages sent by customers (not the merchant) that are unread
+        supabase
+            .from("messages")
+            .select("id", { count: "exact", head: true })
+            .eq("is_read", false)
+            .neq("sender_id", userId)
+            .in(
+                "conversation_id",
+                supabase
+                    .from("conversations")
+                    .select("id")
+                    .eq("restaurant_id", restaurantId)
+            ),
+        supabase
+            .from("reviews")
+            .select("id", { count: "exact", head: true })
+            .eq("restaurant_id", restaurantId)
+            .is("reply", null),
+    ]);
+
+    return c.json({
+        orders: ordersRes.count ?? 0,
+        messages: msgsRes.count ?? 0,
+        reviews: reviewsRes.count ?? 0,
+    });
+});
+
+/** GET /restaurant/search?q=... — Global quick search across orders, products, customers */
+restaurantRoutes.get("/search", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const q = (c.req.query("q") ?? "").trim();
+    const supabase = c.var.supabase;
+
+    if (q.length < 2) return c.json({ results: [] });
+
+    const [ordersRes, productsRes, customersRes] = await Promise.all([
+        supabase
+            .from("orders")
+            .select("id, status, total, customer_name, created_at")
+            .eq("restaurant_id", restaurantId)
+            .or(`id.ilike.%${q}%,customer_name.ilike.%${q}%`)
+            .order("created_at", { ascending: false })
+            .limit(5),
+        supabase
+            .from("products")
+            .select("id, name, price, category_id")
+            .eq("restaurant_id", restaurantId)
+            .ilike("name", `%${q}%`)
+            .limit(5),
+        supabase
+            .from("users")
+            .select("id, full_name, phone, email")
+            .ilike("full_name", `%${q}%`)
+            .limit(3),
+    ]);
+
+    type SearchResult = { type: "order" | "product" | "customer"; id: string; title: string; subtitle?: string; href: string };
+    const results: SearchResult[] = [];
+
+    for (const o of ordersRes.data ?? []) {
+        const shortId = (o.id as string).slice(-6).toUpperCase();
+        results.push({
+            type: "order",
+            id: o.id as string,
+            title: `Commande #${shortId}`,
+            subtitle: `${o.customer_name ?? "Client"} — ${(o.total as number)?.toLocaleString("fr-FR")} FCFA`,
+            href: `/dashboard/orders`,
+        });
+    }
+    for (const p of productsRes.data ?? []) {
+        results.push({
+            type: "product",
+            id: p.id as string,
+            title: p.name as string,
+            subtitle: `${(p.price as number)?.toLocaleString("fr-FR")} FCFA`,
+            href: `/dashboard/menu`,
+        });
+    }
+    for (const u of customersRes.data ?? []) {
+        results.push({
+            type: "customer",
+            id: u.id as string,
+            title: u.full_name as string,
+            subtitle: (u.phone ?? u.email) as string | undefined,
+            href: `/dashboard/customers`,
+        });
+    }
+
+    return c.json({ results: results.slice(0, 10) });
+});

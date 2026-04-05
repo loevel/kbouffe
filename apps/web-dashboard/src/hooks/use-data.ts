@@ -440,3 +440,20 @@ export function useRestaurant() {
     mutate,
   };
 }
+
+// ── useNavBadges ─────────────────────────────────────────────────────────
+
+interface NavBadges extends Record<string, number> {
+    orders: number;
+    messages: number;
+    reviews: number;
+}
+
+export function useNavBadges(): NavBadges {
+    const { data } = useSWR<NavBadges>(
+        "/api/restaurant/badges",
+        (url: string) => fetcher<NavBadges>(url),
+        { refreshInterval: 30_000, fallbackData: { orders: 0, messages: 0, reviews: 0 } }
+    );
+    return data ?? { orders: 0, messages: 0, reviews: 0 };
+}

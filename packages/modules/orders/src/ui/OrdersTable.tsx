@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, Eye, ArrowUpDown, Download, RotateCcw } from "lucide-react";
+import { Search, Eye, ArrowUpDown, CalendarClock, Download, RotateCcw } from "lucide-react";
 import { Badge, Button, Card, Dropdown, EmptyState, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Tabs, toast, useLocale, formatDate, formatCFA, formatDateTime, formatOrderId, type Order } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "./OrderStatusBadge";
 import { useOrders } from "../hooks/use-orders";
@@ -34,8 +34,11 @@ export function OrdersTable() {
     // Use all orders (no limit) for tab counts
     const { orders: allOrders } = useOrders({ limit: 200 });
 
+    const scheduledCount = allOrders.filter(o => o.status === "scheduled").length;
+
     const statusTabs = [
         { id: "all", label: t.orders.allStatuses },
+        ...(scheduledCount > 0 ? [{ id: "scheduled", label: t.orders.scheduled, count: scheduledCount }] : []),
         { id: "pending", label: t.orders.pending, count: allOrders.filter(o => o.status === "pending").length },
         { id: "accepted", label: t.orders.acceptedPlural, count: allOrders.filter(o => o.status === "accepted").length },
         { id: "preparing", label: t.orders.preparingPlural, count: allOrders.filter(o => o.status === "preparing").length },
@@ -181,14 +184,23 @@ export function OrdersTable() {
                                     <TableCell>{order.customer_name}</TableCell>
                                     <TableCell className="font-medium">{formatCFA(order.total)}</TableCell>
                                     <TableCell><OrderStatusBadge status={order.status} /></TableCell>
-                                    <TableCell className="text-surface-500">{formatDateTime(order.created_at)}</TableCell>
+                                    <TableCell className="text-surface-500">
+                                        {order.status === "scheduled" && "scheduled_for" in order && order.scheduled_for ? (
+                                            <span className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 font-medium">
+                                                <CalendarClock size={13} />
+                                                {formatDateTime(String(order.scheduled_for))}
+                                            </span>
+                                        ) : (
+                                            formatDateTime(order.created_at)
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         <div className="inline-flex items-center gap-2 justify-end">
                                             {/* Badge "Remboursé" */}
                                             {order.payment_status === "refunded" && (
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg">
                                                     <RotateCcw size={11} />
-                                                    Remboursé
+                                                    {t.orders.refunded}
                                                 </span>
                                             )}
                                             {/* Bouton Rembourser */}
@@ -196,10 +208,10 @@ export function OrdersTable() {
                                                 <button
                                                     onClick={() => setOrderToRefund(order)}
                                                     className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
-                                                    aria-label={`Rembourser la commande ${formatOrderId(order.id)}`}
+                                                    aria-label={`${t.orders.refundOrder} ${formatOrderId(order.id)}`}
                                                 >
                                                     <RotateCcw size={12} />
-                                                    Rembourser
+                                                    {t.orders.refundOrder}
                                                 </button>
                                             )}
                                             <Link

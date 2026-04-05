@@ -26,6 +26,7 @@ interface MobileSidebarProps {
     isOpen: boolean;
     onClose: () => void;
     pendingOrderCount?: number;
+    badgeCounts?: Record<string, number>;
 }
 
 // Groupes de navigation pour meilleure lisibilité sur mobile
@@ -48,7 +49,7 @@ const NAV_GROUPS = [
     },
 ] as const;
 
-export function MobileSidebar({ isOpen, onClose, pendingOrderCount = 0 }: MobileSidebarProps) {
+export function MobileSidebar({ isOpen, onClose, pendingOrderCount = 0, badgeCounts = {} }: MobileSidebarProps) {
     const pathname = usePathname();
     const { t } = useLocale();
     const { can, user, restaurant } = useDashboard();
@@ -76,9 +77,12 @@ export function MobileSidebar({ isOpen, onClose, pendingOrderCount = 0 }: Mobile
     }
 
     // Filtre par permissions (comme le Sidebar desktop)
-    const allNavItems = navItemsDef.map((item) =>
-        item.labelKey === "orders" ? { ...item, badge: pendingOrderCount } : item
-    ).filter((item) => {
+    const allNavItems = navItemsDef.map((item) => {
+        if (item.labelKey === "orders") return { ...item, badge: (badgeCounts["orders"] ?? pendingOrderCount) || undefined };
+        if (item.labelKey === "messages") return { ...item, badge: badgeCounts["messages"] || undefined };
+        if (item.labelKey === "reviews") return { ...item, badge: badgeCounts["reviews"] || undefined };
+        return item;
+    }).filter((item) => {
         const requiredPermission = NAV_PERMISSIONS[item.href as keyof typeof NAV_PERMISSIONS];
         return requiredPermission ? can(requiredPermission) : true;
     });

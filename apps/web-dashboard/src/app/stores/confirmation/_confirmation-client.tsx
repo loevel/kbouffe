@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+    CalendarClock,
     CheckCircle2,
     ChefHat,
     Clock,
@@ -59,11 +60,21 @@ function TimelineStep({
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function ConfirmationPageClient() {
     const searchParams   = useSearchParams();
-    const orderId        = searchParams.get("orderId");
-    const restaurantName = searchParams.get("restaurant") ?? "le restaurant";
-    const totalParam     = searchParams.get("total");
-    const total          = totalParam ? parseInt(totalParam, 10) : null;
-    const deliveryType   = searchParams.get("deliveryType") ?? "delivery";
+    const orderId          = searchParams.get("orderId");
+    const restaurantName   = searchParams.get("restaurant") ?? "le restaurant";
+    const totalParam       = searchParams.get("total");
+    const total            = totalParam ? parseInt(totalParam, 10) : null;
+    const deliveryType     = searchParams.get("deliveryType") ?? "delivery";
+    const scheduledForParam = searchParams.get("scheduledFor");
+
+    // Parse and validate scheduledFor date
+    let scheduledFor: Date | null = null;
+    if (scheduledForParam) {
+        const parsed = new Date(scheduledForParam);
+        if (!isNaN(parsed.getTime())) {
+            scheduledFor = parsed;
+        }
+    }
 
     const [visible, setVisible] = useState(false);
 
@@ -109,7 +120,7 @@ export function ConfirmationPageClient() {
                         </span>
                     </div>
                     <h1 className="text-3xl font-extrabold text-surface-900 dark:text-white mt-5 mb-2">
-                        Commande confirmée !
+                        {scheduledFor ? "Commande programmée !" : "Commande confirmée !"}
                     </h1>
                     <p className="text-surface-500 dark:text-surface-400 text-base">
                         Votre commande chez <strong className="text-surface-900 dark:text-white">{decodeURIComponent(restaurantName)}</strong> a bien été enregistrée.
@@ -132,42 +143,87 @@ export function ConfirmationPageClient() {
                         )}
                     </div>
 
-                    {/* ETA */}
-                    <div className="mt-4 inline-flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 bg-brand-50 dark:bg-brand-500/10 px-4 py-2 rounded-full">
-                        <Clock size={14} className="text-brand-500" />
-                        <span>
-                            {deliveryType === "delivery"
-                                ? <>Livraison estimée dans <strong className="text-surface-900 dark:text-white">30 – 50 min</strong></>
-                                : deliveryType === "dine_in"
-                                ? <>Vos plats seront prêts dans <strong className="text-surface-900 dark:text-white">20 – 35 min</strong></>
-                                : <>Prêt à retirer dans <strong className="text-surface-900 dark:text-white">20 – 35 min</strong></>}
-                        </span>
-                    </div>
+                    {/* ETA ou date programmée */}
+                    {scheduledFor && !isNaN(scheduledFor.getTime()) ? (
+                        <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30 px-4 py-2.5 rounded-full">
+                            <CalendarClock size={15} className="text-brand-500 shrink-0" />
+                            <span>
+                                Prévue le{" "}
+                                <strong className="text-surface-900 dark:text-white">
+                                    {scheduledFor.toLocaleString("fr-CM", {
+                                        weekday: "long", day: "numeric", month: "long",
+                                        hour: "2-digit", minute: "2-digit"
+                                    })}
+                                </strong>
+                            </span>
+                        </div>
+                    ) : (
+                        <div className="mt-4 inline-flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 bg-brand-50 dark:bg-brand-500/10 px-4 py-2 rounded-full">
+                            <Clock size={14} className="text-brand-500" />
+                            <span>
+                                {deliveryType === "delivery"
+                                    ? <>Livraison estimée dans <strong className="text-surface-900 dark:text-white">30 – 50 min</strong></>
+                                    : deliveryType === "dine_in"
+                                    ? <>Vos plats seront prêts dans <strong className="text-surface-900 dark:text-white">20 – 35 min</strong></>
+                                    : <>Prêt à retirer dans <strong className="text-surface-900 dark:text-white">20 – 35 min</strong></>}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Status timeline ──────────────────────────────────── */}
                 <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6 mb-6">
                     <h2 className="font-bold text-surface-900 dark:text-white mb-5">Suivi de la commande</h2>
-                    {deliveryType === "pickup" ? (
+
+                    {/* Timeline spécifique aux commandes programmées */}
+                    {scheduledFor && !isNaN(scheduledFor.getTime()) ? (
                         <>
-                            <TimelineStep label="Commande reçue"  desc="Votre commande a été enregistrée"                  done active={false} />
-                            <TimelineStep label="En préparation"  desc="Le restaurant prépare vos plats"                 done={false} active />
-                            <TimelineStep label="Prête à retirer" desc="Vous pouvez venir récupérer votre commande"     done={false} active={false} />
-                            <TimelineStep label="Récupérée"       desc="Commande récupérée avec succès"                  done={false} active={false} />
+                            <TimelineStep
+                                label="Commande enregistrée"
+                                desc="Votre commande programmée a bien été reçue"
+                                done
+                                active={false}
+                            />
+                            <TimelineStep
+                                label={`En attente — ${scheduledFor.toLocaleString("fr-CM", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}`}
+                                desc="Le restaurant prendra en charge votre commande à cette heure"
+                                done={false}
+                                active
+                            />
+                            <TimelineStep
+                                label="En préparation"
+                                desc="Le restaurant prépare vos plats"
+                                done={false}
+                                active={false}
+                            />
+                            {deliveryType === "pickup" ? (
+                                <TimelineStep label="Prête à retirer" desc="Vous pouvez venir récupérer votre commande" done={false} active={false} />
+                            ) : deliveryType === "dine_in" ? (
+                                <TimelineStep label="Servie" desc="Vos plats seront servis à votre table" done={false} active={false} />
+                            ) : (
+                                <TimelineStep label="Livrée" desc="Votre commande vous sera remise" done={false} active={false} />
+                            )}
+                        </>
+                    ) : deliveryType === "pickup" ? (
+                        <>
+                            <TimelineStep label="Commande reçue"  desc="Votre commande a été enregistrée"              done active={false} />
+                            <TimelineStep label="En préparation"  desc="Le restaurant prépare vos plats"               done={false} active />
+                            <TimelineStep label="Prête à retirer" desc="Vous pouvez venir récupérer votre commande"    done={false} active={false} />
+                            <TimelineStep label="Récupérée"       desc="Commande récupérée avec succès"                done={false} active={false} />
                         </>
                     ) : deliveryType === "dine_in" ? (
                         <>
-                            <TimelineStep label="Commande reçue"  desc="Votre commande a été enregistrée"                  done active={false} />
-                            <TimelineStep label="En préparation"  desc="La cuisine prépare vos plats"                    done={false} active />
-                            <TimelineStep label="Prête"           desc="Votre commande est prête"                       done={false} active={false} />
-                            <TimelineStep label="Servie"         desc="Vos plats ont été servis à votre table"          done={false} active={false} />
+                            <TimelineStep label="Commande reçue"  desc="Votre commande a été enregistrée"              done active={false} />
+                            <TimelineStep label="En préparation"  desc="La cuisine prépare vos plats"                  done={false} active />
+                            <TimelineStep label="Prête"           desc="Votre commande est prête"                      done={false} active={false} />
+                            <TimelineStep label="Servie"          desc="Vos plats ont été servis à votre table"        done={false} active={false} />
                         </>
                     ) : (
                         <>
-                            <TimelineStep label="Commande reçue"      desc="Votre commande a été enregistrée"         done active={false} />
-                            <TimelineStep label="En préparation"      desc="Le restaurant prépare vos plats"          done={false} active />
-                            <TimelineStep label="En cours de livraison" desc="Un livreur est en route vers vous"      done={false} active={false} />
-                            <TimelineStep label="Livrée"              desc="Votre commande vous a été remise"         done={false} active={false} />
+                            <TimelineStep label="Commande reçue"        desc="Votre commande a été enregistrée"        done active={false} />
+                            <TimelineStep label="En préparation"        desc="Le restaurant prépare vos plats"         done={false} active />
+                            <TimelineStep label="En cours de livraison" desc="Un livreur est en route vers vous"       done={false} active={false} />
+                            <TimelineStep label="Livrée"                desc="Votre commande vous a été remise"        done={false} active={false} />
                         </>
                     )}
                 </section>

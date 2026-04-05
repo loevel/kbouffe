@@ -16,6 +16,7 @@ import {
 import { Card, Badge, Input, Button } from "@kbouffe/module-core/ui";
 import { useLocale, useDashboard, formatDateTime } from "@kbouffe/module-core/ui";
 import { useChat, type Message } from "@kbouffe/module-orders/ui";
+import { MessageTemplates } from "@/components/dashboard/messages/MessageTemplates";
 
 interface ConversationItem {
     id: string;
@@ -576,7 +577,8 @@ function ChatUI({
 
             {/* Input */}
             <div className="p-4 border-t border-surface-100 dark:border-surface-800 bg-surface-50/30 dark:bg-surface-800/30">
-                <div className="flex items-center gap-2">
+                <MessageTemplates onSelect={onInputChange} />
+                <div className="flex items-center gap-2 mt-2">
                     <input
                         type="text"
                         value={input}

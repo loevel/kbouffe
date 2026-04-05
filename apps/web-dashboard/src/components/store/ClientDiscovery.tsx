@@ -91,7 +91,7 @@ const PROMO_CARDS = [
 ];
 
 const FILTER_CHIPS = [
-    { id: "offers", label: "Offres" },
+    { id: "offers", label: "🏷️ Offres", href: "/stores/offers" },
     { id: "free_delivery", label: "Livraison gratuite" },
     { id: "fast", label: "Moins de 30 min" },
     { id: "premium", label: "La crème de la crème" },
@@ -160,19 +160,29 @@ function FilterChips({
 
     return (
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 sm:-mx-6 px-4 sm:px-6">
-            {FILTER_CHIPS.map((chip) => (
-                <button
-                    key={chip.id}
-                    onClick={() => onToggle(chip.id)}
-                    className={`shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                        activeFilters.includes(chip.id)
-                            ? "bg-surface-900 dark:bg-white border-surface-900 dark:border-white text-white dark:text-surface-900"
-                            : "bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:border-surface-400"
-                    }`}
-                >
-                    {chip.label}
-                </button>
-            ))}
+            {FILTER_CHIPS.map((chip) =>
+                (chip as any).href ? (
+                    <Link
+                        key={chip.id}
+                        href={(chip as any).href}
+                        className="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition-all bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20"
+                    >
+                        {chip.label}
+                    </Link>
+                ) : (
+                    <button
+                        key={chip.id}
+                        onClick={() => onToggle(chip.id)}
+                        className={`shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                            activeFilters.includes(chip.id)
+                                ? "bg-surface-900 dark:bg-white border-surface-900 dark:border-white text-white dark:text-surface-900"
+                                : "bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:border-surface-400"
+                        }`}
+                    >
+                        {chip.label}
+                    </button>
+                )
+            )}
 
             <div className="relative shrink-0">
                 <button
@@ -220,75 +230,62 @@ function FilterChips({
 
 // ── Promo Carousel ───────────────────────────────────────────────────────────
 function PromoCarousel() {
-    const [index, setIndex] = useState(0);
-    const total = PROMO_CARDS.length;
+    const rowRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const t = setInterval(() => setIndex((i) => (i + 1) % total), 5000);
-        return () => clearInterval(t);
-    }, [total]);
-
-    const prev = () => setIndex((i) => (i - 1 + total) % total);
-    const next = () => setIndex((i) => (i + 1) % total);
+    const scroll = (dir: number) => {
+        rowRef.current?.scrollBy({ left: dir * 340, behavior: "smooth" });
+    };
 
     return (
-        <div className="relative mb-6 group">
-            {/* Track */}
-            <div className="overflow-hidden rounded-2xl">
-                <div
-                    className="flex transition-transform duration-500 ease-in-out"
-                    style={{ transform: `translateX(-${index * 100}%)` }}
-                >
-                    {PROMO_CARDS.map((card) => (
-                        <Link
-                            key={card.id}
-                            href={card.target}
-                            className={`shrink-0 w-full flex flex-col justify-between p-6 min-h-[160px] ${card.bgClass}`}
-                        >
-                            <div>
-                                <p className={`font-bold text-base leading-snug mb-1 ${card.textClass}`}>
-                                    {card.title}
-                                </p>
-                                {card.sub && (
-                                    <p className={`text-sm ${card.subClass}`}>{card.sub}</p>
-                                )}
-                            </div>
-                            <div className="mt-4">
-                                <span className={`inline-block px-4 py-2 rounded-full text-xs font-bold ${card.ctaClass}`}>
-                                    {card.cta}
-                                </span>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
+        <div className="relative mb-8 group">
+            {/* Multi-card horizontal scroll row */}
+            <div
+                ref={rowRef}
+                className="flex gap-4 overflow-x-auto scrollbar-hide pb-1 -mx-4 sm:-mx-6 px-4 sm:px-6 snap-x snap-mandatory"
+            >
+                {PROMO_CARDS.map((card) => (
+                    <Link
+                        key={card.id}
+                        href={card.target}
+                        className={`
+                            shrink-0 snap-start
+                            w-[78vw] sm:w-[360px] lg:w-[400px]
+                            flex flex-col justify-between
+                            p-6 rounded-2xl min-h-[152px]
+                            transition-transform hover:scale-[1.02] active:scale-[0.98]
+                            ${card.bgClass}
+                        `}
+                    >
+                        <div>
+                            <p className={`font-bold text-base leading-snug mb-1.5 ${card.textClass}`}>
+                                {card.title}
+                            </p>
+                            {card.sub && (
+                                <p className={`text-sm ${card.subClass}`}>{card.sub}</p>
+                            )}
+                        </div>
+                        <div className="mt-5">
+                            <span className={`inline-block px-4 py-2 rounded-full text-xs font-bold ${card.ctaClass}`}>
+                                {card.cta}
+                            </span>
+                        </div>
+                    </Link>
+                ))}
             </div>
 
-            {/* Arrows */}
+            {/* Left arrow — hidden on mobile, visible on hover on desktop */}
             <button
-                onClick={prev}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 dark:bg-surface-900/90 border border-surface-200 dark:border-surface-700 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => scroll(-1)}
+                className="hidden sm:flex absolute -left-4 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
                 <ChevronLeft size={16} />
             </button>
             <button
-                onClick={next}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 dark:bg-surface-900/90 border border-surface-200 dark:border-surface-700 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => scroll(1)}
+                className="hidden sm:flex absolute -right-4 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
                 <ChevronRight size={16} />
             </button>
-
-            {/* Dots */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                {PROMO_CARDS.map((_, i) => (
-                    <button
-                        key={i}
-                        onClick={() => setIndex(i)}
-                        className={`rounded-full transition-all duration-300 h-1.5 ${
-                            i === index ? "bg-white w-5" : "bg-white/50 w-1.5"
-                        }`}
-                    />
-                ))}
-            </div>
         </div>
     );
 }

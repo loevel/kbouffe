@@ -83,7 +83,7 @@ export function OrderTimeline({ currentStatus }: OrderTimelineProps) {
                                 "text-sm font-medium",
                                 isCompleted ? "text-surface-900 dark:text-white" : "text-surface-400 dark:text-surface-500"
                             )}>
-                                {t.orders[step.status]}
+                                {(t.orders as Record<string, string>)[step.status]}
                             </p>
                         </div>
                     </div>

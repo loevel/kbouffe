@@ -12,9 +12,11 @@ import { LocaleProvider } from "../../contexts/LocaleContext";
 interface DashboardShellProps {
     children: ReactNode;
     pendingOrderCount?: number;
+    badgeCounts?: Record<string, number>;
+    searchSlot?: ReactNode;
 }
 
-export function DashboardShell({ children, pendingOrderCount = 0 }: DashboardShellProps) {
+export function DashboardShell({ children, pendingOrderCount = 0, badgeCounts = {}, searchSlot }: DashboardShellProps) {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     return (
@@ -23,17 +25,18 @@ export function DashboardShell({ children, pendingOrderCount = 0 }: DashboardShe
                 <DashboardProvider>
                     <div className="flex h-screen overflow-hidden bg-surface-50 dark:bg-surface-950 text-surface-900 dark:text-surface-100">
                         {/* ── Sidebar desktop (hidden < lg) ── */}
-                        <Sidebar pendingOrderCount={pendingOrderCount} />
+                        <Sidebar pendingOrderCount={pendingOrderCount} badgeCounts={badgeCounts} />
 
                         {/* ── Drawer mobile animé (toujours monté) ── */}
                         <MobileSidebar
                             isOpen={isMobileSidebarOpen}
                             onClose={() => setIsMobileSidebarOpen(false)}
                             pendingOrderCount={pendingOrderCount}
+                            badgeCounts={badgeCounts}
                         />
 
                         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                            <Topbar onMenuClick={() => setIsMobileSidebarOpen(true)} />
+                            <Topbar onMenuClick={() => setIsMobileSidebarOpen(true)} searchSlot={searchSlot} />
 
                             <main className="flex-1 overflow-y-auto">
                                 {/*

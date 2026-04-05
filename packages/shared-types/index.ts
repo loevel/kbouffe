@@ -8,6 +8,7 @@
 export type UserRole = 'merchant' | 'customer';
 
 export type OrderStatus =
+    | 'scheduled'   // Commande programmée pour une heure future
     | 'pending'
     | 'accepted'
     | 'preparing'

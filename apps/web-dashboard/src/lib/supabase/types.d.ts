@@ -1920,7 +1920,7 @@ export interface AdCampaign {
     created_at: string;
     updated_at: string | null;
 }
-export type OrderStatus = Enums<"order_status"> | "delivering" | "delivered";
+export type OrderStatus = Enums<"order_status"> | "delivering" | "delivered" | "scheduled";
 export type UserRole = Enums<"user_role">;
 export type PayoutStatus = Enums<"payout_status">;
 export type PaymentMethod = Enums<"payment_method">;

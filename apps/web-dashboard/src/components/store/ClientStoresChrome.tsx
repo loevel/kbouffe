@@ -170,6 +170,25 @@ export function ClientStoresChrome({
 
                 {/* Nav */}
                 <div className="px-3 py-4 overflow-y-auto flex-1 space-y-6">
+                    {/* Offres shortcut */}
+                    <div>
+                        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-surface-400 dark:text-surface-600">
+                            Promotions
+                        </p>
+                        <nav className="space-y-0.5">
+                            <Link
+                                href="/stores/offers"
+                                className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                            >
+                                <div className="shrink-0 text-rose-500">
+                                    <Tag size={20} />
+                                </div>
+                                <span className="truncate">Offres & réductions</span>
+                                <span className="ml-auto text-[10px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full">NEW</span>
+                            </Link>
+                        </nav>
+                    </div>
+
                     {sectionGroups.map((group) => (
                         <div key={group.title}>
                             <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-surface-400 dark:text-surface-600">

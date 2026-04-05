@@ -3,8 +3,10 @@
 import { usePathname } from "next/navigation";
 import { DashboardShell } from "@kbouffe/module-core/ui";
 import { usePendingOrderCount } from "@/hooks/use-data";
+import { useNavBadges } from "@/hooks/use-data";
 import { useDashboardNotifications } from "@/hooks/use-dashboard-notifications";
 import { PosOperatorProvider } from "@/contexts/PosOperatorContext";
+import { GlobalSearch } from "@/components/dashboard/GlobalSearch";
 
 /**
  * DashboardShellWrapper
@@ -21,6 +23,7 @@ const SHELL_EXCLUDED_PREFIXES = [
 export function DashboardShellWrapper({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const pendingCount = usePendingOrderCount();
+    const badgeCounts = useNavBadges();
     useDashboardNotifications();
 
     // Pages avec leur propre shell → rendre les enfants directement
@@ -34,7 +37,9 @@ export function DashboardShellWrapper({ children }: { children: React.ReactNode 
 
     return (
         <PosOperatorProvider>
-            <DashboardShell pendingOrderCount={pendingCount}>{children}</DashboardShell>
+            <DashboardShell pendingOrderCount={pendingCount} badgeCounts={badgeCounts} searchSlot={<GlobalSearch />}>
+                {children}
+            </DashboardShell>
         </PosOperatorProvider>
     );
 }

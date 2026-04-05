@@ -269,6 +269,7 @@ export const fr = {
         statsActiveOrders: "Commandes actives",
         statsTodayRevenue: "CA du jour",
         statsCompletionRate: "Taux de completion",
+        scheduled: "Programmée",
         pending: "En attente",
         accepted: "Acceptee",
         preparing: "En preparation",

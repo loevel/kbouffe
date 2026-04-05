@@ -15,9 +15,7 @@ import {
     Shield,
     SlidersHorizontal,
     Smartphone,
-    Star,
     Tag,
-    Ticket,
     User,
 } from "lucide-react";
 import { OrdersPanelReal }    from "./OrdersPanelReal";
@@ -243,42 +241,6 @@ export function PaymentMethodsPanel() {
     );
 }
 
-export function PromotionsPanel() {
-    return (
-        <PanelShell title="Offres & promotions" subtitle="Codes promo, remises actives et bons plans du moment.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative overflow-hidden group p-5 rounded-2xl border border-brand-200 dark:border-brand-500/20 bg-brand-50 dark:bg-brand-500/5 hover:shadow-lg transition-all">
-                    <div className="relative z-10">
-                        <span className="inline-block px-2 py-0.5 rounded-lg bg-brand-500 text-white text-[10px] font-bold uppercase mb-2">Actif</span>
-                        <p className="text-lg font-black text-brand-900 dark:text-brand-100 mb-1">KBWELCOME20</p>
-                        <p className="text-sm text-brand-700 dark:text-brand-300 font-medium">
-                            -20% sur votre première commande
-                        </p>
-                        <p className="text-xs text-brand-600/60 dark:text-brand-400/60 mt-2">Valable jusqu&apos;au 31 Mars</p>
-                    </div>
-                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Ticket size={80} className="text-brand-500" />
-                    </div>
-                </div>
-
-                <div className="relative overflow-hidden group p-5 rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 hover:shadow-lg transition-all">
-                    <div className="relative z-10">
-                        <span className="inline-block px-2 py-0.5 rounded-lg bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-300 text-[10px] font-bold uppercase mb-2">Permanent</span>
-                        <p className="text-lg font-black text-surface-900 dark:text-white mb-1">Dimanche Royal</p>
-                        <p className="text-sm text-surface-500 dark:text-surface-400 font-medium">
-                            Livraison offerte sur toute la ville
-                        </p>
-                        <p className="text-xs text-surface-400/60 mt-2">Chaque dimanche de 12h à 20h</p>
-                    </div>
-                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Star size={80} className="text-surface-400" />
-                    </div>
-                </div>
-            </div>
-        </PanelShell>
-    );
-}
-
 
 export function SupportPanel() {
     return <SupportPanelReal />;
@@ -289,7 +251,6 @@ export type ClientSectionId =
     | "restaurants"
     | "orders"
     | "reservations"
-    | "promotions"
     | "favorites"
     | "addresses"
     | "payments"
@@ -303,7 +264,6 @@ export type ClientSectionIcon =
     | "home"
     | "orders"
     | "reservations"
-    | "promotions"
     | "favorites"
     | "addresses"
     | "payments"
@@ -328,7 +288,6 @@ export const clientSectionPath: Record<ClientSectionId, string> = {
     restaurants: "/stores",
     orders: "/stores/orders",
     reservations: "/stores/reservations",
-    promotions: "/stores/promotions",
     favorites: "/stores/favorites",
     addresses: "/stores/addresses",
     payments: "/stores/payments",
@@ -346,7 +305,6 @@ export const sectionGroups: ClientSectionGroup[] = [
             { id: "restaurants", label: "Accueil client", icon: "home" },
             { id: "orders", label: "Mes commandes", icon: "orders" },
             { id: "reservations", label: "Mes réservations", icon: "reservations" },
-            { id: "promotions", label: "Offres & promos", icon: "promotions" },
         ],
     },
     {
@@ -375,8 +333,6 @@ export function renderSectionPanel(section: ClientSectionId) {
             return <OrdersPanelReal />;
         case "reservations":
             return <ReservationsPanelReal />;
-        case "promotions":
-            return <PromotionsPanel />;
         case "favorites":
             return <FavoritesPanelReal />;
         case "addresses":

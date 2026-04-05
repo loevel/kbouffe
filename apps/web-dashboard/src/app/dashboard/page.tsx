@@ -9,6 +9,8 @@ import { RecentOrders } from "@/components/dashboard/overview/RecentOrders";
 import { PopularProducts } from "@/components/dashboard/overview/PopularProducts";
 import { QuickActions } from "@/components/dashboard/overview/QuickActions";
 import { OperationalAlerts } from "@/components/dashboard/overview/OperationalAlerts";
+import { KycProgressBar } from "@/components/dashboard/overview/KycProgressBar";
+import { ActivityFeed } from "@/components/dashboard/overview/ActivityFeed";
 import { useDashboard } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 
@@ -29,6 +31,7 @@ export default function DashboardPage() {
 
             <div className="space-y-6">
                 <OperationalAlerts />
+                <KycProgressBar />
                 <QuickActions />
 
                 {/* AI Advisor Banner */}
@@ -55,8 +58,9 @@ export default function DashboardPage() {
                 <RevenueChart />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <RecentOrders />
-                    <PopularProducts />
+                    <ActivityFeed />
                 </div>
+                <PopularProducts />
             </div>
         </>
     );

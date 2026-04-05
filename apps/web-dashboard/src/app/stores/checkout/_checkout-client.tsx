@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
     AlertCircle,
     ArrowLeft,
+    CalendarClock,
     CheckCircle2,
     ChefHat,
     CreditCard,
@@ -20,6 +21,7 @@ import {
     Users,
     Plus,
     Trash2,
+    Zap,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
@@ -125,6 +127,11 @@ export function CheckoutPageClient() {
     const [submitting, setSubmitting]         = useState(false);
     const [error, setError]                   = useState<string | null>(null);
     const [isLocating, setIsLocating]         = useState(false);
+
+    // ── Scheduled order state ────────────────────────────────────────────
+    const [isScheduled, setIsScheduled]         = useState(false);
+    const [scheduledDate, setScheduledDate]     = useState("");
+    const [scheduledTime, setScheduledTime]     = useState("");
 
     // ── Split payment state ──────────────────────────────────────────────
     const [isSplitPayment, setIsSplitPayment] = useState(false);
@@ -257,9 +264,27 @@ export function CheckoutPageClient() {
             setError("L'adresse de livraison est requise.");
             return false;
         }
+        if (isScheduled) {
+            if (!scheduledDate || !scheduledTime) {
+                setError("Veuillez choisir une date et une heure pour la commande programmée.");
+                return false;
+            }
+            const dt = new Date(`${scheduledDate}T${scheduledTime}`);
+            if (isNaN(dt.getTime()) || dt < new Date(Date.now() + 30 * 60 * 1000)) {
+                setError("L'heure programmée doit être au minimum 30 minutes dans le futur.");
+                return false;
+            }
+        }
         setError(null);
         return true;
     };
+
+    // ── Scheduled helpers ──────────────────────────────────────────────────
+    // min date = today, min time = now + 30min (pour le même jour)
+    const todayStr = new Date().toISOString().split("T")[0];
+    const scheduledIso = isScheduled && scheduledDate && scheduledTime
+        ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+        : undefined;
 
     // ── Split payment helpers ────────────────────────────────────────────
     const buildEqualSplits = (count: number) => {
@@ -312,6 +337,7 @@ export function CheckoutPageClient() {
                 deliveryFee,
                 total,
                 customerId:      userId ?? undefined,
+                scheduledFor:    scheduledIso,
             };
             const res = await fetch("/api/store/order", {
                 method:  "POST",
@@ -324,6 +350,7 @@ export function CheckoutPageClient() {
                 return;
             }
             const orderId = data.order?.id ?? data.id ?? data.orderId;
+            const confirmedScheduledFor: string | null = data.scheduledFor ?? null;
 
             // Create split payments if enabled (fire-and-forget — restaurant will manage confirmation)
             if (isSplitPayment && orderId) {
@@ -355,7 +382,12 @@ export function CheckoutPageClient() {
                 });
             }
             clear();
-            router.push(`/stores/confirmation?orderId=${orderId}&restaurant=${encodeURIComponent(restaurant.name)}&total=${total}`);
+            const confirmUrl = new URL("/stores/confirmation", window.location.origin);
+            confirmUrl.searchParams.set("orderId", orderId);
+            confirmUrl.searchParams.set("restaurant", restaurant.name);
+            confirmUrl.searchParams.set("total", String(total));
+            if (confirmedScheduledFor) confirmUrl.searchParams.set("scheduledFor", confirmedScheduledFor);
+            router.push(confirmUrl.pathname + confirmUrl.search);
         } catch {
             setError("Impossible de passer la commande. Vérifiez votre connexion.");
         } finally {
@@ -483,6 +515,88 @@ export function CheckoutPageClient() {
                                 </p>
                             </section>
                         )}
+
+                        {/* ── Commande programmée ───────────────────────── */}
+                        <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CalendarClock size={16} className="text-brand-500" />
+                                    <h2 className="font-bold text-surface-900 dark:text-white">Programmer la commande</h2>
+                                </div>
+                                {/* Toggle */}
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsScheduled(!isScheduled); setScheduledDate(""); setScheduledTime(""); }}
+                                    role="switch"
+                                    aria-checked={isScheduled}
+                                    aria-label={isScheduled ? "Désactiver la programmation de commande" : "Activer la programmation de commande"}
+                                    className={`relative w-11 h-6 rounded-full transition-colors ${isScheduled ? "bg-brand-500" : "bg-surface-200 dark:bg-surface-700"}`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isScheduled ? "translate-x-5" : ""}`} />
+                                </button>
+                            </div>
+
+                            {!isScheduled && (
+                                <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-50 dark:bg-surface-800">
+                                    <Zap size={14} className="text-amber-500 shrink-0" />
+                                    <p className="text-sm text-surface-600 dark:text-surface-400">
+                                        Votre commande sera préparée <span className="font-semibold text-surface-900 dark:text-white">dès que possible</span>.
+                                    </p>
+                                </div>
+                            )}
+
+                            {isScheduled && (
+                                <div className="mt-4 space-y-3">
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">
+                                        Choisissez la date et l&apos;heure souhaitées (minimum 30 min dans le futur).
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label htmlFor="scheduled-date" className="block text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-1.5">
+                                                Date
+                                            </label>
+                                            <input
+                                                id="scheduled-date"
+                                                type="date"
+                                                value={scheduledDate}
+                                                min={todayStr}
+                                                onChange={(e) => setScheduledDate(e.target.value)}
+                                                aria-label="Date de livraison programmée"
+                                                className="w-full h-11 px-3 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="scheduled-time" className="block text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-1.5">
+                                                Heure
+                                            </label>
+                                            <input
+                                                id="scheduled-time"
+                                                type="time"
+                                                value={scheduledTime}
+                                                onChange={(e) => setScheduledTime(e.target.value)}
+                                                aria-label="Heure de livraison programmée"
+                                                className="w-full h-11 px-3 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition"
+                                            />
+                                        </div>
+                                    </div>
+                                    {scheduledDate && scheduledTime && (() => {
+                                        const previewDate = new Date(`${scheduledDate}T${scheduledTime}`);
+                                        if (isNaN(previewDate.getTime())) return null;
+                                        return (
+                                            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20">
+                                                <CalendarClock size={14} className="text-brand-500 shrink-0" />
+                                                <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">
+                                                    Livraison prévue le{" "}
+                                                    {previewDate.toLocaleString("fr-CM", {
+                                                        weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit"
+                                                    })}
+                                                </p>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+                        </section>
 
                         <button
                             onClick={() => { if (validateStep1()) setStep("payment"); }}

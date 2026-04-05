@@ -16,6 +16,7 @@ export type Json =
 
 export type OrderStatus =
     | "draft"       // Parked order — Park & Recall feature
+    | "scheduled"   // Commande programmée — préparée à une heure future
     | "pending"
     | "accepted"
     | "preparing"
