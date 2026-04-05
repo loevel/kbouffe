@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { DashboardShell } from "@kbouffe/module-core/ui";
 import { usePendingOrderCount } from "@/hooks/use-data";
@@ -7,6 +8,7 @@ import { useNavBadges } from "@/hooks/use-data";
 import { useDashboardNotifications } from "@/hooks/use-dashboard-notifications";
 import { PosOperatorProvider } from "@/contexts/PosOperatorContext";
 import { GlobalSearch } from "@/components/dashboard/GlobalSearch";
+import { HelpModal } from "@/components/dashboard/HelpModal";
 
 /**
  * DashboardShellWrapper
@@ -24,6 +26,7 @@ export function DashboardShellWrapper({ children }: { children: React.ReactNode 
     const pathname = usePathname();
     const pendingCount = usePendingOrderCount();
     const badgeCounts = useNavBadges();
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
     useDashboardNotifications();
 
     // Pages avec leur propre shell → rendre les enfants directement
@@ -37,7 +40,14 @@ export function DashboardShellWrapper({ children }: { children: React.ReactNode 
 
     return (
         <PosOperatorProvider>
-            <DashboardShell pendingOrderCount={pendingCount} badgeCounts={badgeCounts} searchSlot={<GlobalSearch />}>
+            <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+            <DashboardShell 
+                pendingOrderCount={pendingCount} 
+                badgeCounts={badgeCounts} 
+                searchSlot={<GlobalSearch />}
+                helpOpen={isHelpOpen}
+                onHelpOpen={() => setIsHelpOpen(true)}
+            >
                 {children}
             </DashboardShell>
         </PosOperatorProvider>

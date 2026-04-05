@@ -22,6 +22,7 @@ import type { Locale } from "../../i18n";
 interface TopbarProps {
     onMenuClick: () => void;
     searchSlot?: ReactNode;
+    onHelpOpen?: () => void;
 }
 
 const themeOptions: { value: Theme; icon: any }[] = [
@@ -30,7 +31,7 @@ const themeOptions: { value: Theme; icon: any }[] = [
     { value: "system", icon: Monitor },
 ];
 
-export function Topbar({ onMenuClick, searchSlot }: TopbarProps) {
+export function Topbar({ onMenuClick, searchSlot, onHelpOpen }: TopbarProps) {
     const { user, restaurant, signOut } = useDashboard();
     const { theme, setTheme } = useTheme();
     const { locale, t, setLocale } = useLocale();
@@ -122,7 +123,7 @@ export function Topbar({ onMenuClick, searchSlot }: TopbarProps) {
                     items={[
                         { label: t.topbar.myProfile, onClick: () => router.push("/dashboard/profile") },
                         { label: t.topbar.security || "Sécurité", onClick: () => router.push("/dashboard/security") },
-                        { label: t.topbar.help || "Aide", onClick: () => {} }, // TODO: Open help modal
+                        { label: t.topbar.help || "Aide", onClick: () => onHelpOpen?.() }, // Invoke help modal
                         // Sélecteur thème dans le dropdown sur mobile
                         ...themeOptions.map((opt) => ({
                             label: t.theme[opt.value],

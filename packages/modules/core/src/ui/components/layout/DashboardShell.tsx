@@ -14,9 +14,11 @@ interface DashboardShellProps {
     pendingOrderCount?: number;
     badgeCounts?: Record<string, number>;
     searchSlot?: ReactNode;
+    helpOpen?: boolean;
+    onHelpOpen?: () => void;
 }
 
-export function DashboardShell({ children, pendingOrderCount = 0, badgeCounts = {}, searchSlot }: DashboardShellProps) {
+export function DashboardShell({ children, pendingOrderCount = 0, badgeCounts = {}, searchSlot, helpOpen = false, onHelpOpen }: DashboardShellProps) {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     return (
@@ -36,7 +38,7 @@ export function DashboardShell({ children, pendingOrderCount = 0, badgeCounts = 
                         />
 
                         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                            <Topbar onMenuClick={() => setIsMobileSidebarOpen(true)} searchSlot={searchSlot} />
+                            <Topbar onMenuClick={() => setIsMobileSidebarOpen(true)} searchSlot={searchSlot} onHelpOpen={onHelpOpen} />
 
                             <main className="flex-1 overflow-y-auto">
                                 {/*
