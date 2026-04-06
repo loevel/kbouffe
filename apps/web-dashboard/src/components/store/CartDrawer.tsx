@@ -341,7 +341,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                     )}
                                     {items.map((item) => (
                                         <div
-                                            key={item.cartKey}
+                                            key={item.cartKey ?? item.id}
                                             className="flex gap-3 items-start bg-surface-50 dark:bg-surface-800 rounded-xl p-3"
                                         >
                                             {/* Image */}

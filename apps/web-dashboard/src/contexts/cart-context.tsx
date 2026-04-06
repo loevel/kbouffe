@@ -96,7 +96,14 @@ function reducer(state: CartState, action: CartAction): CartState {
         case "CLEAR":
             return EMPTY;
         case "HYDRATE":
-            return action.state;
+            // Backfill cartKey for items persisted before the cartKey field was added
+            return {
+                ...action.state,
+                items: action.state.items.map((i) => ({
+                    ...i,
+                    cartKey: i.cartKey ?? i.id,
+                })),
+            };
         default:
             return state;
     }
