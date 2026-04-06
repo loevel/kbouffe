@@ -103,6 +103,7 @@ function PosOrderPanelInner({ tableNumber, tableId, onClose, existingDraft }: In
                     orderId: existingDraft.orderId,
                     draftLabel: existingDraft.draftLabel,
                     items: existingDraft.items.map((i) => ({
+                        cartKey: i.id,
                         productId: i.id,
                         name: i.name,
                         price: i.unit_price ?? i.price ?? 0,
@@ -133,6 +134,13 @@ function PosOrderPanelInner({ tableNumber, tableId, onClose, existingDraft }: In
                 unit_price: item.price,
                 quantity: item.quantity,
                 notes: item.notes,
+                ...(item.selectedOptions && Object.keys(item.selectedOptions).length > 0
+                    ? {
+                          options: Object.entries(item.selectedOptions).map(
+                              ([name, value]) => ({ name, value }),
+                          ),
+                      }
+                    : {}),
             })),
         [state.items],
     );
@@ -394,8 +402,13 @@ function PosOrderPanelInner({ tableNumber, tableId, onClose, existingDraft }: In
                 >
                     <MenuBrowserPanel
                         onAddProduct={(product) => {
-                            addItem(product);
-                            // Briefly bounce the Panier tab on mobile to give visual feedback
+                            addItem({
+                                cartKey: product.cartKey,
+                                productId: product.productId,
+                                name: product.name,
+                                price: product.price,
+                                selectedOptions: product.selectedOptions,
+                            });
                         }}
                         cartItems={state.items}
                         className="h-full w-full"

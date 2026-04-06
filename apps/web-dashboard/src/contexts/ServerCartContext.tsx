@@ -27,11 +27,15 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface CartItem {
+    /** Unique key for deduplication — equals productId when no options, or `${productId}|${JSON.stringify(selectedOptions)}` when options are chosen */
+    cartKey: string;
     productId: string;
     name: string;
-    price: number; // FCFA unit price
+    price: number; // FCFA unit price (includes extra_price from selected options)
     quantity: number;
     notes?: string;
+    /** Option selections, e.g. { "Format": "Grande (65cl)", "Température": "Bien fraîche" } */
+    selectedOptions?: Record<string, string>;
 }
 
 export interface ServerCartState {
@@ -46,9 +50,9 @@ export interface ServerCartState {
 
 export type CartAction =
     | { type: "ADD_ITEM"; payload: Omit<CartItem, "quantity"> }
-    | { type: "REMOVE_ITEM"; payload: { productId: string } }
-    | { type: "UPDATE_QTY"; payload: { productId: string; quantity: number } }
-    | { type: "UPDATE_ITEM_NOTES"; payload: { productId: string; notes: string } }
+    | { type: "REMOVE_ITEM"; payload: { cartKey: string } }
+    | { type: "UPDATE_QTY"; payload: { cartKey: string; quantity: number } }
+    | { type: "UPDATE_ITEM_NOTES"; payload: { cartKey: string; notes: string } }
     | { type: "SET_TABLE"; payload: { tableNumber: string; tableId?: string } }
     | { type: "SET_COVERS"; payload: number | null }
     | { type: "SET_GLOBAL_NOTES"; payload: string }
@@ -73,8 +77,8 @@ interface ServerCartContextValue {
     /** Sum of price × quantity for all items */
     totalPrice: number;
     addItem: (product: Omit<CartItem, "quantity">) => void;
-    removeItem: (productId: string) => void;
-    updateQty: (productId: string, quantity: number) => void;
+    removeItem: (cartKey: string) => void;
+    updateQty: (cartKey: string, quantity: number) => void;
 }
 
 // ── Initial state ─────────────────────────────────────────────────────────────
@@ -95,14 +99,14 @@ function reducer(state: ServerCartState, action: CartAction): ServerCartState {
     switch (action.type) {
         case "ADD_ITEM": {
             const existing = state.items.find(
-                (i) => i.productId === action.payload.productId,
+                (i) => i.cartKey === action.payload.cartKey,
             );
             if (existing) {
-                // Increment quantity if already in cart
+                // Increment quantity if same product+options already in cart
                 return {
                     ...state,
                     items: state.items.map((i) =>
-                        i.productId === action.payload.productId
+                        i.cartKey === action.payload.cartKey
                             ? { ...i, quantity: i.quantity + 1 }
                             : i,
                     ),
@@ -118,7 +122,7 @@ function reducer(state: ServerCartState, action: CartAction): ServerCartState {
             return {
                 ...state,
                 items: state.items.filter(
-                    (i) => i.productId !== action.payload.productId,
+                    (i) => i.cartKey !== action.payload.cartKey,
                 ),
             };
 
@@ -128,14 +132,14 @@ function reducer(state: ServerCartState, action: CartAction): ServerCartState {
                 return {
                     ...state,
                     items: state.items.filter(
-                        (i) => i.productId !== action.payload.productId,
+                        (i) => i.cartKey !== action.payload.cartKey,
                     ),
                 };
             }
             return {
                 ...state,
                 items: state.items.map((i) =>
-                    i.productId === action.payload.productId
+                    i.cartKey === action.payload.cartKey
                         ? { ...i, quantity: action.payload.quantity }
                         : i,
                 ),
@@ -146,7 +150,7 @@ function reducer(state: ServerCartState, action: CartAction): ServerCartState {
             return {
                 ...state,
                 items: state.items.map((i) =>
-                    i.productId === action.payload.productId
+                    i.cartKey === action.payload.cartKey
                         ? { ...i, notes: action.payload.notes }
                         : i,
                 ),
@@ -209,12 +213,12 @@ export function ServerCartProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "ADD_ITEM", payload: product });
     }, []);
 
-    const removeItem = useCallback((productId: string) => {
-        dispatch({ type: "REMOVE_ITEM", payload: { productId } });
+    const removeItem = useCallback((cartKey: string) => {
+        dispatch({ type: "REMOVE_ITEM", payload: { cartKey } });
     }, []);
 
-    const updateQty = useCallback((productId: string, quantity: number) => {
-        dispatch({ type: "UPDATE_QTY", payload: { productId, quantity } });
+    const updateQty = useCallback((cartKey: string, quantity: number) => {
+        dispatch({ type: "UPDATE_QTY", payload: { cartKey, quantity } });
     }, []);
 
     const value = useMemo<ServerCartContextValue>(

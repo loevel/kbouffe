@@ -89,7 +89,7 @@ export async function GET() {
   try {
     const { data: products, error: queryError } = await supabase
       .from("products")
-      .select("*, categories(id, name)")
+      .select("*, categories(id, name), menu_item_options(id, name, type, is_required, max_selections, sort_order, menu_item_option_values(id, name, price_adjustment, is_default, sort_order))")
       .eq("restaurant_id", restaurantId)
       .order("sort_order", { ascending: true });
 
