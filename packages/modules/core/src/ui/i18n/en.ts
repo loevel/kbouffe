@@ -103,6 +103,7 @@ export const en: TranslationKeys = {
         subscriptions: "SaaS Subscriptions",
         onboarding: "Onboarding Tracker",
         broadcast: "Broadcast",
+        emailTemplates: "Email Templates",
         socialMonitor: "Social Monitor",
         backup: "Backup & Export",
         suppliers: "Agricultural Suppliers",

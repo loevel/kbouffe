@@ -101,6 +101,7 @@ export const fr = {
         subscriptions: "Abonnements SaaS",
         onboarding: "Suivi Onboarding",
         broadcast: "Broadcast",
+        emailTemplates: "Modèles de courriel",
         socialMonitor: "Social Monitor",
         backup: "Backup & Export",
         suppliers: "Fournisseurs Agricoles",
