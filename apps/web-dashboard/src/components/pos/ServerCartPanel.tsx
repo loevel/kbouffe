@@ -143,16 +143,32 @@ export function ServerCartPanel({
                         className="divide-y divide-surface-100 dark:divide-surface-800"
                     >
                         {state.items.map((item) => {
-                            const noteExpanded = expandedNotes.has(item.productId);
+                            const noteExpanded = expandedNotes.has(item.cartKey);
+                            const optionEntries = item.selectedOptions
+                                ? Object.entries(item.selectedOptions)
+                                : [];
 
                             return (
-                                <li key={item.productId} className="px-4 py-3 space-y-2">
+                                <li key={item.cartKey} className="px-4 py-3 space-y-2">
                                     {/* Item name + line total + delete */}
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-surface-900 dark:text-white leading-tight">
                                                 {item.name}
                                             </p>
+                                            {/* Selected options pills */}
+                                            {optionEntries.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {optionEntries.map(([key, val]) => (
+                                                        <span
+                                                            key={key}
+                                                            className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400"
+                                                        >
+                                                            {val}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                                                 {formatCFA(item.price)} ×{" "}
                                                 {item.quantity}
@@ -169,7 +185,7 @@ export function ServerCartPanel({
                                             onClick={() =>
                                                 dispatch({
                                                     type: "REMOVE_ITEM",
-                                                    payload: { productId: item.productId },
+                                                    payload: { cartKey: item.cartKey },
                                                 })
                                             }
                                             aria-label={`Supprimer ${item.name} du panier`}
@@ -193,7 +209,7 @@ export function ServerCartPanel({
                                                     dispatch({
                                                         type: "UPDATE_QTY",
                                                         payload: {
-                                                            productId: item.productId,
+                                                            cartKey: item.cartKey,
                                                             quantity: item.quantity - 1,
                                                         },
                                                     })
@@ -217,7 +233,7 @@ export function ServerCartPanel({
                                                     dispatch({
                                                         type: "UPDATE_QTY",
                                                         payload: {
-                                                            productId: item.productId,
+                                                            cartKey: item.cartKey,
                                                             quantity: item.quantity + 1,
                                                         },
                                                     })
@@ -232,7 +248,7 @@ export function ServerCartPanel({
                                         {/* Inline note toggle */}
                                         <button
                                             type="button"
-                                            onClick={() => toggleNoteExpanded(item.productId)}
+                                            onClick={() => toggleNoteExpanded(item.cartKey)}
                                             aria-expanded={noteExpanded}
                                             aria-label={`${noteExpanded ? "Masquer" : "Ajouter"} une note pour ${item.name}`}
                                             className={[
@@ -257,7 +273,7 @@ export function ServerCartPanel({
                                                 dispatch({
                                                     type: "UPDATE_ITEM_NOTES",
                                                     payload: {
-                                                        productId: item.productId,
+                                                        cartKey: item.cartKey,
                                                         notes: e.target.value,
                                                     },
                                                 })
