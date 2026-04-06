@@ -38,7 +38,7 @@ function CartItemRow({
     onQtyChange,
     onRemove,
 }: {
-    item: { id: string; name: string; price: number; quantity: number; imageUrl: string | null };
+    item: { id: string; cartKey: string; name: string; price: number; quantity: number; imageUrl: string | null; selectedOptions?: Array<{ name: string; choice: string; extra_price: number }>; notes?: string };
     onQtyChange: (qty: number) => void;
     onRemove: () => void;
 }) {
@@ -59,6 +59,16 @@ function CartItemRow({
             {/* Info */}
             <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-surface-900 dark:text-white truncate">{item.name}</p>
+                {/* Selected options pills */}
+                {item.selectedOptions && item.selectedOptions.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                        {item.selectedOptions.map((opt) => (
+                            <span key={opt.name} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-[11px] font-semibold">
+                                {opt.choice}
+                            </span>
+                        ))}
+                    </div>
+                )}
                 <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
                     {formatCFA(item.price)}
                 </p>
@@ -222,10 +232,10 @@ export function CartPageClient() {
                 <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 px-5">
                     {items.map((item) => (
                         <CartItemRow
-                            key={item.id}
+                            key={item.cartKey}
                             item={item}
-                            onQtyChange={(qty) => updateQty(item.id, qty)}
-                            onRemove={() => removeItem(item.id)}
+                            onQtyChange={(qty) => updateQty(item.cartKey, qty)}
+                            onRemove={() => removeItem(item.cartKey)}
                         />
                     ))}
                     {restaurant && (

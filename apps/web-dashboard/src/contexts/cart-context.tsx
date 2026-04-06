@@ -12,12 +12,22 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface SelectedOption {
+    name: string;
+    choice: string;
+    extra_price: number;
+}
+
 export interface CartItem {
     id: string;
+    /** Unique key: productId for simple items, productId|JSON(opts) for items with options */
+    cartKey: string;
     name: string;
     price: number;
     quantity: number;
     imageUrl: string | null;
+    selectedOptions?: SelectedOption[];
+    notes?: string;
 }
 
 interface CartRestaurant {
@@ -33,8 +43,8 @@ interface CartState {
 
 type CartAction =
     | { type: "ADD_ITEM"; restaurant: CartRestaurant; item: CartItem }
-    | { type: "REMOVE_ITEM"; itemId: string }
-    | { type: "UPDATE_QTY"; itemId: string; qty: number }
+    | { type: "REMOVE_ITEM"; cartKey: string }
+    | { type: "UPDATE_QTY"; cartKey: string; qty: number }
     | { type: "CLEAR" }
     | { type: "HYDRATE"; state: CartState };
 
@@ -44,8 +54,8 @@ interface CartContextValue {
     itemCount: number;
     subtotal: number;
     addItem: (restaurant: CartRestaurant, item: Omit<CartItem, "quantity">) => void;
-    removeItem: (itemId: string) => void;
-    updateQty: (itemId: string, qty: number) => void;
+    removeItem: (cartKey: string) => void;
+    updateQty: (cartKey: string, qty: number) => void;
     clear: () => void;
 }
 
@@ -59,27 +69,27 @@ function reducer(state: CartState, action: CartAction): CartState {
             // If new restaurant → clear previous cart
             const sameRestaurant = state.restaurant?.id === action.restaurant.id;
             const baseItems = sameRestaurant ? state.items : [];
-            const existing = baseItems.find((i) => i.id === action.item.id);
+            const existing = baseItems.find((i) => i.cartKey === action.item.cartKey);
             const items = existing
                 ? baseItems.map((i) =>
-                      i.id === action.item.id ? { ...i, quantity: i.quantity + 1 } : i,
+                      i.cartKey === action.item.cartKey ? { ...i, quantity: i.quantity + 1 } : i,
                   )
                 : [...baseItems, { ...action.item, quantity: 1 }];
             return { restaurant: action.restaurant, items };
         }
         case "REMOVE_ITEM": {
-            const items = state.items.filter((i) => i.id !== action.itemId);
+            const items = state.items.filter((i) => i.cartKey !== action.cartKey);
             return { ...state, items, restaurant: items.length === 0 ? null : state.restaurant };
         }
         case "UPDATE_QTY": {
             if (action.qty <= 0) {
-                const items = state.items.filter((i) => i.id !== action.itemId);
+                const items = state.items.filter((i) => i.cartKey !== action.cartKey);
                 return { ...state, items, restaurant: items.length === 0 ? null : state.restaurant };
             }
             return {
                 ...state,
                 items: state.items.map((i) =>
-                    i.id === action.itemId ? { ...i, quantity: action.qty } : i,
+                    i.cartKey === action.cartKey ? { ...i, quantity: action.qty } : i,
                 ),
             };
         }
@@ -128,12 +138,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         [],
     );
 
-    const removeItem = useCallback((itemId: string) => {
-        dispatch({ type: "REMOVE_ITEM", itemId });
+    const removeItem = useCallback((cartKey: string) => {
+        dispatch({ type: "REMOVE_ITEM", cartKey });
     }, []);
 
-    const updateQty = useCallback((itemId: string, qty: number) => {
-        dispatch({ type: "UPDATE_QTY", itemId, qty });
+    const updateQty = useCallback((cartKey: string, qty: number) => {
+        dispatch({ type: "UPDATE_QTY", cartKey, qty });
     }, []);
 
     const clear = useCallback(() => dispatch({ type: "CLEAR" }), []);

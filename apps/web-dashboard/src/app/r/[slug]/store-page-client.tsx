@@ -105,6 +105,12 @@ interface Product {
     is_featured?: boolean;
     category_id: string | null;
     sort_order: number;
+    /** JSONB options stored in products.options column */
+    options?: Array<{
+        name: string;
+        choices: Array<{ label: string; extra_price: number }>;
+        required?: boolean;
+    }> | null;
 }
 
 /** Retourne le texte traduit ou le fallback FR */
@@ -270,7 +276,7 @@ function ProductDetailModal({
     product: Product;
     restaurant: { id: string; name: string; slug: string };
     onClose: () => void;
-    onAdd: () => void;
+    onAdd: (selectedOptions: Record<string, string>, notes: string, finalPrice: number) => void;
     relatedProducts?: Product[];
 }) {
     const [quantity, setQuantity] = useState(1);
@@ -283,6 +289,17 @@ function ProductDetailModal({
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
+    /** Selected option choices: { [optionName]: choiceLabel } */
+    const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
+        // Pre-select first choice for required options
+        const defaults: Record<string, string> = {};
+        if (product.options) {
+            for (const opt of product.options) {
+                if (opt.choices.length > 0) defaults[opt.name] = opt.choices[0].label;
+            }
+        }
+        return defaults;
+    });
 
     // Image carousel
     const allImages = product.images && product.images.length > 0
@@ -355,6 +372,21 @@ function ProductDetailModal({
             setSubmitting(false);
         }
     };
+
+    // Compute extra price from selected options
+    const optionsExtraPrice = product.options
+        ? product.options.reduce((sum, opt) => {
+              const choiceLabel = selectedOptions[opt.name];
+              const choice = opt.choices.find((c) => c.label === choiceLabel);
+              return sum + (choice?.extra_price ?? 0);
+          }, 0)
+        : 0;
+    const finalUnitPrice = product.price + optionsExtraPrice;
+
+    // Check if all required options are selected
+    const requiredMissing = product.options
+        ? product.options.filter((opt) => opt.required && !selectedOptions[opt.name])
+        : [];
 
     return (
         <AnimatePresence>
@@ -478,7 +510,14 @@ function ProductDetailModal({
                                     )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <p className="text-lg font-extrabold text-brand-600 dark:text-brand-400">{formatCFA(product.price)}</p>
+                                    <p className="text-lg font-extrabold text-brand-600 dark:text-brand-400">
+                                        {formatCFA(finalUnitPrice)}
+                                        {optionsExtraPrice > 0 && (
+                                            <span className="text-xs font-normal text-surface-400 block">
+                                                base {formatCFA(product.price)} + options
+                                            </span>
+                                        )}
+                                    </p>
                                     {product.compare_at_price && product.compare_at_price > product.price && (
                                         <p className="text-xs text-surface-400 line-through">{formatCFA(product.compare_at_price)}</p>
                                     )}
@@ -487,6 +526,57 @@ function ProductDetailModal({
 
                             {product.description && (
                                 <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed mb-4">{product.description}</p>
+                            )}
+
+                            {/* ── Options / Variantes ───────────────────────────────── */}
+                            {product.options && product.options.length > 0 && (
+                                <div className="space-y-4 mb-5">
+                                    {product.options.map((opt) => (
+                                        <div key={opt.name}>
+                                            <p className="text-sm font-bold text-surface-900 dark:text-white mb-2 flex items-center gap-1.5">
+                                                {opt.name}
+                                                {opt.required && (
+                                                    <span className="text-[10px] font-bold text-white bg-brand-500 rounded-full px-1.5 py-0.5 uppercase tracking-wide">
+                                                        Requis
+                                                    </span>
+                                                )}
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {opt.choices.map((choice) => {
+                                                    const isSelected = selectedOptions[opt.name] === choice.label;
+                                                    return (
+                                                        <button
+                                                            key={choice.label}
+                                                            onClick={() =>
+                                                                setSelectedOptions((prev) => ({
+                                                                    ...prev,
+                                                                    [opt.name]: choice.label,
+                                                                }))
+                                                            }
+                                                            className={`px-3 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                                                                isSelected
+                                                                    ? "bg-brand-500 border-brand-500 text-white shadow-sm"
+                                                                    : "border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:border-brand-400 hover:text-brand-500"
+                                                            }`}
+                                                        >
+                                                            {choice.label}
+                                                            {choice.extra_price > 0 && (
+                                                                <span className={`ml-1.5 text-xs ${isSelected ? "text-white/80" : "text-surface-400"}`}>
+                                                                    +{formatCFA(choice.extra_price)}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {requiredMissing.length > 0 && (
+                                        <p className="text-xs text-amber-500 font-medium">
+                                            Veuillez sélectionner : {requiredMissing.map((o) => o.name).join(", ")}
+                                        </p>
+                                    )}
+                                </div>
                             )}
 
                             {/* Quantity + Add to cart */}
@@ -508,14 +598,18 @@ function ProductDetailModal({
                                         </button>
                                     </div>
                                     <button
+                                        disabled={requiredMissing.length > 0}
                                         onClick={() => {
-                                            for (let i = 0; i < quantity; i++) onAdd();
+                                            if (requiredMissing.length > 0) return;
+                                            for (let i = 0; i < quantity; i++) {
+                                                onAdd(selectedOptions, note, finalUnitPrice);
+                                            }
                                             onClose();
                                         }}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-sm transition-colors"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-500 hover:bg-brand-600 disabled:bg-surface-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-colors"
                                     >
                                         <ShoppingBag size={16} />
-                                        <span>Ajouter — {formatCFA(product.price * quantity)}</span>
+                                        <span>Ajouter — {formatCFA(finalUnitPrice * quantity)}</span>
                                     </button>
                                 </div>
                             )}
@@ -569,7 +663,7 @@ function ProductDetailModal({
                                                                 </div>
                                                                 {p.is_available && (
                                                                     <button
-                                                                        onClick={(e) => { e.stopPropagation(); onAdd(); }}
+                                                                        onClick={(e) => { e.stopPropagation(); onAdd({}, "", p.price); }}
                                                                         className="absolute -bottom-2.5 -right-2.5 w-7 h-7 rounded-full bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 shadow-md flex items-center justify-center hover:scale-110 transition-transform"
                                                                     >
                                                                         <Plus size={14} strokeWidth={2.5} className="text-surface-900 dark:text-white" />
@@ -1248,17 +1342,52 @@ export function StorePageClient({ slug }: { slug: string }) {
           )
         : featuredProducts;
 
-    const handleAddToCart = (product: { id: string; name: string; price: number; image_url: string | null }) => {
+    const handleAddToCart = (
+        product: { id: string; name: string; price: number; image_url: string | null; options?: Array<{ name: string; choices: Array<{ label: string; extra_price: number }>; required?: boolean }> | null },
+        selectedOptions: Record<string, string> = {},
+        notes: string = "",
+        finalPrice?: number,
+    ) => {
+        // Compute cartKey: unique per product+options combo
+        const hasSelections = Object.keys(selectedOptions).length > 0;
+        const cartKey = hasSelections
+            ? `${product.id}|${JSON.stringify(selectedOptions)}`
+            : product.id;
+        const unitPrice = finalPrice ?? product.price;
+
+        // Build SelectedOption array for cart display
+        const selectedOptionsList = product.options
+            ? product.options
+                  .filter((opt) => selectedOptions[opt.name])
+                  .map((opt) => {
+                      const choiceLabel = selectedOptions[opt.name];
+                      const choice = opt.choices.find((c) => c.label === choiceLabel);
+                      return {
+                          name: opt.name,
+                          choice: choiceLabel,
+                          extra_price: choice?.extra_price ?? 0,
+                      };
+                  })
+            : undefined;
+
         addItem(
             { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
-            { id: product.id, name: product.name, price: product.price, imageUrl: product.image_url },
+            {
+                id: product.id,
+                cartKey,
+                name: product.name,
+                price: unitPrice,
+                imageUrl: product.image_url,
+                selectedOptions: selectedOptionsList?.length ? selectedOptionsList : undefined,
+                notes: notes.trim() || undefined,
+            },
         );
         setCartOpen(true);
         trackEvent("AddToCart", {
             content_name: product.name,
             content_ids: [product.id],
             content_type: "product",
-            value: product.price,
+            value: unitPrice,
             currency: "XAF",
         });
     };
@@ -1272,6 +1401,20 @@ export function StorePageClient({ slug }: { slug: string }) {
             value: product.price,
             currency: "XAF",
         });
+    };
+
+    /**
+     * Called from ThemeComponent product cards.
+     * If the product has options, open the detail modal so the user can
+     * pick a variant. Otherwise add directly.
+     */
+    const handleThemeAddToCart = (product: Product) => {
+        const hasOptions = product.options && product.options.length > 0;
+        if (hasOptions) {
+            handleProductClick(product);
+        } else {
+            handleAddToCart(product);
+        }
     };
 
     return (
@@ -2159,7 +2302,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                         featuredProducts={filteredFeaturedProducts}
                         activeCategory={activeCategory ?? ""}
                         onCategoryChange={scrollToCategory}
-                        onAddToCart={handleAddToCart}
+                        onAddToCart={handleThemeAddToCart}
                         onProductClick={handleProductClick}
                         formatPrice={formatCFA}
                         sectionRefs={sectionRefs}
@@ -2257,7 +2400,9 @@ export function StorePageClient({ slug }: { slug: string }) {
                     product={selectedProduct}
                     restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
                     onClose={() => setSelectedProduct(null)}
-                    onAdd={() => handleAddToCart(selectedProduct)}
+                    onAdd={(selectedOpts, notes, finalPrice) =>
+                        handleAddToCart(selectedProduct, selectedOpts, notes, finalPrice)
+                    }
                     relatedProducts={products.filter((p) => p.id !== selectedProduct.id && p.is_available).slice(0, 6)}
                 />
             )}

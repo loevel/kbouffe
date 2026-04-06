@@ -1,3 +1,14 @@
+export interface JsonbOptionChoice {
+    label: string;
+    extra_price: number;
+}
+
+export interface JsonbOption {
+    name: string;
+    choices: JsonbOptionChoice[];
+    required?: boolean;
+}
+
 export interface ThemeProduct {
     id: string;
     name: string;
@@ -10,6 +21,8 @@ export interface ThemeProduct {
     is_featured?: boolean;
     category_id: string | null;
     sort_order: number;
+    // Options / Variants (JSONB format stored in products.options)
+    options?: JsonbOption[] | null;
     // Scarcity / Limited edition
     is_limited_edition?: boolean;
     stock_quantity?: number | null;

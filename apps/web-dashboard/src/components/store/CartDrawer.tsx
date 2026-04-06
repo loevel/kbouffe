@@ -180,6 +180,12 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                         unitPrice: i.price,
                         price: i.price,
                         quantity: i.quantity,
+                        options: i.selectedOptions?.map((o) => ({
+                            name: o.name,
+                            value: o.choice,
+                            price_adjustment: o.extra_price,
+                        })),
+                        notes: i.notes,
                     })),
                     deliveryType,
                     deliveryAddress: deliveryType === "delivery" ? deliveryAddress : undefined,
@@ -335,7 +341,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                     )}
                                     {items.map((item) => (
                                         <div
-                                            key={item.id}
+                                            key={item.cartKey}
                                             className="flex gap-3 items-start bg-surface-50 dark:bg-surface-800 rounded-xl p-3"
                                         >
                                             {/* Image */}
@@ -357,13 +363,29 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                                 <p className="text-sm font-medium text-surface-900 dark:text-white line-clamp-1">
                                                     {item.name}
                                                 </p>
+                                                {/* Selected options pills */}
+                                                {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {item.selectedOptions.map((opt) => (
+                                                            <span
+                                                                key={opt.name}
+                                                                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-[11px] font-semibold"
+                                                            >
+                                                                {opt.choice}
+                                                                {opt.extra_price > 0 && (
+                                                                    <span className="text-brand-400/70">+{opt.extra_price}</span>
+                                                                )}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 <p className="text-xs text-brand-500 font-semibold mt-0.5">
                                                     {formatCFA(item.price)}
                                                 </p>
                                                 {/* Qty controls */}
                                                 <div className="flex items-center gap-2 mt-2">
                                                     <button
-                                                        onClick={() => updateQty(item.id, item.quantity - 1)}
+                                                        onClick={() => updateQty(item.cartKey, item.quantity - 1)}
                                                         className="w-7 h-7 rounded-full border border-surface-200 dark:border-surface-600 flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
                                                         aria-label="Diminuer la quantité"
                                                     >
@@ -373,7 +395,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                                         {item.quantity}
                                                     </span>
                                                     <button
-                                                        onClick={() => updateQty(item.id, item.quantity + 1)}
+                                                        onClick={() => updateQty(item.cartKey, item.quantity + 1)}
                                                         className="w-7 h-7 rounded-full border border-surface-200 dark:border-surface-600 flex items-center justify-center hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
                                                         aria-label="Augmenter la quantité"
                                                     >
@@ -388,7 +410,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                                     {formatCFA(item.price * item.quantity)}
                                                 </span>
                                                 <button
-                                                    onClick={() => removeItem(item.id)}
+                                                    onClick={() => removeItem(item.cartKey)}
                                                     className="text-surface-400 hover:text-red-500 transition-colors p-1"
                                                     aria-label={`Supprimer ${item.name}`}
                                                 >
