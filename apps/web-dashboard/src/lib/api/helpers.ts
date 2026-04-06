@@ -13,6 +13,7 @@ export interface AuthContext {
 
 export interface AdminAuthContext {
   userId: string;
+  adminRole: string | null;
   supabase: Awaited<ReturnType<typeof createAdminClient>>;
 }
 
@@ -112,7 +113,7 @@ export async function withAdmin(): Promise<
 
   const { data: dbUser } = await authClient
     .from("users")
-    .select("role")
+    .select("role, admin_role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -131,6 +132,7 @@ export async function withAdmin(): Promise<
   return {
     ctx: {
       userId: user.id,
+      adminRole: (dbUser as any).admin_role ?? null,
       supabase,
     },
   };

@@ -52,7 +52,7 @@ export default function EmailTemplatesPage() {
         setIsLoading(true);
         try {
             const query = selectedCategory !== "all" ? `?category=${selectedCategory}` : "";
-            const res = await adminFetch(`/api/email-templates${query}`);
+            const res = await adminFetch(`/api/admin/email-templates${query}`);
             if (!res.ok) {
                 console.error("Failed to fetch templates");
                 setTemplates([]);
@@ -83,7 +83,7 @@ export default function EmailTemplatesPage() {
         if (!confirm("Êtes-vous sûr de vouloir supprimer ce modèle?")) return;
 
         try {
-            const res = await adminFetch(`/api/email-templates/${id}`, { method: "DELETE" });
+            const res = await adminFetch(`/api/admin/email-templates/${id}`, { method: "DELETE" });
             if (res.ok) {
                 setTemplates((prev) => prev.filter((t) => t.id !== id));
             } else {
@@ -99,7 +99,7 @@ export default function EmailTemplatesPage() {
     const handleDuplicate = async (template: EmailTemplate) => {
         const newName = `${template.name} (Copie)`;
         try {
-            const res = await adminFetch("/api/email-templates", {
+            const res = await adminFetch("/api/admin/email-templates", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -412,7 +412,7 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
         
         setAiLoading(true);
         try {
-            const res = await adminFetch(`/api/email-templates/${template.id}/ai/improve`, {
+            const res = await adminFetch(`/api/admin/email-templates/${template.id}/ai/improve`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({}),
@@ -444,7 +444,7 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
 
         setAiLoading(true);
         try {
-            const res = await adminFetch(`/api/email-templates/${template.id}/ai/variants`, {
+            const res = await adminFetch(`/api/admin/email-templates/${template.id}/ai/variants`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({}),
@@ -477,7 +477,7 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
         setAiLoading(true);
         setTranslateTarget(toLang);
         try {
-            const res = await adminFetch(`/api/email-templates/${template.id}/ai/translate`, {
+            const res = await adminFetch(`/api/admin/email-templates/${template.id}/ai/translate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ toLang }),
@@ -506,7 +506,7 @@ function EditTemplateModal({ template, onClose, onSave }: EditTemplateModalProps
         setIsSaving(true);
 
         try {
-            const url = isCreateMode ? "/api/email-templates" : `/api/email-templates/${template?.id}`;
+            const url = isCreateMode ? "/api/admin/email-templates" : `/api/admin/email-templates/${template?.id}`;
             const method = isCreateMode ? "POST" : "PUT";
 
             const res = await adminFetch(url, {
@@ -951,7 +951,7 @@ function GenerateTemplateModal({ onClose, onSuccess }: GenerateTemplateModalProp
         setError(null);
 
         try {
-            const res = await adminFetch("/api/email-templates/ai/generate", {
+            const res = await adminFetch("/api/admin/email-templates/ai/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ category, topic: topic.trim(), tone }),
@@ -978,7 +978,7 @@ function GenerateTemplateModal({ onClose, onSuccess }: GenerateTemplateModalProp
 
         setIsGenerating(true);
         try {
-            const res = await adminFetch("/api/email-templates", {
+            const res = await adminFetch("/api/admin/email-templates", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1313,6 +1313,12 @@ function AIVariantsResultsModal({ variants, onClose }: AIVariantsResultsModalPro
 // ── Send Template Modal ────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface SendTemplateModalProps {
+    template: EmailTemplate;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
 function SendTemplateModal({ template, onClose, onSuccess }: SendTemplateModalProps) {
     const [recipients, setRecipients] = useState<string>("");
     const [recipientType, setRecipientType] = useState<"restaurant" | "supplier" | "client">(template.category);
@@ -1343,7 +1349,7 @@ function SendTemplateModal({ template, onClose, onSuccess }: SendTemplateModalPr
         setError(null);
 
         try {
-            const res = await adminFetch(`/api/email-templates/${template.id}/send`, {
+            const res = await adminFetch(`/api/admin/email-templates/${template.id}/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
