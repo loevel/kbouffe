@@ -83,6 +83,11 @@ usersRoutes.get("/loyalty", async (c) => {
             restaurants: favRestaurants?.map(f => f.restaurant_id) || [],
             products: favProducts?.map(f => f.product_id) || []
         },
+        referral: {
+            code: user.referral_code ?? null,
+            invites: user.referral_invites ?? 0,
+            rewards: user.referral_rewards ?? 0,
+        },
         profile: {
             fullName: user.full_name,
             phone: user.phone,

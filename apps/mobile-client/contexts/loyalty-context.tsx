@@ -70,11 +70,11 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
             .then((data) => {
                 setState((prev) => ({
                     ...prev,
-                    referralCode: data.referral.code,
-                    referralInvites: data.referral.invites,
-                    referralRewards: data.referral.rewards,
-                    favoriteRestaurantIds: data.favorites.restaurants,
-                    favoriteProductIds: data.favorites.products,
+                    referralCode: data.referral?.code ?? null,
+                    referralInvites: data.referral?.invites ?? 0,
+                    referralRewards: data.referral?.rewards ?? 0,
+                    favoriteRestaurantIds: data.favorites?.restaurants ?? [],
+                    favoriteProductIds: data.favorites?.products ?? [],
                 }));
             })
             .catch((err) => {

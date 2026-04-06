@@ -18,61 +18,65 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 
 import { registerPushToken } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 
-// ── Global notification handler ───────────────────────────────────────────────
-// Must be set before any listener is attached. Defines behaviour when a
-// notification arrives while the app is foregrounded.
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-    }),
-});
+// expo-notifications is not supported in Expo Go since SDK 53.
+// We lazy-import it so the app doesn't crash when running in Expo Go.
+let Notifications: typeof import('expo-notifications') | null = null;
+const isExpoGo = Constants.appOwnership === 'expo';
+
+if (!isExpoGo) {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        Notifications = require('expo-notifications');
+        Notifications!.setNotificationHandler({
+            handleNotification: async () => ({
+                shouldShowAlert: true,
+                shouldPlaySound: true,
+                shouldSetBadge: true,
+                shouldShowBanner: true,
+                shouldShowList: true,
+            }),
+        });
+    } catch {
+        Notifications = null;
+    }
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface UsePushNotificationsReturn {
-    /** The Expo push token for this device/user, or null if unavailable. */
     expoPushToken: string | null;
-    /** The last notification received while the app was foregrounded, if any. */
-    notification: Notifications.Notification | null;
+    notification: unknown | null;
 }
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function usePushNotifications(): UsePushNotificationsReturn {
     const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
-    const [notification, setNotification] = useState<Notifications.Notification | null>(null);
+    const [notification, setNotification] = useState<unknown | null>(null);
 
-    const foregroundListenerRef = useRef<Notifications.EventSubscription | null>(null);
-    const responseListenerRef = useRef<Notifications.EventSubscription | null>(null);
+    const foregroundListenerRef = useRef<{ remove: () => void } | null>(null);
+    const responseListenerRef = useRef<{ remove: () => void } | null>(null);
 
     const { isAuthenticated } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        // Only register when the user is signed in — we need their user_id on
-        // the backend to associate the token with an account.
-        if (!isAuthenticated) return;
+        // Push notifications non disponibles dans Expo Go (SDK 53+)
+        if (!isAuthenticated || !Notifications) return;
 
         let cancelled = false;
 
         async function registerForPushNotifications() {
             try {
-                // ── Android notification channel ──────────────────────────────
-                // Must be created before any notification is displayed on Android.
                 if (Platform.OS === 'android') {
-                    await Notifications.setNotificationChannelAsync('orders', {
+                    await Notifications!.setNotificationChannelAsync('orders', {
                         name: 'Commandes',
-                        description: 'Mises à jour de l\'état de vos commandes',
-                        importance: Notifications.AndroidImportance.MAX,
+                        description: "Mises à jour de l'état de vos commandes",
+                        importance: Notifications!.AndroidImportance.MAX,
                         vibrationPattern: [0, 250, 250, 250],
                         lightColor: '#FF6B2B',
                         sound: 'default',
@@ -80,22 +84,21 @@ export function usePushNotifications(): UsePushNotificationsReturn {
                         enableVibrate: true,
                         showBadge: true,
                     });
-
-                    await Notifications.setNotificationChannelAsync('promotions', {
+                    await Notifications!.setNotificationChannelAsync('promotions', {
                         name: 'Promotions',
                         description: 'Offres spéciales et promotions des restaurants',
-                        importance: Notifications.AndroidImportance.DEFAULT,
+                        importance: Notifications!.AndroidImportance.DEFAULT,
                         sound: 'default',
                         showBadge: false,
                     });
                 }
 
                 // ── Permission request ────────────────────────────────────────
-                const { status: existingStatus } = await Notifications.getPermissionsAsync();
+                const { status: existingStatus } = await Notifications!.getPermissionsAsync();
                 let finalStatus = existingStatus;
 
                 if (existingStatus !== 'granted') {
-                    const { status } = await Notifications.requestPermissionsAsync({
+                    const { status } = await Notifications!.requestPermissionsAsync({
                         ios: {
                             allowAlert: true,
                             allowBadge: true,
@@ -116,11 +119,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
                 // getExpoPushTokenAsync throws on a simulator — catch gracefully.
                 const projectId =
                     Constants.expoConfig?.extra?.eas?.projectId ??
-                    // @ts-expect-error — easConfig exists at runtime but is not in types for all SDK versions
-                    (Constants.easConfig as { projectId?: string } | undefined)?.projectId ??
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (Constants as any).easConfig?.projectId ??
                     undefined;
 
-                const tokenData = await Notifications.getExpoPushTokenAsync(
+                const tokenData = await Notifications!.getExpoPushTokenAsync(
                     projectId ? { projectId } : undefined,
                 );
 
@@ -151,7 +154,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
         // ── Foreground notification listener ──────────────────────────────────
         // Called when a push notification arrives while the app is open.
-        foregroundListenerRef.current = Notifications.addNotificationReceivedListener(
+        foregroundListenerRef.current = Notifications!.addNotificationReceivedListener(
             (receivedNotification) => {
                 setNotification(receivedNotification);
             },
@@ -159,7 +162,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
         // ── Response (tap) listener ───────────────────────────────────────────
         // Called when the user taps a notification (foreground or background).
-        responseListenerRef.current = Notifications.addNotificationResponseReceivedListener(
+        responseListenerRef.current = Notifications!.addNotificationResponseReceivedListener(
             (response) => {
                 const data = response.notification.request.content.data as Record<string, unknown>;
 
