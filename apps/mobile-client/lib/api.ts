@@ -98,6 +98,8 @@ export interface MobileRestaurant {
     reviewCount: number | null;
     estimatedDeliveryTime: number;
     deliveryFee: number;
+    /** Whether this restaurant accepts online reservations */
+    hasReservations: boolean;
     deliveryBaseFee: number;
     deliveryPerKmFee: number;
     maxDeliveryRadiusKm: number;
@@ -184,6 +186,7 @@ interface StoresResponse {
         delivery_base_fee: number | null;
         delivery_per_km_fee: number | null;
         max_delivery_radius_km: number | null;
+        hasReservations?: boolean;
     }[];
 }
 
@@ -205,6 +208,7 @@ function mapRestaurant(r: StoresResponse['restaurants'][0]): MobileRestaurant {
         deliveryBaseFee: r.delivery_base_fee ?? 1000,
         deliveryPerKmFee: r.delivery_per_km_fee ?? 0,
         maxDeliveryRadiusKm: r.max_delivery_radius_km ?? 10,
+        hasReservations: r.hasReservations ?? false,
         isActive: r.isActive,
         isVerified: r.isVerified,
         isPremium: r.isPremium,
@@ -242,6 +246,7 @@ interface StoreResponse {
         orderCount: number | null;
         isVerified: boolean;
         isPremium: boolean;
+        hasReservations?: boolean;
         delivery_base_fee?: number | null;
         delivery_per_km_fee?: number | null;
         max_delivery_radius_km?: number | null;
@@ -289,6 +294,7 @@ export async function getStore(slug: string): Promise<StoreDetail> {
                 delivery_base_fee: data.restaurant.delivery_base_fee ?? null,
                 delivery_per_km_fee: data.restaurant.delivery_per_km_fee ?? null,
                 max_delivery_radius_km: data.restaurant.max_delivery_radius_km ?? null,
+                hasReservations: data.restaurant.hasReservations ?? false,
                 isActive: true,
                 isSponsored: false,
                 sponsoredRank: null,
@@ -536,6 +542,50 @@ export async function createSupportTicket(params: Partial<SupportTicket>): Promi
     });
 }
 
+/**
+ * A single message in a support ticket thread.
+ * `senderType` can be "customer" (the mobile user), "admin" (KBouffe support),
+ * or "restaurant" (legacy tickets opened from the restaurant dashboard).
+ */
+export interface TicketMessage {
+    id: string;
+    ticketId: string;
+    senderId: string | null;
+    senderType: 'customer' | 'admin' | 'restaurant' | string;
+    senderName: string | null;
+    senderAvatar: string | null;
+    content: string;
+    isRead: boolean;
+    createdAt: string;
+}
+
+/**
+ * Fetches all messages for a support ticket (including the synthesised
+ * initial message derived from the ticket description).
+ */
+export async function getTicketMessages(ticketId: string): Promise<TicketMessage[]> {
+    const data = await apiFetch<{ messages: TicketMessage[] }>(
+        `/api/account/support/tickets/${encodeURIComponent(ticketId)}/messages`
+    );
+    return data.messages ?? [];
+}
+
+/**
+ * Sends a new message from the logged-in customer on an existing ticket.
+ */
+export async function sendTicketMessage(
+    ticketId: string,
+    message: string
+): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>(
+        `/api/account/support/tickets/${encodeURIComponent(ticketId)}/messages`,
+        {
+            method: 'POST',
+            body: JSON.stringify({ content: message }),
+        }
+    );
+}
+
 // ── Reviews ──────────────────────────────────────────────────────────────────
 
 export interface SubmitReviewParams {
@@ -618,4 +668,74 @@ export async function getAccountOrders(): Promise<OrderTracking[]> {
     return data.orders || [];
 }
 
+/**
+ * Cancel an order by its ID.
+ * The backend only allows cancellation when the order status is "pending".
+ * Requires the user to be authenticated (uses the Supabase session token).
+ * POST /api/auth/orders/{orderId}/cancel
+ */
+export async function cancelOrder(orderId: string): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>(`/api/auth/orders/${orderId}/cancel`, {
+        method: 'POST',
+    });
+}
+
 export { phoneToAuthEmail };
+
+// ── Reservations ─────────────────────────────────────────────────────────────
+
+/**
+ * Represents a confirmed or pending reservation returned by the API.
+ */
+export interface Reservation {
+    id: string;
+    date: string;          // YYYY-MM-DD
+    time: string;          // HH:MM
+    party_size: number;
+    status: 'pending' | 'confirmed' | 'cancelled' | 'seated' | 'completed' | 'no_show';
+    occasion?: string | null;
+    special_requests?: string | null;
+    byob_requested?: boolean;
+    corkage_fee_amount?: number;
+}
+
+/**
+ * Payload sent to POST /api/store/[slug]/reservations
+ */
+export interface CreateReservationInput {
+    /** Full name of the customer (required) */
+    customerName: string;
+    /** Phone number of the customer */
+    customerPhone?: string;
+    /** Email address of the customer */
+    customerEmail?: string;
+    /** Authenticated customer UUID, if logged in */
+    customerId?: string;
+    /** Number of guests, 1–20 (required) */
+    partySize: number;
+    /** Date in YYYY-MM-DD format (required) */
+    date: string;
+    /** Time in HH:MM format (required) */
+    time: string;
+    /** Optional free-text special requests */
+    specialRequests?: string;
+    /** Optional occasion label (e.g. "birthday", "anniversary") */
+    occasion?: string;
+}
+
+/**
+ * Create a public reservation for a restaurant identified by its slug.
+ * Calls: POST /api/store/[slug]/reservations
+ */
+export async function createReservation(
+    slug: string,
+    data: CreateReservationInput,
+): Promise<{ reservation: Reservation }> {
+    return apiFetch<{ reservation: Reservation }>(
+        `/api/store/${encodeURIComponent(slug)}/reservations`,
+        {
+            method: 'POST',
+            body: JSON.stringify(data),
+        },
+    );
+}

@@ -1,7 +1,9 @@
-import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrders, type MobileOrderStatus } from '@/contexts/orders-context';
+import { cancelOrder } from '@/lib/api';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,10 +85,40 @@ export default function OrderTrackingScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
-    const { getOrderById } = useOrders();
+    const { getOrderById, updateOrderStatus } = useOrders();
     const { getTicketsByOrderId } = useSupport();
+    const [isCancelling, setIsCancelling] = useState(false);
 
     const order = getOrderById(id ?? '');
+
+    const handleCancelOrder = () => {
+        if (!order) return;
+        Alert.alert(
+            'Annuler la commande',
+            'Êtes-vous sûr de vouloir annuler cette commande ?',
+            [
+                { text: 'Non', style: 'cancel' },
+                {
+                    text: 'Oui, annuler',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsCancelling(true);
+                        try {
+                            await cancelOrder(order.id);
+                            updateOrderStatus(order.id, 'cancelled');
+                        } catch (err: any) {
+                            Alert.alert(
+                                'Erreur',
+                                err?.message ?? 'Impossible d\'annuler la commande. Veuillez réessayer.',
+                            );
+                        } finally {
+                            setIsCancelling(false);
+                        }
+                    },
+                },
+            ],
+        );
+    };
 
     if (!order) {
         return (
@@ -243,6 +275,24 @@ export default function OrderTrackingScreen() {
                         <Ionicons name="chevron-forward" size={18} color="#f59e0b" />
                     </Pressable>
                 )}
+
+                {/* Cancel order — only when cancellable */}
+                {(order.status === 'pending' || order.status === 'confirmed') && (
+                    <Pressable
+                        style={[styles.cancelButton, isCancelling && styles.cancelButtonDisabled]}
+                        onPress={handleCancelOrder}
+                        disabled={isCancelling}
+                    >
+                        {isCancelling ? (
+                            <ActivityIndicator size="small" color="#ef4444" />
+                        ) : (
+                            <Ionicons name="close-circle-outline" size={20} color="#ef4444" />
+                        )}
+                        <Text style={styles.cancelButtonText}>
+                            {isCancelling ? 'Annulation en cours…' : 'Annuler la commande'}
+                        </Text>
+                    </Pressable>
+                )}
             </ScrollView>
         </View>
     );
@@ -348,4 +398,25 @@ const styles = StyleSheet.create({
     },
     reviewCtaTitle: { ...Typography.body, fontWeight: '700' },
     reviewCtaBody: { ...Typography.small, marginTop: 2 },
+    cancelButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.sm,
+        marginTop: Spacing.lg,
+        paddingVertical: Spacing.md,
+        paddingHorizontal: Spacing.lg,
+        borderWidth: 1.5,
+        borderColor: '#ef4444' + '60',
+        borderRadius: Radii.lg,
+        backgroundColor: '#ef4444' + '08',
+    },
+    cancelButtonDisabled: {
+        opacity: 0.5,
+    },
+    cancelButtonText: {
+        ...Typography.body,
+        fontWeight: '600',
+        color: '#ef4444',
+    },
 });

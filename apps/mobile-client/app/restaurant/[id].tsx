@@ -109,6 +109,11 @@ export default function RestaurantScreen() {
         });
     };
 
+    const handleReserve = () => {
+        if (!restaurant) return;
+        router.push(`/restaurant/${slug}/reserve` as any);
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -168,6 +173,20 @@ export default function RestaurantScreen() {
                         {restaurant.deliveryFee === 0 ? 'Livraison gratuite' : `${restaurant.deliveryFee} FCFA`}
                     </Text>
                 </View>
+
+                {/* ── Reservation CTA ─────────────────────────────────── */}
+                {restaurant.hasReservations && (
+                    <Pressable
+                        style={[reserveStyles.reserveBtn, { backgroundColor: theme.primary + '12', borderColor: theme.primary + '40' }]}
+                        onPress={handleReserve}
+                    >
+                        <Ionicons name="calendar-outline" size={18} color={theme.primary} />
+                        <Text style={[reserveStyles.reserveBtnText, { color: theme.primary }]}>
+                            Réserver une table
+                        </Text>
+                        <Ionicons name="chevron-forward" size={16} color={theme.primary} style={{ marginLeft: 'auto' }} />
+                    </Pressable>
+                )}
             </View>
 
             {/* ── Reviews Section ─────────────────────────────────── */}
@@ -487,5 +506,22 @@ const reviewStyles = StyleSheet.create({
     emptySubtext: {
         ...Typography.caption,
         marginTop: 2,
+    },
+});
+
+const reserveStyles = StyleSheet.create({
+    reserveBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginTop: Spacing.md,
+        borderWidth: 1,
+        borderRadius: Radii.lg,
+        paddingVertical: Spacing.sm + 2,
+        paddingHorizontal: Spacing.md,
+    },
+    reserveBtnText: {
+        ...Typography.body,
+        fontWeight: '600',
     },
 });

@@ -49,7 +49,13 @@ export default function SupportTicketsScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{ padding: Spacing.md, paddingBottom: insets.bottom + Spacing.xl, gap: Spacing.sm }}
                 renderItem={({ item }) => (
-                    <View style={[styles.card, { borderColor: theme.border }]}> 
+                    <Pressable
+                        onPress={() => router.push(`/support/${item.id}`)}
+                        style={({ pressed }) => [
+                            styles.card,
+                            { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                        ]}
+                    >
                         <View style={styles.row}>
                             <Text style={[styles.ticketTitle, { color: theme.text }]} numberOfLines={1}>{item.subject}</Text>
                             <View style={[styles.badge, { backgroundColor: statusColor[item.status] + '20' }]}> 
@@ -58,7 +64,10 @@ export default function SupportTicketsScreen() {
                         </View>
                         <Text style={[styles.ticketMeta, { color: theme.icon }]}>#{item.id.slice(-6)} · {typeLabel[item.type]}{item.orderId ? ` · cmd #${item.orderId.slice(-4)}` : ''}</Text>
                         <Text style={[styles.ticketMessage, { color: theme.icon }]} numberOfLines={2}>{item.description}</Text>
-                    </View>
+                        <View style={styles.cardFooter}>
+                            <Ionicons name="chevron-forward" size={14} color={theme.icon} />
+                        </View>
+                    </Pressable>
                 )}
                 ListEmptyComponent={
                     <View style={styles.empty}>
@@ -102,6 +111,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     resolveButtonText: { ...Typography.small, fontWeight: '700' },
+    cardFooter: { alignItems: 'flex-end', marginTop: 2 },
     empty: { alignItems: 'center', paddingTop: Spacing.xxl, gap: Spacing.sm },
     emptyTitle: { ...Typography.title3 },
     emptySubtitle: { ...Typography.caption, textAlign: 'center', maxWidth: 280 },

@@ -43,6 +43,7 @@ function LayoutContent() {
                                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                                     <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                                     <Stack.Screen name="restaurant/[id]" options={{ headerShown: false }} />
+                                    <Stack.Screen name="restaurant/[id]/reserve" options={{ headerShown: false }} />
                                     <Stack.Screen name="product-modal" options={{ presentation: 'modal', headerShown: false }} />
                                     <Stack.Screen name="cart" options={{ presentation: 'modal', headerShown: false }} />
                                     <Stack.Screen name="checkout" options={{ headerShown: false }} />
