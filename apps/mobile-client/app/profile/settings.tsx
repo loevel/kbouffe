@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, Pressable, Switch, Alert } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Pressable, Switch, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
@@ -7,17 +7,19 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { useAuth } from '@/contexts/auth-context';
+import { deleteAccount } from '@/lib/api';
 
 export default function SettingsScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
     const { preference, setPreference } = useAppTheme();
-    const { user, updateProfile } = useAuth();
+    const { user, updateProfile, logout } = useAuth();
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
 
     const [notifications, setNotifications] = useState(user?.profile?.notificationsEnabled ?? true);
     const [language, setLanguage] = useState<'fr' | 'en'>(user?.profile?.preferredLang === 'en' ? 'en' : 'fr');
+    const [deleting, setDeleting] = useState(false);
 
     const handleLanguageChange = () => {
         const newLang = language === 'fr' ? 'en' : 'fr';
@@ -30,10 +32,30 @@ export default function SettingsScreen() {
     const handleDeleteAccount = () => {
         Alert.alert(
             'Supprimer le compte',
-            'Cette action est irréversible. Toutes vos données seront supprimées.',
+            'Êtes-vous sûr ? Cette action est irréversible. Toutes vos données seront supprimées.',
             [
                 { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: () => {} },
+                {
+                    text: 'Supprimer',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setDeleting(true);
+                        try {
+                            await deleteAccount();
+                            await logout();
+                            router.replace('/(auth)');
+                        } catch (err) {
+                            Alert.alert(
+                                'Erreur',
+                                err instanceof Error
+                                    ? err.message
+                                    : 'Impossible de supprimer le compte. Veuillez réessayer.',
+                            );
+                        } finally {
+                            setDeleting(false);
+                        }
+                    },
+                },
             ],
         );
     };
@@ -166,9 +188,19 @@ export default function SettingsScreen() {
 
             {/* Danger Zone */}
             <View style={[styles.section, { marginTop: Spacing.xl }]}>
-                <Pressable style={styles.deleteButton} onPress={handleDeleteAccount}>
-                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                    <Text style={styles.deleteButtonText}>Supprimer mon compte</Text>
+                <Pressable
+                    style={[styles.deleteButton, deleting && { opacity: 0.6 }]}
+                    onPress={handleDeleteAccount}
+                    disabled={deleting}
+                >
+                    {deleting ? (
+                        <ActivityIndicator size="small" color="#ef4444" />
+                    ) : (
+                        <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                    )}
+                    <Text style={styles.deleteButtonText}>
+                        {deleting ? 'Suppression…' : 'Supprimer mon compte'}
+                    </Text>
                 </Pressable>
             </View>
 

@@ -508,6 +508,17 @@ export async function updateProfile(params: any): Promise<{ success: boolean }> 
     });
 }
 
+/**
+ * Permanently deletes the authenticated user's account.
+ * Calls: DELETE /api/account/profile
+ * Removes both the public profile row and the Supabase Auth user.
+ */
+export async function deleteAccount(): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>('/api/account/profile', {
+        method: 'DELETE',
+    });
+}
+
 export async function registerCustomer(params: {
     fullName: string;
     phone: string;
@@ -677,6 +688,25 @@ export async function getAccountOrders(): Promise<OrderTracking[]> {
 export async function cancelOrder(orderId: string): Promise<{ success: boolean }> {
     return apiFetch<{ success: boolean }>(`/api/auth/orders/${orderId}/cancel`, {
         method: 'POST',
+    });
+}
+
+// ── Push Notifications ────────────────────────────────────────────────────────
+
+/**
+ * Register (or update) the Expo push token for the currently authenticated user.
+ * Called once on app launch after the user signs in.
+ *
+ * POST /api/account/push-token
+ * Body: { token: string, platform: 'ios' | 'android' }
+ */
+export async function registerPushToken(
+    token: string,
+    platform: 'ios' | 'android',
+): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>('/api/account/push-token', {
+        method: 'POST',
+        body: JSON.stringify({ token, platform }),
     });
 }
 

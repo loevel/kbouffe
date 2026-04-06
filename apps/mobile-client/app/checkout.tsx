@@ -145,12 +145,32 @@ export default function CheckoutScreen() {
                 notes: notes.trim() || undefined,
             });
 
+            // ── MoMo MTN: show payment-pending waiting screen ──────────────────
             if (paymentMethod === 'momo_mtn') {
                 if (res.payment?.status === 'failed') {
-                    Alert.alert('Paiement MTN non initié', res.payment.error ?? 'La commande est créée mais le paiement MTN a échoué.');
+                    // Payment initiation failed — still send user to confirmation
+                    // but warn them the MoMo push never arrived.
+                    Alert.alert(
+                        'Paiement MTN non initié',
+                        res.payment.error ?? 'La commande est créée mais la demande MTN MoMo a échoué. Vous pouvez régler à la livraison.',
+                    );
+                    await refreshOrders();
+                    clearCart();
+                    router.replace({ pathname: '/order-confirmation', params: { orderId: res.orderId } });
                 } else {
-                    Alert.alert('Paiement MTN initié', 'Validez la demande de paiement sur votre téléphone.');
+                    // Push sent — navigate to the waiting screen
+                    await refreshOrders();
+                    clearCart();
+                    router.replace({
+                        pathname: '/payment-pending',
+                        params: {
+                            orderId: res.orderId,
+                            amount: String(effectiveTotal),
+                            phone: user?.phone ?? '',
+                        },
+                    });
                 }
+                return; // skip generic navigation below
             }
 
             await refreshOrders();
