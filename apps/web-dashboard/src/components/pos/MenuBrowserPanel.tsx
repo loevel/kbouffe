@@ -27,7 +27,20 @@ interface ApiCategory {
     name: string;
 }
 
-interface OptionValue {
+/** JSONB format stored directly on products.options */
+interface JsonbOptionChoice {
+    label: string;
+    extra_price: number;
+}
+
+interface JsonbOption {
+    name: string;
+    choices: JsonbOptionChoice[];
+    required?: boolean;
+}
+
+/** Relational format from menu_item_options table */
+interface RelationalOptionValue {
     id: string;
     name: string;
     price_adjustment: number;
@@ -35,15 +48,14 @@ interface OptionValue {
     sort_order: number;
 }
 
-interface ProductOption {
+interface RelationalOption {
     id: string;
     name: string;
-    /** "single" → radio (pick 1), "multiple" → checkbox (pick many) */
     type: "single" | "multiple";
     is_required: boolean;
     max_selections: number | null;
     sort_order: number;
-    menu_item_option_values: OptionValue[];
+    menu_item_option_values: RelationalOptionValue[];
 }
 
 interface ApiProduct {
@@ -54,7 +66,75 @@ interface ApiProduct {
     image_url: string | null;
     is_available: boolean;
     categories: ApiCategory | null;
-    menu_item_options: ProductOption[];
+    /** JSONB options (legacy format: { name, choices[], required }) */
+    options: JsonbOption[] | null;
+    /** Relational options (new format) */
+    menu_item_options: RelationalOption[];
+}
+
+// ── Normalized option type (merged from both sources) ─────────────────────────
+
+interface NormalizedChoice {
+    id: string; // index-based for JSONB, UUID for relational
+    label: string;
+    extraPrice: number;
+    isDefault: boolean;
+}
+
+interface NormalizedOption {
+    id: string;
+    name: string;
+    isSingle: boolean;
+    isRequired: boolean;
+    choices: NormalizedChoice[];
+}
+
+/** Merge JSONB + relational options into one unified list */
+function normalizeOptions(product: ApiProduct): NormalizedOption[] {
+    const result: NormalizedOption[] = [];
+
+    // JSONB options (what's in the actual DB right now)
+    if (product.options && Array.isArray(product.options)) {
+        for (let i = 0; i < product.options.length; i++) {
+            const opt = product.options[i];
+            result.push({
+                id: `jsonb-${i}`,
+                name: opt.name,
+                isSingle: true, // JSONB options are always single-select
+                isRequired: opt.required ?? false,
+                choices: (opt.choices ?? []).map((c, j) => ({
+                    id: `jsonb-${i}-${j}`,
+                    label: c.label,
+                    extraPrice: c.extra_price ?? 0,
+                    isDefault: j === 0, // first choice is default
+                })),
+            });
+        }
+    }
+
+    // Relational options (from menu_item_options table)
+    if (product.menu_item_options && product.menu_item_options.length > 0) {
+        for (const opt of [...product.menu_item_options].sort(
+            (a, b) => a.sort_order - b.sort_order,
+        )) {
+            result.push({
+                id: opt.id,
+                name: opt.name,
+                isSingle: opt.type === "single",
+                isRequired: opt.is_required,
+                choices: [...opt.menu_item_option_values]
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((v) => ({
+                        id: v.id,
+                        label: v.name,
+                        extraPrice: v.price_adjustment ?? 0,
+                        isDefault: v.is_default,
+                    })),
+            });
+        }
+    }
+
+    return result;
 }
 
 // ── Component props ───────────────────────────────────────────────────────────
@@ -83,13 +163,13 @@ interface ProductOptionsModalProps {
 }
 
 function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModalProps) {
-    // Map: optionId → Set of selected valueIds
+    const normalizedOptions = useMemo(() => normalizeOptions(product), [product]);
+
+    // Map: optionId → Set of selected choiceIds (pre-select defaults)
     const [selections, setSelections] = useState<Record<string, Set<string>>>(() => {
         const init: Record<string, Set<string>> = {};
-        for (const opt of product.menu_item_options) {
-            const defaults = opt.menu_item_option_values
-                .filter((v) => v.is_default)
-                .map((v) => v.id);
+        for (const opt of normalizedOptions) {
+            const defaults = opt.choices.filter((c) => c.isDefault).map((c) => c.id);
             init[opt.id] = new Set(defaults);
         }
         return init;
@@ -97,28 +177,26 @@ function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModa
 
     const overlayRef = useRef<HTMLDivElement>(null);
 
-    // Close on backdrop click
     const handleBackdrop = (e: React.MouseEvent) => {
         if (e.target === overlayRef.current) onClose();
     };
 
-    // Close on Escape
     useEffect(() => {
         const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
     }, [onClose]);
 
-    const toggle = (optionId: string, valueId: string, isSingle: boolean) => {
+    const toggle = (optionId: string, choiceId: string, isSingle: boolean) => {
         setSelections((prev) => {
             const next = { ...prev, [optionId]: new Set(prev[optionId]) };
             if (isSingle) {
-                next[optionId] = new Set([valueId]);
+                next[optionId] = new Set([choiceId]);
             } else {
-                if (next[optionId].has(valueId)) {
-                    next[optionId].delete(valueId);
+                if (next[optionId].has(choiceId)) {
+                    next[optionId].delete(choiceId);
                 } else {
-                    next[optionId].add(valueId);
+                    next[optionId].add(choiceId);
                 }
             }
             return next;
@@ -128,46 +206,35 @@ function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModa
     // Compute final price
     const finalPrice = useMemo(() => {
         let total = product.price;
-        for (const opt of product.menu_item_options) {
+        for (const opt of normalizedOptions) {
             const selected = selections[opt.id] ?? new Set();
-            for (const v of opt.menu_item_option_values) {
-                if (selected.has(v.id)) total += v.price_adjustment;
+            for (const c of opt.choices) {
+                if (selected.has(c.id)) total += c.extraPrice;
             }
         }
         return total;
-    }, [product, selections]);
+    }, [product.price, normalizedOptions, selections]);
 
-    // Validate: all required options have at least one selection
+    // Validate required options
     const missingRequired = useMemo(
-        () =>
-            product.menu_item_options
-                .filter((o) => o.is_required)
-                .filter((o) => (selections[o.id]?.size ?? 0) === 0),
-        [product, selections],
+        () => normalizedOptions.filter((o) => o.isRequired && (selections[o.id]?.size ?? 0) === 0),
+        [normalizedOptions, selections],
     );
 
     const handleConfirm = () => {
         if (missingRequired.length > 0) return;
 
-        // Build selectedOptions map: optionName → comma-joined valueName(s)
         const selectedOptions: Record<string, string> = {};
-        for (const opt of product.menu_item_options) {
+        for (const opt of normalizedOptions) {
             const selected = selections[opt.id] ?? new Set();
-            const names = opt.menu_item_option_values
-                .filter((v) => selected.has(v.id))
-                .sort((a, b) => a.sort_order - b.sort_order)
-                .map((v) => v.name);
-            if (names.length > 0) selectedOptions[opt.name] = names.join(", ");
+            const labels = opt.choices.filter((c) => selected.has(c.id)).map((c) => c.label);
+            if (labels.length > 0) selectedOptions[opt.name] = labels.join(", ");
         }
 
         const cartKey = `${product.id}|${JSON.stringify(selectedOptions)}`;
         onConfirm({ productId: product.id, name: product.name, price: finalPrice, cartKey, selectedOptions });
         onClose();
     };
-
-    const sortedOptions = [...product.menu_item_options].sort(
-        (a, b) => a.sort_order - b.sort_order,
-    );
 
     return (
         <div
@@ -200,12 +267,8 @@ function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModa
 
                 {/* Options list — scrollable */}
                 <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-                    {sortedOptions.map((opt) => {
-                        const isSingle = opt.type === "single";
+                    {normalizedOptions.map((opt) => {
                         const selectedSet = selections[opt.id] ?? new Set();
-                        const sortedValues = [...opt.menu_item_option_values].sort(
-                            (a, b) => a.sort_order - b.sort_order,
-                        );
                         const isMissing = missingRequired.some((o) => o.id === opt.id);
 
                         return (
@@ -214,7 +277,7 @@ function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModa
                                     <span className="text-sm font-semibold text-surface-800 dark:text-surface-200">
                                         {opt.name}
                                     </span>
-                                    {opt.is_required && (
+                                    {opt.isRequired && (
                                         <span
                                             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                                                 isMissing
@@ -225,20 +288,15 @@ function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModa
                                             Requis
                                         </span>
                                     )}
-                                    {!isSingle && opt.max_selections && (
-                                        <span className="text-[10px] text-surface-400 dark:text-surface-500">
-                                            (max {opt.max_selections})
-                                        </span>
-                                    )}
                                 </legend>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {sortedValues.map((v) => {
-                                        const isSelected = selectedSet.has(v.id);
+                                    {opt.choices.map((c) => {
+                                        const isSelected = selectedSet.has(c.id);
                                         return (
                                             <button
-                                                key={v.id}
+                                                key={c.id}
                                                 type="button"
-                                                onClick={() => toggle(opt.id, v.id, isSingle)}
+                                                onClick={() => toggle(opt.id, c.id, opt.isSingle)}
                                                 className={[
                                                     "flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-left text-sm transition-all",
                                                     isSelected
@@ -247,12 +305,12 @@ function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModa
                                                 ].join(" ")}
                                                 aria-pressed={isSelected}
                                             >
-                                                <span className="truncate">{v.name}</span>
+                                                <span className="truncate">{c.label}</span>
                                                 <span className="shrink-0 flex items-center gap-1">
-                                                    {v.price_adjustment !== 0 && (
+                                                    {c.extraPrice !== 0 && (
                                                         <span className="text-xs text-surface-500 dark:text-surface-400">
-                                                            {v.price_adjustment > 0 ? "+" : ""}
-                                                            {formatCFA(v.price_adjustment)}
+                                                            {c.extraPrice > 0 ? "+" : ""}
+                                                            {formatCFA(c.extraPrice)}
                                                         </span>
                                                     )}
                                                     {isSelected && (
@@ -279,8 +337,8 @@ function ProductOptionsModal({ product, onConfirm, onClose }: ProductOptionsModa
                         type="button"
                         onClick={handleConfirm}
                         disabled={missingRequired.length > 0}
-                        className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
-                        style={{ backgroundColor: missingRequired.length > 0 ? undefined : "var(--brand-primary, #f97316)" }}
+                        className="w-full py-3 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ backgroundColor: "var(--brand-primary, #f97316)" }}
                     >
                         Ajouter au panier — {formatCFA(finalPrice)}
                     </button>
@@ -316,7 +374,9 @@ interface ProductCardProps {
 
 function ProductCard({ product, cartQty, brandColor, onAdd }: ProductCardProps) {
     const isAvailable = product.is_available;
-    const hasOptions = product.menu_item_options?.length > 0;
+    const hasOptions =
+        (product.options && product.options.length > 0) ||
+        (product.menu_item_options && product.menu_item_options.length > 0);
 
     return (
         <div
@@ -624,7 +684,10 @@ export function MenuBrowserPanel({
                                 cartQty={cartQtyMap.get(product.id) ?? 0}
                                 brandColor={brandColor}
                                 onAdd={() => {
-                                    if (product.menu_item_options?.length > 0) {
+                                    const hasOptions =
+                                        (product.options && product.options.length > 0) ||
+                                        (product.menu_item_options && product.menu_item_options.length > 0);
+                                    if (hasOptions) {
                                         // Product has options — open selection modal
                                         setPendingProduct(product);
                                     } else {
