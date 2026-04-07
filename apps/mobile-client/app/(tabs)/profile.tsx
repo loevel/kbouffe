@@ -1,6 +1,7 @@
 import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +22,11 @@ const menuItems: MenuItem[] = [
     { icon: 'person', label: 'Mon profil', route: '/profile/edit' },
     { icon: 'location', label: 'Mes adresses de livraison', route: '/profile/addresses' },
     { icon: 'heart', label: 'Mes favoris', route: '/profile/favorites' },
-    { icon: 'settings', label: 'Paramètres & Préférences', route: '/profile/settings' },
+    { icon: 'calendar', label: 'Mes réservations', route: '/profile/reservations' },
+    { icon: 'card', label: 'Méthodes de paiement', route: '/profile/payments' },
+    { icon: 'nutrition', label: 'Préférences alimentaires', route: '/profile/preferences' },
+    { icon: 'shield-checkmark', label: 'Sécurité', route: '/profile/security' },
+    { icon: 'settings', label: 'Paramètres', route: '/profile/settings' },
 ];
 
 export default function ProfileScreen() {
@@ -41,6 +46,7 @@ export default function ProfileScreen() {
     const favCount = favoriteRestaurantIds.length + favoriteProductIds.length;
 
     const pickImage = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
@@ -87,6 +93,7 @@ export default function ProfileScreen() {
     };
 
     const confirmLogout = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         Alert.alert(
             'Déconnexion',
             'Êtes-vous sûr de vouloir vous déconnecter ?',
@@ -120,14 +127,28 @@ export default function ProfileScreen() {
                         Connectez-vous pour retrouver vos commandes, vos favoris et vos adresses en un clin d&apos;œil.
                     </Text>
                     <Pressable
-                        style={[styles.authButton, { backgroundColor: theme.primary }]}
-                        onPress={() => router.push('/(auth)/login')}
+                        style={({ pressed }) => [
+                            styles.authButton, 
+                            { backgroundColor: theme.primary },
+                            pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+                        ]}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            router.push('/(auth)/login');
+                        }}
                     >
                         <Text style={styles.authButtonText}>Me connecter</Text>
                     </Pressable>
                     <Pressable
-                        style={[styles.authGhostButton, { borderColor: theme.border }]}
-                        onPress={() => router.push('/(auth)/register')}
+                        style={({ pressed }) => [
+                            styles.authGhostButton, 
+                            { borderColor: theme.border },
+                            pressed && { opacity: 0.8, backgroundColor: theme.border + '30' }
+                        ]}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            router.push('/(auth)/register');
+                        }}
                     >
                         <Text style={[styles.authGhostButtonText, { color: theme.text }]}>Créer un compte</Text>
                     </Pressable>
@@ -140,7 +161,25 @@ export default function ProfileScreen() {
         <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingTop: Math.max(insets.top, Spacing.md), paddingBottom: Spacing.xxl + 80 }}>
             {/* Header / Profil */}
             <View style={styles.header}>
-                <Text style={[styles.pageTitle, { color: theme.text }]}>Mon Profil</Text>
+                <View style={styles.pageTitleRow}>
+                    <Text style={[styles.pageTitle, { color: theme.text }]}>Mon Profil</Text>
+                    <View style={styles.headerActions}>
+                        <Pressable
+                            onPress={() => { Haptics.selectionAsync(); router.push('/offers'); }}
+                            style={[styles.headerActionBtn, { backgroundColor: theme.primary + '15' }]}
+                            accessibilityLabel="Offres & Promotions"
+                        >
+                            <Ionicons name="pricetag-outline" size={20} color={theme.primary} />
+                        </Pressable>
+                        <Pressable
+                            onPress={() => { Haptics.selectionAsync(); router.push('/notifications'); }}
+                            style={[styles.headerActionBtn, { backgroundColor: theme.border + '50' }]}
+                            accessibilityLabel="Notifications"
+                        >
+                            <Ionicons name="notifications-outline" size={20} color={theme.text} />
+                        </Pressable>
+                    </View>
+                </View>
                 <View style={[styles.profileCard, { backgroundColor: theme.surface }]}>
                     <Pressable onPress={pickImage} style={[styles.avatar, { backgroundColor: theme.primaryLight }]}>
                         {uploading ? (
@@ -194,7 +233,10 @@ export default function ProfileScreen() {
                     {menuItems.map((item, index) => (
                         <Pressable
                             key={item.route}
-                            onPress={() => router.push(item.route as any)}
+                            onPress={() => {
+                                Haptics.selectionAsync();
+                                router.push(item.route as any);
+                            }}
                             style={({ pressed }) => [
                                 styles.menuItem,
                                 index !== menuItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
@@ -220,7 +262,10 @@ export default function ProfileScreen() {
                             { borderBottomWidth: 1, borderBottomColor: theme.border },
                             pressed && { opacity: 0.6 },
                         ]}
-                        onPress={() => router.push('/support')}
+                        onPress={() => {
+                            Haptics.selectionAsync();
+                            router.push('/support');
+                        }}
                     >
                         <View style={[styles.menuIconBox, { backgroundColor: theme.textMuted + '15' }]}>
                             <Ionicons name="help-buoy" size={20} color={theme.textMuted} />
@@ -257,7 +302,10 @@ const styles = StyleSheet.create({
     authGhostButtonText: { ...Typography.bodySemibold },
     
     header: { paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
-    pageTitle: { ...Typography.title1, marginBottom: Spacing.md, marginLeft: Spacing.xs },
+    pageTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
+    pageTitle: { ...Typography.title1, marginLeft: Spacing.xs },
+    headerActions: { flexDirection: 'row', gap: Spacing.sm },
+    headerActionBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     profileCard: {
         flexDirection: 'row',
         alignItems: 'center',

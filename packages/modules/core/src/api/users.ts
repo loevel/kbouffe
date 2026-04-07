@@ -402,17 +402,19 @@ usersRoutes.post("/support/tickets", async (c) => {
 usersRoutes.get("/orders", async (c) => {
     const { data, error } = await c.var.supabase
         .from("orders")
-        .select("*, restaurant:restaurants(name, slug)")
+        .select("*, restaurant:restaurants(name, slug, lat, lng)")
         .eq("customer_id", c.var.userId)
         .order("created_at", { ascending: false })
         .limit(100);
 
     if (error) return c.json({ error: error.message }, 500);
     return c.json({
-        orders: (data || []).map((order: Record<string, unknown> & { restaurant?: { name?: string | null; slug?: string | null } | null; items?: unknown[] | null }) => ({
+        orders: (data || []).map((order: Record<string, unknown> & { restaurant?: { name?: string | null; slug?: string | null; lat?: number | null; lng?: number | null } | null; items?: unknown[] | null }) => ({
             ...order,
             restaurant_name: order.restaurant?.name ?? null,
             restaurant_slug: order.restaurant?.slug ?? null,
+            restaurant_lat: order.restaurant?.lat ?? null,
+            restaurant_lng: order.restaurant?.lng ?? null,
             item_count: Array.isArray(order.items) ? order.items.length : 0,
         })),
     });
@@ -490,6 +492,87 @@ securityRoutes.get("/sessions", async (c) => {
         ],
     });
 });
+
+// ── Push Notifications ────────────────────────────────────────────────────────
+
+/** POST /push-token — Register or refresh an Expo push token */
+usersRoutes.post("/push-token", async (c) => {
+    const userId = c.var.userId;
+    const supabase = c.var.supabase;
+    const body = await c.req.json().catch(() => ({})) as { token?: string; platform?: string };
+
+    if (!body.token || typeof body.token !== "string") {
+        return c.json({ error: "Token manquant ou invalide" }, 400);
+    }
+
+    const platform = body.platform === "android" || body.platform === "ios" ? body.platform : "unknown";
+
+    const { error } = await supabase
+        .from("push_tokens")
+        .upsert(
+            { user_id: userId, token: body.token, platform },
+            { onConflict: "user_id,token" },
+        );
+
+    if (error) return c.json({ error: "Impossible d'enregistrer le token" }, 500);
+
+    return c.json({ success: true });
+});
+
+/** GET /notifications — List in-app notifications for the current user */
+usersRoutes.get("/notifications", async (c) => {
+    const userId = c.var.userId;
+    const supabase = c.var.supabase;
+
+    const { data, error } = await supabase
+        .from("client_notifications")
+        .select("id, type, title, body, is_read, order_id, reservation_id, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+    if (error) return c.json({ error: "Impossible de charger les notifications" }, 500);
+
+    const notifications = (data ?? []).map((n: {
+        id: string;
+        type: string;
+        title: string;
+        body: string;
+        is_read: boolean;
+        order_id: string | null;
+        reservation_id: string | null;
+        created_at: string;
+    }) => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        message: n.body,
+        isRead: n.is_read,
+        relatedId: n.order_id ?? n.reservation_id ?? null,
+        createdAt: n.created_at,
+    }));
+
+    return c.json({ notifications });
+});
+
+/** PATCH /notifications/:id/read — Mark a notification as read */
+usersRoutes.patch("/notifications/:id/read", async (c) => {
+    const userId = c.var.userId;
+    const supabase = c.var.supabase;
+    const notifId = c.req.param("id");
+
+    const { error } = await supabase
+        .from("client_notifications")
+        .update({ is_read: true })
+        .eq("id", notifId)
+        .eq("user_id", userId);
+
+    if (error) return c.json({ error: "Impossible de marquer comme lu" }, 500);
+
+    return c.json({ success: true });
+});
+
+// ── Security ──────────────────────────────────────────────────────────────────
 
 /** POST /security/sessions — Revoke all sessions */
 securityRoutes.post("/sessions", async (c) => {

@@ -43,7 +43,7 @@ export default function SettingsScreen() {
                         try {
                             await deleteAccount();
                             await logout();
-                            router.replace('/(auth)');
+                            router.replace('/(auth)/login' as any);
                         } catch (err) {
                             Alert.alert(
                                 'Erreur',

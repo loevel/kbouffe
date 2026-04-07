@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { StyleSheet, View, Text, Image, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, FlatList, NativeSyntheticEvent, NativeScrollEvent, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, FadeIn, Layout, BounceIn } from 'react-native-reanimated';
 import { useCart } from '@/contexts/cart-context';
 import { useRestaurantCache } from '@/contexts/restaurant-context';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
@@ -30,6 +32,7 @@ export default function ProductModal() {
         : product?.image ? [product.image] : [];
     const [activeImgIdx, setActiveImgIdx] = useState(0);
     const imgFlatRef = useRef<FlatList>(null);
+    const [quantity, setQuantity] = useState(1);
 
     const handleImageScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
         const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
@@ -108,6 +111,7 @@ export default function ProductModal() {
     const totalPrice = unitPrice * quantity;
 
     const handleAddToCart = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         addItem(product as any, quantity, selectedOptions, restaurantId ?? '', restaurant?.name ?? '');
         router.back();
     };
@@ -169,7 +173,10 @@ export default function ProductModal() {
 
                 <Pressable
                     style={[styles.favoriteButton, { backgroundColor: theme.background, top: insets.top + Spacing.sm }]}
-                    onPress={() => toggleProductFavorite(product.id)}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        toggleProductFavorite(product.id);
+                    }}
                 >
                     <Ionicons name={isProductFavorite(product.id) ? 'heart' : 'heart-outline'} size={22} color={isProductFavorite(product.id) ? '#ef4444' : theme.text} />
                 </Pressable>
@@ -238,7 +245,10 @@ export default function ProductModal() {
                                             styles.choiceRow,
                                             { borderColor: isSelected ? theme.primary : theme.border },
                                         ]}
-                                        onPress={() => setSelectedOptions(prev => ({ ...prev, [option.name]: choice.label }))}
+                                        onPress={() => {
+                                            Haptics.selectionAsync();
+                                            setSelectedOptions(prev => ({ ...prev, [option.name]: choice.label }));
+                                        }}
                                     >
                                         <View style={[
                                             styles.radio,
@@ -262,15 +272,31 @@ export default function ProductModal() {
                         <Text style={[styles.optionTitle, { color: theme.text }]}>Quantite</Text>
                         <View style={styles.quantityRow}>
                             <Pressable
-                                style={[styles.quantityButton, { borderColor: theme.border }]}
-                                onPress={() => setQuantity(Math.max(1, quantity - 1))}
+                                style={({ pressed }) => [
+                                    styles.quantityButton, 
+                                    { borderColor: theme.border },
+                                    pressed && { backgroundColor: theme.border + '50' }
+                                ]}
+                                onPress={() => {
+                                    if (quantity > 1) {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setQuantity(quantity - 1);
+                                    }
+                                }}
                             >
                                 <Ionicons name="remove" size={20} color={theme.text} />
                             </Pressable>
                             <Text style={[styles.quantityValue, { color: theme.text }]}>{quantity}</Text>
                             <Pressable
-                                style={[styles.quantityButton, { borderColor: theme.border }]}
-                                onPress={() => setQuantity(quantity + 1)}
+                                style={({ pressed }) => [
+                                    styles.quantityButton, 
+                                    { borderColor: theme.border },
+                                    pressed && { backgroundColor: theme.border + '50' }
+                                ]}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    setQuantity(quantity + 1);
+                                }}
                             >
                                 <Ionicons name="add" size={20} color={theme.text} />
                             </Pressable>
@@ -301,7 +327,7 @@ export default function ProductModal() {
 
                         {/* Submit review */}
                         {!reviewSubmitted ? (
-                            <View style={[styles.reviewForm, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                            <View style={[styles.reviewForm, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                                 <Text style={[styles.reviewFormLabel, { color: theme.text }]}>Donner votre avis</Text>
                                 <View style={styles.starsRow}>
                                     {[1, 2, 3, 4, 5].map((s) => (
@@ -348,7 +374,7 @@ export default function ProductModal() {
                         ) : (
                             <View style={styles.reviewsList}>
                                 {reviews.map((review) => (
-                                    <View key={review.id} style={[styles.reviewCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                                    <View key={review.id} style={[styles.reviewCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                                         <View style={styles.reviewCardHeader}>
                                             <View style={[styles.reviewAvatar, { backgroundColor: theme.primary + '20' }]}>
                                                 <Text style={[styles.reviewAvatarText, { color: theme.primary }]}>

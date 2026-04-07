@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Pressable, ScrollView, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useCart } from '@/contexts/cart-context';
 import { useOrders } from '@/contexts/orders-context';
 import { useRestaurantCache } from '@/contexts/restaurant-context';
@@ -74,13 +76,16 @@ export default function CheckoutScreen() {
             });
 
             if (result.valid) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 setAppliedPromo({ code: promoCode.trim().toUpperCase(), discount: result.discount });
                 setPromoCode('');
             } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                 setPromoError(result.reason);
                 setAppliedPromo(null);
             }
         } catch (error) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             setPromoError('Erreur de validation. Veuillez reessayer.');
         } finally {
             setPromoLoading(false);
@@ -88,6 +93,7 @@ export default function CheckoutScreen() {
     };
 
     const handleOrder = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setLoading(true);
         try {
             const paymentMap: Record<PaymentType, PlaceOrderParams['paymentMethod']> = {
@@ -204,16 +210,18 @@ export default function CheckoutScreen() {
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>Mode de reception</Text>
                 <View style={styles.toggleRow}>
                     {(['delivery', 'pickup', 'dine_in'] as DeliveryType[]).map(type => (
-                        <Pressable
-                            key={type}
-                            style={[
-                                styles.toggleButton,
-                                { borderColor: deliveryType === type ? theme.primary : theme.border },
-                                deliveryType === type && { backgroundColor: theme.primary + '10' },
-                            ]}
-                            onPress={() => setDeliveryType(type)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Mode ${type === 'delivery' ? 'livraison' : type === 'pickup' ? 'retrait' : 'sur place'}`}
+                                                    <Pressable
+                                                        key={type}
+                                                        style={[
+                                                            styles.toggleButton,
+                                                            { borderColor: deliveryType === type ? theme.primary : theme.border },
+                                                            deliveryType === type && { backgroundColor: theme.primary + '10' },
+                                                        ]}
+                                                        onPress={() => {
+                                                            Haptics.selectionAsync();
+                                                            setDeliveryType(type);
+                                                        }}
+                                                        accessibilityRole="button"                            accessibilityLabel={`Mode ${type === 'delivery' ? 'livraison' : type === 'pickup' ? 'retrait' : 'sur place'}`}
                             accessibilityState={{ selected: deliveryType === type }}
                         >
                             <Ionicons
@@ -261,7 +269,10 @@ export default function CheckoutScreen() {
                                     { borderColor: selectedAddress?.id === addr.id ? theme.primary : theme.border },
                                     selectedAddress?.id === addr.id && { backgroundColor: theme.primary + '08' },
                                 ]}
-                                onPress={() => setSelectedAddress(addr)}
+                                onPress={() => {
+                                    Haptics.selectionAsync();
+                                    setSelectedAddress(addr);
+                                }}
                             >
                                 <Ionicons name="location-outline" size={20} color={selectedAddress?.id === addr.id ? theme.primary : theme.icon} />
                                 <View style={{ flex: 1 }}>
@@ -286,7 +297,10 @@ export default function CheckoutScreen() {
                             { borderColor: paymentMethod === pm.id ? theme.primary : theme.border },
                             paymentMethod === pm.id && { backgroundColor: theme.primary + '08' },
                         ]}
-                        onPress={() => setPaymentMethod(pm.id)}
+                        onPress={() => {
+                            Haptics.selectionAsync();
+                            setPaymentMethod(pm.id);
+                        }}
                     >
                         <View style={[styles.paymentIcon, { backgroundColor: pm.color + '20' }]}>
                             <Ionicons name={pm.icon} size={20} color={pm.color} />

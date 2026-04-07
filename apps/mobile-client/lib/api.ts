@@ -13,10 +13,11 @@ function phoneToAuthEmail(phone: string) {
 }
 
 function resolveBaseUrl() {
-    const rawBase = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+    const rawBase = (process.env.EXPO_PUBLIC_API_URL ?? 'https://kbouffe-api.davechendjou.workers.dev').replace(/\/$/, '');
 
-    // Android emulators cannot reach the host machine via localhost.
-    if (Platform.OS === 'android') {
+    // In local development (localhost / 127.0.0.1), Android emulators cannot reach
+    // the host machine directly — remap to the special emulator alias 10.0.2.2.
+    if (Platform.OS === 'android' && (rawBase.includes('://localhost') || rawBase.includes('://127.0.0.1'))) {
         return rawBase.replace('://localhost', '://10.0.2.2').replace('://127.0.0.1', '://10.0.2.2');
     }
 
@@ -108,6 +109,8 @@ export interface MobileRestaurant {
     isPremium: boolean;
     isSponsored: boolean;
     sponsoredRank: number | null;
+    lat?: number | null;
+    lng?: number | null;
 }
 
 export interface MobileCategory {
@@ -187,6 +190,8 @@ interface StoresResponse {
         delivery_per_km_fee: number | null;
         max_delivery_radius_km: number | null;
         hasReservations?: boolean;
+        lat?: number | null;
+        lng?: number | null;
     }[];
 }
 
@@ -214,6 +219,8 @@ function mapRestaurant(r: StoresResponse['restaurants'][0]): MobileRestaurant {
         isPremium: r.isPremium,
         isSponsored: r.isSponsored,
         sponsoredRank: r.sponsoredRank,
+        lat: r.lat ?? null,
+        lng: r.lng ?? null,
     };
 }
 
@@ -229,7 +236,50 @@ export async function getRestaurants(params: StoresParams = {}): Promise<MobileR
     return (data.restaurants ?? []).map(mapRestaurant);
 }
 
-// ── /api/store/[slug] ─────────────────────────────────────────────────────────
+// ── /api/cuisine-categories ───────────────────────────────────────────────────
+export interface CuisineCategory {
+    id: string;
+    label: string;
+    value: string;
+    icon: string;
+    sort_order: number;
+}
+
+export async function getCuisineCategories(): Promise<CuisineCategory[]> {
+    const data = await apiFetch<{ data: CuisineCategory[] }>('/api/cuisine-categories');
+    return data.data ?? [];
+}
+
+// ── /api/homepage-sections ────────────────────────────────────────────────────
+export interface SectionRestaurant {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    coverUrl: string | null;
+    cuisineType: string | null;
+    rating: number | null;
+    reviewCount: number | null;
+    isVerified: boolean;
+    isPremium: boolean;
+    isSponsored: boolean;
+}
+
+export interface HomepageSection {
+    id: string;
+    title: string;
+    subtitle: string | null;
+    display_style: 'cards' | 'circles';
+    restaurants: SectionRestaurant[];
+}
+
+export async function getHomepageSections(cuisine?: string): Promise<HomepageSection[]> {
+    const qs = cuisine ? `?cuisine=${encodeURIComponent(cuisine)}` : '';
+    const data = await apiFetch<{ sections: HomepageSection[] }>(`/api/homepage-sections${qs}`);
+    return data.sections ?? [];
+}
+
+
 interface StoreResponse {
     restaurant: {
         id: string;
@@ -250,6 +300,8 @@ interface StoreResponse {
         delivery_base_fee?: number | null;
         delivery_per_km_fee?: number | null;
         max_delivery_radius_km?: number | null;
+        lat?: number | null;
+        lng?: number | null;
     };
     categories: MobileCategory[];
     products: {
@@ -305,7 +357,7 @@ export async function getStore(slug: string): Promise<StoreDetail> {
             ...p,
             category: data.categories.find((c) => c.id === p.category_id)?.name,
             image: p.image_url ?? undefined,
-            images: p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []),
+            images: p.image_url ? [p.image_url] : [],
         })),
         reviews: data.reviews ?? [],
     };
@@ -372,6 +424,8 @@ export interface OrderTracking {
     payment_status: string;
     restaurant_id?: string | null;
     restaurant_name?: string | null;
+    restaurant_lat?: number | null;
+    restaurant_lng?: number | null;
     delivery_type: string;
     delivery_address: string | null;
     customer_name: string;
@@ -711,6 +765,63 @@ export async function registerPushToken(
 }
 
 export { phoneToAuthEmail };
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export interface AppNotification {
+    id: string;
+    type: 'order_update' | 'delivery' | 'promotion' | 'loyalty' | 'reservation' | 'system';
+    title: string;
+    message: string;
+    isRead: boolean;
+    relatedId: string | null;
+    createdAt: string;
+}
+
+export async function getNotifications(): Promise<AppNotification[]> {
+    const data = await apiFetch<{ notifications: AppNotification[] }>('/api/account/notifications');
+    return data.notifications ?? [];
+}
+
+export async function markNotificationRead(notificationId: string): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>(`/api/account/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+    });
+}
+
+// ── Offers & Promotions ───────────────────────────────────────────────────────
+
+export interface AppOffer {
+    id: string;
+    type: 'percentage' | 'fixed' | 'free_delivery' | 'bogo' | 'loyalty';
+    title: string;
+    description: string | null;
+    displayValue: string;
+    code: string | null;
+    expiresAt: string | null;
+    restaurantId: string | null;
+    restaurantName: string | null;
+    restaurantSlug: string | null;
+    minOrderAmount: number | null;
+}
+
+export async function getAvailableOffers(): Promise<AppOffer[]> {
+    const data = await apiFetch<{ offers: AppOffer[] }>('/api/account/offers');
+    return data.offers ?? [];
+}
+
+// ── My Reservations ───────────────────────────────────────────────────────────
+
+export async function getMyReservations(): Promise<Reservation[]> {
+    const data = await apiFetch<{ reservations: Reservation[] }>('/api/account/reservations');
+    return data.reservations ?? [];
+}
+
+export async function cancelReservation(reservationId: string): Promise<{ success: boolean }> {
+    return apiFetch<{ success: boolean }>(`/api/account/reservations/${reservationId}/cancel`, {
+        method: 'POST',
+    });
+}
 
 // ── Reservations ─────────────────────────────────────────────────────────────
 

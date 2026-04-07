@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View, Text, Image, SectionList, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, FadeIn, Layout } from 'react-native-reanimated';
+import MapView, { Marker, Circle, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
 import { MenuItem } from '@/components/restaurant/MenuItem';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -95,6 +98,7 @@ export default function RestaurantScreen() {
     }, [data]);
 
     const handleAddProduct = (product: MobileProduct) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
             pathname: '/product-modal',
             params: { productId: product.id, restaurantId: restaurant!.id },
@@ -103,6 +107,7 @@ export default function RestaurantScreen() {
 
     const handleLeaveReview = () => {
         if (!restaurant) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         router.push({
             pathname: '/review/restaurant' as any,
             params: { restaurantId: restaurant.id, restaurantName: restaurant.name },
@@ -111,6 +116,7 @@ export default function RestaurantScreen() {
 
     const handleReserve = () => {
         if (!restaurant) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         router.push(`/restaurant/${slug}/reserve` as any);
     };
 
@@ -190,6 +196,58 @@ export default function RestaurantScreen() {
             </View>
 
             {/* ── Reviews Section ─────────────────────────────────── */}
+            {/* ── Delivery Zone Map ─────────────────────────────── */}
+            {restaurant.lat && restaurant.lng && (
+                <View style={[deliveryZoneStyles.section, { borderColor: theme.border }]}>
+                    <View style={deliveryZoneStyles.header}>
+                        <Ionicons name="bicycle-outline" size={18} color={theme.primary} />
+                        <Text style={[deliveryZoneStyles.title, { color: theme.text }]}>Zone de livraison</Text>
+                        {restaurant.maxDeliveryRadiusKm ? (
+                            <Text style={[deliveryZoneStyles.radius, { color: theme.icon }]}>
+                                jusqu'à {restaurant.maxDeliveryRadiusKm} km
+                            </Text>
+                        ) : null}
+                    </View>
+                    <MapView
+                        style={deliveryZoneStyles.map}
+                        provider={PROVIDER_DEFAULT}
+                        mapType="none"
+                        initialRegion={{
+                            latitude: restaurant.lat,
+                            longitude: restaurant.lng,
+                            latitudeDelta: (restaurant.maxDeliveryRadiusKm ?? 5) * 0.025,
+                            longitudeDelta: (restaurant.maxDeliveryRadiusKm ?? 5) * 0.025,
+                        }}
+                        scrollEnabled={false}
+                        zoomEnabled={false}
+                        pitchEnabled={false}
+                        rotateEnabled={false}
+                    >
+                        <UrlTile
+                            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            maximumZ={19}
+                            flipY={false}
+                            tileSize={256}
+                        />
+                        <Marker
+                            coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
+                            title={restaurant.name}
+                            pinColor="#f97316"
+                        />
+                        {restaurant.maxDeliveryRadiusKm && (
+                            <Circle
+                                center={{ latitude: restaurant.lat, longitude: restaurant.lng }}
+                                radius={restaurant.maxDeliveryRadiusKm * 1000}
+                                strokeColor="#f9731660"
+                                fillColor="#f9731610"
+                                strokeWidth={2}
+                            />
+                        )}
+                    </MapView>
+                </View>
+            )}
+
+            {/* ── Reviews Section ─────────────────────────────────── */}
             <View style={[reviewStyles.section, { borderColor: theme.border }]}>
                 <View style={reviewStyles.sectionHeader}>
                     <View>
@@ -240,17 +298,17 @@ export default function RestaurantScreen() {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <SectionList
                 sections={sections}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => (item as any).id}
                 ListHeaderComponent={renderHeader}
-                renderSectionHeader={({ section: { title } }) => (
+                renderSectionHeader={({ section: { title } }: any) => (
                     <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
                         <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
                     </View>
                 )}
-                renderItem={({ item }) => (
-                    <View style={styles.menuItemContainer}>
+                renderItem={({ item, index }: any) => (
+                    <Animated.View entering={FadeInDown.delay(index * 50).duration(400).springify()} style={styles.menuItemContainer}>
                         <MenuItem item={item as never} onAdd={() => handleAddProduct(item)} />
-                    </View>
+                    </Animated.View>
                 )}
                 stickySectionHeadersEnabled={true}
                 contentContainerStyle={{ paddingBottom: showCartFab ? 100 : 40 }}
@@ -265,10 +323,17 @@ export default function RestaurantScreen() {
             />
 
             {showCartFab && (
-                <View style={[styles.fabContainer, { bottom: Math.max(insets.bottom, Spacing.md) }]}>
+                <Animated.View entering={FadeInDown.duration(300).springify()} style={[styles.fabContainer, { bottom: Math.max(insets.bottom, Spacing.md) }]}>
                     <Pressable
-                        style={[styles.fab, { backgroundColor: theme.primary }]}
-                        onPress={() => router.push('/cart')}
+                        style={({ pressed }) => [
+                            styles.fab, 
+                            { backgroundColor: theme.primary },
+                            pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+                        ]}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            router.push('/cart');
+                        }}
                     >
                         <View style={styles.fabBadge}>
                             <Text style={styles.fabBadgeText}>{itemCount}</Text>
@@ -276,7 +341,7 @@ export default function RestaurantScreen() {
                         <Text style={styles.fabText}>Voir le panier</Text>
                         <Text style={styles.fabPrice}>{total.toLocaleString()} FCFA</Text>
                     </Pressable>
-                </View>
+                </Animated.View>
             )}
         </View>
     );
@@ -523,5 +588,27 @@ const reserveStyles = StyleSheet.create({
     reserveBtnText: {
         ...Typography.body,
         fontWeight: '600',
+    },
+});
+
+const deliveryZoneStyles = StyleSheet.create({
+    section: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingTop: Spacing.md,
+        paddingHorizontal: Spacing.md,
+        paddingBottom: Spacing.md,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginBottom: Spacing.md,
+    },
+    title: { ...Typography.body, fontWeight: '600', flex: 1 },
+    radius: { ...Typography.caption },
+    map: {
+        height: 200,
+        borderRadius: Radii.lg,
+        overflow: 'hidden',
     },
 });

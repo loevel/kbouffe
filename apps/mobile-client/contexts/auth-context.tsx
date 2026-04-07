@@ -89,11 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
+                // Set base user immediately — no await, no blocking
                 setUser(buildBaseUser(session.user));
-                const fullUser = await fetchUserProfile(session.user);
-                setUser(fullUser);
+                // Fetch full profile in background (avatar, loyalty, etc.)
+                fetchUserProfile(session.user).then(setUser).catch(() => {/* keep base user */});
             } else {
                 setUser(null);
             }
@@ -104,26 +105,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = useCallback(async (identifier: string, password: string) => {
         const trimmedIdentifier = identifier.trim();
-        const attempts = trimmedIdentifier.includes('@')
-            ? [{ email: trimmedIdentifier.toLowerCase() }]
-            : [
-                { email: phoneToAuthEmail(normalizePhoneNumber(trimmedIdentifier)) },
-                { phone: normalizePhoneNumber(trimmedIdentifier) },
-            ];
 
-        let lastError: Error | null = null;
-
-        for (const attempt of attempts) {
-            const { error } = await supabase.auth.signInWithPassword({
-                ...attempt,
+        // For phone numbers, try the email-alias first (fastest path — single call).
+        // Only fall back to direct phone auth if the alias doesn't match.
+        if (!trimmedIdentifier.includes('@')) {
+            const emailAlias = phoneToAuthEmail(normalizePhoneNumber(trimmedIdentifier));
+            const { error: aliasError } = await supabase.auth.signInWithPassword({
+                email: emailAlias,
                 password,
             });
+            if (!aliasError) return;
 
-            if (!error) return;
-            lastError = error;
+            // Alias failed → try direct phone (legacy accounts)
+            const { error: phoneError } = await supabase.auth.signInWithPassword({
+                phone: normalizePhoneNumber(trimmedIdentifier),
+                password,
+            });
+            if (!phoneError) return;
+            throw phoneError;
         }
 
-        if (lastError) throw lastError;
+        const { error } = await supabase.auth.signInWithPassword({
+            email: trimmedIdentifier.toLowerCase(),
+            password,
+        });
+        if (error) throw error;
     }, []);
 
     const register = useCallback(async (fullName: string, phone: string, password: string) => {

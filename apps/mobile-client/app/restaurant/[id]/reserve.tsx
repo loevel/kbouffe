@@ -536,7 +536,7 @@ export default function ReserveScreen() {
                         <ActivityIndicator color="#fff" />
                     ) : (
                         <>
-                            <Ionicons name="calendar-check-outline" size={20} color="#fff" />
+                            <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
                             <Text style={styles.submitBtnText}>Confirmer la réservation</Text>
                         </>
                     )}

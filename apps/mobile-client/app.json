@@ -48,6 +48,13 @@
             "backgroundColor": "#0f172a"
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "KBouffe utilise votre position pour trouver les restaurants proches et calculer la livraison.",
+          "locationWhenInUsePermission": "KBouffe utilise votre position pour trouver les restaurants proches et calculer la livraison."
+        }
       ]
     ],
     "experiments": {
@@ -55,9 +62,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "eas-project-id-here"
+        "projectId": "29feeab5-e1c9-403b-9665-4bd22de42d2a"
       }
     },
-    "owner": "kbouffe"
+    "owner": "dreamsevo"
   }
 }

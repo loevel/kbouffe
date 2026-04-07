@@ -20,7 +20,7 @@ export default function Index() {
     }
 
     if (!isAuthenticated) {
-        return <Redirect href={localOnboardingDone ? '/(tabs)' : '/onboarding'} />;
+        return <Redirect href={localOnboardingDone ? '/(auth)/login' : '/onboarding'} />;
     }
 
     const onboardingDone = user?.profile?.onboardingCompleted ?? localOnboardingDone ?? false;

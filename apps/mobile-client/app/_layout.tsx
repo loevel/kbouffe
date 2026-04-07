@@ -64,6 +64,12 @@ function LayoutContent() {
                                         <Stack.Screen name="profile/favorites" options={{ headerShown: false }} />
                                         <Stack.Screen name="profile/settings" options={{ headerShown: false }} />
                                         <Stack.Screen name="profile/loyalty" options={{ headerShown: false }} />
+                                        <Stack.Screen name="profile/payments" options={{ headerShown: false }} />
+                                        <Stack.Screen name="profile/reservations" options={{ headerShown: false }} />
+                                        <Stack.Screen name="profile/security" options={{ headerShown: false }} />
+                                        <Stack.Screen name="profile/preferences" options={{ headerShown: false }} />
+                                        <Stack.Screen name="notifications" options={{ headerShown: false }} />
+                                        <Stack.Screen name="offers" options={{ headerShown: false }} />
                                         <Stack.Screen name="support/index" options={{ headerShown: false }} />
                                         <Stack.Screen name="support/new-ticket" options={{ headerShown: false }} />
                                         <Stack.Screen name="support/tickets" options={{ headerShown: false }} />

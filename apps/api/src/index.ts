@@ -30,6 +30,7 @@ import { storePublicRoutes } from "./modules/store/store-public";
 import { dashboardRoutes } from "./modules/store/dashboard";
 import { restaurantRoutes } from "./modules/store/restaurant";
 import { cuisineCategoriesPublicRoutes } from "./modules/cuisine-categories";
+import { homepageSectionsPublicRoutes } from "./modules/homepage-sections";
 
 // ── Authenticated routes ─────────────────────────────────────────────
 import { ordersApi } from "@kbouffe/module-orders";
@@ -154,6 +155,7 @@ const couponRateLimiter = (() => {
 })();
 api.use("/coupons/validate/*", couponRateLimiter);
 api.route("/cuisine-categories", cuisineCategoriesPublicRoutes);
+api.route("/homepage-sections", homepageSectionsPublicRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
 api.route("/auth", authRoutes);
 api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
@@ -216,7 +218,7 @@ api.use("/auth", authRateLimiter);
 const merchantPaths = [
     "/orders", "/categories", "/products", "/reservations",
     "/dashboard", "/coupons", "/gift-cards", "/tables", "/restaurant",
-    "/customers", "/account", "/security", "/register-restaurant",
+    "/customers", "/register-restaurant",
     "/marketing", "/notifications", "/payouts", "/sms",
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
     "/restaurant/brands", "/restaurant/kyc",
@@ -242,6 +244,12 @@ api.use("/chat", userAuthMiddleware);
 // Reviews uses userAuthMiddleware (customers submit reviews, no restaurant required)
 api.use("/reviews/*", userAuthMiddleware);
 api.use("/reviews", userAuthMiddleware);
+
+// Account & security are client routes — no restaurantId required
+api.use("/account/*", userAuthMiddleware);
+api.use("/account", userAuthMiddleware);
+api.use("/security/*", userAuthMiddleware);
+api.use("/security", userAuthMiddleware);
 
 for (const path of merchantPaths) {
     api.use(`${path}/*`, authMiddleware);

@@ -152,7 +152,7 @@ storePublicRoutes.post("/order", async (c) => {
         const productIds = body.items.map(i => i.productId);
         const { data: dbProducts } = await supabase
             .from("products")
-            .select("id, price, dine_in_price, is_available")
+            .select("id, price, dine_in_price, is_available, options")
             .in("id", productIds)
             .eq("restaurant_id", body.restaurantId);
 
@@ -160,9 +160,9 @@ storePublicRoutes.post("/order", async (c) => {
             return c.json({ error: "Un ou plusieurs produits sont invalides ou n'appartiennent pas à ce restaurant" }, 400);
         }
 
-        const productMap = new Map(dbProducts.map(p => [p.id, p as { id: string; price: number; dine_in_price: number | null; is_available: boolean }]));
+        const productMap = new Map(dbProducts.map(p => [p.id, p as { id: string; price: number; dine_in_price: number | null; is_available: boolean; options: any[] | null }]));
 
-        // Fetch option values prices from DB for price_adjustment validation
+        // Fetch option values prices from DB for price_adjustment validation (legacy valueId-based)
         const allValueIds = body.items.flatMap(i => (i.options ?? []).map(o => o.valueId).filter(Boolean)) as string[];
         const valueAdjustMap = new Map<string, number>();
         if (allValueIds.length > 0) {
@@ -173,6 +173,23 @@ storePublicRoutes.post("/order", async (c) => {
             for (const v of dbValues ?? []) {
                 valueAdjustMap.set(v.id, (v as any).price_adjustment ?? 0);
             }
+        }
+
+        /** Compute extra price for a single option choice.
+         *  Prefers the DB-sourced valueId map (legacy), falls back to the
+         *  product's JSONB options to validate client-sent priceAdjustment. */
+        function resolveOptionPrice(
+            opt: { valueId?: string; name: string; value: string; priceAdjustment: number },
+            dbProduct: { options: any[] | null }
+        ): number {
+            if (opt.valueId) return valueAdjustMap.get(opt.valueId) ?? 0;
+            // Look up extra_price in the product's JSONB options (source of truth)
+            const optGroup = (dbProduct.options ?? []).find((o: any) => o.name === opt.name);
+            if (optGroup) {
+                const choice = (optGroup.choices ?? []).find((c: any) => c.label === opt.value);
+                if (choice) return (choice.extra_price ?? 0);
+            }
+            return 0;
         }
 
         // Compute subtotal server-side from DB prices
@@ -188,7 +205,7 @@ storePublicRoutes.post("/order", async (c) => {
 
             let optionsTotal = 0;
             for (const opt of item.options ?? []) {
-                if (opt.valueId) optionsTotal += valueAdjustMap.get(opt.valueId) ?? 0;
+                optionsTotal += resolveOptionPrice(opt, dbProduct);
             }
             computedSubtotal += (basePrice + optionsTotal) * item.quantity;
         }
@@ -293,7 +310,7 @@ storePublicRoutes.post("/order", async (c) => {
                 : dbProduct.price;
             let optionsTotal = 0;
             for (const opt of item.options ?? []) {
-                if (opt.valueId) optionsTotal += valueAdjustMap.get(opt.valueId) ?? 0;
+                optionsTotal += resolveOptionPrice(opt, dbProduct);
             }
             const validatedItemPrice = basePrice + optionsTotal;
 
@@ -564,7 +581,7 @@ storePublicRoutes.get("/:slug", async (c) => {
                 .order("sort_order"),
             supabase
                 .from("products")
-                .select("id, name, description, price, compare_at_price, image_url, is_available, category_id, sort_order, product_images(url, display_order)")
+                .select("id, name, description, price, compare_at_price, image_url, is_available, category_id, sort_order, options, is_halal, is_vegan, is_gluten_free, allergens, product_images(url, display_order)")
                 .eq("restaurant_id", rest.id)
                 .eq("is_available", true)
                 .order("sort_order"),
@@ -665,6 +682,10 @@ storePublicRoutes.get("/:slug", async (c) => {
                 loyaltyPointValue: rest.loyalty_point_value ?? 1,
                 loyaltyMinRedeemPoints: rest.loyalty_min_redeem_points ?? 100,
                 loyaltyRewardTiers: rest.loyalty_reward_tiers ?? [],
+                // Coordinates (for map features)
+                lat: rest.lat ?? null,
+                lng: rest.lng ?? null,
+                maxDeliveryRadiusKm: rest.max_delivery_radius_km ?? null,
             },
             categories: categoriesRes.data ?? [],
             products: (productsRes.data ?? []).map((p: any) => {
@@ -674,8 +695,17 @@ storePublicRoutes.get("/:slug", async (c) => {
                 const images = p.image_url
                     ? [p.image_url, ...extraImages]
                     : extraImages;
-                const { product_images: _, ...product } = p;
-                return { ...product, images };
+                const { product_images: _, options: rawOptions, ...product } = p;
+                // Map extra_price → extraPrice for mobile compatibility
+                const options = (rawOptions ?? []).map((opt: any) => ({
+                    name: opt.name,
+                    required: opt.required ?? false,
+                    choices: (opt.choices ?? []).map((c: any) => ({
+                        label: c.label,
+                        extraPrice: c.extra_price ?? 0,
+                    })),
+                }));
+                return { ...product, images, options: options.length > 0 ? options : undefined };
             }),
             reviews: reviewData.map(r => ({
                 id: r.id,

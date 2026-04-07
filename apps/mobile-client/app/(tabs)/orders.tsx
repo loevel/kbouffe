@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { StyleSheet, View, Text, FlatList, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useOrders, type StoredOrder, type MobileOrderStatus } from '@/contexts/orders-context';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -46,6 +48,7 @@ export default function OrdersScreen() {
     const pastOrders = useMemo(() => orders.filter(o => ['completed', 'cancelled', 'delivered'].includes(o.status)), [orders]);
 
     const handleReorder = (order: StoredOrder) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         clearCart();
         order.items.forEach(item => {
             addItem(
@@ -74,7 +77,10 @@ export default function OrdersScreen() {
                     { backgroundColor: theme.background, borderColor: theme.border },
                     pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
                 ]}
-                onPress={() => router.push(`/order/${order.id}`)}
+                onPress={() => {
+                    Haptics.selectionAsync();
+                    router.push(`/order/${order.id}`);
+                }}
             >
                 <View style={styles.orderHeader}>
                     <View style={styles.orderRestaurant}>
@@ -156,13 +162,13 @@ export default function OrdersScreen() {
                 </View>
             ) : (
 
-                <FlatList
+                <Animated.FlatList
                     data={[...activeOrders, ...pastOrders]}
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={styles.listContainer}
                     showsVerticalScrollIndicator={false}
                     renderItem={({ item, index }) => (
-                        <View>
+                        <Animated.View entering={FadeInDown.delay(index * 100).duration(400).springify()}>
                             {index === 0 && activeOrders.length > 0 && (
                                 <Text style={[styles.sectionTitle, { color: theme.text }]}>En cours</Text>
                             )}
@@ -170,7 +176,7 @@ export default function OrdersScreen() {
                                 <Text style={[styles.sectionTitle, { color: theme.text, marginTop: Spacing.lg }]}>Historique</Text>
                             )}
                             {renderOrderCard(item)}
-                        </View>
+                        </Animated.View>
                     )}
                     ListEmptyComponent={() => (
                         <View style={styles.empty}>

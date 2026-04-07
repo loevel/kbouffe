@@ -26,6 +26,8 @@ export interface StoredOrder {
     id: string;
     restaurantId: string;
     restaurantName: string;
+    restaurantLat?: number | null;
+    restaurantLng?: number | null;
     status: MobileOrderStatus;
     deliveryType: 'delivery' | 'pickup' | 'dine_in';
     items: { productId: string; name: string; price: number; quantity: number }[];
@@ -89,6 +91,8 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
                 id: o.id,
                 restaurantId: o.restaurant_id ?? '',
                 restaurantName: o.restaurant_name ?? 'Restaurant',
+                restaurantLat: o.restaurant_lat ?? null,
+                restaurantLng: o.restaurant_lng ?? null,
                 status: mapOrderStatus(o.status),
                 deliveryType: mapDeliveryType(o.delivery_type),
                 items: o.items,

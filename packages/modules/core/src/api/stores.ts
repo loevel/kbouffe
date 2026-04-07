@@ -27,7 +27,8 @@ storesRoutes.get("/", async (c) => {
             id, name, slug, description, logo_url, banner_url, address, city,
             cuisine_type, price_range, rating, review_count, order_count,
             is_verified, is_premium, is_sponsored, has_dine_in,
-            delivery_base_fee, delivery_per_km_fee, max_delivery_radius_km
+            delivery_base_fee, delivery_per_km_fee, max_delivery_radius_km,
+            lat, lng
         `)
         .eq("is_published", true);
 

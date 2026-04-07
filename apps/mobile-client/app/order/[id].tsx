@@ -1,7 +1,9 @@
 import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useOrders, type MobileOrderStatus } from '@/contexts/orders-context';
 import { cancelOrder } from '@/lib/api';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
@@ -79,6 +81,67 @@ const shortStatusIndex: Partial<Record<MobileOrderStatus, number>> = {
     cancelled: -1,
 };
 
+const ESTIMATED_MINUTES: Partial<Record<string, number>> = {
+    pending:    30,
+    confirmed:  28,
+    accepted:   25,
+    preparing:  20,
+    ready:      10,
+    delivering:  5,
+    completed:   0,
+    delivered:   0,
+};
+
+function LiveDeliveryBanner({ theme }: { theme: typeof Colors['light'] }) {
+    const pulse = useSharedValue(1);
+    useEffect(() => {
+        pulse.value = withRepeat(
+            withSequence(
+                withTiming(1.15, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+                withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+            ),
+            -1,
+            false,
+        );
+    }, [pulse]);
+
+    const bikeAnim = useSharedValue(0);
+    useEffect(() => {
+        bikeAnim.value = withRepeat(
+            withTiming(1, { duration: 2500, easing: Easing.linear }),
+            -1,
+            false,
+        );
+    }, [bikeAnim]);
+
+    const bikeStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: bikeAnim.value * 220 }],
+    }));
+
+    const dotStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pulse.value }],
+        opacity: pulse.value > 1.05 ? 0.8 : 1,
+    }));
+
+    return (
+        <View style={[liveBannerStyles.container, { backgroundColor: '#10b98115', borderColor: '#10b98130' }]}>
+            <View style={liveBannerStyles.header}>
+                <Animated.View style={[liveBannerStyles.dot, { backgroundColor: '#10b981' }, dotStyle]} />
+                <Text style={[liveBannerStyles.title, { color: '#10b981' }]}>Votre commande est en route !</Text>
+            </View>
+            <View style={liveBannerStyles.track}>
+                <View style={[liveBannerStyles.trackLine, { backgroundColor: '#10b98130' }]} />
+                <Animated.View style={[liveBannerStyles.bikeWrapper, bikeStyle]}>
+                    <Text style={liveBannerStyles.bikeIcon}>🚴</Text>
+                </Animated.View>
+                <View style={[liveBannerStyles.destination, { backgroundColor: '#10b981' }]}>
+                    <Text style={liveBannerStyles.destinationIcon}>🏠</Text>
+                </View>
+            </View>
+        </View>
+    );
+}
+
 export default function OrderTrackingScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
@@ -149,6 +212,67 @@ export default function OrderTrackingScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Live delivery banner */}
+                {order.deliveryType === 'delivery' && order.status === 'delivering' && (
+                    <LiveDeliveryBanner theme={theme} />
+                )}
+
+                {/* Estimated time */}
+                {!isCancelled && order.status !== 'completed' && order.status !== 'delivered' && (
+                    <View style={[styles.estimatedCard, { backgroundColor: theme.primary + '10', borderColor: theme.primary + '25' }]}>
+                        <Ionicons name="time-outline" size={20} color={theme.primary} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.estimatedLabel, { color: theme.icon }]}>Temps estimé</Text>
+                            <Text style={[styles.estimatedValue, { color: theme.primary }]}>
+                                ~{ESTIMATED_MINUTES[order.status] ?? 30} minutes restantes
+                            </Text>
+                        </View>
+                        <View style={[styles.progressWrapper, { backgroundColor: theme.border }]}>
+                            <View
+                                style={[
+                                    styles.progressFill,
+                                    {
+                                        backgroundColor: theme.primary,
+                                        width: `${Math.round((1 - (ESTIMATED_MINUTES[order.status] ?? 30) / 30) * 100)}%` as any,
+                                    },
+                                ]}
+                            />
+                        </View>
+                    </View>
+                )}
+
+                {/* Delivery tracking map — shown when order is in delivery and restaurant has coordinates */}
+                {order.deliveryType === 'delivery' && order.status === 'delivering' && order.restaurantLat && order.restaurantLng && (
+                    <View style={styles.trackingMapContainer}>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Suivi en direct</Text>
+                        <MapView
+                            style={styles.trackingMap}
+                            provider={PROVIDER_DEFAULT}
+                            mapType="none"
+                            initialRegion={{
+                                latitude: order.restaurantLat,
+                                longitude: order.restaurantLng,
+                                latitudeDelta: 0.02,
+                                longitudeDelta: 0.02,
+                            }}
+                            scrollEnabled={false}
+                            zoomEnabled={false}
+                        >
+                            <UrlTile
+                                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                maximumZ={19}
+                                flipY={false}
+                                tileSize={256}
+                            />
+                            <Marker
+                                coordinate={{ latitude: order.restaurantLat, longitude: order.restaurantLng }}
+                                title={order.restaurantName}
+                                pinColor="#f97316"
+                            />
+                        </MapView>
+                    </View>
+                )}
+
                 {/* Restaurant */}
                 <View style={[styles.restaurantCard, { borderColor: theme.border }]}>
                     <Ionicons name="restaurant-outline" size={20} color={theme.primary} />
@@ -197,7 +321,7 @@ export default function OrderTrackingScreen() {
                                     </View>
                                 </View>
                             );
-                        })}}
+                        })}
                     </View>
                 )}
 
@@ -298,11 +422,52 @@ export default function OrderTrackingScreen() {
     );
 }
 
+const liveBannerStyles = StyleSheet.create({
+    container: {
+        borderWidth: 1,
+        borderRadius: Radii.lg,
+        padding: Spacing.md,
+        marginBottom: Spacing.md,
+        overflow: 'hidden',
+    },
+    header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+    dot: { width: 10, height: 10, borderRadius: 5 },
+    title: { ...Typography.captionSemibold },
+    track: { height: 36, justifyContent: 'center', overflow: 'hidden' },
+    trackLine: { position: 'absolute', left: 0, right: 0, height: 3, borderRadius: 2 },
+    bikeWrapper: { position: 'absolute', left: 0, top: 4 },
+    bikeIcon: { fontSize: 22 },
+    destination: { position: 'absolute', right: 4, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    destinationIcon: { fontSize: 14 },
+});
+
 const styles = StyleSheet.create({
     container: { flex: 1 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md },
     headerTitle: { ...Typography.title3 },
     scrollContent: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+    estimatedCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderRadius: Radii.lg,
+        marginBottom: Spacing.md,
+    },
+    estimatedLabel: { ...Typography.small },
+    estimatedValue: { ...Typography.bodySemibold },
+    progressWrapper: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        borderRadius: 0,
+        borderBottomLeftRadius: Radii.lg,
+        borderBottomRightRadius: Radii.lg,
+    },
+    progressFill: { height: '100%', borderRadius: 2 },
     restaurantCard: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -418,5 +583,14 @@ const styles = StyleSheet.create({
         ...Typography.body,
         fontWeight: '600',
         color: '#ef4444',
+    },
+    trackingMapContainer: {
+        marginBottom: Spacing.md,
+        gap: Spacing.sm,
+    },
+    trackingMap: {
+        height: 180,
+        borderRadius: Radii.lg,
+        overflow: 'hidden',
     },
 });

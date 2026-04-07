@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, Pressable, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { getAddresses, createAddress, updateAddress, deleteAddress, type Address } from '@/lib/api';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { setMapPickerCallback, type PickedAddress } from '@/app/map-picker';
 
 export default function AddressesScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const router = useRouter();
 
     const [addresses, setAddresses] = useState<Address[]>([]);
     const [loading, setLoading] = useState(true);
@@ -17,6 +20,18 @@ export default function AddressesScreen() {
     const [newLabel, setNewLabel] = useState('');
     const [newAddress, setNewAddress] = useState('');
     const [newCity, setNewCity] = useState('Douala');
+    const [pickedLat, setPickedLat] = useState<number | undefined>();
+    const [pickedLng, setPickedLng] = useState<number | undefined>();
+
+    const handleOpenMapPicker = () => {
+        setMapPickerCallback((picked: PickedAddress) => {
+            setNewAddress(picked.address);
+            setNewCity(picked.city);
+            setPickedLat(picked.lat);
+            setPickedLng(picked.lng);
+        });
+        router.push('/map-picker');
+    };
 
     useEffect(() => {
         fetchAddresses();
@@ -64,11 +79,15 @@ export default function AddressesScreen() {
                 label: newLabel.trim(),
                 address: newAddress.trim(),
                 city: newCity.trim() || 'Douala',
+                lat: pickedLat,
+                lng: pickedLng,
                 isDefault: addresses.length === 0,
             });
             setNewLabel('');
             setNewAddress('');
             setNewCity('Douala');
+            setPickedLat(undefined);
+            setPickedLng(undefined);
             setShowForm(false);
             fetchAddresses();
         } catch (error) {
@@ -145,6 +164,16 @@ export default function AddressesScreen() {
                                 placeholder="Adresse complete"
                                 placeholderTextColor={theme.icon}
                             />
+                            {/* Map picker button */}
+                            <Pressable
+                                onPress={handleOpenMapPicker}
+                                style={[styles.mapPickerBtn, { borderColor: theme.primary, backgroundColor: theme.primary + '10' }]}
+                            >
+                                <Ionicons name="map-outline" size={18} color={theme.primary} />
+                                <Text style={[styles.mapPickerText, { color: theme.primary }]}>
+                                    {pickedLat ? '📍 Position sur carte ✓' : 'Choisir sur la carte'}
+                                </Text>
+                            </Pressable>
                             <TextInput
                                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                                 value={newCity}
@@ -214,6 +243,15 @@ const styles = StyleSheet.create({
     },
     actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     actionText: { ...Typography.caption, fontWeight: '500' },
+    mapPickerBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        padding: Spacing.md,
+        borderRadius: Radii.lg,
+        borderWidth: 1,
+    },
+    mapPickerText: { ...Typography.body, fontWeight: '500' },
     empty: { alignItems: 'center', paddingVertical: Spacing.xxl, gap: Spacing.md },
     emptyText: { ...Typography.body },
     formCard: {

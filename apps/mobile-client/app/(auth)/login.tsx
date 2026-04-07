@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useRouter, Link } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -23,6 +24,8 @@ export default function LoginScreen() {
             Alert.alert('Champs requis', 'Veuillez renseigner votre identifiant et votre mot de passe.');
             return;
         }
+        // Retour haptique immédiat — l'utilisateur sent la pression avant la réponse réseau
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setLoading(true);
         try {
             await login(identifier, password);
@@ -82,8 +85,11 @@ export default function LoginScreen() {
                         </Pressable>
                     </View>
 
-                    <Pressable style={styles.forgotPassword}>
-                        <Text style={[styles.forgotPasswordText, { color: theme.primary }]}>Mot de passe oublie?</Text>
+                    <Pressable
+                        style={styles.forgotPassword}
+                        onPress={() => router.push('/(auth)/forgot-password')}
+                    >
+                        <Text style={[styles.forgotPasswordText, { color: theme.primary }]}>Mot de passe oublié ?</Text>
                     </Pressable>
 
                     <Pressable

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Restaurant } from '@kbouffe/shared-types';
 import { Colors, Spacing, Typography, Radii, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -37,7 +38,10 @@ export function RestaurantCard({ restaurant, onPress, isFavorite = false, onTogg
                 {onToggleFavorite && (
                     <Pressable 
                         style={[styles.favoriteButton, { backgroundColor: theme.surface, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }]} 
-                        onPress={onToggleFavorite}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            onToggleFavorite();
+                        }}
                     >
                         <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={20} color={isFavorite ? '#ef4444' : theme.icon} />
                     </Pressable>
