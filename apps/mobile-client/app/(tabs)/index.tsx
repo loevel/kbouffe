@@ -235,6 +235,23 @@ export default function HomeScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            {/* Simple header */}
+            <View style={[styles.simpleHeader, { paddingTop: insets.top }]}>
+                <View>
+                    <Text style={[styles.headerSmallText, { color: theme.icon }]}>KBOUFFE</Text>
+                    <Text style={[styles.headerLargeText, { color: theme.text }]}>Bonjour</Text>
+                </View>
+                <Pressable
+                    style={[styles.cartButton, { backgroundColor: theme.primaryLight }]}
+                    onPress={() => router.push('/(tabs)/orders')}
+                >
+                    <Ionicons name="cart" size={20} color={theme.primary} />
+                    <View style={[styles.cartBadge, { backgroundColor: theme.primary }]}>
+                        <Text style={styles.cartBadgeText}>2</Text>
+                    </View>
+                </Pressable>
+            </View>
+
             {loading && sections.length === 0 ? (
                 <View style={{ paddingHorizontal: Spacing.md, gap: Spacing.lg, marginTop: Spacing.md }}>
                     <Skeleton height={48} borderRadius={Radii.lg} />
@@ -405,6 +422,47 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    simpleHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.md,
+        gap: Spacing.md,
+    },
+    headerSmallText: {
+        ...Typography.caption,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+    },
+    headerLargeText: {
+        ...Typography.title1,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    cartButton: {
+        position: 'relative',
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cartBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cartBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
     headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
