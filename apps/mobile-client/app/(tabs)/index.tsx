@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { CustomHeader } from '@/components/CustomHeader';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -182,7 +181,6 @@ export default function HomeScreen() {
     const insets = useSafeAreaInsets();
     const { setPreview } = useRestaurantCache();
 
-    const [homeSearch, setHomeSearch] = useState('');
     const [activeCuisine, setActiveCuisine] = useState<string | undefined>(undefined);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [activePromo, setActivePromo] = useState(0);
@@ -195,16 +193,6 @@ export default function HomeScreen() {
         for (const s of sections) for (const r of s.restaurants) map.set(r.slug, r);
         return map;
     }, [sections]);
-
-    const firstName = useMemo(() => (user?.fullName ?? 'vous').split(' ')[0], [user?.fullName]);
-
-    const handleOpenExplore = useCallback(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push({
-            pathname: '/(tabs)/explore',
-            params: homeSearch.trim() ? { q: homeSearch.trim() } : undefined,
-        });
-    }, [homeSearch, router]);
 
     const handleCuisine = useCallback((value: string | undefined) => {
         Haptics.selectionAsync();
@@ -247,13 +235,6 @@ export default function HomeScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <CustomHeader
-                title={`Bonjour, ${firstName}`}
-                showSearch={true}
-                onSearchChange={setHomeSearch}
-                showCart={true}
-                showBack={false}
-            />
             {loading && sections.length === 0 ? (
                 <View style={{ paddingHorizontal: Spacing.md, gap: Spacing.lg, marginTop: Spacing.md }}>
                     <Skeleton height={48} borderRadius={Radii.lg} />
@@ -268,28 +249,6 @@ export default function HomeScreen() {
                     showsVerticalScrollIndicator={false}
                     removeClippedSubviews
                 >
-                    {/* Delivery Address Bar + Filters */}
-                    <View style={[styles.headerTop, { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.md }]}>
-                        <Pressable
-                            style={[
-                                styles.addressBar,
-                                {
-                                    backgroundColor: theme.surfaceElevated,
-                                    borderColor: theme.border,
-                                    flex: 1,
-                                },
-                            ]}
-                            onPress={() => router.push('/profile/addresses')}
-                            hitSlop={8}
-                        >
-                            <Ionicons name="location" size={16} color={theme.primary} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={[styles.addressLabel, { color: theme.icon }]}>Livraison à</Text>
-                                <Text style={[styles.addressValue, { color: theme.text }]} numberOfLines={1}>Douala</Text>
-                            </View>
-                            <Ionicons name="chevron-down" size={16} color={theme.icon} />
-                        </Pressable>
-                    </View>
 
                     {/* Categories */}
                     {allCategories.length > 0 && (
