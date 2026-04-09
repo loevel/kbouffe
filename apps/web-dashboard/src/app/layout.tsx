@@ -40,17 +40,19 @@ export const metadata: Metadata = {
   creator: "Kbouffe",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon",
-    apple: "/apple-icon",
+    icon: "/logo-icon.svg",
+    apple: "/logo-icon.svg",
   },
   openGraph: {
     type: "website",
     locale: "fr_CM",
     siteName: "Kbouffe",
+    images: [{ url: "/logo-full.svg", width: 400, height: 120, alt: "Kbouffe" }],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     creator: "@kbouffe",
+    images: ["/logo-full.svg"],
   },
   appleWebApp: {
     capable: true,

@@ -16,6 +16,7 @@
  */
 
 import { useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, type Variants } from "framer-motion";
@@ -37,7 +38,12 @@ import { KbouffeLogo } from "@/components/brand/Logo";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { SupplierRegisterForm } from "@kbouffe/module-marketplace/ui";
 import type { SupplierType } from "@kbouffe/module-marketplace/lib";
-import { FaceLivenessKYC, type KYCResult } from "@/components/kyc/FaceLivenessKYC";
+import type { KYCResult } from "@/components/kyc/FaceLivenessKYC";
+
+const FaceLivenessKYC = dynamic(
+    () => import("@/components/kyc/FaceLivenessKYC").then((m) => ({ default: m.FaceLivenessKYC })),
+    { ssr: false }
+);
 
 // ── Supabase client ────────────────────────────────────────────────────────
 

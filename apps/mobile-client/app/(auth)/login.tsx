@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -49,12 +50,12 @@ export default function LoginScreen() {
                 </Pressable>
 
                 <View style={styles.header}>
-                    <Text style={[styles.logo, { color: theme.primary }]}>Kbouffe</Text>
-                    <Text style={[styles.title, { color: theme.text }]}>Content de vous revoir!</Text>
-                    <Text style={[styles.subtitle, { color: theme.icon }]}>Connectez-vous pour commander</Text>
+                    <Animated.Text entering={FadeInDown.delay(100).springify()} style={[styles.logo, { color: theme.primary }]}>Kbouffe</Animated.Text>
+                    <Animated.Text entering={FadeInDown.delay(200).springify()} style={[styles.title, { color: theme.text }]}>Content de vous revoir!</Animated.Text>
+                    <Animated.Text entering={FadeInDown.delay(300).springify()} style={[styles.subtitle, { color: theme.icon }]}>Connectez-vous pour commander</Animated.Text>
                 </View>
 
-                <View style={styles.form}>
+                <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.form}>
                     <View style={[styles.inputContainer, { borderColor: theme.border, backgroundColor: theme.background }]}>
                         <Ionicons name="call-outline" size={20} color={theme.icon} style={styles.inputIcon} />
                         <TextInput
@@ -93,22 +94,26 @@ export default function LoginScreen() {
                     </Pressable>
 
                     <Pressable
-                        style={[styles.button, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
+                        style={({ pressed }) => [
+                            styles.button, 
+                            { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 },
+                            pressed && { transform: [{ scale: 0.98 }] }
+                        ]}
                         onPress={handleLogin}
                         disabled={loading}
                     >
                         <Text style={styles.buttonText}>{loading ? 'Connexion...' : 'Se connecter'}</Text>
                     </Pressable>
-                </View>
+                </Animated.View>
 
-                <View style={styles.footer}>
+                <Animated.View entering={FadeInUp.delay(500).springify()} style={styles.footer}>
                     <Text style={[styles.footerText, { color: theme.icon }]}>Pas encore de compte? </Text>
                     <Link href="/(auth)/register" asChild>
                         <Pressable>
                             <Text style={[styles.footerLink, { color: theme.primary }]}>Creer un compte</Text>
                         </Pressable>
                     </Link>
-                </View>
+                </Animated.View>
             </ScrollView>
         </KeyboardAvoidingView>
     );

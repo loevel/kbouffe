@@ -1,21 +1,19 @@
 /**
  * app/restaurant/[id]/reserve.tsx
  *
- * Reservation screen — lets the customer book a table at the restaurant
- * identified by the `id` slug in the URL.
- *
- * Route: /restaurant/:id/reserve
+ * Reservation screen — lets the customer book a table at the restaurant.
  *
  * Features:
  *  • Horizontal date-chip carousel (next 60 days)
- *  • Horizontal time-slot grid (30-min intervals, 11:00–22:00)
+ *  • Real-time time slots from GET /api/store/:slug/availability
+ *  • Zone selector (when restaurant has multiple zones)
+ *  • Occasion selector (birthday, anniversary, etc.)
  *  • Party-size stepper (1–20 guests)
  *  • Customer name & phone pre-filled from auth context
- *  • Optional free-text "demandes spéciales"
  *  • Calls POST /api/store/[slug]/reservations on submit
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -26,6 +24,7 @@ import {
     ScrollView,
     ActivityIndicator,
     FlatList,
+    Image,
     KeyboardAvoidingView,
     Platform,
     TouchableOpacity,
@@ -36,7 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
-import { createReservation } from '@/lib/api';
+import { createReservation, getAvailability, type AvailabilityResponse, type AvailabilitySlot } from '@/lib/api';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,17 +43,30 @@ const MIN_PARTY = 1;
 const MAX_PARTY = 20;
 const DAYS_AHEAD = 60;
 
-/** Time slots: 11:00 → 22:00, every 30 minutes */
-const TIME_SLOTS: string[] = (() => {
+/** Fallback time slots used if API is unavailable: 11:00 → 22:00, every 30 min */
+const FALLBACK_SLOTS: string[] = (() => {
     const slots: string[] = [];
     for (let h = 11; h <= 22; h++) {
         for (const m of [0, 30]) {
-            if (h === 22 && m === 30) break; // don't generate 22:30
+            if (h === 22 && m === 30) break;
             slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
     }
     return slots;
 })();
+
+// ── Occasions ─────────────────────────────────────────────────────────────────
+
+const OCCASIONS = [
+    { key: 'birthday',    label: 'Anniversaire', emoji: '🎂' },
+    { key: 'anniversary', label: 'Anniversaire de mariage', emoji: '💍' },
+    { key: 'dinner',      label: 'Dîner',         emoji: '🍽️' },
+    { key: 'date',        label: 'Rendez-vous',   emoji: '💕' },
+    { key: 'business',    label: 'Affaires',      emoji: '💼' },
+    { key: 'family',      label: 'Famille',       emoji: '👨‍👩‍👧' },
+    { key: 'surprise',    label: 'Surprise',      emoji: '🎉' },
+    { key: 'other',       label: 'Autre',         emoji: '✨' },
+] as const;
 
 // ── Helper: generate upcoming dates ─────────────────────────────────────────
 
@@ -145,7 +157,62 @@ export default function ReserveScreen() {
     const [customerName, setCustomerName] = useState(user?.fullName ?? '');
     const [customerPhone, setCustomerPhone] = useState(user?.phone ?? '');
     const [specialRequests, setSpecialRequests] = useState('');
+    const [occasion, setOccasion] = useState<string | null>(null);
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    // ── Availability (real-time from API) ───────────────────────────────────
+    const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
+    const [availabilityLoading, setAvailabilityLoading] = useState(false);
+
+    // Auto-fill user info when auth data loads (user may arrive after mount)
+    React.useEffect(() => {
+        if (user?.fullName && !customerName) {
+            setCustomerName(user.fullName);
+        }
+        if (user?.phone && !customerPhone) {
+            setCustomerPhone(user.phone);
+        }
+    }, [user]);
+
+    // Fetch real-time availability when date or party size changes
+    useEffect(() => {
+        if (!slug) return;
+        setAvailabilityLoading(true);
+        setSelectedTime(null);
+        getAvailability(slug, selectedDay.isoDate, partySize)
+            .then((res) => {
+                setAvailability(res);
+                // Auto-select zone if only one is available
+                if (res.zones.length === 1) setSelectedZoneId(res.zones[0].zone.id);
+                else setSelectedZoneId(null);
+            })
+            .catch(() => setAvailability(null))
+            .finally(() => setAvailabilityLoading(false));
+    }, [slug, selectedDay.isoDate, partySize]);
+
+    // Derive time slots: from selected zone or all zones merged
+    const timeSlots: (AvailabilitySlot | { time: string; available: boolean; available_count: number; reserved_until: null })[] =
+        React.useMemo(() => {
+            if (!availability) {
+                return FALLBACK_SLOTS.map((t) => ({ time: t, available: true, available_count: 1, reserved_until: null }));
+            }
+            const zone = availability.zones.find((z) => z.zone.id === selectedZoneId);
+            if (zone) return zone.slots;
+            // Merge all zones: a slot is available if ANY zone has it
+            const mergedMap = new Map<string, AvailabilitySlot>();
+            for (const z of availability.zones) {
+                for (const slot of z.slots) {
+                    const existing = mergedMap.get(slot.time);
+                    if (!existing || slot.available_count > existing.available_count) {
+                        mergedMap.set(slot.time, slot);
+                    }
+                }
+            }
+            // Fall back to unzoned slots if no zones
+            const source = mergedMap.size > 0 ? Array.from(mergedMap.values()) : (availability.unzoned_slots ?? []);
+            return source.length > 0 ? source : FALLBACK_SLOTS.map((t) => ({ time: t, available: true, available_count: 1, reserved_until: null }));
+        }, [availability, selectedZoneId]);
 
     // Keep the date list ref for scroll-to-selected
     const dateListRef = useRef<FlatList<DayItem>>(null);
@@ -181,6 +248,7 @@ export default function ReserveScreen() {
                 date: selectedDay.isoDate,
                 time: selectedTime,
                 specialRequests: specialRequests.trim() || undefined,
+                occasion: occasion ?? undefined,
             });
 
             Alert.alert(
@@ -312,43 +380,254 @@ export default function ReserveScreen() {
                 {/* ── Heure ────────────────────────────────────────────── */}
                 <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                     <SectionLabel icon="time-outline" label="Heure" theme={theme} required />
-                    <View style={styles.timeGrid}>
-                        {TIME_SLOTS.map((slot) => {
-                            const isSelected = slot === selectedTime;
+                    {availabilityLoading ? (
+                        <View style={styles.availabilityLoader}>
+                            <ActivityIndicator size="small" color={theme.primary} />
+                            <Text style={[styles.hintText, { color: theme.icon }]}>Vérification des disponibilités…</Text>
+                        </View>
+                    ) : (
+                        <View style={styles.timeGrid}>
+                            {timeSlots.map((slot) => {
+                                const isSelected = slot.time === selectedTime;
+                                const isUnavailable = !slot.available;
+                                return (
+                                    <TouchableOpacity
+                                        key={slot.time}
+                                        onPress={() => !isUnavailable && setSelectedTime(slot.time)}
+                                        activeOpacity={isUnavailable ? 1 : 0.7}
+                                        style={[
+                                            styles.timeChip,
+                                            {
+                                                backgroundColor: isSelected
+                                                    ? theme.primary
+                                                    : isUnavailable
+                                                    ? theme.border + '60'
+                                                    : theme.background,
+                                                borderColor: isSelected
+                                                    ? theme.primary
+                                                    : isUnavailable
+                                                    ? theme.border
+                                                    : theme.border,
+                                                opacity: isUnavailable ? 0.5 : 1,
+                                            },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.timeChipText,
+                                                { color: isSelected ? '#fff' : isUnavailable ? theme.icon : theme.text },
+                                            ]}
+                                        >
+                                            {slot.time}
+                                        </Text>
+                                        {isUnavailable && (
+                                            <Ionicons name="close" size={10} color={theme.icon} />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    )}
+                    {!selectedTime && !availabilityLoading && (
+                        <Text style={[styles.hintText, { color: theme.icon }]}>
+                            Sélectionnez un créneau disponible
+                        </Text>
+                    )}
+                </View>
+
+                {/* ── Zone ─────────────────────────────────────────────── */}
+                {availability && availability.zones.length > 1 && (
+                    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                        <SectionLabel icon="map-outline" label="Choisissez votre espace" theme={theme} />
+                        <Text style={[styles.hintText, { color: theme.icon, marginTop: 0, marginBottom: Spacing.sm, textAlign: 'left' }]}>
+                            Sélectionnez l'espace qui vous convient le mieux
+                        </Text>
+                        <View style={styles.zoneCardList}>
+                            {/* "No preference" option */}
+                            <Pressable
+                                onPress={() => setSelectedZoneId(null)}
+                                style={[
+                                    styles.zoneCard,
+                                    {
+                                        borderColor: !selectedZoneId ? theme.primary : theme.border,
+                                        backgroundColor: !selectedZoneId ? theme.primary + '08' : theme.background,
+                                    },
+                                ]}
+                            >
+                                <View style={[styles.zoneCardNoPreferenceIcon, { backgroundColor: theme.border }]}>
+                                    <Ionicons name="help-outline" size={22} color={theme.icon} />
+                                </View>
+                                <View style={styles.zoneCardInfo}>
+                                    <Text style={[styles.zoneCardName, { color: !selectedZoneId ? theme.primary : theme.text }]}>
+                                        Pas de préférence
+                                    </Text>
+                                    <Text style={[styles.zoneCardDesc, { color: theme.icon }]}>
+                                        Le restaurant choisira la meilleure table pour vous
+                                    </Text>
+                                </View>
+                                {!selectedZoneId && (
+                                    <Ionicons name="checkmark-circle" size={22} color={theme.primary} />
+                                )}
+                            </Pressable>
+
+                            {availability.zones.map(({ zone, slots, tables_count, total_capacity }) => {
+                                const isSelected = selectedZoneId === zone.id;
+                                const hasAvailability = slots.some((s) => s.available);
+                                const coverImage = zone.image_urls?.[0] ?? zone.image_url;
+                                const availableSlotCount = slots.filter((s) => s.available).length;
+
+                                return (
+                                    <Pressable
+                                        key={zone.id}
+                                        onPress={() => hasAvailability && setSelectedZoneId(zone.id)}
+                                        style={[
+                                            styles.zoneCard,
+                                            {
+                                                borderColor: isSelected ? theme.primary : theme.border,
+                                                backgroundColor: isSelected ? theme.primary + '08' : theme.background,
+                                                opacity: hasAvailability ? 1 : 0.5,
+                                            },
+                                        ]}
+                                    >
+                                        {/* Photo or color strip */}
+                                        {coverImage ? (
+                                            <Image
+                                                source={{ uri: coverImage }}
+                                                style={styles.zoneCardImage}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <View
+                                                style={[
+                                                    styles.zoneCardColorStrip,
+                                                    { backgroundColor: zone.color ?? theme.border },
+                                                ]}
+                                            >
+                                                <Ionicons
+                                                    name={
+                                                        zone.type === 'terrace' ? 'sunny-outline' :
+                                                        zone.type === 'private' ? 'lock-closed-outline' :
+                                                        zone.type === 'bar' ? 'wine-outline' :
+                                                        'restaurant-outline'
+                                                    }
+                                                    size={28}
+                                                    color="#fff"
+                                                />
+                                            </View>
+                                        )}
+
+                                        <View style={styles.zoneCardBody}>
+                                            <View style={styles.zoneCardHeader}>
+                                                <Text style={[styles.zoneCardName, { color: isSelected ? theme.primary : theme.text }]}>
+                                                    {zone.name}
+                                                </Text>
+                                                {isSelected && (
+                                                    <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+                                                )}
+                                                {!hasAvailability && (
+                                                    <View style={[styles.zoneFullBadge, { backgroundColor: theme.error + '20' }]}>
+                                                        <Text style={[styles.zoneFullBadgeText, { color: theme.error }]}>Complet</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            {zone.description ? (
+                                                <Text style={[styles.zoneCardDesc, { color: theme.icon }]} numberOfLines={2}>
+                                                    {zone.description}
+                                                </Text>
+                                            ) : null}
+
+                                            {/* Meta chips */}
+                                            <View style={styles.zoneCardMeta}>
+                                                {(zone.capacity > 0 || total_capacity > 0) && (
+                                                    <View style={[styles.zoneMetaChip, { backgroundColor: theme.border + '60' }]}>
+                                                        <Ionicons name="people-outline" size={12} color={theme.icon} />
+                                                        <Text style={[styles.zoneMetaText, { color: theme.icon }]}>
+                                                            {total_capacity > 0 ? total_capacity : zone.capacity} pers. max
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                                {hasAvailability && (
+                                                    <View style={[styles.zoneMetaChip, { backgroundColor: theme.success + '20' }]}>
+                                                        <Ionicons name="time-outline" size={12} color={theme.success} />
+                                                        <Text style={[styles.zoneMetaText, { color: theme.success }]}>
+                                                            {availableSlotCount} créneau{availableSlotCount > 1 ? 'x' : ''}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                                {zone.pricing_note ? (
+                                                    <View style={[styles.zoneMetaChip, { backgroundColor: theme.border + '60' }]}>
+                                                        <Ionicons name="pricetag-outline" size={12} color={theme.icon} />
+                                                        <Text style={[styles.zoneMetaText, { color: theme.icon }]}>
+                                                            {zone.pricing_note}
+                                                        </Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+
+                                            {/* Amenities */}
+                                            {zone.amenities?.length > 0 && (
+                                                <View style={styles.zoneAmenities}>
+                                                    {zone.amenities.slice(0, 4).map((a, i) => (
+                                                        <Text key={i} style={[styles.zoneAmenityTag, { color: theme.icon, borderColor: theme.border }]}>
+                                                            {a}
+                                                        </Text>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* Photo gallery thumbnails */}
+                                            {zone.image_urls?.length > 1 && (
+                                                <ScrollView
+                                                    horizontal
+                                                    showsHorizontalScrollIndicator={false}
+                                                    style={styles.zoneThumbScroll}
+                                                    contentContainerStyle={{ gap: 6 }}
+                                                >
+                                                    {zone.image_urls.map((uri, i) => (
+                                                        <Image
+                                                            key={i}
+                                                            source={{ uri }}
+                                                            style={styles.zoneThumb}
+                                                            resizeMode="cover"
+                                                        />
+                                                    ))}
+                                                </ScrollView>
+                                            )}
+                                        </View>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Occasion ─────────────────────────────────────────── */}
+                <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <SectionLabel icon="sparkles-outline" label="Occasion (optionnel)" theme={theme} />
+                    <View style={styles.occasionGrid}>
+                        {OCCASIONS.map((occ) => {
+                            const isSelected = occasion === occ.key;
                             return (
-                                <TouchableOpacity
-                                    key={slot}
-                                    onPress={() => setSelectedTime(slot)}
-                                    activeOpacity={0.7}
+                                <Pressable
+                                    key={occ.key}
+                                    onPress={() => setOccasion((prev) => (prev === occ.key ? null : occ.key))}
                                     style={[
-                                        styles.timeChip,
+                                        styles.occasionChip,
                                         {
-                                            backgroundColor: isSelected
-                                                ? theme.primary
-                                                : theme.background,
-                                            borderColor: isSelected
-                                                ? theme.primary
-                                                : theme.border,
+                                            backgroundColor: isSelected ? theme.primary + '18' : theme.background,
+                                            borderColor: isSelected ? theme.primary : theme.border,
                                         },
                                     ]}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.timeChipText,
-                                            { color: isSelected ? '#fff' : theme.text },
-                                        ]}
-                                    >
-                                        {slot}
+                                    <Text style={styles.occasionEmoji}>{occ.emoji}</Text>
+                                    <Text style={[styles.occasionLabel, { color: isSelected ? theme.primary : theme.text }]}>
+                                        {occ.label}
                                     </Text>
-                                </TouchableOpacity>
+                                </Pressable>
                             );
                         })}
                     </View>
-                    {!selectedTime && (
-                        <Text style={[styles.hintText, { color: theme.icon }]}>
-                            Sélectionnez un créneau horaire
-                        </Text>
-                    )}
                 </View>
 
                 {/* ── Nombre de personnes ───────────────────────────────── */}
@@ -639,12 +918,15 @@ const styles = StyleSheet.create({
         gap: Spacing.sm,
     },
     timeChip: {
+        flexDirection: 'row',
         borderWidth: 1,
         borderRadius: Radii.sm,
         paddingVertical: Spacing.xs + 2,
         paddingHorizontal: Spacing.md - 4,
         minWidth: 70,
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
     },
     timeChipText: {
         ...Typography.captionSemibold,
@@ -737,6 +1019,141 @@ const styles = StyleSheet.create({
         color: '#fff',
         ...Typography.bodySemibold,
         fontWeight: '700',
+    },
+
+    // Availability loader
+    availabilityLoader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.sm,
+        paddingVertical: Spacing.md,
+    },
+
+    // Zone cards
+    zoneCardList: {
+        gap: Spacing.sm,
+    },
+    zoneCard: {
+        borderWidth: 1.5,
+        borderRadius: Radii.lg,
+        overflow: 'hidden',
+    },
+    zoneCardImage: {
+        width: '100%',
+        height: 140,
+    },
+    zoneCardColorStrip: {
+        width: '100%',
+        height: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    zoneCardNoPreferenceIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: Spacing.md,
+        alignSelf: 'flex-start',
+    },
+    zoneCardBody: {
+        padding: Spacing.md,
+        gap: Spacing.xs,
+    },
+    zoneCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: Spacing.sm,
+    },
+    zoneCardName: {
+        ...Typography.bodySemibold,
+        flex: 1,
+    },
+    zoneCardInfo: {
+        flex: 1,
+        gap: 2,
+        paddingVertical: Spacing.xs,
+    },
+    zoneCardDesc: {
+        ...Typography.small,
+        lineHeight: 18,
+    },
+    zoneCardMeta: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Spacing.xs,
+        marginTop: 4,
+    },
+    zoneMetaChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 3,
+        borderRadius: Radii.sm,
+    },
+    zoneMetaText: {
+        ...Typography.small,
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    zoneFullBadge: {
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 2,
+        borderRadius: Radii.sm,
+    },
+    zoneFullBadgeText: {
+        ...Typography.small,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    zoneAmenities: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginTop: 4,
+    },
+    zoneAmenityTag: {
+        ...Typography.small,
+        fontSize: 11,
+        borderWidth: 1,
+        borderRadius: Radii.sm,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    zoneThumbScroll: {
+        marginTop: Spacing.sm,
+    },
+    zoneThumb: {
+        width: 72,
+        height: 54,
+        borderRadius: Radii.sm,
+    },
+
+    // Occasion chips
+    occasionGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Spacing.sm,
+    },
+    occasionChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderWidth: 1.5,
+        borderRadius: Radii.full,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.xs + 2,
+    },
+    occasionEmoji: {
+        fontSize: 16,
+    },
+    occasionLabel: {
+        ...Typography.caption,
+        fontWeight: '600',
     },
 
     // Disclaimer

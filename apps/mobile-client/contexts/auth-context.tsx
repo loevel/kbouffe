@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!supabaseUser) return null;
 
         const baseUser = buildBaseUser(supabaseUser);
-        
+
         try {
             const loyalty = await getLoyalty();
             return {
@@ -150,7 +150,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const updateProfile = useCallback(async (data: Partial<User>) => {
         if (!user) return;
-        
+
+        // Normalize phone number before sending
+        let normalizedPhone = data.phone;
+        if (data.phone) {
+            // Remove all non-digit characters except leading '+'
+            const cleaned = data.phone.replace(/^(\+)?(.*)/, (match, plus, rest) => {
+                return (plus ? '+' : '') + rest.replace(/\D/g, '');
+            });
+            normalizedPhone = cleaned || null;
+        }
+
         // Update local state optimistically
         const updatedUser = { ...user, ...data };
         setUser(updatedUser);
@@ -158,16 +168,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Sync with API
         try {
             await updateProfileRequest({
-                fullName: data.fullName,
-                phone: data.phone,
+                fullName: data.fullName ? data.fullName.trim() : undefined,
+                phone: normalizedPhone,
                 avatarUrl: data.avatarUrl,
-                preferredLang: data.profile?.preferredLang,
-                notificationsEnabled: data.profile?.notificationsEnabled,
-                onboardingCompleted: data.profile?.onboardingCompleted,
-                themePreference: data.profile?.themePreference,
             });
         } catch (err) {
-            console.error(err);
+            console.error('Profile update error:', err);
             await refreshUser();
             throw err;
         }

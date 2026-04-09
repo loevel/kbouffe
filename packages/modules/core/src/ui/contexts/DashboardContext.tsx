@@ -11,7 +11,6 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "../lib/supabase-client";
 import type { Restaurant, Tables } from "../lib/supabase-types";
-import { MOCK_USER, MOCK_RESTAURANT } from "../lib/mock-data";
 import { hasPermission as checkPermission, type TeamRole, type Permission } from "../lib/permissions";
 
 // Re-define User to match API response which may include extra roles
@@ -114,17 +113,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
     const fetchData = useCallback(async () => {
         if (!isSupabaseConfigured()) {
-            // Fallback mock data si Supabase n'est pas configuré
-            setUser(MOCK_USER);
-            setRestaurant(MOCK_RESTAURANT);
+            // Supabase not configured: leave user/restaurant null (dev-only path)
             setLoading(false);
             return;
         }
 
         const supabase = createClient();
         if (!supabase) {
-            setUser(MOCK_USER);
-            setRestaurant(MOCK_RESTAURANT);
             setLoading(false);
             return;
         }

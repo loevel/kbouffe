@@ -2,6 +2,7 @@ import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Image
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { CustomHeader } from '@/components/CustomHeader';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+    { icon: 'shield-outline', label: 'Vérification du compte', route: '/profile/account-verification' },
     { icon: 'person', label: 'Mon profil', route: '/profile/edit' },
     { icon: 'location', label: 'Mes adresses de livraison', route: '/profile/addresses' },
     { icon: 'heart', label: 'Mes favoris', route: '/profile/favorites' },
@@ -28,6 +30,24 @@ const menuItems: MenuItem[] = [
     { icon: 'shield-checkmark', label: 'Sécurité', route: '/profile/security' },
     { icon: 'settings', label: 'Paramètres', route: '/profile/settings' },
 ];
+
+// Composant MenuItem réutilisable
+const MenuItemComponent = ({ item, theme, isLast, onPress }: { item: MenuItem; theme: any; isLast: boolean; onPress: () => void }) => (
+    <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+            styles.menuItem,
+            !isLast && { borderBottomWidth: 1, borderBottomColor: theme.border },
+            pressed && { opacity: 0.6 },
+        ]}
+    >
+        <View style={[styles.menuIconBox, { backgroundColor: theme.primary + '15' }]}>
+            <Ionicons name={item.icon as any} size={20} color={theme.primary} />
+        </View>
+        <Text style={[styles.menuLabel, { color: theme.text }]}>{item.label}</Text>
+        <Ionicons name="chevron-forward" size={20} color={theme.border} />
+    </Pressable>
+);
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -117,7 +137,14 @@ export default function ProfileScreen() {
 
     if (!isAuthenticated) {
         return (
-            <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: Spacing.xxl }}>
+            <View style={[styles.container, { backgroundColor: theme.background, flex: 1 }]}>
+                <CustomHeader
+                    title="Mon Profil"
+                    showSearch={false}
+                    showCart={false}
+                    showBack={false}
+                />
+                <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
                 <View style={[styles.emptyGuest, { paddingTop: Spacing.xxl * 2 }]}>
                     <View style={[styles.guestAvatar, { backgroundColor: theme.primary + '15' }]}>
                         <Ionicons name="person" size={48} color={theme.primary} />
@@ -153,34 +180,23 @@ export default function ProfileScreen() {
                         <Text style={[styles.authGhostButtonText, { color: theme.text }]}>Créer un compte</Text>
                     </Pressable>
                 </View>
-            </ScrollView>
+                </ScrollView>
+            </View>
         );
     }
 
     return (
-        <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingTop: Math.max(insets.top, Spacing.md), paddingBottom: Spacing.xxl + 80 }}>
-            {/* Header / Profil */}
-            <View style={styles.header}>
-                <View style={styles.pageTitleRow}>
-                    <Text style={[styles.pageTitle, { color: theme.text }]}>Mon Profil</Text>
-                    <View style={styles.headerActions}>
-                        <Pressable
-                            onPress={() => { Haptics.selectionAsync(); router.push('/offers'); }}
-                            style={[styles.headerActionBtn, { backgroundColor: theme.primary + '15' }]}
-                            accessibilityLabel="Offres & Promotions"
-                        >
-                            <Ionicons name="pricetag-outline" size={20} color={theme.primary} />
-                        </Pressable>
-                        <Pressable
-                            onPress={() => { Haptics.selectionAsync(); router.push('/notifications'); }}
-                            style={[styles.headerActionBtn, { backgroundColor: theme.border + '50' }]}
-                            accessibilityLabel="Notifications"
-                        >
-                            <Ionicons name="notifications-outline" size={20} color={theme.text} />
-                        </Pressable>
-                    </View>
-                </View>
-                <View style={[styles.profileCard, { backgroundColor: theme.surface }]}>
+        <View style={[styles.container, { backgroundColor: theme.background, flex: 1 }]}>
+            <CustomHeader
+                title="Mon Profil"
+                showSearch={false}
+                showCart={false}
+                showBack={false}
+            />
+            <ScrollView contentContainerStyle={{ paddingBottom: Spacing.xxl + 80 }}>
+            {/* ── PROFILE CARD ── */}
+            <View style={[styles.profileCard, { backgroundColor: theme.surface, marginHorizontal: Spacing.md, marginVertical: Spacing.md }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: Spacing.lg }}>
                     <Pressable onPress={pickImage} style={[styles.avatar, { backgroundColor: theme.primaryLight }]}>
                         {uploading ? (
                             <ActivityIndicator color={theme.primary} />
@@ -195,15 +211,40 @@ export default function ProfileScreen() {
                             <Ionicons name="camera" size={12} color={theme.text} />
                         </View>
                     </Pressable>
-                    <View style={styles.profileInfo}>
+                    <View style={[styles.profileInfo, { flex: 1 }]}>
                         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{displayName}</Text>
                         <Text style={[styles.phone, { color: theme.textMuted }]}>{displayPhone}</Text>
+                        <Text style={[styles.memberBadge, { color: theme.primary, marginTop: Spacing.xs }]}>Membre depuis 2024</Text>
                     </View>
+                    <Pressable
+                        onPress={() => router.push('/profile/edit')}
+                        style={[styles.editBtn, { backgroundColor: theme.primary + '15' }]}
+                    >
+                        <Ionicons name="pencil" size={18} color={theme.primary} />
+                    </Pressable>
+                </View>
+
+                {/* Quick Actions Row */}
+                <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                    <Pressable
+                        onPress={() => router.push('/offers')}
+                        style={[styles.quickActionBtn, { borderColor: theme.primary }]}
+                    >
+                        <Ionicons name="pricetag-outline" size={18} color={theme.primary} />
+                        <Text style={[styles.quickActionText, { color: theme.primary }]}>Offres</Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={() => router.push('/notifications')}
+                        style={[styles.quickActionBtn, { borderColor: theme.border }]}
+                    >
+                        <Ionicons name="notifications-outline" size={18} color={theme.text} />
+                        <Text style={[styles.quickActionText, { color: theme.text }]}>Notifications</Text>
+                    </Pressable>
                 </View>
             </View>
 
-            {/* Statistiques */}
-            <View style={styles.statsGrid}>
+            {/* ── STATISTIQUES ── */}
+            <View style={[styles.statsGrid, { paddingHorizontal: Spacing.md, marginBottom: Spacing.lg }]}>
                 <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
                     <View style={[styles.statIconBox, { backgroundColor: theme.primary + '15' }]}>
                         <Ionicons name="receipt" size={20} color={theme.primary} />
@@ -227,34 +268,67 @@ export default function ProfileScreen() {
                 </View>
             </View>
 
-            {/* Menu */}
+            {/* ── MENU GROUPÉ ── */}
+
+            {/* Section Compte */}
             <View style={styles.menuSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Compte</Text>
                 <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
-                    {menuItems.map((item, index) => (
-                        <Pressable
+                    {menuItems.slice(0, 3).map((item, index) => (
+                        <MenuItemComponent
                             key={item.route}
+                            item={item}
+                            theme={theme}
+                            isLast={index === 2}
                             onPress={() => {
                                 Haptics.selectionAsync();
                                 router.push(item.route as any);
                             }}
-                            style={({ pressed }) => [
-                                styles.menuItem,
-                                index !== menuItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
-                                pressed && { opacity: 0.6 },
-                            ]}
-                        >
-                            <View style={[styles.menuIconBox, { backgroundColor: theme.primary + '15' }]}>
-                                <Ionicons name={item.icon} size={20} color={theme.primary} />
-                            </View>
-                            <Text style={[styles.menuLabel, { color: theme.text }]}>{item.label}</Text>
-                            <Ionicons name="chevron-forward" size={20} color={theme.border} />
-                        </Pressable>
+                        />
                     ))}
                 </View>
             </View>
 
-            {/* Actions secondaires */}
-            <View style={[styles.menuSection, { marginTop: Spacing.lg }]}>
+            {/* Section Préférences */}
+            <View style={styles.menuSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Préférences</Text>
+                <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
+                    {menuItems.slice(3, 7).map((item, index) => (
+                        <MenuItemComponent
+                            key={item.route}
+                            item={item}
+                            theme={theme}
+                            isLast={index === 3}
+                            onPress={() => {
+                                Haptics.selectionAsync();
+                                router.push(item.route as any);
+                            }}
+                        />
+                    ))}
+                </View>
+            </View>
+
+            {/* Section Sécurité */}
+            <View style={styles.menuSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Sécurité</Text>
+                <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
+                    {menuItems.slice(7).map((item, index) => (
+                        <MenuItemComponent
+                            key={item.route}
+                            item={item}
+                            theme={theme}
+                            isLast={index === menuItems.length - 8}
+                            onPress={() => {
+                                Haptics.selectionAsync();
+                                router.push(item.route as any);
+                            }}
+                        />
+                    ))}
+                </View>
+            </View>
+
+            {/* Section Support & Déconnexion */}
+            <View style={styles.menuSection}>
                 <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
                     <Pressable
                         style={({ pressed }) => [
@@ -274,19 +348,25 @@ export default function ProfileScreen() {
                         <Ionicons name="chevron-forward" size={20} color={theme.border} />
                     </Pressable>
                     <Pressable
-                        style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.6 }]}
+                        style={({ pressed }) => [
+                            styles.menuItem,
+                            { backgroundColor: '#ef444408' },
+                            pressed && { opacity: 0.6 },
+                        ]}
                         onPress={confirmLogout}
                     >
                         <View style={[styles.menuIconBox, { backgroundColor: '#ef444415' }]}>
                             <Ionicons name="log-out" size={20} color="#ef4444" />
                         </View>
                         <Text style={[styles.menuLabel, { color: '#ef4444' }]}>Se déconnecter</Text>
+                        <Ionicons name="chevron-forward" size={20} color="#ef4444" />
                     </Pressable>
                 </View>
             </View>
 
             <Text style={[styles.version, { color: theme.textMuted }]}>Kbouffe v1.0.0</Text>
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 }
 
@@ -336,7 +416,27 @@ const styles = StyleSheet.create({
     profileInfo: { flex: 1, marginLeft: Spacing.md },
     name: { ...Typography.title3, marginBottom: 2 },
     phone: { ...Typography.caption },
-    
+    memberBadge: { ...Typography.small, fontWeight: '600' },
+    editBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: Radii.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quickActionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.xs,
+        paddingVertical: Spacing.sm,
+        borderRadius: Radii.lg,
+        borderWidth: 1,
+    },
+    quickActionText: { ...Typography.small, fontWeight: '600' },
+    sectionTitle: { ...Typography.bodySemibold, marginLeft: Spacing.md, marginBottom: Spacing.sm },
+
     statsGrid: {
         flexDirection: 'row',
         paddingHorizontal: Spacing.md,

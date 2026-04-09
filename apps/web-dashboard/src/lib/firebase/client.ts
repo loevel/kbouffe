@@ -1,5 +1,4 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getMessaging, Messaging, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,14 +12,5 @@ const firebaseConfig = {
 // Initialize Firebase App globally across hot reloads
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-let messaging: Messaging | null = null;
-if (typeof window !== "undefined") {
-  // FCM only works in the browser and supported contexts
-  isSupported().then((supported) => {
-    if (supported) {
-      messaging = getMessaging(app);
-    }
-  });
-}
-
-export { app, messaging };
+export default app;
+export { app };

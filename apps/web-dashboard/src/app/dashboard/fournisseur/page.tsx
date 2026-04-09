@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -28,12 +29,20 @@ import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier } from "./SupplierContext";
 
 // ── Phase 1 Components ───────────────────────────────────────────────────
-import { RevenueChart } from "./components/RevenueChart";
 import { PerformanceMetrics } from "./components/PerformanceMetrics";
 import { AlertBadges } from "./components/AlertBadges";
 import { ActivityFeed, type ActivityItem } from "./components/ActivityFeed";
 import { KYCProgress } from "./components/KYCProgress";
-import { ExportReport } from "./components/ExportReport";
+
+const RevenueChart = dynamic(
+    () => import("./components/RevenueChart").then((m) => ({ default: m.RevenueChart })),
+    { ssr: false, loading: () => <div className="h-80 animate-pulse bg-surface-100 dark:bg-surface-800 rounded-2xl" /> }
+);
+
+const ExportReport = dynamic(
+    () => import("./components/ExportReport").then((m) => ({ default: m.ExportReport })),
+    { ssr: false }
+);
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 

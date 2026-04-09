@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
+import React, { memo, useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Restaurant } from '@kbouffe/shared-types';
 import { Colors, Spacing, Typography, Radii, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 interface Props {
     restaurant: Restaurant;
@@ -14,34 +15,39 @@ interface Props {
     onToggleFavorite?: () => void;
 }
 
-export function RestaurantCard({ restaurant, onPress, isFavorite = false, onToggleFavorite }: Props) {
+export const RestaurantCard = memo(function RestaurantCard({ restaurant, onPress, isFavorite = false, onToggleFavorite }: Props) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
 
+    const handleFavorite = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onToggleFavorite?.();
+    }, [onToggleFavorite]);
+
     return (
-        <Animated.View entering={FadeInDown.duration(500).springify()}>
+        <Animated.View entering={FadeInDown.duration(400).springify()}>
             <Pressable
                 onPress={onPress}
-            style={({ pressed }) => [
-                styles.container,
-                { backgroundColor: theme.surface },
-                Shadows.md,
-                pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-            ]}
-        >
-            <View>
+                style={({ pressed }) => [
+                    styles.container,
+                    { backgroundColor: theme.surface },
+                    Shadows.md,
+                    pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                ]}
+            >
+                <View>
                 <Image
                     source={{ uri: restaurant.coverImage }}
                     style={styles.image}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    recyclingKey={restaurant.id}
+                    transition={200}
+                    cachePolicy="memory-disk"
                 />
                 {onToggleFavorite && (
-                    <Pressable 
-                        style={[styles.favoriteButton, { backgroundColor: theme.surface, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }]} 
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            onToggleFavorite();
-                        }}
+                    <Pressable
+                        style={[styles.favoriteButton, { backgroundColor: theme.surface, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }]}
+                        onPress={handleFavorite}
                     >
                         <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={20} color={isFavorite ? '#ef4444' : theme.icon} />
                     </Pressable>
@@ -86,10 +92,10 @@ export function RestaurantCard({ restaurant, onPress, isFavorite = false, onTogg
                     </View>
                 </View>
             </View>
-        </Pressable>
+            </Pressable>
         </Animated.View>
     );
-}
+});
 
 const styles = StyleSheet.create({
     container: {

@@ -6,17 +6,22 @@ compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
 minify = true
 
-
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
-# --- R2 bucket (Chantier 2) ---
+# Les secrets sont définis via : npx wrangler secret put <KEY>
+
+[alias]
+"next/dist/compiled/@vercel/og/index.edge.js" = "./stubs/og-stub.js"
+"next/dist/compiled/@vercel/og/index.node.js" = "./stubs/og-stub.js"
+
+# --- R2 bucket ---
 [[r2_buckets]]
 binding = "IMAGES_BUCKET"
 bucket_name = "kbouffe-images"
 
 
 # ── MTN Developer API Keys ──────────────────────────────────────────────
-# Set via `wrangler secret put <KEY_NAME>`
+# Set via `wrangler pages secret put <KEY_NAME>`
 #
 # Collection (customer payments):
 #   MTN_BASE_URL              — https://sandbox.momodeveloper.mtn.com (sandbox) or https://momodeveloper.mtn.com (prod)

@@ -99,8 +99,19 @@ export function SupportProvider({ children }: { children: ReactNode }) {
         }
     }, [isAuthenticated]);
 
+    // Lazy load: tickets are fetched on first call to refreshTickets(),
+    // not eagerly on mount — avoids unnecessary API call on every app start.
+    const hasFetched = React.useRef(false);
     useEffect(() => {
-        refreshTickets();
+        // Only reset when auth state changes (logout)
+        if (!isAuthenticated) {
+            hasFetched.current = false;
+        }
+    }, [isAuthenticated]);
+
+    const lazyRefreshTickets = useCallback(async () => {
+        hasFetched.current = true;
+        return refreshTickets();
     }, [refreshTickets]);
 
     const createTicket = useCallback(async (params: { type?: SupportTicketType; subject: string; description: string; orderId?: string; reporterType?: string }) => {
@@ -129,8 +140,8 @@ export function SupportProvider({ children }: { children: ReactNode }) {
         createTicket,
         getTicketById,
         getTicketsByOrderId,
-        refreshTickets,
-    }), [tickets, loading, createTicket, getTicketById, getTicketsByOrderId, refreshTickets]);
+        refreshTickets: lazyRefreshTickets,
+    }), [tickets, loading, createTicket, getTicketById, getTicketsByOrderId, lazyRefreshTickets]);
 
     return <SupportContext.Provider value={value}>{children}</SupportContext.Provider>;
 }

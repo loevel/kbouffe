@@ -17,6 +17,7 @@ import {
     Pressable,
     ActivityIndicator,
     Alert,
+    Linking,
     Platform,
 } from 'react-native';
 import MapView, {
@@ -105,9 +106,20 @@ export default function MapPickerScreen() {
 
     const handleLocateMe = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission refusée', 'Activez la localisation dans les paramètres de l\'application.');
+            Alert.alert(
+                'Localisation bloquée',
+                canAskAgain
+                    ? 'Autorisez la localisation pour vous positionner sur la carte.'
+                    : 'La localisation est bloquée. Activez-la dans les Paramètres de l\'application.',
+                canAskAgain
+                    ? [{ text: 'OK' }]
+                    : [
+                        { text: 'Annuler', style: 'cancel' },
+                        { text: 'Ouvrir les Paramètres', onPress: () => Linking.openSettings() },
+                    ]
+            );
             return;
         }
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });

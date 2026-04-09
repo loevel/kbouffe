@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, ScrollView, Pressable, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { StyleSheet, View, Text, Image, ScrollView, Pressable, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -7,6 +7,7 @@ import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMyReservations, cancelReservation, type Reservation } from '@/lib/api';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const STATUS_CONFIG: Record<Reservation['status'], { label: string; color: string; icon: string }> = {
     pending:   { label: 'En attente',  color: '#f59e0b', icon: 'hourglass-outline' },
@@ -30,6 +31,7 @@ export default function ReservationsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const isDark = colorScheme === 'dark';
 
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [loading, setLoading] = useState(true);
@@ -102,8 +104,8 @@ export default function ReservationsScreen() {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.backButton, { backgroundColor: isDark ? '#ffffff08' : '#f1f5f9' }]}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </Pressable>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Mes réservations</Text>
                 <View style={{ width: 40 }} />
@@ -166,12 +168,16 @@ export default function ReservationsScreen() {
                             )}
                         </View>
                     ) : (
-                        filtered.map(reservation => {
+                        filtered.map((reservation, index) => {
                             const config = STATUS_CONFIG[reservation.status];
                             const canCancel = ['pending', 'confirmed'].includes(reservation.status);
 
                             return (
-                                <View key={reservation.id} style={[styles.card, { backgroundColor: theme.surface }]}>
+                                <Animated.View
+                                    key={reservation.id}
+                                    entering={FadeInDown.delay(index * 80).duration(400).springify()}
+                                    style={[styles.card, { backgroundColor: theme.surface }]}
+                                >
                                     {/* Status header */}
                                     <View style={[styles.cardHeader, { backgroundColor: config.color + '12' }]}>
                                         <View style={styles.statusRow}>
@@ -184,6 +190,29 @@ export default function ReservationsScreen() {
                                     </View>
 
                                     <View style={styles.cardBody}>
+                                        {/* Restaurant */}
+                                        {reservation.restaurant_name && (
+                                            <View style={styles.detailRow}>
+                                                <View style={[styles.detailIcon, { backgroundColor: theme.border + '40' }]}>
+                                                    {reservation.restaurant_logo ? (
+                                                        <Image
+                                                            source={{ uri: reservation.restaurant_logo }}
+                                                            style={{ width: 28, height: 28, borderRadius: 6 }}
+                                                            resizeMode="cover"
+                                                        />
+                                                    ) : (
+                                                        <Ionicons name="restaurant-outline" size={18} color={theme.icon} />
+                                                    )}
+                                                </View>
+                                                <View>
+                                                    <Text style={[styles.detailLabel, { color: theme.icon }]}>Restaurant</Text>
+                                                    <Text style={[styles.detailValue, { color: theme.text }]}>
+                                                        {reservation.restaurant_name}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        )}
+
                                         {/* Date & Time */}
                                         <View style={styles.detailRow}>
                                             <View style={[styles.detailIcon, { backgroundColor: theme.primary + '15' }]}>
@@ -255,7 +284,7 @@ export default function ReservationsScreen() {
                                             </Pressable>
                                         )}
                                     </View>
-                                </View>
+                                </Animated.View>
                             );
                         })
                     )}
@@ -274,7 +303,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md,
         paddingBottom: Spacing.sm,
     },
-    backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { ...Typography.title3 },
     tabBar: {
         flexDirection: 'row',

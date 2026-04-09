@@ -63,22 +63,27 @@ const statusColor: Record<SupportTicketStatus, string> = {
  * "à l'instant", "il y a 5 min", "il y a 2h", "hier", "il y a 3 j", or a date.
  */
 function formatRelativeTime(dateStr: string): string {
-    const now = new Date();
-    const date = new Date(dateStr);
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60_000);
+    try {
+        const now = new Date();
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return 'date invalide';
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60_000);
 
-    if (diffMins < 1) return "à l'instant";
-    if (diffMins < 60) return `il y a ${diffMins} min`;
+        if (diffMins < 1) return "à l'instant";
+        if (diffMins < 60) return `il y a ${diffMins} min`;
 
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `il y a ${diffHours}h`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `il y a ${diffHours}h`;
 
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) return 'hier';
-    if (diffDays < 7) return `il y a ${diffDays} j`;
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays === 1) return 'hier';
+        if (diffDays < 7) return `il y a ${diffDays} j`;
 
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+        return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+    } catch {
+        return 'date invalide';
+    }
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

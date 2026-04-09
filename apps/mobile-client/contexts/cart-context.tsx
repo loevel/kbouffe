@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Product, ProductOption } from '@kbouffe/shared-types';
 
@@ -77,13 +77,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
         loadCart();
     }, []); // runs once on mount
 
-    // ─── Persist cart to AsyncStorage on every change ──────────────────────
+    // ─── Persist cart to AsyncStorage on every change (debounced) ──────────────
+    const persistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     useEffect(() => {
         // Skip the initial render(s) that happen before the load effect has
         // finished reading from AsyncStorage.
         if (!isHydrated.current) return;
 
-        const persistCart = async () => {
+        // Clear previous timeout to avoid multiple writes
+        if (persistTimeoutRef.current) {
+            clearTimeout(persistTimeoutRef.current);
+        }
+
+        // Debounce: wait 500ms before writing to AsyncStorage
+        persistTimeoutRef.current = setTimeout(async () => {
             try {
                 if (items.length === 0) {
                     // Empty cart → remove the key entirely (covers clearCart
@@ -96,9 +104,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
             } catch (error) {
                 console.warn('[CartProvider] Erreur lors de la persistance du panier :', error);
             }
-        };
+        }, 500);
 
-        persistCart();
+        return () => {
+            if (persistTimeoutRef.current) {
+                clearTimeout(persistTimeoutRef.current);
+            }
+        };
     }, [items, restaurantId, restaurantName]);
 
     const addItem = useCallback((product: Product, quantity: number, selectedOptions: Record<string, string>, restId: string, restName: string) => {
@@ -158,13 +170,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setRestaurantName(null);
     }, []);
 
-    const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
-    const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    const itemCount = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
+    const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0), [items]);
     const deliveryFee = restaurantId ? 1000 : 0; // Default fee
     const total = subtotal + deliveryFee;
 
+    const value = useMemo(() => ({
+        items, restaurantId, restaurantName, addItem, removeItem, updateQuantity, clearCart, itemCount, subtotal, deliveryFee, total,
+    }), [items, restaurantId, restaurantName, addItem, removeItem, updateQuantity, clearCart, itemCount, subtotal, deliveryFee, total]);
+
     return (
-        <CartContext.Provider value={{ items, restaurantId, restaurantName, addItem, removeItem, updateQuantity, clearCart, itemCount, subtotal, deliveryFee, total }}>
+        <CartContext.Provider value={value}>
             {children}
         </CartContext.Provider>
     );

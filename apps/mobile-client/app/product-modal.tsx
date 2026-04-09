@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { StyleSheet, View, Text, Image, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, FlatList, NativeSyntheticEvent, NativeScrollEvent, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, FlatList, NativeSyntheticEvent, NativeScrollEvent, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn, Layout, BounceIn } from 'react-native-reanimated';
 import { useCart } from '@/contexts/cart-context';
+import { useFavorites } from '@/contexts/favorites-context';
 import { useRestaurantCache } from '@/contexts/restaurant-context';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -20,7 +22,7 @@ export default function ProductModal() {
     const insets = useSafeAreaInsets();
     const { addItem } = useCart();
     const { getProduct, getRestaurant } = useRestaurantCache();
-    const { isProductFavorite, toggleProductFavorite } = useLoyalty();
+    const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
     const product = getProduct(productId ?? '');
     const restaurant = getRestaurant();
@@ -124,7 +126,7 @@ export default function ProductModal() {
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Image gallery */}
                 {allImages.length > 0 && (
-                    <View style={styles.galleryContainer}>
+                    <View style={[styles.galleryContainer, { backgroundColor: colorScheme === 'dark' ? '#1a1a2e' : '#f1f5f9' }]}>
                         <FlatList
                             ref={imgFlatRef}
                             data={allImages}
@@ -135,11 +137,13 @@ export default function ProductModal() {
                             scrollEventThrottle={16}
                             keyExtractor={(_, i) => String(i)}
                             renderItem={({ item }) => (
-                                <Image
-                                    source={{ uri: item }}
-                                    style={[styles.image, { width: screenWidth }]}
-                                    resizeMode="cover"
-                                />
+                                <View style={[styles.imageWrapper, { width: screenWidth }]}>
+                                    <Image
+                                        source={{ uri: item }}
+                                        style={styles.image}
+                                        resizeMode="contain"
+                                    />
+                                </View>
                             )}
                         />
                         {allImages.length > 1 && (
@@ -175,10 +179,14 @@ export default function ProductModal() {
                     style={[styles.favoriteButton, { backgroundColor: theme.background, top: insets.top + Spacing.sm }]}
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        toggleProductFavorite(product.id);
+                        if (isFavorite(product.id)) {
+                            removeFavorite(product.id);
+                        } else {
+                            addFavorite(product, restaurant.id, restaurant.name, restaurant.logoUrl);
+                        }
                     }}
                 >
-                    <Ionicons name={isProductFavorite(product.id) ? 'heart' : 'heart-outline'} size={22} color={isProductFavorite(product.id) ? '#ef4444' : theme.text} />
+                    <Ionicons name={isFavorite(product.id) ? 'heart' : 'heart-outline'} size={22} color={isFavorite(product.id) ? '#ef4444' : theme.text} />
                 </Pressable>
 
                 <View style={styles.content}>
@@ -427,7 +435,15 @@ export default function ProductModal() {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     galleryContainer: { position: 'relative' },
-    image: { height: 280 },
+    imageWrapper: {
+        height: 320,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+    },
     dotRow: {
         position: 'absolute',
         bottom: 10,

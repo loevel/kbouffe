@@ -34,9 +34,27 @@ export class ApiError extends Error {
     }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+// Auth token cache — avoids a slow AsyncStorage read on every request
+let _cachedToken: string | null = null;
+let _tokenExpiry = 0;
+
+async function getAuthToken(): Promise<string | null> {
+    // Return cached token if it's valid for at least 60 more seconds
+    if (_cachedToken && Date.now() < _tokenExpiry - 60_000) return _cachedToken;
     const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    _cachedToken = session?.access_token ?? null;
+    _tokenExpiry = session?.expires_at ? session.expires_at * 1000 : 0;
+    return _cachedToken;
+}
+
+// Invalidate cache on auth state change (logout / token refresh)
+supabase.auth.onAuthStateChange((_event, session) => {
+    _cachedToken = session?.access_token ?? null;
+    _tokenExpiry = session?.expires_at ? session.expires_at * 1000 : 0;
+});
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+    const token = await getAuthToken();
 
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -55,6 +73,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
+        // On 401, invalidate token cache so next request re-fetches session
+        if (res.status === 401) {
+            _cachedToken = null;
+            _tokenExpiry = 0;
+        }
         throw new ApiError(res.status, (json as { error?: string }).error ?? `HTTP ${res.status}`);
     }
     return json as T;
@@ -836,6 +859,10 @@ export interface Reservation {
     status: 'pending' | 'confirmed' | 'cancelled' | 'seated' | 'completed' | 'no_show';
     occasion?: string | null;
     special_requests?: string | null;
+    created_at?: string;
+    restaurant_name?: string | null;
+    restaurant_slug?: string | null;
+    restaurant_logo?: string | null;
     byob_requested?: boolean;
     corkage_fee_amount?: number;
 }
@@ -878,5 +905,58 @@ export async function createReservation(
             method: 'POST',
             body: JSON.stringify(data),
         },
+    );
+}
+
+// ── Availability ─────────────────────────────────────────────────────────────
+
+export interface AvailabilitySlot {
+    time: string;
+    available: boolean;
+    available_count: number;
+    reserved_until: string | null;
+}
+
+export interface ZoneAvailabilityItem {
+    zone: {
+        id: string;
+        name: string;
+        type: string | null;
+        description: string | null;
+        image_url: string | null;
+        image_urls: string[];
+        color: string | null;
+        capacity: number;
+        min_party_size: number;
+        amenities: string[];
+        pricing_note: string | null;
+    };
+    tables_count: number;
+    total_capacity: number;
+    slots: AvailabilitySlot[];
+}
+
+export interface AvailabilityResponse {
+    date: string;
+    slot_duration: number;
+    open_time: string;
+    close_time: string;
+    zones: ZoneAvailabilityItem[];
+    unzoned_slots: AvailabilitySlot[] | null;
+}
+
+/**
+ * Get availability for a restaurant on a given date.
+ * Calls: GET /api/store/[slug]/availability?date=YYYY-MM-DD&partySize=N
+ */
+export async function getAvailability(
+    slug: string,
+    date: string,
+    partySize?: number,
+): Promise<AvailabilityResponse> {
+    const params = new URLSearchParams({ date });
+    if (partySize) params.set('partySize', String(partySize));
+    return apiFetch<AvailabilityResponse>(
+        `/api/store/${encodeURIComponent(slug)}/availability?${params}`,
     );
 }

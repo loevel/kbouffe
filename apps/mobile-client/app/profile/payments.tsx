@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 type PaymentType = 'mtn_momo' | 'orange_money' | 'cash';
 
@@ -40,6 +41,7 @@ export default function PaymentsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const isDark = colorScheme === 'dark';
 
     const [methods, setMethods] = useState<SavedPaymentMethod[]>([
         { id: '1', type: 'cash', label: 'Espèces', number: '', isDefault: true },
@@ -92,8 +94,8 @@ export default function PaymentsScreen() {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {/* Header */}
             <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.backButton, { backgroundColor: isDark ? '#ffffff08' : '#f1f5f9' }]}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </Pressable>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Méthodes de paiement</Text>
                 <View style={{ width: 40 }} />
@@ -101,7 +103,7 @@ export default function PaymentsScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={[styles.sectionTitle, { color: theme.icon }]}>Méthodes enregistrées</Text>
-                <View style={[styles.card, { backgroundColor: theme.surface }]}>
+                <Animated.View entering={FadeInDown.delay(100).duration(400).springify()} style={[styles.card, { backgroundColor: theme.surface }]}>
                     {methods.map((method, index) => (
                         <View
                             key={method.id}
@@ -154,26 +156,26 @@ export default function PaymentsScreen() {
                             </View>
                         </View>
                     ))}
-                </View>
+                </Animated.View>
 
-                <Pressable
-                    style={[styles.addButton, { borderColor: theme.primary, backgroundColor: theme.primary + '10' }]}
-                    onPress={() => {
-                        Haptics.selectionAsync();
-                        setShowAddModal(true);
-                    }}
-                >
-                    <Ionicons name="add-circle-outline" size={22} color={theme.primary} />
-                    <Text style={[styles.addButtonText, { color: theme.primary }]}>Ajouter un compte Mobile Money</Text>
-                </Pressable>
-
-                {/* Info card */}
-                <View style={[styles.infoCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Animated.View entering={FadeInDown.delay(200).duration(400).springify()}>
+                    <Pressable
+                        style={[styles.addButton, { borderColor: theme.primary, backgroundColor: theme.primary + '10' }]}
+                        onPress={() => {
+                            Haptics.selectionAsync();
+                            setShowAddModal(true);
+                        }}
+                    >
+                        <Ionicons name="add-circle-outline" size={22} color={theme.primary} />
+                        <Text style={[styles.addButtonText, { color: theme.primary }]}>Ajouter un compte Mobile Money</Text>
+                    </Pressable>
+                </Animated.View>
+                <Animated.View entering={FadeInDown.delay(300).duration(400).springify()} style={[styles.infoCard, { backgroundColor: theme.surface, borderColor: theme.border + '40' }]}>
                     <Ionicons name="information-circle-outline" size={20} color={theme.icon} />
                     <Text style={[styles.infoText, { color: theme.icon }]}>
                         Vos numéros de Mobile Money sont stockés localement sur votre appareil et utilisés pour pré-remplir le checkout.
                     </Text>
-                </View>
+                </Animated.View>
             </ScrollView>
 
             {/* Add modal */}
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md,
         paddingBottom: Spacing.md,
     },
-    backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { ...Typography.title3 },
     scrollContent: { padding: Spacing.md, paddingBottom: Spacing.xxl },
     sectionTitle: {

@@ -1,16 +1,21 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Brain, ArrowRight } from "lucide-react";
 import { KpiCards } from "@/components/dashboard/overview/KpiCards";
 import { BadgeStrip } from "@/components/dashboard/overview/BadgeStrip";
-import { RevenueChart } from "@/components/dashboard/overview/RevenueChart";
 import { RecentOrders } from "@/components/dashboard/overview/RecentOrders";
 import { PopularProducts } from "@/components/dashboard/overview/PopularProducts";
 import { QuickActions } from "@/components/dashboard/overview/QuickActions";
 import { OperationalAlerts } from "@/components/dashboard/overview/OperationalAlerts";
 import { KycProgressBar } from "@/components/dashboard/overview/KycProgressBar";
 import { ActivityFeed } from "@/components/dashboard/overview/ActivityFeed";
+
+const RevenueChart = dynamic(
+    () => import("@/components/dashboard/overview/RevenueChart").then((m) => ({ default: m.RevenueChart })),
+    { ssr: false, loading: () => <div className="h-80 animate-pulse bg-surface-100 dark:bg-surface-800 rounded-2xl" /> }
+);
 import { useDashboard } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 

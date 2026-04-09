@@ -7,6 +7,7 @@ import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/auth-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 interface DietaryOption {
     id: string;
@@ -65,6 +66,7 @@ export default function PreferencesScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const isDark = colorScheme === 'dark';
 
     const [prefs, setPrefs] = useState<Preferences>({ dietary: [], allergens: [], cuisines: [] });
     const [saving, setSaving] = useState(false);
@@ -143,8 +145,8 @@ export default function PreferencesScreen() {
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.backButton, { backgroundColor: isDark ? '#ffffff08' : '#f1f5f9' }]}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </Pressable>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Préférences alimentaires</Text>
                 <View style={{ width: 40 }} />
@@ -152,15 +154,15 @@ export default function PreferencesScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Intro */}
-                <View style={[styles.infoCard, { backgroundColor: theme.primary + '10', borderColor: theme.primary + '30' }]}>
+                <Animated.View entering={FadeInDown.delay(100).duration(400).springify()} style={[styles.infoCard, { backgroundColor: theme.primary + '10', borderColor: theme.primary + '30' }]}>
                     <Ionicons name="sparkles-outline" size={20} color={theme.primary} />
                     <Text style={[styles.infoText, { color: theme.text }]}>
                         Vos préférences nous aident à vous proposer des restaurants et plats adaptés à votre mode de vie.
                     </Text>
-                </View>
+                </Animated.View>
 
                 {/* Dietary */}
-                <View style={styles.section}>
+                <Animated.View entering={FadeInDown.delay(200).duration(400).springify()} style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: theme.icon }]}>Régimes alimentaires</Text>
                     <ChipRow
                         items={DIETARY_OPTIONS}
@@ -168,10 +170,10 @@ export default function PreferencesScreen() {
                         onToggle={(id) => toggle('dietary', id)}
                         colorFn={(item) => (item as DietaryOption).color}
                     />
-                </View>
+                </Animated.View>
 
                 {/* Allergens */}
-                <View style={styles.section}>
+                <Animated.View entering={FadeInDown.delay(300).duration(400).springify()} style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: theme.icon }]}>Allergènes à éviter</Text>
                     <View style={[styles.allergenNote, { backgroundColor: '#ef444410', borderColor: '#ef444430' }]}>
                         <Ionicons name="warning-outline" size={16} color="#ef4444" />
@@ -185,17 +187,17 @@ export default function PreferencesScreen() {
                         onToggle={(id) => toggle('allergens', id)}
                         colorFn={() => '#ef4444'}
                     />
-                </View>
+                </Animated.View>
 
                 {/* Cuisine preferences */}
-                <View style={styles.section}>
+                <Animated.View entering={FadeInDown.delay(400).duration(400).springify()} style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: theme.icon }]}>Cuisines préférées</Text>
                     <ChipRow
                         items={CUISINE_PREFS}
                         selected={prefs.cuisines}
                         onToggle={(id) => toggle('cuisines', id)}
                     />
-                </View>
+                </Animated.View>
 
                 {/* Summary */}
                 {(prefs.dietary.length > 0 || prefs.allergens.length > 0 || prefs.cuisines.length > 0) && (
@@ -247,7 +249,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md,
         paddingBottom: Spacing.md,
     },
-    backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { ...Typography.title3 },
     scrollContent: { padding: Spacing.md, paddingBottom: Spacing.xxl, gap: Spacing.lg },
     infoCard: {

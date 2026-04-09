@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { Product } from '@kbouffe/shared-types';
 import { Colors, Spacing, Typography, Radii, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 interface Props {
     item: Product;
@@ -19,8 +21,14 @@ export function MenuItem({ item, onAdd }: Props) {
             style={({ pressed }) => [
                 styles.container,
                 { backgroundColor: theme.background, borderColor: theme.border },
-                pressed && { opacity: 0.9 },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
             ]}
+            onPress={() => {
+                // If the user wants to navigate to product modal, they tap the card
+                // The parent usually passes onAdd which is add to cart.
+                // We let the parent handle the press through onAdd for now.
+                onAdd();
+            }}
         >
             <View style={styles.content}>
                 <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
@@ -41,8 +49,16 @@ export function MenuItem({ item, onAdd }: Props) {
                         style={styles.image}
                     />
                     <Pressable
-                        style={[styles.addButtonOverlay, { backgroundColor: theme.background, shadowColor: theme.text }]}
-                        onPress={onAdd}
+                        style={({ pressed }) => [
+                            styles.addButtonOverlay, 
+                            { backgroundColor: theme.background, shadowColor: theme.text },
+                            pressed && { opacity: 0.8, transform: [{ scale: 0.9 }] }
+                        ]}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            onAdd();
+                        }}
                     >
                         <Ionicons name="add" size={16} color={theme.primary} />
                     </Pressable>
@@ -50,8 +66,16 @@ export function MenuItem({ item, onAdd }: Props) {
             ) : (
                 <View style={styles.noImageAddContainer}>
                     <Pressable
-                        style={[styles.addButton, { backgroundColor: theme.primary + '15' }]}
-                        onPress={onAdd}
+                        style={({ pressed }) => [
+                            styles.addButton, 
+                            { backgroundColor: theme.primary + '15' },
+                            pressed && { opacity: 0.8, transform: [{ scale: 0.9 }] }
+                        ]}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            onAdd();
+                        }}
                     >
                         <Ionicons name="add" size={20} color={theme.primary} />
                     </Pressable>

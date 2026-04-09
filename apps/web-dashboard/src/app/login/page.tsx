@@ -2,15 +2,31 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Utensils, User, LogIn, Wheat, CheckCircle2 } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function ResetSuccessBanner() {
     const searchParams = useSearchParams();
     const resetSuccess = searchParams.get("reset") === "1";
+    if (!resetSuccess) return null;
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 p-4 mb-8 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-sm"
+        >
+            <CheckCircle2 size={18} className="shrink-0" />
+            <span>
+                <strong>Mot de passe mis à jour !</strong> Connectez-vous avec votre nouveau mot de passe.
+            </span>
+        </motion.div>
+    );
+}
 
+export default function LoginPage() {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans">
             {/* Header */}
@@ -32,18 +48,9 @@ export default function LoginPage() {
             <main className="flex-1 flex flex-col items-center justify-center p-6 pt-24 pb-12">
                 <div className="max-w-4xl w-full">
                     {/* Password reset success banner */}
-                    {resetSuccess && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="flex items-center gap-3 p-4 mb-8 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-sm"
-                        >
-                            <CheckCircle2 size={18} className="shrink-0" />
-                            <span>
-                                <strong>Mot de passe mis à jour !</strong> Connectez-vous avec votre nouveau mot de passe.
-                            </span>
-                        </motion.div>
-                    )}
+                    <Suspense fallback={null}>
+                        <ResetSuccessBanner />
+                    </Suspense>
 
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}

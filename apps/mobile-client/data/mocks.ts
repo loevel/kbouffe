@@ -402,36 +402,3 @@ export const MOCK_REVIEWS: Review[] = [
 // --- Favorites ---
 export const MOCK_FAVORITES: string[] = ['1', '3', '6'];
 
-// --- Promotions ---
-export const MOCK_PROMOS = [
-    { 
-        id: 'promo1', 
-        title: 'Livraison GRATUITE', 
-        subtitle: 'Sur votre 1ère commande', 
-        backgroundColor: '#f97316', 
-        icon: 'bicycle-outline' as const,
-        image: require('@/assets/images/promo_delivery.png'),
-        cta: 'En profiter',
-        target: '/(tabs)/explore',
-    },
-    { 
-        id: 'promo2', 
-        title: '-20% ce weekend', 
-        subtitle: 'Chez les restaurants partenaires', 
-        backgroundColor: '#10b981', 
-        icon: 'pricetag-outline' as const,
-        image: require('@/assets/images/promo_discount.png'),
-        cta: 'Voir l\'offre',
-        target: '/(tabs)/explore',
-    },
-    { 
-        id: 'promo3', 
-        title: 'Menu spécial Chef', 
-        subtitle: 'Découvrez nos offres exclusives', 
-        backgroundColor: '#6366f1', 
-        icon: 'fast-food-outline' as const,
-        image: require('@/assets/images/promo_menu.png'),
-        cta: 'Découvrir',
-        target: '/(tabs)/explore',
-    },
-];

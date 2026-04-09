@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getToken, onMessage, isSupported } from 'firebase/messaging';
-import { app } from '@/lib/firebase/client';
 import toast from 'react-hot-toast';
 
 export function usePushNotifications() {
@@ -17,6 +15,7 @@ export function usePushNotifications() {
     try {
       if (typeof window === 'undefined') return null;
 
+      const { isSupported } = await import('firebase/messaging');
       const supported = await isSupported();
       if (!supported) {
         console.warn('[FCM] Firebase Messaging non supporté dans ce navigateur.');
@@ -33,8 +32,9 @@ export function usePushNotifications() {
 
       setIsPermissionGranted(true);
 
-      const { getMessaging } = await import('firebase/messaging');
-      const messaging = getMessaging(app);
+      const { default: firebaseApp } = await import('@/lib/firebase/client');
+      const { getMessaging, getToken } = await import('firebase/messaging');
+      const messaging = getMessaging(firebaseApp);
 
       // Enregistre le SW Firebase dédié pour les push en arrière-plan
       let registration: ServiceWorkerRegistration | undefined;
@@ -96,11 +96,13 @@ export function usePushNotifications() {
   const listenForMessages = async (): Promise<(() => void) | undefined> => {
     if (typeof window === 'undefined') return;
 
+    const { isSupported } = await import('firebase/messaging');
     const supported = await isSupported();
     if (!supported) return;
 
-    const { getMessaging } = await import('firebase/messaging');
-    const messaging = getMessaging(app);
+    const { default: firebaseApp } = await import('@/lib/firebase/client');
+    const { getMessaging, onMessage } = await import('firebase/messaging');
+    const messaging = getMessaging(firebaseApp);
 
     const unsubscribe = onMessage(messaging, (payload) => {
       const title = payload.notification?.title ?? 'Notification';

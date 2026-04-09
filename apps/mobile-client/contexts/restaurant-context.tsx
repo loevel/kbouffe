@@ -17,8 +17,12 @@ import type { StoreDetail, MobileProduct, MobileRestaurant } from '@/lib/api';
 interface RestaurantContextType {
     /** Currently cached restaurant + menu */
     current: StoreDetail | null;
+    /** Preview data for the restaurant being navigated to (shown immediately) */
+    preview: MobileRestaurant | null;
     /** Set the currently viewed restaurant */
     setCurrentStore: (store: StoreDetail) => void;
+    /** Set a lightweight preview before navigating (for instant header render) */
+    setPreview: (restaurant: MobileRestaurant) => void;
     /** Get a product by id from the cache */
     getProduct: (id: string) => MobileProduct | undefined;
     /** Get the restaurant object */
@@ -29,12 +33,18 @@ const RestaurantContext = createContext<RestaurantContextType | null>(null);
 
 export function RestaurantProvider({ children }: { children: ReactNode }) {
     const [current, setCurrent] = useState<StoreDetail | null>(null);
+    const [preview, setPreviewState] = useState<MobileRestaurant | null>(null);
     // Keep a ref map for fast product lookups
     const productMapRef = useRef<Map<string, MobileProduct>>(new Map());
 
     const setCurrentStore = useCallback((store: StoreDetail) => {
         setCurrent(store);
+        setPreviewState(store.restaurant);
         productMapRef.current = new Map(store.products.map((p) => [p.id, p]));
+    }, []);
+
+    const setPreview = useCallback((restaurant: MobileRestaurant) => {
+        setPreviewState(restaurant);
     }, []);
 
     const getProduct = useCallback(
@@ -45,8 +55,8 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     const getRestaurant = useCallback(() => current?.restaurant, [current]);
 
     const value = useMemo(
-        () => ({ current, setCurrentStore, getProduct, getRestaurant }),
-        [current, setCurrentStore, getProduct, getRestaurant],
+        () => ({ current, preview, setCurrentStore, setPreview, getProduct, getRestaurant }),
+        [current, preview, setCurrentStore, setPreview, getProduct, getRestaurant],
     );
 
     return <RestaurantContext.Provider value={value}>{children}</RestaurantContext.Provider>;

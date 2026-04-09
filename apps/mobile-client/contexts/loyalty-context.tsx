@@ -113,8 +113,10 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const isRestaurantFavorite = useCallback((id: string) => state.favoriteRestaurantIds.includes(id), [state.favoriteRestaurantIds]);
-    const isProductFavorite = useCallback((id: string) => state.favoriteProductIds.includes(id), [state.favoriteProductIds]);
+    const restaurantFavSet = useMemo(() => new Set(state.favoriteRestaurantIds), [state.favoriteRestaurantIds]);
+    const productFavSet = useMemo(() => new Set(state.favoriteProductIds), [state.favoriteProductIds]);
+    const isRestaurantFavorite = useCallback((id: string) => restaurantFavSet.has(id), [restaurantFavSet]);
+    const isProductFavorite = useCallback((id: string) => productFavSet.has(id), [productFavSet]);
 
     const validatePromotion = useCallback(async (params: { 
         code: string; 

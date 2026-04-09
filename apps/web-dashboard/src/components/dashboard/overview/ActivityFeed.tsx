@@ -24,14 +24,21 @@ const EVENT_CONFIG: Record<ActivityEvent["type"], { icon: any; color: string; bg
 };
 
 function formatRelative(dateStr: string) {
-    const diffMs = Date.now() - new Date(dateStr).getTime();
-    const diffMin = Math.floor(diffMs / 60_000);
-    if (diffMin < 1) return "à l'instant";
-    if (diffMin < 60) return `il y a ${diffMin}min`;
-    const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24) return `il y a ${diffH}h`;
-    const diffD = Math.floor(diffH / 24);
-    return `il y a ${diffD}j`;
+    try {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return "date invalide";
+        const diffMs = Date.now() - date.getTime();
+        const diffMin = Math.floor(diffMs / 60_000);
+        if (diffMin < 1) return "à l'instant";
+        if (diffMin < 60) return `il y a ${diffMin} min`;
+        const diffH = Math.floor(diffMin / 60);
+        if (diffH < 24) return `il y a ${diffH}h`;
+        const diffD = Math.floor(diffH / 24);
+        if (diffD < 7) return `il y a ${diffD}j`;
+        return date.toLocaleDateString("fr-FR");
+    } catch {
+        return "date invalide";
+    }
 }
 
 export function ActivityFeed() {

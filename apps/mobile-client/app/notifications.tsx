@@ -7,14 +7,17 @@ import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationRead, type AppNotification } from '@/lib/api';
+import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const NOTIF_ICONS: Record<string, { icon: string; color: string }> = {
-    order_update:   { icon: 'receipt-outline',        color: '#3b82f6' },
-    delivery:       { icon: 'bicycle-outline',         color: '#10b981' },
-    promotion:      { icon: 'pricetag-outline',        color: '#f59e0b' },
-    loyalty:        { icon: 'star-outline',            color: '#a855f7' },
-    reservation:    { icon: 'calendar-outline',        color: '#ec4899' },
-    system:         { icon: 'notifications-outline',   color: '#64748b' },
+    order_update:   { icon: 'receipt',               color: '#3b82f6' },
+    delivery:       { icon: 'bicycle',               color: '#10b981' },
+    promotion:      { icon: 'pricetag',              color: '#f59e0b' },
+    loyalty:        { icon: 'star',                  color: '#a855f7' },
+    reservation:    { icon: 'calendar',              color: '#ec4899' },
+    system:         { icon: 'notifications',         color: '#64748b' },
 };
 
 function timeAgo(dateStr: string) {
@@ -25,7 +28,19 @@ function timeAgo(dateStr: string) {
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `Il y a ${hours}h`;
     const days = Math.floor(hours / 24);
+    if (days === 1) return 'Hier';
     return `Il y a ${days}j`;
+}
+
+function formatGroupDate(dateStr: string) {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Aujourd\'hui';
+    if (date.toDateString() === yesterday.toDateString()) return 'Hier';
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 }
 
 export default function NotificationsScreen() {
@@ -33,6 +48,7 @@ export default function NotificationsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const isDark = colorScheme === 'dark';
 
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [loading, setLoading] = useState(true);
@@ -53,13 +69,11 @@ export default function NotificationsScreen() {
     useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
     const handlePress = async (notif: AppNotification) => {
-        void Haptics.selectionAsync();
-        // Mark as read
+        Haptics.selectionAsync();
         if (!notif.isRead) {
             setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
             markNotificationRead(notif.id).catch(() => {/* ignore */});
         }
-        // Navigate based on type
         if (notif.type === 'order_update' && notif.relatedId) {
             router.push(`/order/${notif.relatedId}`);
         } else if (notif.type === 'reservation' && notif.relatedId) {
@@ -70,14 +84,14 @@ export default function NotificationsScreen() {
     };
 
     const markAllRead = () => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     };
 
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
     const grouped = notifications.reduce<Record<string, AppNotification[]>>((acc, n) => {
-        const date = new Date(n.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        const date = new Date(n.createdAt).toDateString();
         if (!acc[date]) acc[date] = [];
         acc[date].push(n);
         return acc;
@@ -87,8 +101,8 @@ export default function NotificationsScreen() {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {/* Header */}
             <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.backBtn, { backgroundColor: isDark ? '#ffffff08' : '#f1f5f9' }]}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </Pressable>
                 <View style={styles.headerCenter}>
                     <Text style={[styles.headerTitle, { color: theme.text }]}>Notifications</Text>
@@ -99,11 +113,19 @@ export default function NotificationsScreen() {
                     )}
                 </View>
                 {unreadCount > 0 ? (
-                    <Pressable onPress={markAllRead} style={styles.readAllBtn}>
-                        <Text style={[styles.readAllText, { color: theme.primary }]}>Tout lire</Text>
+                    <Pressable
+                        onPress={markAllRead}
+                        hitSlop={8}
+                        style={({ pressed }) => [
+                            styles.readAllBtn,
+                            { backgroundColor: theme.primary + '10' },
+                            pressed && { opacity: 0.7 },
+                        ]}
+                    >
+                        <Ionicons name="checkmark-done" size={16} color={theme.primary} />
                     </Pressable>
                 ) : (
-                    <View style={{ width: 60 }} />
+                    <View style={{ width: 40 }} />
                 )}
             </View>
 
@@ -124,39 +146,53 @@ export default function NotificationsScreen() {
                     }
                 >
                     {notifications.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <View style={[styles.emptyIcon, { backgroundColor: theme.border + '40' }]}>
-                                <Ionicons name="notifications-off-outline" size={48} color={theme.icon} />
+                        <Animated.View
+                            entering={FadeInDown.duration(400).springify()}
+                            style={styles.emptyState}
+                        >
+                            <View style={[styles.emptyIconCircle, { backgroundColor: theme.primary + '12' }]}>
+                                <Ionicons name="notifications-off-outline" size={48} color={theme.primary} />
                             </View>
                             <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune notification</Text>
                             <Text style={[styles.emptyText, { color: theme.icon }]}>
-                                Vos mises à jour de commandes, promotions et rappels apparaîtront ici.
+                                Vos mises à jour de commandes,{'\n'}promotions et rappels apparaîtront ici.
                             </Text>
-                        </View>
+                        </Animated.View>
                     ) : (
-                        Object.entries(grouped).map(([date, items]) => (
-                            <View key={date}>
-                                <Text style={[styles.dateLabel, { color: theme.icon }]}>{date}</Text>
+                        Object.entries(grouped).map(([dateKey, items], groupIndex) => (
+                            <Animated.View
+                                key={dateKey}
+                                entering={FadeInDown.delay(groupIndex * 100).duration(400).springify()}
+                            >
+                                <Text style={[styles.dateLabel, { color: theme.icon }]}>{formatGroupDate(items[0].createdAt)}</Text>
                                 <View style={[styles.card, { backgroundColor: theme.surface }]}>
                                     {items.map((notif, index) => {
                                         const meta = NOTIF_ICONS[notif.type] ?? NOTIF_ICONS.system;
                                         return (
-                                            <Pressable
+                                            <AnimatedPressable
                                                 key={notif.id}
+                                                layout={LinearTransition.springify()}
                                                 style={({ pressed }) => [
                                                     styles.notifRow,
-                                                    index !== items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
-                                                    !notif.isRead && { backgroundColor: theme.primary + '06' },
+                                                    index !== items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border + '30' },
+                                                    !notif.isRead && { backgroundColor: theme.primary + '04' },
                                                     pressed && { opacity: 0.7 },
                                                 ]}
                                                 onPress={() => handlePress(notif)}
                                             >
-                                                <View style={[styles.notifIcon, { backgroundColor: meta.color + '18' }]}>
-                                                    <Ionicons name={meta.icon as any} size={22} color={meta.color} />
+                                                <View style={[styles.notifIcon, { backgroundColor: meta.color + '15' }]}>
+                                                    <Ionicons name={meta.icon as any} size={20} color={meta.color} />
                                                 </View>
                                                 <View style={styles.notifBody}>
                                                     <View style={styles.notifTitleRow}>
-                                                        <Text style={[styles.notifTitle, { color: theme.text }, !notif.isRead && { fontWeight: '700' }]}>
+                                                        <Text
+                                                            style={[
+                                                                styles.notifTitle,
+                                                                { color: theme.text },
+                                                                !notif.isRead && { fontWeight: '700' },
+                                                            ]}
+                                                            numberOfLines={1}
+                                                        >
                                                             {notif.title}
                                                         </Text>
                                                         {!notif.isRead && (
@@ -171,13 +207,13 @@ export default function NotificationsScreen() {
                                                     </Text>
                                                 </View>
                                                 {notif.relatedId && (
-                                                    <Ionicons name="chevron-forward" size={16} color={theme.border} />
+                                                    <Ionicons name="chevron-forward" size={14} color={theme.border} />
                                                 )}
-                                            </Pressable>
+                                            </AnimatedPressable>
                                         );
                                     })}
                                 </View>
-                            </View>
+                            </Animated.View>
                         ))
                     )}
                 </ScrollView>
@@ -188,6 +224,8 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+
+    /* Header */
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -195,41 +233,91 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md,
         paddingBottom: Spacing.md,
     },
-    backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    backBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     headerCenter: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
     headerTitle: { ...Typography.title3 },
-    badge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    badge: {
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 5,
+    },
     badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-    readAllBtn: { width: 60, alignItems: 'flex-end' },
-    readAllText: { ...Typography.caption, fontWeight: '600' },
+    readAllBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    /* Loading */
     loadingWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+    /* List */
     scrollContent: { padding: Spacing.md, paddingBottom: Spacing.xxl },
     emptyContent: { flex: 1 },
-    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl, gap: Spacing.md, marginTop: Spacing.xxl },
-    emptyIcon: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
+
+    /* Empty State */
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: Spacing.xl,
+        gap: Spacing.md,
+        marginTop: Spacing.xxl,
+    },
+    emptyIconCircle: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: Spacing.sm,
+    },
     emptyTitle: { ...Typography.title3, textAlign: 'center' },
-    emptyText: { ...Typography.body, textAlign: 'center', lineHeight: 24 },
+    emptyText: { ...Typography.body, textAlign: 'center', lineHeight: 22 },
+
+    /* Date labels */
     dateLabel: {
         ...Typography.small,
         fontWeight: '700',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        letterSpacing: 0.8,
         marginBottom: Spacing.sm,
         marginLeft: Spacing.xs,
         marginTop: Spacing.md,
     },
+
+    /* Card */
     card: { borderRadius: Radii.xl, overflow: 'hidden', ...Shadows.sm, marginBottom: Spacing.sm },
+
+    /* Notification row */
     notifRow: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: Spacing.md,
         gap: Spacing.md,
     },
-    notifIcon: { width: 44, height: 44, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center' },
+    notifIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: Radii.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     notifBody: { flex: 1 },
-    notifTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 2 },
-    notifTitle: { ...Typography.caption, flex: 1 },
+    notifTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+    notifTitle: { ...Typography.caption, fontWeight: '600', flex: 1 },
     unreadDot: { width: 8, height: 8, borderRadius: 4 },
-    notifMessage: { ...Typography.small, lineHeight: 17 },
-    notifTime: { ...Typography.small, marginTop: 4, fontSize: 11 },
+    notifMessage: { ...Typography.small, lineHeight: 18 },
+    notifTime: { ...Typography.small, marginTop: 4, fontSize: 11, fontWeight: '500' },
 });

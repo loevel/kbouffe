@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { StorePageClient } from "./store-page-client";
 
 interface Props {
@@ -16,5 +17,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PublicStorePage({ params }: Props) {
     const { slug } = await params;
-    return <StorePageClient slug={slug} />;
+    return (
+        <Suspense fallback={null}>
+            <StorePageClient slug={slug} />
+        </Suspense>
+    );
 }

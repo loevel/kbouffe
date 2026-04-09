@@ -122,7 +122,7 @@ export default function OnboardingScreen() {
             <View style={styles.imageContainer}>
                 <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
             </View>
-            <View style={[styles.card, { backgroundColor: theme.surface, paddingBottom: Math.max(insets.bottom, Spacing.xl) }]}>
+            <View style={[styles.card, { backgroundColor: theme.surface }]}>
                 <View style={[styles.iconCircle, { backgroundColor: item.accent + '1A' }]}>
                     <Ionicons name={item.icon} size={32} color={item.accent} />
                 </View>
@@ -134,15 +134,21 @@ export default function OnboardingScreen() {
 
     const buttonStyle = useAnimatedStyle(() => {
         return {
-            width: withSpring(isLastPage ? width - Spacing.xl * 2 : 64, { damping: 16 }),
             backgroundColor: withTiming(currentAccent, { duration: 300 }),
         };
     });
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.surface }]}>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
             <Pressable
-                style={[styles.skipButton, { top: insets.top + Spacing.md, backgroundColor: theme.surface }]}
+                style={[
+                    styles.skipButton,
+                    {
+                        top: insets.top + Spacing.md,
+                        backgroundColor: theme.surfaceElevated,
+                        borderColor: theme.border,
+                    },
+                ]}
                 onPress={completeOnboarding}
                 disabled={completing}
             >
@@ -162,22 +168,30 @@ export default function OnboardingScreen() {
                 viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
             />
 
-            <View style={[styles.bottomContainer, { bottom: Math.max(insets.bottom, Spacing.lg) }]}>
-                <View style={styles.dotsContainer}>
-                    {pages.map((_, index) => (
-                        <PaginationDot key={index} index={index} currentIndex={currentIndex} accent={currentAccent} theme={theme} />
-                    ))}
+            <View style={[styles.bottomContainer, { paddingBottom: Math.max(insets.bottom + Spacing.sm, Spacing.xl) }]}>
+                <View style={styles.bottomRow}>
+                    <View style={styles.dotsContainer}>
+                        {pages.map((_, index) => (
+                            <PaginationDot key={index} index={index} currentIndex={currentIndex} accent={currentAccent} theme={theme} />
+                        ))}
+                    </View>
+
+                    {!isLastPage && (
+                        <Animated.View style={[styles.nextButtonWrapper, buttonStyle]}>
+                            <Pressable style={styles.nextButton} onPress={handleNext} disabled={completing}>
+                                <Ionicons name="arrow-forward" size={28} color="#fff" />
+                            </Pressable>
+                        </Animated.View>
+                    )}
                 </View>
 
-                <Animated.View style={[styles.nextButtonWrapper, buttonStyle]}>
-                    <Pressable style={styles.nextButton} onPress={handleNext} disabled={completing}>
-                        {isLastPage ? (
+                {isLastPage && (
+                    <Animated.View style={[styles.startButtonWrapper, { backgroundColor: currentAccent }]}>
+                        <Pressable style={styles.nextButton} onPress={handleNext} disabled={completing}>
                             <Text style={styles.startButtonText}>{completing ? 'Ouverture...' : 'Commencer'}</Text>
-                        ) : (
-                            <Ionicons name="arrow-forward" size={28} color="#fff" />
-                        )}
-                    </Pressable>
-                </Animated.View>
+                        </Pressable>
+                    </Animated.View>
+                )}
             </View>
         </View>
     );
@@ -192,23 +206,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md,
         paddingVertical: Spacing.sm,
         borderRadius: Radii.full,
+        borderWidth: 1,
         ...Shadows.sm,
     },
     skipText: { ...Typography.bodySemibold },
     page: { flex: 1 },
     imageContainer: {
-        height: height * 0.6,
+        height: height * 0.58,
         width: '100%',
     },
     image: { width: '100%', height: '100%' },
     card: {
         flex: 1,
-        marginTop: -40,
-        borderTopLeftRadius: 40,
-        borderTopRightRadius: 40,
+        marginTop: -52,
+        borderTopLeftRadius: 44,
+        borderTopRightRadius: 44,
         paddingHorizontal: Spacing.xl,
         paddingTop: Spacing.xxl,
-        alignItems: 'center',
+        alignItems: 'flex-start',
         ...Shadows.lg,
     },
     iconCircle: {
@@ -221,19 +236,22 @@ const styles = StyleSheet.create({
     },
     title: {
         ...Typography.title1,
-        textAlign: 'center',
         marginBottom: Spacing.md,
     },
     subtitle: {
         ...Typography.body,
-        textAlign: 'center',
         lineHeight: 24,
     },
     bottomContainer: {
         position: 'absolute',
+        bottom: 0,
         left: 0,
         right: 0,
         paddingHorizontal: Spacing.xl,
+        paddingTop: Spacing.md,
+        gap: Spacing.md,
+    },
+    bottomRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -245,10 +263,17 @@ const styles = StyleSheet.create({
     },
     dot: { height: 8, borderRadius: 4 },
     nextButtonWrapper: {
-        height: 64,
-        borderRadius: 32,
+        height: 56,
+        width: 56,
+        borderRadius: 28,
         overflow: 'hidden',
-        ...Shadows.md,
+        ...Shadows.lg,
+    },
+    startButtonWrapper: {
+        height: 56,
+        borderRadius: 28,
+        overflow: 'hidden',
+        ...Shadows.lg,
     },
     nextButton: {
         flex: 1,

@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,277018,e=>{"use strict";e.s(["localeLabels",0,{fr:"Francais",en:"English"}],277018)}]);

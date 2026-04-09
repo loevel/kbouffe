@@ -7,5 +7,5 @@ export * from "./lib/admin-fetch";
 export * from "./i18n";
 export * from "./lib/supabase-types";
 export * from "./lib/supabase-client";
-export * from "./lib/mock-data";
+// mock-data excluded: dev-only, do not export in production bundle
 export * from "./lib/notification-sounds";

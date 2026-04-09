@@ -1,19 +1,6 @@
 "use client";
 
-/**
- * /forgot-password — Demande de réinitialisation de mot de passe
- *
- * Fonctionne pour tous les types de comptes :
- *  - Client, Restaurant, Fournisseur/Agriculteur, Admin
- *
- * Flux :
- *  1. Utilisateur saisit son email
- *  2. Supabase envoie un lien de réinitialisation (token valide 1h)
- *  3. Le lien redirige vers /auth/callback?token_hash=xxx&type=recovery
- *  4. Le callback redirige vers /reset-password
- */
-
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,7 +9,7 @@ import { KbouffeLogo } from "@/components/brand/Logo";
 import { useSearchParams } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordForm() {
     const searchParams  = useSearchParams();
     const [email, setEmail]     = useState("");
     const [loading, setLoading] = useState(false);
@@ -63,8 +50,6 @@ export default function ForgotPasswordPage() {
                 redirectTo,
             });
 
-            // On affiche toujours le succès même si l'email n'existe pas
-            // (sécurité — empêche l'énumération d'adresses)
             if (sbError && sbError.message.toLowerCase().includes("rate")) {
                 setError("Trop de tentatives. Attendez quelques minutes avant de réessayer.");
                 return;
@@ -78,6 +63,110 @@ export default function ForgotPasswordPage() {
         }
     }
 
+    return (
+        <div className="bg-white dark:bg-surface-900 rounded-3xl border border-surface-200 dark:border-surface-800 p-8 shadow-xl">
+            <AnimatePresence mode="wait">
+                {sent ? (
+                    <motion.div
+                        key="success"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center space-y-5"
+                    >
+                        <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto">
+                            <CheckCircle2 size={32} className="text-emerald-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-2">
+                                Email envoyé !
+                            </h2>
+                            <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
+                                Si un compte existe pour{" "}
+                                <span className="font-semibold text-surface-900 dark:text-white">{email}</span>,
+                                vous recevrez un lien de réinitialisation dans quelques minutes.
+                            </p>
+                        </div>
+
+                        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 text-left">
+                            <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                                <strong>Vous ne trouvez pas l'email ?</strong>{" "}
+                                Vérifiez vos spams ou dossier courrier indésirable.
+                                Le lien est valide pendant <strong>1 heure</strong>.
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={() => { setSent(false); setEmail(""); }}
+                            className="w-full py-3 border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 rounded-2xl text-sm font-medium hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                        >
+                            Utiliser une autre adresse
+                        </button>
+                    </motion.div>
+                ) : (
+                    <motion.form
+                        key="form"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="space-y-5"
+                        onSubmit={handleSubmit}
+                    >
+                        <AnimatePresence>
+                            {error && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+                                >
+                                    <AlertTriangle size={15} className="shrink-0" />
+                                    {error}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        <div>
+                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5 ml-1">
+                                Adresse email du compte
+                            </label>
+                            <div className="relative group">
+                                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400 group-focus-within:text-brand-500 transition-colors" />
+                                <input
+                                    type="email"
+                                    autoFocus
+                                    value={email}
+                                    onChange={e => { setEmail(e.target.value); setError(null); }}
+                                    placeholder="votre@email.com"
+                                    required
+                                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <p className="text-xs text-surface-500 mt-2 ml-1">
+                                Fonctionne pour les comptes client, restaurant, fournisseur et admin.
+                            </p>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="group relative w-full py-4 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-all shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 flex items-center justify-center gap-3"
+                        >
+                            {loading ? (
+                                <Loader2 size={20} className="animate-spin" />
+                            ) : (
+                                <>
+                                    <span>Envoyer le lien</span>
+                                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                </>
+                            )}
+                        </button>
+                    </motion.form>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+export default function ForgotPasswordPage() {
     return (
         <div className="flex min-h-screen">
             {/* Left — decorative image */}
@@ -129,107 +218,13 @@ export default function ForgotPasswordPage() {
                         </p>
                     </div>
 
-                    <div className="bg-white dark:bg-surface-900 rounded-3xl border border-surface-200 dark:border-surface-800 p-8 shadow-xl">
-                        <AnimatePresence mode="wait">
-                            {sent ? (
-                                /* ── Success state ── */
-                                <motion.div
-                                    key="success"
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className="text-center space-y-5"
-                                >
-                                    <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto">
-                                        <CheckCircle2 size={32} className="text-emerald-400" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-2">
-                                            Email envoyé !
-                                        </h2>
-                                        <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                                            Si un compte existe pour{" "}
-                                            <span className="font-semibold text-surface-900 dark:text-white">{email}</span>,
-                                            vous recevrez un lien de réinitialisation dans quelques minutes.
-                                        </p>
-                                    </div>
-
-                                    <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 text-left">
-                                        <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-                                            <strong>Vous ne trouvez pas l'email ?</strong>{" "}
-                                            Vérifiez vos spams ou dossier courrier indésirable.
-                                            Le lien est valide pendant <strong>1 heure</strong>.
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        onClick={() => { setSent(false); setEmail(""); }}
-                                        className="w-full py-3 border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 rounded-2xl text-sm font-medium hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
-                                    >
-                                        Utiliser une autre adresse
-                                    </button>
-                                </motion.div>
-                            ) : (
-                                /* ── Email form ── */
-                                <motion.form
-                                    key="form"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="space-y-5"
-                                    onSubmit={handleSubmit}
-                                >
-                                    <AnimatePresence>
-                                        {error && (
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
-                                            >
-                                                <AlertTriangle size={15} className="shrink-0" />
-                                                {error}
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5 ml-1">
-                                            Adresse email du compte
-                                        </label>
-                                        <div className="relative group">
-                                            <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400 group-focus-within:text-brand-500 transition-colors" />
-                                            <input
-                                                type="email"
-                                                autoFocus
-                                                value={email}
-                                                onChange={e => { setEmail(e.target.value); setError(null); }}
-                                                placeholder="votre@email.com"
-                                                required
-                                                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
-                                            />
-                                        </div>
-                                        <p className="text-xs text-surface-500 mt-2 ml-1">
-                                            Fonctionne pour les comptes client, restaurant, fournisseur et admin.
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="group relative w-full py-4 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-all shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 flex items-center justify-center gap-3"
-                                    >
-                                        {loading ? (
-                                            <Loader2 size={20} className="animate-spin" />
-                                        ) : (
-                                            <>
-                                                <span>Envoyer le lien</span>
-                                                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                            </>
-                                        )}
-                                    </button>
-                                </motion.form>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                    <Suspense fallback={
+                        <div className="bg-white dark:bg-surface-900 rounded-3xl border border-surface-200 dark:border-surface-800 p-8 shadow-xl flex items-center justify-center min-h-[200px]">
+                            <Loader2 size={24} className="animate-spin text-brand-500" />
+                        </div>
+                    }>
+                        <ForgotPasswordForm />
+                    </Suspense>
 
                     {/* Back to login */}
                     <div className="mt-6 text-center">

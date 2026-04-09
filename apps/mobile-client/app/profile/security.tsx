@@ -8,6 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function SecurityScreen() {
     const router = useRouter();
@@ -15,6 +16,7 @@ export default function SecurityScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const isDark = colorScheme === 'dark';
 
     const [currentPwd, setCurrentPwd] = useState('');
     const [newPwd, setNewPwd] = useState('');
@@ -93,15 +95,15 @@ export default function SecurityScreen() {
         >
             {/* Header */}
             <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.backButton, { backgroundColor: isDark ? '#ffffff08' : '#f1f5f9' }]}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </Pressable>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Sécurité</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             {/* Account info */}
-            <View style={[styles.section, { marginTop: Spacing.md }]}>
+            <Animated.View entering={FadeInDown.delay(100).duration(400).springify()} style={[styles.section, { marginTop: Spacing.md }]}>
                 <Text style={[styles.sectionTitle, { color: theme.icon }]}>Compte</Text>
                 <View style={[styles.card, { backgroundColor: theme.surface }]}>
                     <View style={styles.infoRow}>
@@ -129,10 +131,10 @@ export default function SecurityScreen() {
                         </View>
                     )}
                 </View>
-            </View>
+            </Animated.View>
 
             {/* Change password */}
-            <View style={styles.section}>
+            <Animated.View entering={FadeInDown.delay(200).duration(400).springify()} style={styles.section}>
                 <Pressable
                     style={[styles.accordionHeader, { backgroundColor: theme.surface }]}
                     onPress={() => {
@@ -243,10 +245,10 @@ export default function SecurityScreen() {
                         </Pressable>
                     </View>
                 )}
-            </View>
+            </Animated.View>
 
             {/* Security tips */}
-            <View style={styles.section}>
+            <Animated.View entering={FadeInDown.delay(300).duration(400).springify()} style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: theme.icon }]}>Conseils de sécurité</Text>
                 <View style={[styles.card, { backgroundColor: theme.surface }]}>
                     {[
@@ -267,7 +269,7 @@ export default function SecurityScreen() {
                         </View>
                     ))}
                 </View>
-            </View>
+            </Animated.View>
         </ScrollView>
     );
 }
@@ -281,7 +283,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md,
         paddingBottom: Spacing.md,
     },
-    backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { ...Typography.title3 },
     section: { paddingHorizontal: Spacing.md, marginTop: Spacing.lg },
     sectionTitle: {

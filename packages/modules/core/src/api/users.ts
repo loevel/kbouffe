@@ -204,22 +204,44 @@ usersRoutes.patch("/profile", async (c) => {
     const supabase = c.var.supabase;
     const userId = c.var.userId;
 
+    if (!userId) {
+        return c.json({ error: "Utilisateur non authentifié" }, 401);
+    }
+
     const updateData: any = {};
-    if (body.fullName !== undefined) updateData.full_name = body.fullName;
-    if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.fullName !== undefined && body.fullName !== null) {
+        updateData.full_name = body.fullName.trim();
+    }
+    if (body.phone !== undefined && body.phone !== null) {
+        updateData.phone = body.phone.trim();
+    }
     if (body.avatarUrl !== undefined) updateData.avatar_url = body.avatarUrl;
     if (body.preferredLang !== undefined) updateData.preferred_lang = body.preferredLang;
     if (body.notificationsEnabled !== undefined) updateData.notifications_enabled = body.notificationsEnabled;
     if (body.onboardingCompleted !== undefined) updateData.onboarding_completed = body.onboardingCompleted;
     if (body.themePreference !== undefined) updateData.theme_preference = body.themePreference;
 
-    const { error } = await supabase
+    // Ensure we have something to update
+    if (Object.keys(updateData).length === 0) {
+        return c.json({ success: true, message: "Aucune donnée à mettre à jour" });
+    }
+
+    const { error, data } = await supabase
         .from("users")
         .update(updateData)
-        .eq("id", userId);
+        .eq("id", userId)
+        .select();
 
-    if (error) return c.json({ error: error.message }, 500);
-    return c.json({ success: true });
+    if (error) {
+        console.error("[PATCH /account/profile] Update failed for user", userId, error);
+        return c.json({
+            error: error.message,
+            code: error.code,
+            details: process.env.ENVIRONMENT === 'development' ? error.details : undefined
+        }, 500);
+    }
+
+    return c.json({ success: true, data });
 });
 
 /** GET /account/addresses — List addresses */
@@ -421,6 +443,65 @@ usersRoutes.get("/orders", async (c) => {
 });
 
 /** POST /account/orders/:id/cancel — Client cancels own pending order */
+
+// ── Reservations client ───────────────────────────────────────────────────────
+
+/** GET /account/reservations — Customer's own reservations */
+usersRoutes.get("/reservations", async (c) => {
+    const { data, error } = await c.var.supabase
+        .from("reservations")
+        .select("id, date, time, party_size, status, occasion, special_requests, created_at, restaurant:restaurants(id, name, slug, logo_url)")
+        .eq("customer_id", c.var.userId)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false })
+        .limit(100);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    const reservations = (data ?? []).map((r: any) => ({
+        id: r.id,
+        date: r.date,
+        time: r.time,
+        party_size: r.party_size,
+        status: r.status,
+        occasion: r.occasion ?? null,
+        special_requests: r.special_requests ?? null,
+        created_at: r.created_at,
+        restaurant_name: r.restaurant?.name ?? null,
+        restaurant_slug: r.restaurant?.slug ?? null,
+        restaurant_logo: r.restaurant?.logo_url ?? null,
+    }));
+
+    return c.json({ reservations });
+});
+
+/** POST /account/reservations/:id/cancel — Customer cancels own reservation */
+usersRoutes.post("/reservations/:id/cancel", async (c) => {
+    const reservationId = c.req.param("id");
+
+    const { data: reservation, error: fetchErr } = await c.var.supabase
+        .from("reservations")
+        .select("id, status, customer_id, date, time")
+        .eq("id", reservationId)
+        .eq("customer_id", c.var.userId)
+        .single();
+
+    if (fetchErr || !reservation) return c.json({ error: "Réservation introuvable" }, 404);
+
+    if (!["pending", "confirmed"].includes(reservation.status)) {
+        return c.json({ error: "Cette réservation ne peut plus être annulée" }, 400);
+    }
+
+    const { error: updateErr } = await c.var.supabase
+        .from("reservations")
+        .update({ status: "cancelled" })
+        .eq("id", reservationId);
+
+    if (updateErr) return c.json({ error: updateErr.message }, 500);
+    return c.json({ success: true });
+});
+
+/** POST /account/orders/:id/cancel — Client cancels own pending order */
 usersRoutes.post("/orders/:id/cancel", async (c) => {
     const orderId = c.req.param("id");
 
@@ -570,6 +651,67 @@ usersRoutes.patch("/notifications/:id/read", async (c) => {
     if (error) return c.json({ error: "Impossible de marquer comme lu" }, 500);
 
     return c.json({ success: true });
+});
+
+// ── Offers & Promotions ───────────────────────────────────────────────────────
+
+/** GET /offers — Active coupons available to the user */
+usersRoutes.get("/offers", async (c) => {
+    const supabase = c.var.supabase;
+    const now = new Date().toISOString();
+
+    const { data: coupons, error } = await supabase
+        .from("coupons")
+        .select(`
+            id, name, code, kind, value, max_discount, min_order,
+            description, expires_at, starts_at, restaurant_id,
+            restaurants ( name, slug )
+        `)
+        .eq("is_active", true)
+        .or(`expires_at.is.null,expires_at.gt.${now}`)
+        .or(`starts_at.is.null,starts_at.lte.${now}`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+    if (error) return c.json({ offers: [] });
+
+    const offers = (coupons ?? []).map((c: {
+        id: string;
+        name: string | null;
+        code: string | null;
+        kind: string | null;
+        value: number | null;
+        max_discount: number | null;
+        min_order: number | null;
+        description: string | null;
+        expires_at: string | null;
+        restaurant_id: string | null;
+        restaurants: { name: string; slug: string } | null;
+    }) => {
+        const kind = c.kind === 'percent' ? 'percentage' : (c.kind ?? 'percentage');
+        let displayValue = '';
+        if (kind === 'percentage') displayValue = `${c.value ?? 0}%`;
+        else if (kind === 'fixed') displayValue = `${c.value ?? 0} FCFA`;
+        else if (kind === 'free_delivery') displayValue = 'Livraison offerte';
+        else if (kind === 'bogo') displayValue = '1 acheté = 1 offert';
+        else displayValue = `${c.value ?? 0} pts`;
+
+        return {
+            id: c.id,
+            type: kind,
+            title: c.name ?? 'Offre spéciale',
+            description: c.description,
+            displayValue,
+            code: c.code,
+            expiresAt: c.expires_at,
+            restaurantId: c.restaurant_id,
+            restaurantName: c.restaurants?.name ?? null,
+            restaurantSlug: c.restaurants?.slug ?? null,
+            minOrderAmount: c.min_order,
+        };
+    });
+
+    return c.json({ offers });
 });
 
 // ── Security ──────────────────────────────────────────────────────────────────

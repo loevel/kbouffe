@@ -1,0 +1,746 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - link "Kbouffe Kbouffe" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]:
+            - img "Kbouffe" [ref=e8]
+            - generic [ref=e24]: Kbouffe
+        - button "Menu" [active] [ref=e25]:
+          - img [ref=e1149]
+      - generic [ref=e28]:
+        - button "Solutions" [ref=e29]:
+          - generic [ref=e30]: Solutions
+          - img [ref=e31]
+        - link "Fonctionnalites" [ref=e33] [cursor=pointer]:
+          - /url: /#features
+        - link "Comment ca marche" [ref=e34] [cursor=pointer]:
+          - /url: /#how-it-works
+        - link "Restaurateurs" [ref=e35] [cursor=pointer]:
+          - /url: /partenaires
+        - link "Tarifs" [ref=e36] [cursor=pointer]:
+          - /url: /pricing
+        - link "Explorer" [ref=e37] [cursor=pointer]:
+          - /url: /stores
+        - link "Se connecter" [ref=e39] [cursor=pointer]:
+          - /url: /login
+        - link "Commencer gratuitement" [ref=e40] [cursor=pointer]:
+          - /url: /register
+        - generic [ref=e42]:
+          - generic [ref=e43]: Langue
+          - button "Select Language" [ref=e45]:
+            - img [ref=e46]
+            - generic [ref=e49]: fr
+            - img [ref=e50]
+        - generic [ref=e52]:
+          - generic [ref=e53]: Theme
+          - button "Select Theme" [ref=e55]:
+            - img [ref=e56]
+            - img [ref=e62]
+    - main [ref=e64]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e1152]: Conçu pour les restaurants modernes
+          - heading "Transformez votre restaurant en boutique en ligne." [level=1] [ref=e1154]:
+            - text: Transformez votre restaurant en
+            - generic [ref=e1156]: boutique en ligne.
+          - paragraph [ref=e1157]: Votre vitrine en ligne gratuite. Recevez des commandes, encaissez en Mobile Money et boostez votre visibilité avec nos packs. Seulement 5% par transaction — 6x moins que la concurrence.
+          - generic [ref=e1158]:
+            - generic [ref=e1159]:
+              - img [ref=e1160]
+              - text: 5% seulement
+            - generic [ref=e1163]:
+              - img [ref=e1164]
+              - text: En ligne en 2 min
+            - generic [ref=e1167]:
+              - img [ref=e1168]
+              - text: MoMo Intégré
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - img [ref=e92]
+              - textbox "Nom de votre établissement" [ref=e96]
+            - link "Créer mon espace" [ref=e97] [cursor=pointer]:
+              - /url: /register/restaurant
+              - text: Créer mon espace
+              - img [ref=e98]
+          - paragraph [ref=e100]: Gratuit pour toujours — Payez uniquement quand vous vendez
+        - generic [ref=e101]:
+          - img "Delicious grilled food meal" [ref=e103]
+          - generic [ref=e105]:
+            - generic [ref=e107]:
+              - img [ref=e109]
+              - generic [ref=e113]:
+                - paragraph [ref=e114]: Nouvelle commande ! 🎉
+                - paragraph [ref=e115]: À l'instant
+            - generic [ref=e116]:
+              - paragraph [ref=e117]: Poisson Braisé x1 • 6 500 FCFA
+              - generic [ref=e118]:
+                - generic [ref=e119]: Payé MoMo
+                - generic [ref=e120]: Table 4
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - generic [ref=e125]: Pour tous les formats
+          - heading "Votre établissement passe à l'étape supérieure" [level=2] [ref=e126]
+          - paragraph [ref=e127]: Kbouffe s'adapte à la façon dont vous travaillez déjà, avec un impact immédiat sur votre chiffre d'affaires mensuel.
+        - generic [ref=e128]:
+          - article [ref=e129]:
+            - img "Tourne-dos & Cafétérias" [ref=e131]
+            - generic [ref=e133]:
+              - img [ref=e136]
+              - generic [ref=e140]:
+                - heading "Tourne-dos & Cafétérias" [level=3] [ref=e141]
+                - paragraph [ref=e142]: Finies les pertes de commandes WhatsApp et les erreurs d'encaissement. Un seul lien, tout est clair.
+          - article [ref=e143]:
+            - img "Braiseries & Snacks" [ref=e145]
+            - generic [ref=e147]:
+              - img [ref=e150]
+              - generic [ref=e152]:
+                - heading "Braiseries & Snacks" [level=3] [ref=e153]
+                - paragraph [ref=e154]: Le client scanne le QR code sur la table, passe sa commande et paie. Votre service devient magique.
+          - article [ref=e155]:
+            - img "Fast-foods" [ref=e157]
+            - generic [ref=e159]:
+              - img [ref=e162]
+              - generic [ref=e168]:
+                - heading "Fast-foods" [level=3] [ref=e169]
+                - paragraph [ref=e170]: Partagez vos menus et recevez des commandes avec des options hyper précises et paiements automatisés.
+          - article [ref=e171]:
+            - img "Restaurants classiques" [ref=e173]
+            - generic [ref=e175]:
+              - img [ref=e178]
+              - generic [ref=e182]:
+                - heading "Restaurants classiques" [level=3] [ref=e183]
+                - paragraph [ref=e184]: La gestion du rush de midi devient fluide. La cuisine et le bar suivent la même commande sur écran.
+          - article [ref=e185]:
+            - img "Cantines d'entreprises/écoles" [ref=e187]
+            - generic [ref=e189]:
+              - img [ref=e192]
+              - generic [ref=e195]:
+                - heading "Cantines d'entreprises/écoles" [level=3] [ref=e196]
+                - paragraph [ref=e197]: Gérez un volume énorme sans frictions. Retraits rapides via pré-commandes programmées.
+      - generic [ref=e201]:
+        - generic [ref=e202]:
+          - generic [ref=e203]: Qui gagne tout de suite ?
+          - heading "Kbouffe parle au patron et a ses clients en meme temps" [level=2] [ref=e204]
+          - paragraph [ref=e205]: Le proprietaire garde une operation simple. Le client, lui, recoit enfin une experience de commande claire. C'est ce double benefice qui fait adopter le produit vite.
+          - generic [ref=e206]:
+            - generic [ref=e207]:
+              - img [ref=e208]
+              - text: Sans logiciel lourd ni materiel complique
+            - generic [ref=e210]:
+              - img [ref=e211]
+              - text: Pensé pour les etablissements qui utilisent deja Mobile Money
+        - generic [ref=e215]:
+          - generic [ref=e217]:
+            - generic [ref=e218]:
+              - img [ref=e220]
+              - generic [ref=e223]: Cote client
+            - heading "Vos clients commandent sans vous appeler 6 fois" [level=3] [ref=e224]
+            - paragraph [ref=e225]: Ils voient le menu, les prix, les options et le mode de paiement sans passer par un aller-retour WhatsApp ou un appel manqué.
+            - list [ref=e226]:
+              - listitem [ref=e227]:
+                - img [ref=e229]
+                - text: Lien simple a ouvrir depuis WhatsApp
+              - listitem [ref=e231]:
+                - img [ref=e233]
+                - text: QR code a scanner sur la table ou au comptoir
+              - listitem [ref=e235]:
+                - img [ref=e237]
+                - text: Commande claire avant meme d'arriver en cuisine
+            - link "Voir les boutiques" [ref=e240] [cursor=pointer]:
+              - /url: /stores
+              - text: Voir les boutiques
+              - img [ref=e241]
+          - generic [ref=e243]:
+            - generic [ref=e245]: ⭐ Le plus rentable au depart
+            - generic [ref=e246]:
+              - generic [ref=e247]:
+                - img [ref=e249]
+                - generic [ref=e253]: Cote gerant
+              - heading "Votre etablissement reste leger, mais beaucoup mieux organise" [level=3] [ref=e254]
+              - paragraph [ref=e255]: Pas besoin d'un ordinateur ou d'une equipe IT. Le telephone Android du gerant suffit pour publier, encaisser et suivre le rush du midi.
+              - list [ref=e256]:
+                - listitem [ref=e257]:
+                  - img [ref=e259]
+                  - text: Un smartphone Android suffit pour piloter l'activite
+                - listitem [ref=e261]:
+                  - img [ref=e263]
+                  - text: Les paiements MoMo se rapprochent plus facilement
+                - listitem [ref=e265]:
+                  - img [ref=e267]
+                  - text: Les commandes du midi sont centralisees au meme endroit
+              - link "Lancer mon etablissement" [ref=e270] [cursor=pointer]:
+                - /url: /register/restaurant
+                - text: Lancer mon etablissement
+                - img [ref=e271]
+      - generic [ref=e274]:
+        - generic [ref=e275]:
+          - generic [ref=e276]: L'essentiel, sans le superflu
+          - heading "Des outils pensés pour votre quotidien" [level=2] [ref=e277]
+          - paragraph [ref=e278]: Kbouffe ne transforme pas votre restaurant en usine. Il élimine juste les frictions qui vous coûtent du temps et de l'argent.
+        - generic [ref=e279]:
+          - generic [ref=e282]:
+            - img [ref=e284]
+            - heading "Menu en ligne instantané" [level=3] [ref=e288]
+            - paragraph [ref=e289]: Publiez et modifiez vos plats sans attendre un développeur ni réimprimer des menus.
+          - generic [ref=e293]:
+            - img [ref=e295]
+            - heading "Pilotage sur smartphone" [level=3] [ref=e297]
+            - paragraph [ref=e298]: Gérez les commandes et suivez votre service où que vous soyez.
+          - generic [ref=e302]:
+            - img [ref=e304]
+            - heading "MoMo automatique" [level=3] [ref=e307]
+            - paragraph [ref=e308]: Fini les captures d'écran. Les paiements mobiles sont liés directement aux commandes.
+          - generic [ref=e312]:
+            - img [ref=e314]
+            - heading "Lien unique & QR Code" [level=3] [ref=e317]
+            - paragraph [ref=e318]: "Un point d'entrée unique pour commander : table, comptoir ou WhatsApp."
+          - generic [ref=e322]:
+            - img [ref=e324]
+            - heading "Service fluide" [level=3] [ref=e326]
+            - paragraph [ref=e327]: La cuisine et le comptoir lisent exactement la même chose. Les erreurs disparaissent.
+          - generic [ref=e331]:
+            - img [ref=e333]
+            - heading "Vue sur vos ventes" [level=3] [ref=e335]
+            - paragraph [ref=e336]: Sachez ce qui se vend, à quel moment, avec des rapports clairs et lisibles.
+      - generic [ref=e339]:
+        - generic [ref=e340]:
+          - generic [ref=e341]: KBouffe Business
+          - heading "Construisez un vrai business, pas juste une vitrine" [level=2] [ref=e343]
+          - paragraph [ref=e344]: Des fonctionnalités avancées pensées pour les restaurateurs qui veulent aller plus loin — approvisionnement, financement, conformité légale.
+        - generic [ref=e345]:
+          - generic [ref=e349]:
+            - generic [ref=e350]:
+              - img [ref=e352]
+              - generic [ref=e358]: Centrale d'Achat
+            - heading "Achetez directement aux producteurs locaux" [level=3] [ref=e359]
+            - paragraph [ref=e360]: Accédez à un annuaire d'agriculteurs, coopératives et grossistes de votre région. Commandez des tomates, poulets ou épices directement depuis le tableau de bord — avec traçabilité de la ferme à l'assiette.
+            - generic [ref=e361]:
+              - img [ref=e362]
+              - paragraph [ref=e364]: TVA 0% sur produits bruts — conforme CGI Art.131
+          - generic [ref=e368]:
+            - generic [ref=e369]:
+              - img [ref=e371]
+              - generic [ref=e374]: KBouffe Capital
+            - heading "Financez votre croissance via vos données" [level=3] [ref=e375]
+            - paragraph [ref=e376]: Obtenez un score de crédit basé sur vos commandes réelles (90 jours). KBouffe transmet votre dossier à une banque partenaire (Advans, Express Union, BICEC) — vous gardez 100% du contrôle, aucun risque de surendettement.
+            - generic [ref=e377]:
+              - img [ref=e378]
+              - paragraph [ref=e380]: Apporteur d'affaires uniquement — pas de prêt direct (COBAC compliant)
+          - generic [ref=e384]:
+            - generic [ref=e385]:
+              - img [ref=e387]
+              - generic [ref=e391]: Dark Kitchens
+            - heading "Opérez plusieurs marques depuis une cuisine" [level=3] [ref=e392]
+            - paragraph [ref=e393]: Lancez une deuxième ou troisième enseigne depuis vos locaux existants. Gérez chaque marque avec son propre menu, ses propres horaires et son identité visuelle — tout depuis un seul tableau de bord.
+            - generic [ref=e394]:
+              - img [ref=e395]
+              - paragraph [ref=e397]: Déclaration légale liante + KYC (RCCM, NIF, licence sanitaire) inclus
+          - generic [ref=e401]:
+            - generic [ref=e402]:
+              - img [ref=e404]
+              - generic [ref=e409]: Rapports RH
+            - heading "Gérez primes et pourboires en toute conformité" [level=3] [ref=e410]
+            - paragraph [ref=e411]: Calculez automatiquement les primes et pourboires de votre personnel avec les déductions CNPS (11,2 % + 5,25 %) et IRPP estimées. Le rapport est consultatif — c'est vous qui validez et payez directement.
+            - generic [ref=e412]:
+              - img [ref=e413]
+              - paragraph [ref=e415]: Outil indicatif — KBouffe n'est pas co-employeur (Code du Travail Loi n°92/007)
+        - generic [ref=e416]:
+          - link "Découvrir KBouffe Pro" [ref=e417] [cursor=pointer]:
+            - /url: /register
+            - text: Découvrir KBouffe Pro
+            - img [ref=e418]
+          - paragraph [ref=e420]:
+            - text: Agriculteur ou producteur ?
+            - link "Inscrivez votre exploitation →" [ref=e421] [cursor=pointer]:
+              - /url: /register/fournisseur
+      - generic [ref=e423]:
+        - generic [ref=e424]:
+          - generic [ref=e425]: Marketplace
+          - heading "Boostez vos ventes quand vous le souhaitez" [level=2] [ref=e426]
+          - paragraph [ref=e427]: Des packs a la carte pour augmenter votre visibilite et vos commandes. Pas d'abonnement — achetez uniquement ce qui vous rapporte.
+        - generic [ref=e428]:
+          - generic [ref=e431]:
+            - img [ref=e433]
+            - heading "Visibilite" [level=3] [ref=e436]
+            - paragraph [ref=e437]: Apparaissez en tete des resultats et attirez plus de clients vers votre vitrine.
+            - generic [ref=e438]: A partir de 5 000 FCFA
+          - generic [ref=e442]:
+            - img [ref=e444]
+            - heading "Banniere pub" [level=3] [ref=e447]
+            - paragraph [ref=e448]: Affichez votre restaurant en banniere sur la page d'accueil de Kbouffe.
+            - generic [ref=e449]: A partir de 10 000 FCFA
+          - generic [ref=e453]:
+            - img [ref=e455]
+            - heading "SMS Promo" [level=3] [ref=e457]
+            - paragraph [ref=e458]: Envoyez des promotions directement sur le telephone de vos clients fideles.
+            - generic [ref=e459]: A partir de 5 000 FCFA
+          - generic [ref=e463]:
+            - img [ref=e465]
+            - heading "Boost Menu" [level=3] [ref=e467]
+            - paragraph [ref=e468]: Mettez en avant vos plats stars pour augmenter leur taux de commande.
+            - generic [ref=e469]: A partir de 3 000 FCFA
+          - generic [ref=e473]:
+            - img [ref=e475]
+            - heading "Analytics Pro" [level=3] [ref=e477]
+            - paragraph [ref=e478]: Comprenez ce qui se vend, quand et pourquoi. Prenez des decisions eclairees.
+            - generic [ref=e479]: A partir de 5 000 FCFA
+          - generic [ref=e483]:
+            - img [ref=e485]
+            - heading "Pack Premium" [level=3] [ref=e488]
+            - paragraph [ref=e489]: Badge verifie, priorite support et toutes les fonctionnalites avancees reunies.
+            - generic [ref=e490]: A partir de 15 000 FCFA
+        - link "Creer ma vitrine gratuite" [ref=e493] [cursor=pointer]:
+          - /url: /register/restaurant
+          - generic [ref=e494]: Creer ma vitrine gratuite
+          - img [ref=e495]
+      - generic [ref=e500]:
+        - generic [ref=e501]:
+          - generic [ref=e502]: Commande à distance
+          - heading "Installez-vous, vos proches régalent" [level=2] [ref=e503]
+          - paragraph [ref=e504]: "Une expérience inédite : asseyez-vous à une table, donnez votre numéro de table à un proche resté à la maison, et laissez-le commander et payer pour vous. Vous êtes servi sur place, sans rien faire."
+        - generic [ref=e505]:
+          - generic [ref=e506]:
+            - img [ref=e508]
+            - heading "Prenez place" [level=3] [ref=e511]
+            - paragraph [ref=e512]: Installez-vous confortablement au restaurant et repérez votre numéro de table.
+          - generic [ref=e513]:
+            - img [ref=e515]
+            - heading "Partagez l'info" [level=3] [ref=e521]
+            - paragraph [ref=e522]: Donnez votre numéro de table au proche qui souhaite vous inviter.
+          - generic [ref=e523]:
+            - img [ref=e525]
+            - heading "Ils commandent" [level=3] [ref=e527]
+            - paragraph [ref=e528]: Depuis chez eux, ils accèdent au menu, choisissent vos plats et paient en ligne.
+          - generic [ref=e529]:
+            - img [ref=e531]
+            - heading "Savourez" [level=3] [ref=e536]
+            - paragraph [ref=e537]: La commande est validée, vous êtes servi directement à votre table. Bon appétit !
+      - generic [ref=e539]:
+        - generic [ref=e540]:
+          - generic [ref=e541]: Simple comme 1-2-3
+          - heading "Votre transition numérique en douceur" [level=2] [ref=e542]
+          - paragraph [ref=e543]: Pas besoin de changer vos habitudes. Kbouffe s'intègre naturellement à votre façon de travailler avec vos clients.
+        - generic [ref=e544]:
+          - generic [ref=e545]:
+            - generic [ref=e547]:
+              - img "Publiez votre menu" [ref=e548]
+              - generic [ref=e550]: "01"
+            - generic [ref=e552]:
+              - generic [ref=e553]:
+                - img [ref=e555]
+                - heading "Publiez votre menu" [level=3] [ref=e560]
+              - paragraph [ref=e561]: Créez une belle carte digitale en quelques minutes. Ajoutez vos plats, vos options et vos prix.
+              - generic [ref=e562]:
+                - generic [ref=e563]:
+                  - img [ref=e565]
+                  - generic [ref=e570]:
+                    - paragraph [ref=e571]: Poisson braisé
+                    - paragraph [ref=e572]: 6 500 FCFA
+                - generic [ref=e573]:
+                  - img [ref=e575]
+                  - generic [ref=e580]:
+                    - paragraph [ref=e581]: Poulet DG
+                    - paragraph [ref=e582]: 5 500 FCFA
+          - generic [ref=e583]:
+            - generic [ref=e585]:
+              - img "Partagez votre lien" [ref=e586]
+              - generic [ref=e588]: "02"
+            - generic [ref=e590]:
+              - generic [ref=e591]:
+                - img [ref=e593]
+                - heading "Partagez votre lien" [level=3] [ref=e599]
+              - paragraph [ref=e600]: Vos clients scannent le QR code sur la table ou cliquent sur votre lien WhatsApp pour commander.
+              - generic [ref=e601]:
+                - generic [ref=e602]:
+                  - img [ref=e604]
+                  - generic [ref=e610]:
+                    - paragraph [ref=e611]: Statut WhatsApp
+                    - paragraph [ref=e612]: Lien direct
+                - generic [ref=e613]:
+                  - img [ref=e615]
+                  - generic [ref=e621]:
+                    - paragraph [ref=e622]: QR code
+                    - paragraph [ref=e623]: Sur table
+          - generic [ref=e624]:
+            - generic [ref=e626]:
+              - img "Servez et encaissez" [ref=e627]
+              - generic [ref=e629]: "03"
+            - generic [ref=e631]:
+              - generic [ref=e632]:
+                - img [ref=e634]
+                - heading "Servez et encaissez" [level=3] [ref=e639]
+              - paragraph [ref=e640]: Recevez les commandes claires en cuisine et les paiements MoMo confirmés automatiquement.
+              - generic [ref=e641]:
+                - generic [ref=e642]:
+                  - img [ref=e644]
+                  - generic [ref=e648]:
+                    - paragraph [ref=e649]: Paiement
+                    - paragraph [ref=e650]: MoMo automatique
+                - generic [ref=e651]:
+                  - img [ref=e653]
+                  - generic [ref=e657]:
+                    - paragraph [ref=e658]: Service
+                    - paragraph [ref=e659]: Zéro oubli
+        - link "Ouvrir mon espace restaurant" [ref=e661] [cursor=pointer]:
+          - /url: /register/restaurant
+          - generic [ref=e662]: Ouvrir mon espace restaurant
+          - img [ref=e663]
+      - generic [ref=e669]:
+        - generic [ref=e670]:
+          - generic [ref=e671]: Modele transparent
+          - heading "Gratuit pour demarrer. 5% quand vous vendez." [level=2] [ref=e672]
+          - paragraph [ref=e673]: Pas d'abonnement. Pas de frais caches. Vous ne payez que lorsque vos clients passent commande. Et avec nos packs optionnels, vous boostez votre visibilite quand vous le souhaitez.
+          - generic [ref=e674]: Glovo prend 30% sur chaque commande. Kbouffe prend 5%. Faites le calcul.
+        - generic [ref=e675]:
+          - heading "Kbouffe vs la concurrence" [level=3] [ref=e676]
+          - generic [ref=e677]:
+            - generic [ref=e678]:
+              - heading "Plateformes classiques" [level=4] [ref=e679]
+              - list [ref=e680]:
+                - listitem [ref=e681]:
+                  - generic [ref=e683]: ×
+                  - generic [ref=e684]: 25-30% de commission par commande
+                - listitem [ref=e685]:
+                  - generic [ref=e687]: ×
+                  - generic [ref=e688]: Le client appartient a la plateforme
+                - listitem [ref=e689]:
+                  - generic [ref=e691]: ×
+                  - generic [ref=e692]: Aucune visibilite sur vos donnees
+                - listitem [ref=e693]:
+                  - generic [ref=e695]: ×
+                  - generic [ref=e696]: Livraison imposee et couteuse
+            - generic [ref=e697]:
+              - heading "Avec Kbouffe" [level=4] [ref=e698]
+              - list [ref=e699]:
+                - listitem [ref=e700]:
+                  - img [ref=e701]
+                  - generic [ref=e703]: Seulement 5% par transaction
+                - listitem [ref=e704]:
+                  - img [ref=e705]
+                  - generic [ref=e707]: Vos clients, votre marque, vos donnees
+                - listitem [ref=e708]:
+                  - img [ref=e709]
+                  - generic [ref=e711]: Statistiques et rapports en temps reel
+                - listitem [ref=e712]:
+                  - img [ref=e713]
+                  - generic [ref=e715]: Vous choisissez votre mode de livraison
+        - generic [ref=e717]:
+          - generic [ref=e718]:
+            - img [ref=e720]
+            - heading "Vitrine" [level=3] [ref=e722]
+            - generic [ref=e723]: Gratuitpour toujours
+            - list [ref=e724]:
+              - listitem [ref=e725]:
+                - img [ref=e726]
+                - text: Menu digital complet
+              - listitem [ref=e728]:
+                - img [ref=e729]
+                - text: Commandes en ligne illimitees
+              - listitem [ref=e731]:
+                - img [ref=e732]
+                - text: Paiements Mobile Money
+              - listitem [ref=e734]:
+                - img [ref=e735]
+                - text: Notifications push
+              - listitem [ref=e737]:
+                - img [ref=e738]
+                - text: QR code & lien unique
+              - listitem [ref=e740]:
+                - img [ref=e741]
+                - text: 5% par transaction uniquement
+            - link "Creer ma vitrine" [ref=e743] [cursor=pointer]:
+              - /url: /register/restaurant
+          - generic [ref=e744]:
+            - generic [ref=e745]: Croissance
+            - img [ref=e747]
+            - heading "Packs Boost" [level=3] [ref=e749]
+            - generic [ref=e750]: A partir de 3 000 FCFA
+            - list [ref=e751]:
+              - listitem [ref=e752]:
+                - img [ref=e753]
+                - text: Visibilite en tete des resultats
+              - listitem [ref=e755]:
+                - img [ref=e756]
+                - text: Banniere publicitaire sur la home
+              - listitem [ref=e758]:
+                - img [ref=e759]
+                - text: SMS promotionnels a vos clients
+              - listitem [ref=e761]:
+                - img [ref=e762]
+                - text: Mise en avant de vos plats stars
+              - listitem [ref=e764]:
+                - img [ref=e765]
+                - text: Statistiques avancees
+              - listitem [ref=e767]:
+                - img [ref=e768]
+                - text: Achetez uniquement ce dont vous avez besoin
+            - link "Voir les packs" [ref=e770] [cursor=pointer]:
+              - /url: /register/restaurant
+        - generic [ref=e771]:
+          - generic [ref=e772]:
+            - img [ref=e773]
+            - text: Aucun engagement
+          - generic [ref=e776]:
+            - img [ref=e777]
+            - text: Vous gardez 95% de vos ventes
+          - generic [ref=e780]:
+            - img [ref=e781]
+            - text: En ligne en 2 minutes
+      - generic [ref=e788]:
+        - generic [ref=e789]:
+          - generic [ref=e790]:
+            - generic [ref=e791]: Restaurants populaires
+            - heading "Ils vendent deja sur Kbouffe" [level=2] [ref=e792]
+            - paragraph [ref=e793]: Rejoignez les restaurateurs qui ont fait le choix de la digitalisation.
+          - link "Voir tous les restaurants" [ref=e794] [cursor=pointer]:
+            - /url: /stores
+            - text: Voir tous les restaurants
+            - img [ref=e795]
+        - generic [ref=e797]:
+          - generic [ref=e798]:
+            - generic [ref=e799]:
+              - img "Chez Mama Ngono" [ref=e800]
+              - generic [ref=e802]: Populaire
+              - generic [ref=e803]:
+                - img [ref=e804]
+                - text: 25-35 min
+            - generic [ref=e807]:
+              - generic [ref=e808]:
+                - heading "Chez Mama Ngono" [level=3] [ref=e809]
+                - generic [ref=e810]:
+                  - img [ref=e811]
+                  - generic [ref=e813]: "4.8"
+              - paragraph [ref=e814]: Cuisine Camerounaise
+              - generic [ref=e815]:
+                - img [ref=e816]
+                - text: Douala, Bonapriso
+              - generic [ref=e819]:
+                - generic [ref=e820]:
+                  - img [ref=e821]
+                  - generic [ref=e826]: 500 FCFA
+                - generic [ref=e827]: (124 avis)
+          - generic [ref=e828]:
+            - generic [ref=e829]:
+              - img "Le Ndole Royal" [ref=e830]
+              - generic [ref=e832]: Top noté
+              - generic [ref=e833]:
+                - img [ref=e834]
+                - text: 30-40 min
+            - generic [ref=e837]:
+              - generic [ref=e838]:
+                - heading "Le Ndole Royal" [level=3] [ref=e839]
+                - generic [ref=e840]:
+                  - img [ref=e841]
+                  - generic [ref=e843]: "4.9"
+              - paragraph [ref=e844]: Spécialités du Littoral
+              - generic [ref=e845]:
+                - img [ref=e846]
+                - text: Yaoundé, Bastos
+              - generic [ref=e849]:
+                - generic [ref=e850]:
+                  - img [ref=e851]
+                  - generic [ref=e856]: Livraison gratuite
+                - generic [ref=e857]: (89 avis)
+          - generic [ref=e858]:
+            - generic [ref=e859]:
+              - img "Grillades du Carrefour" [ref=e860]
+              - generic [ref=e862]: Rapide
+              - generic [ref=e863]:
+                - img [ref=e864]
+                - text: 20-30 min
+            - generic [ref=e867]:
+              - generic [ref=e868]:
+                - heading "Grillades du Carrefour" [level=3] [ref=e869]
+                - generic [ref=e870]:
+                  - img [ref=e871]
+                  - generic [ref=e873]: "4.7"
+              - paragraph [ref=e874]: Braise & Grillades
+              - generic [ref=e875]:
+                - img [ref=e876]
+                - text: Douala, Akwa
+              - generic [ref=e879]:
+                - generic [ref=e880]:
+                  - img [ref=e881]
+                  - generic [ref=e886]: 300 FCFA
+                - generic [ref=e887]: (203 avis)
+          - generic [ref=e888]:
+            - generic [ref=e889]:
+              - img "La Terrasse Bamiléké" [ref=e890]
+              - generic [ref=e892]: Nouveau
+              - generic [ref=e893]:
+                - img [ref=e894]
+                - text: 35-45 min
+            - generic [ref=e897]:
+              - generic [ref=e898]:
+                - heading "La Terrasse Bamiléké" [level=3] [ref=e899]
+                - generic [ref=e900]:
+                  - img [ref=e901]
+                  - generic [ref=e903]: "4.6"
+              - paragraph [ref=e904]: Cuisine de l'Ouest
+              - generic [ref=e905]:
+                - img [ref=e906]
+                - text: Bafoussam, Centre
+              - generic [ref=e909]:
+                - generic [ref=e910]:
+                  - img [ref=e911]
+                  - generic [ref=e916]: 400 FCFA
+                - generic [ref=e917]: (67 avis)
+      - generic [ref=e919]:
+        - generic [ref=e920]:
+          - generic [ref=e921]: Témoignages terrain
+          - heading "Ils l'utilisent tous les jours" [level=2] [ref=e922]
+        - generic [ref=e923]:
+          - generic [ref=e924]:
+            - generic [ref=e925]:
+              - img "Mama Awa" [ref=e926]
+              - generic [ref=e928]: Mama Awa · Douala
+            - generic [ref=e929]:
+              - img [ref=e930]
+              - generic [ref=e933]:
+                - img [ref=e934]
+                - img [ref=e936]
+                - img [ref=e938]
+                - img [ref=e940]
+                - img [ref=e942]
+              - paragraph [ref=e944]: “Mes clientes envoyaient des vocaux, puis rappelaient. Avec mon lien Kbouffe, elles voient le menu, paient en MoMo et je sers beaucoup plus vite à midi.”
+              - generic [ref=e945]:
+                - img "Awa N." [ref=e947]
+                - generic [ref=e948]:
+                  - generic [ref=e949]: Awa N.
+                  - generic [ref=e950]: Gérante de tourne-dos
+          - generic [ref=e951]:
+            - generic [ref=e952]:
+              - img "Braise du Quartier" [ref=e953]
+              - generic [ref=e955]: Braise du Quartier · Yaoundé
+            - generic [ref=e956]:
+              - img [ref=e957]
+              - generic [ref=e960]:
+                - img [ref=e961]
+                - img [ref=e963]
+                - img [ref=e965]
+                - img [ref=e967]
+                - img [ref=e969]
+              - paragraph [ref=e971]: “J'ai juste mis le QR code sur la table et le lien sur WhatsApp. Les habitués ont commencé à commander sans que je change ma façon de travailler.”
+              - generic [ref=e972]:
+                - img "Lionel T." [ref=e974]
+                - generic [ref=e975]:
+                  - generic [ref=e976]: Lionel T.
+                  - generic [ref=e977]: Propriétaire
+          - generic [ref=e978]:
+            - generic [ref=e979]:
+              - img "Campus Express" [ref=e980]
+              - generic [ref=e982]: Campus Express · Ngoa-Ekellé
+            - generic [ref=e983]:
+              - img [ref=e984]
+              - generic [ref=e987]:
+                - img [ref=e988]
+                - img [ref=e990]
+                - img [ref=e992]
+                - img [ref=e994]
+                - img [ref=e996]
+              - paragraph [ref=e998]: “Le plus fort, c'est la clarté. Je sais quelles commandes sont payées ou en attente et je ne perds plus mes pics de demande.”
+              - generic [ref=e999]:
+                - img "Clarisse M." [ref=e1001]
+                - generic [ref=e1002]:
+                  - generic [ref=e1003]: Clarisse M.
+                  - generic [ref=e1004]: Gérante cantine
+      - generic [ref=e1007]:
+        - generic [ref=e1008]:
+          - generic [ref=e1009]: Questions frequentes
+          - heading "Les questions qu'un gerant se pose avant de se lancer" [level=2] [ref=e1010]
+          - paragraph [ref=e1011]: Tout ce que vous devez savoir pour demarrer sereinement avec Kbouffe.
+        - generic [ref=e1012]:
+          - generic [ref=e1013]:
+            - button "Est-ce que j'ai besoin d'un ordinateur ou d'un caissier dedie ?" [ref=e1014]:
+              - generic [ref=e1015]: Est-ce que j'ai besoin d'un ordinateur ou d'un caissier dedie ?
+              - img [ref=e1016]
+            - paragraph [ref=e1019]: Non. Kbouffe est pense pour les etablissements qui tournent deja depuis un smartphone Android. Le gerant peut publier le menu, suivre les commandes et verifier les paiements depuis son telephone.
+          - button "Comment Kbouffe gagne de l'argent si la plateforme est gratuite ?" [ref=e1021]:
+            - generic [ref=e1022]: Comment Kbouffe gagne de l'argent si la plateforme est gratuite ?
+            - img [ref=e1023]
+          - button "C'est quoi les packs de boost ?" [ref=e1026]:
+            - generic [ref=e1027]: C'est quoi les packs de boost ?
+            - img [ref=e1028]
+          - button "Mes clients utilisent surtout WhatsApp. Est-ce que ca suffit ?" [ref=e1031]:
+            - generic [ref=e1032]: Mes clients utilisent surtout WhatsApp. Est-ce que ca suffit ?
+            - img [ref=e1033]
+          - button "Et si mon etablissement est petit ou encore tres informel ?" [ref=e1036]:
+            - generic [ref=e1037]: Et si mon etablissement est petit ou encore tres informel ?
+            - img [ref=e1038]
+          - button "Est-ce que je suis engage avec un contrat ?" [ref=e1041]:
+            - generic [ref=e1042]: Est-ce que je suis engage avec un contrat ?
+            - img [ref=e1043]
+        - link "Creer ma vitrine gratuite" [ref=e1046] [cursor=pointer]:
+          - /url: /register/restaurant
+          - text: Creer ma vitrine gratuite
+          - img [ref=e1047]
+    - contentinfo [ref=e1049]:
+      - generic [ref=e1054]:
+        - heading "Pret a lancer votre restaurant en ligne ?" [level=2] [ref=e1055]
+        - paragraph [ref=e1056]: Rejoignez les premiers restaurateurs camerounais sur Kbouffe.
+        - generic [ref=e1057]:
+          - link "Creer ma boutique gratuitement" [ref=e1058] [cursor=pointer]:
+            - /url: /register
+            - text: Creer ma boutique gratuitement
+            - img [ref=e1059]
+          - link "Voir les tarifs" [ref=e1061] [cursor=pointer]:
+            - /url: /pricing
+      - generic [ref=e1062]:
+        - generic [ref=e1063]:
+          - generic [ref=e1064]:
+            - link "Kbouffe Kbouffe" [ref=e1065] [cursor=pointer]:
+              - /url: /
+              - generic [ref=e1066]:
+                - img "Kbouffe" [ref=e1067]
+                - generic [ref=e1083]: Kbouffe
+            - paragraph [ref=e1084]: La plateforme de commande en ligne concue pour les restaurateurs camerounais.
+          - generic [ref=e1085]:
+            - heading "Produit" [level=3] [ref=e1086]
+            - list [ref=e1087]:
+              - listitem [ref=e1088]:
+                - link "Fonctionnalites" [ref=e1089] [cursor=pointer]:
+                  - /url: /#features
+              - listitem [ref=e1090]:
+                - link "Comment ca marche" [ref=e1091] [cursor=pointer]:
+                  - /url: /#how-it-works
+              - listitem [ref=e1092]:
+                - link "Tarifs" [ref=e1093] [cursor=pointer]:
+                  - /url: /pricing
+              - listitem [ref=e1094]:
+                - link "Explorer" [ref=e1095] [cursor=pointer]:
+                  - /url: /stores
+          - generic [ref=e1096]:
+            - heading "Rejoindre" [level=3] [ref=e1097]
+            - list [ref=e1098]:
+              - listitem [ref=e1099]:
+                - link "Restaurateurs" [ref=e1100] [cursor=pointer]:
+                  - /url: /partenaires
+          - generic [ref=e1101]:
+            - heading "Entreprise" [level=3] [ref=e1102]
+            - list [ref=e1103]:
+              - listitem [ref=e1104]:
+                - link "A propos" [ref=e1105] [cursor=pointer]:
+                  - /url: /contact
+              - listitem [ref=e1106]:
+                - link "Nous contacter" [ref=e1107] [cursor=pointer]:
+                  - /url: /contact
+          - generic [ref=e1108]:
+            - heading "Legal" [level=3] [ref=e1109]
+            - list [ref=e1110]:
+              - listitem [ref=e1111]:
+                - link "Conditions Generales" [ref=e1112] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e1113]:
+                - link "Confidentialite" [ref=e1114] [cursor=pointer]:
+                  - /url: /privacy
+        - generic [ref=e1115]:
+          - paragraph [ref=e1116]: © 2026 Kbouffe. Tous droits reserves.
+          - paragraph [ref=e1117]:
+            - text: Fait avec
+            - img [ref=e1118]
+            - text: au Cameroun
+  - button "Open Next.js Dev Tools" [ref=e1125] [cursor=pointer]:
+    - img [ref=e1126]
+  - alert [ref=e1148]

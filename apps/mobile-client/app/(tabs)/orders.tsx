@@ -1,53 +1,113 @@
-import { useMemo } from 'react';
-import { StyleSheet, View, Text, FlatList, Pressable, Alert } from 'react-native';
+import { useMemo, useState, useCallback } from 'react';
+import {
+    StyleSheet,
+    View,
+    Text,
+    SectionList,
+    Pressable,
+    Alert,
+    RefreshControl,
+    ActivityIndicator,
+    ScrollView,
+} from 'react-native';
+
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useOrders, type StoredOrder, type MobileOrderStatus } from '@/contexts/orders-context';
+import { CustomHeader } from '@/components/CustomHeader';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '@/contexts/cart-context';
 import { useAuth } from '@/contexts/auth-context';
 
-const statusLabels: Record<MobileOrderStatus, string> = {
-    pending: 'En attente',
-    confirmed: 'Confirmee',
-    accepted: 'Acceptee',
-    preparing: 'En preparation',
-    ready: 'Prete',
-    delivering: 'En livraison',
-    delivered: 'Livree',
-    completed: 'Terminee',
-    cancelled: 'Annulee',
+/* ── Status config ───────────────────────────────────────────────── */
+const statusConfig: Record<MobileOrderStatus, { label: string; color: string; icon: string }> = {
+    pending:    { label: 'En attente',      color: '#f59e0b', icon: 'hourglass-outline' },
+    confirmed:  { label: 'Confirmée',       color: '#3b82f6', icon: 'checkmark-circle-outline' },
+    accepted:   { label: 'Acceptée',        color: '#3b82f6', icon: 'checkmark-done-outline' },
+    preparing:  { label: 'En préparation',  color: '#8b5cf6', icon: 'flame-outline' },
+    ready:      { label: 'Prête',           color: '#10b981', icon: 'bag-check-outline' },
+    delivering: { label: 'En livraison',    color: '#f97316', icon: 'bicycle-outline' },
+    delivered:  { label: 'Livrée',          color: '#10b981', icon: 'checkmark-circle' },
+    completed:  { label: 'Terminée',        color: '#6b7280', icon: 'checkmark-done' },
+    cancelled:  { label: 'Annulée',         color: '#ef4444', icon: 'close-circle-outline' },
 };
 
-const statusColors: Record<MobileOrderStatus, string> = {
-    pending: '#f59e0b',
-    confirmed: '#3b82f6',
-    accepted: '#3b82f6',
-    preparing: '#8b5cf6',
-    ready: '#10b981',
-    delivering: '#f97316',
-    delivered: '#10b981',
-    completed: '#6b7280',
-    cancelled: '#ef4444',
+const deliveryTypeConfig: Record<string, { label: string; icon: string }> = {
+    delivery: { label: 'Livraison', icon: 'bicycle-outline' },
+    pickup:   { label: 'À emporter', icon: 'bag-handle-outline' },
+    dine_in:  { label: 'Sur place', icon: 'restaurant-outline' },
 };
 
+/* active statuses in order for progress bar */
+const ACTIVE_STEPS: MobileOrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'delivering', 'delivered'];
+
+function getProgressIndex(status: MobileOrderStatus): number {
+    const idx = ACTIVE_STEPS.indexOf(status);
+    return idx >= 0 ? idx : 0;
+}
+
+function formatTime(isoStr: string): string {
+    return new Date(isoStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/* ══════════════════════════════════════════════════════════════════ */
 export default function OrdersScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const isDark = colorScheme === 'dark';
+
     const { isAuthenticated } = useAuth();
-    const { orders } = useOrders();
+    const { orders, loading, refreshOrders } = useOrders();
     const { addItem, clearCart } = useCart();
 
-    const activeOrders = useMemo(() => orders.filter(o => !['completed', 'cancelled', 'delivered'].includes(o.status)), [orders]);
-    const pastOrders = useMemo(() => orders.filter(o => ['completed', 'cancelled', 'delivered'].includes(o.status)), [orders]);
+    const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+    const [refreshing, setRefreshing] = useState(false);
 
-    const handleReorder = (order: StoredOrder) => {
+    const activeOrders = useMemo(
+        () => orders.filter(o => !['completed', 'cancelled', 'delivered'].includes(o.status)),
+        [orders],
+    );
+    const pastOrders = useMemo(
+        () => orders.filter(o => ['completed', 'cancelled', 'delivered'].includes(o.status)),
+        [orders],
+    );
+
+    const displayedOrders = activeTab === 'active' ? activeOrders : pastOrders;
+
+    /* Group by date for history */
+    const sections = useMemo(() => {
+        if (activeTab === 'active') {
+            return displayedOrders.length > 0
+                ? [{ title: '', data: displayedOrders }]
+                : [];
+        }
+        const groups: Record<string, StoredOrder[]> = {};
+        displayedOrders.forEach(o => {
+            const key = new Date(o.createdAt).toLocaleDateString('fr-FR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+            });
+            (groups[key] ??= []).push(o);
+        });
+        return Object.entries(groups).map(([title, data]) => ({ title, data }));
+    }, [displayedOrders, activeTab]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await refreshOrders();
+        setRefreshing(false);
+    }, [refreshOrders]);
+
+    const handleReorder = useCallback((order: StoredOrder) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         clearCart();
         order.items.forEach(item => {
@@ -63,253 +123,573 @@ export default function OrdersScreen() {
             { text: 'Voir le panier', onPress: () => router.push('/cart') },
             { text: 'Continuer', style: 'cancel' },
         ]);
-    };
+    }, [addItem, clearCart, router]);
 
-    const renderOrderCard = (order: StoredOrder) => {
-        const statusColor = statusColors[order.status] ?? '#6b7280';
-        const isActive = !['completed', 'cancelled', 'delivered'].includes(order.status);
+    /* ── Progress bar for active orders ───────────────────────────── */
+    const renderProgressBar = useCallback((status: MobileOrderStatus) => {
+        const idx = getProgressIndex(status);
+        const total = ACTIVE_STEPS.length - 1;
+        const pct = (idx / total) * 100;
+        const color = statusConfig[status]?.color ?? '#6b7280';
 
         return (
-            <Pressable
-                key={order.id}
+            <View style={styles.progressContainer}>
+                <View style={[styles.progressTrack, { backgroundColor: theme.border + '60' }]}>
+                    <View
+                        style={[
+                            styles.progressFill,
+                            { width: `${pct}%`, backgroundColor: color },
+                        ]}
+                    />
+                </View>
+                <View style={styles.progressLabels}>
+                    {ACTIVE_STEPS.map((step, i) => {
+                        const reached = i <= idx;
+                        return (
+                            <View
+                                key={step}
+                                style={[
+                                    styles.progressDot,
+                                    {
+                                        backgroundColor: reached ? color : theme.border + '80',
+                                        borderColor: reached ? color : 'transparent',
+                                    },
+                                ]}
+                            />
+                        );
+                    })}
+                </View>
+            </View>
+        );
+    }, [theme]);
+
+    /* ── Order card ───────────────────────────────────────────────── */
+    const renderOrderCard = useCallback(({ item: order, index }: { item: StoredOrder; index: number }) => {
+        const isActive = !['completed', 'cancelled', 'delivered'].includes(order.status);
+        const isCancelled = order.status === 'cancelled';
+        const deliveryInfo = deliveryTypeConfig[order.deliveryType] ?? deliveryTypeConfig.delivery;
+
+        return (
+            <AnimatedPressable
+                entering={FadeInDown.delay(index * 80).duration(400).springify()}
                 style={({ pressed }) => [
                     styles.orderCard,
-                    { backgroundColor: theme.background, borderColor: theme.border },
-                    pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                    {
+                        backgroundColor: theme.surface,
+                        opacity: isCancelled ? 0.7 : pressed ? 0.92 : 1,
+                    },
                 ]}
                 onPress={() => {
                     Haptics.selectionAsync();
                     router.push(`/order/${order.id}`);
                 }}
             >
-                <View style={styles.orderHeader}>
-                    <View style={styles.orderRestaurant}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.orderRestaurantName, { color: theme.text }]}>
-                                {order.restaurantName}
-                            </Text>
-                            <Text style={[styles.orderItemCount, { color: theme.icon }]}>
-                                {order.items.length} article{order.items.length > 1 ? 's' : ''} · {order.total.toLocaleString()} FCFA
+                {/* Restaurant header */}
+                <View style={styles.restaurantHeader}>
+                    <View style={[styles.restaurantLogo, { backgroundColor: theme.primary + '15' }]}>
+                        <Ionicons name="storefront" size={20} color={theme.primary} />
+                    </View>
+                    <View style={styles.restaurantInfo}>
+                        <Text style={[styles.restaurantName, { color: theme.text }]} numberOfLines={1}>
+                            {order.restaurantName}
+                        </Text>
+                        <View style={styles.deliveryMeta}>
+                            <Ionicons name={deliveryInfo.icon as any} size={11} color={theme.icon} />
+                            <Text style={[styles.metaText, { color: theme.icon }]}>
+                                {deliveryInfo.label} à {formatTime(order.createdAt)} • {order.total.toLocaleString('fr-FR')} FCFA
                             </Text>
                         </View>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                        <Text style={[styles.statusText, { color: statusColor }]}>{statusLabels[order.status]}</Text>
-                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={theme.icon} />
                 </View>
 
-                <View style={[styles.orderFooter, { borderTopColor: theme.border }]}>
-                    <Text style={[styles.orderDate, { color: theme.icon }]}>
-                        {new Date(order.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </Text>
-                    {isActive && (
-                        <View style={styles.trackButton}>
-                            <Text style={[styles.trackText, { color: theme.primary }]}>Suivre</Text>
-                            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
-                        </View>
-                    )}
-                    {!isActive && ['completed', 'delivered'].includes(order.status) && (
-                        <View style={styles.completedActions}>
-                            {order.status === 'completed' && (
+                {/* Products grid */}
+                <View style={styles.productsContainer}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.productsList}
+                        scrollEnabled={order.items.length > 2}
+                    >
+                        {order.items.map((item, idx) => (
+                            <View key={idx} style={styles.productCard}>
+                                <View style={[styles.productImage, { backgroundColor: theme.border }]}>
+                                    <Text style={styles.productEmoji}>🍽️</Text>
+                                </View>
+                                <View style={styles.productInfo}>
+                                    <Text style={[styles.productName, { color: theme.text }]} numberOfLines={2}>
+                                        {item.name}
+                                    </Text>
+                                    <View style={styles.productMeta}>
+                                        <Text style={[styles.productPrice, { color: theme.primary }]}>
+                                            {item.price.toLocaleString('fr-FR')} FCFA
+                                        </Text>
+                                        <Text style={[styles.productQty, { color: theme.icon }]}>
+                                            ×{item.quantity}
+                                        </Text>
+                                    </View>
+                                </View>
                                 <Pressable
-                                    style={[styles.reorderButton, { backgroundColor: theme.primary + '15' }]}
-                                    onPress={() => handleReorder(order)}
+                                    style={({ pressed }) => [
+                                        styles.addButton,
+                                        {
+                                            backgroundColor: theme.primary,
+                                            opacity: pressed ? 0.9 : 1
+                                        }
+                                    ]}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        handleReorder(order);
+                                    }}
                                 >
-                                    <Ionicons name="refresh" size={14} color={theme.primary} />
-                                    <Text style={[styles.reorderText, { color: theme.primary }]}>Recommander</Text>
+                                    <Text style={styles.addButtonText}>+</Text>
                                 </Pressable>
-                            )}
-                            <Pressable
-                                style={[styles.reorderButton, { backgroundColor: '#f59e0b' + '18' }]}
-                                onPress={(e) => {
-                                    e.stopPropagation();
-                                    router.push({
-                                        pathname: '/review/[orderId]' as any,
-                                        params: { orderId: order.id, restaurantId: order.restaurantId, restaurantName: order.restaurantName },
-                                    });
-                                }}
-                            >
-                                <Ionicons name="star-outline" size={14} color="#f59e0b" />
-                                <Text style={[styles.reorderText, { color: '#f59e0b' }]}>Laisser un avis</Text>
-                            </Pressable>
-                        </View>
-                    )}
+                            </View>
+                        ))}
+                    </ScrollView>
                 </View>
-            </Pressable>
+
+                {/* Actions footer */}
+                {!isActive && !isCancelled && (
+                    <View style={[styles.actionsRow, { borderTopColor: theme.border }]}>
+                        <Pressable
+                            style={[styles.actionButton, { backgroundColor: theme.primary + '12', flex: 1 }]}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                handleReorder(order);
+                            }}
+                        >
+                            <Ionicons name="refresh" size={15} color={theme.primary} />
+                            <Text style={[styles.actionText, { color: theme.primary }]}>Recommander</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.actionButton, { backgroundColor: '#f59e0b' + '12', flex: 1 }]}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                router.push({
+                                    pathname: '/review/[orderId]' as any,
+                                    params: {
+                                        orderId: order.id,
+                                        restaurantId: order.restaurantId,
+                                        restaurantName: order.restaurantName,
+                                    },
+                                });
+                            }}
+                        >
+                            <Ionicons name="star-outline" size={15} color="#f59e0b" />
+                            <Text style={[styles.actionText, { color: '#f59e0b' }]}>Avis</Text>
+                        </Pressable>
+                    </View>
+                )}
+            </AnimatedPressable>
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [theme, isDark, router, handleReorder, renderProgressBar]);
+
+    /* ── Empty state ──────────────────────────────────────────────── */
+    const renderEmpty = () => {
+        const isHistoryTab = activeTab === 'history';
+        return (
+            <View style={styles.emptyContainer}>
+                <View style={[styles.emptyIconCircle, { backgroundColor: theme.primary + '15' }]}>
+                    <Ionicons
+                        name={isHistoryTab ? 'time-outline' : 'bag-outline'}
+                        size={48}
+                        color={theme.primary}
+                    />
+                </View>
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                    {isHistoryTab ? 'Pas encore d\'historique' : 'Aucune commande en cours'}
+                </Text>
+                <Text style={[styles.emptySubtext, { color: theme.icon }]}>
+                    {isHistoryTab
+                        ? 'Vos commandes terminées et annulées apparaîtront ici.'
+                        : 'Explorez nos restaurants et passez votre première commande !'}
+                </Text>
+                {!isHistoryTab && (
+                    <Pressable
+                        style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+                        onPress={() => router.push('/(tabs)/explore')}
+                    >
+                        <Ionicons name="compass-outline" size={18} color="#fff" />
+                        <Text style={styles.emptyButtonText}>Explorer les restaurants</Text>
+                    </Pressable>
+                )}
+            </View>
         );
     };
 
-    return (
-        <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-            <View style={styles.headerContainer}>
-                <Text style={[styles.title, { color: theme.text }]}>Mes commandes</Text>
-            </View>
-
-            {!isAuthenticated ? (
-                <View style={styles.empty}>
-                    <Ionicons name="lock-closed-outline" size={48} color={theme.icon} />
-                    <Text style={[styles.emptyTitle, { color: theme.text }]}>Connectez-vous pour suivre vos commandes</Text>
-                    <Text style={[styles.emptyText, { color: theme.icon }]}>
-                        Retrouvez votre historique, l&apos;etat des commandes et vos recommandations.
+    /* ── Not authenticated state ──────────────────────────────────── */
+    if (!isAuthenticated) {
+        return (
+            <View style={[styles.container, { backgroundColor: theme.background }]}>
+                <CustomHeader
+                    title="Mes Commandes"
+                    showSearch={false}
+                    showCart={true}
+                    showBack={false}
+                />
+                <View style={styles.emptyContainer}>
+                    <View style={[styles.emptyIconCircle, { backgroundColor: theme.primary + '15' }]}>
+                        <Ionicons name="lock-closed-outline" size={48} color={theme.primary} />
+                    </View>
+                    <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                        Connectez-vous
+                    </Text>
+                    <Text style={[styles.emptySubtext, { color: theme.icon }]}>
+                        Retrouvez votre historique, suivez vos commandes en temps réel.
                     </Text>
                     <Pressable
-                        style={[styles.exploreButton, { backgroundColor: theme.primary }]}
+                        style={[styles.emptyButton, { backgroundColor: theme.primary }]}
                         onPress={() => router.push('/(auth)/login')}
                     >
-                        <Text style={styles.exploreButtonText}>Se connecter</Text>
+                        <Ionicons name="log-in-outline" size={18} color="#fff" />
+                        <Text style={styles.emptyButtonText}>Se connecter</Text>
                     </Pressable>
                 </View>
-            ) : (
+            </View>
+        );
+    }
 
-                <Animated.FlatList
-                    data={[...activeOrders, ...pastOrders]}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.listContainer}
-                    showsVerticalScrollIndicator={false}
-                    renderItem={({ item, index }) => (
-                        <Animated.View entering={FadeInDown.delay(index * 100).duration(400).springify()}>
-                            {index === 0 && activeOrders.length > 0 && (
-                                <Text style={[styles.sectionTitle, { color: theme.text }]}>En cours</Text>
-                            )}
-                            {index === activeOrders.length && pastOrders.length > 0 && (
-                                <Text style={[styles.sectionTitle, { color: theme.text, marginTop: Spacing.lg }]}>Historique</Text>
-                            )}
-                            {renderOrderCard(item)}
-                        </Animated.View>
-                    )}
-                    ListEmptyComponent={() => (
-                        <View style={styles.empty}>
-                            <Ionicons name="receipt-outline" size={48} color={theme.icon} />
-                            <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune commande</Text>
-                            <Text style={[styles.emptyText, { color: theme.icon }]}>
-                                Vos commandes apparaitront ici.
+    /* ── Main render ──────────────────────────────────────────────── */
+    return (
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <CustomHeader
+                title="Mes Commandes"
+                showSearch={false}
+                showCart={true}
+                showBack={false}
+            />
+
+            {/* Segmented tabs */}
+            <View style={[styles.tabBar, { backgroundColor: isDark ? '#ffffff0a' : '#f1f5f9' }]}>
+                {(['active', 'history'] as const).map(tab => {
+                    const isSelected = activeTab === tab;
+                    return (
+                        <Pressable
+                            key={tab}
+                            style={[
+                                styles.tabItem,
+                                isSelected && [styles.tabItemActive, {
+                                    backgroundColor: theme.surface,
+                                    ...Shadows.sm,
+                                }],
+                            ]}
+                            onPress={() => {
+                                Haptics.selectionAsync();
+                                setActiveTab(tab);
+                            }}
+                        >
+                            <Ionicons
+                                name={tab === 'active' ? 'timer-outline' : 'time-outline'}
+                                size={16}
+                                color={isSelected ? theme.primary : theme.icon}
+                            />
+                            <Text style={[
+                                styles.tabLabel,
+                                { color: isSelected ? theme.text : theme.icon },
+                                isSelected && styles.tabLabelActive,
+                            ]}>
+                                {tab === 'active' ? 'En cours' : 'Historique'}
                             </Text>
-                            <Pressable
-                                style={[styles.exploreButton, { backgroundColor: theme.primary }]}
-                                onPress={() => router.push('/(tabs)/explore')}
-                            >
-                                <Text style={styles.exploreButtonText}>Decouvrir les restaurants</Text>
-                            </Pressable>
-                        </View>
-                    )}
+                            {tab === 'active' && activeOrders.length > 0 && (
+                                <View style={[styles.tabBadge, { backgroundColor: theme.primary }]}>
+                                    <Text style={styles.tabBadgeText}>{activeOrders.length}</Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    );
+                })}
+            </View>
+
+            {/* Loading */}
+            {loading && orders.length === 0 ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator color={theme.primary} size="large" />
+                    <Text style={[styles.loadingText, { color: theme.icon }]}>
+                        Chargement de vos commandes…
+                    </Text>
+                </View>
+            ) : (
+                <SectionList
+                    sections={sections}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderOrderCard}
+                    renderSectionHeader={({ section: { title } }) =>
+                        title ? (
+                            <Text style={[styles.sectionHeader, { color: theme.icon }]}>{title}</Text>
+                        ) : null
+                    }
+                    contentContainerStyle={[
+                        styles.listContent,
+                        sections.length === 0 && styles.listContentEmpty,
+                        { paddingBottom: insets.bottom + 100 },
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                    stickySectionHeadersEnabled={false}
+                    removeClippedSubviews
+                    maxToRenderPerBatch={6}
+                    windowSize={5}
+                    initialNumToRender={4}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={theme.primary}
+                        />
+                    }
+                    ListEmptyComponent={renderEmpty}
                 />
             )}
         </View>
     );
 }
 
+/* ══════════════════════════════════════════════════════════════════ */
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    headerContainer: { padding: Spacing.md },
-    title: { ...Typography.title2 },
-    sectionTitle: { ...Typography.title3, marginBottom: Spacing.md },
-    listContainer: { padding: Spacing.md, paddingBottom: Spacing.xxl },
-    orderCard: {
-        borderRadius: Radii.lg,
-        borderWidth: 1,
-        marginBottom: Spacing.md,
-        overflow: 'hidden',
-        ...Shadows.sm,
-    },
-    orderHeader: {
-        padding: Spacing.md,
-    },
-    orderRestaurant: {
+
+    /* Header */
+    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: Spacing.sm,
-        marginBottom: Spacing.sm,
+        paddingHorizontal: Spacing.md,
+        paddingTop: Spacing.sm,
+        paddingBottom: Spacing.xs,
     },
-    orderImage: {
-        width: 44,
-        height: 44,
+    pageTitle: { ...Typography.title2 },
+    badgeCount: {
+        minWidth: 22,
+        height: 22,
+        borderRadius: 11,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 6,
+    },
+    badgeCountText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
+    /* Tabs */
+    tabBar: {
+        flexDirection: 'row',
+        marginHorizontal: Spacing.md,
+        marginTop: Spacing.sm,
+        marginBottom: Spacing.md,
         borderRadius: Radii.md,
+        padding: 3,
+        gap: 4,
     },
-    orderRestaurantName: {
-        ...Typography.body,
-        fontWeight: '600',
+    tabItem: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: Spacing.sm + 2,
+        borderRadius: Radii.sm + 2,
     },
-    orderItemCount: {
+    tabItemActive: {},
+    tabLabel: { ...Typography.caption, fontWeight: '500' },
+    tabLabelActive: { fontWeight: '700' },
+    tabBadge: {
+        minWidth: 18,
+        height: 18,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 5,
+    },
+    tabBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+
+    /* Loading */
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.md,
+    },
+    loadingText: { ...Typography.caption },
+
+    /* List */
+    listContent: { paddingHorizontal: Spacing.md },
+    listContentEmpty: { flexGrow: 1 },
+    sectionHeader: {
         ...Typography.caption,
-        marginTop: 2,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginTop: Spacing.lg,
+        marginBottom: Spacing.sm,
+        paddingHorizontal: Spacing.xs,
     },
+
+    /* Card */
+    orderCard: {
+        borderRadius: Radii.xl,
+        overflow: 'hidden',
+        marginBottom: Spacing.md,
+        ...Shadows.md,
+    },
+
+    /* Restaurant header */
+    restaurantHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.md,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    restaurantLogo: {
+        width: 40,
+        height: 40,
+        borderRadius: Radii.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    restaurantInfo: { flex: 1 },
+    restaurantName: { ...Typography.bodySemibold, fontSize: 14, marginBottom: 2 },
+    deliveryMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    metaText: { fontSize: 11, fontWeight: '400' },
+
+    /* Products */
+    productsContainer: {
+        paddingVertical: Spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    productsList: { paddingHorizontal: Spacing.md, gap: Spacing.sm },
+    productCard: {
+        width: 100,
+        gap: Spacing.xs,
+    },
+    productImage: {
+        width: '100%',
+        height: 80,
+        borderRadius: Radii.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    productEmoji: { fontSize: 28 },
+    productInfo: { gap: 2 },
+    productName: { ...Typography.small, fontWeight: '500', lineHeight: 14 },
+    productMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    productPrice: { ...Typography.caption, fontWeight: '600' },
+    productQty: { ...Typography.caption, fontWeight: '500' },
+    addButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'flex-end',
+    },
+    addButtonText: { color: '#fff', fontSize: 18, fontWeight: '600', lineHeight: 24 },
+
+    /* Actions */
+    actionsRow: {
+        flexDirection: 'row',
+        gap: Spacing.sm,
+        borderTopWidth: 1,
+        padding: Spacing.md,
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.xs,
+        paddingVertical: Spacing.sm,
+        borderRadius: Radii.lg,
+    },
+    actionText: { ...Typography.small, fontWeight: '600' },
+
+    /* Status badge */
     statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        alignSelf: 'flex-start',
-        paddingHorizontal: Spacing.sm,
+        paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: Radii.full,
-        gap: 6,
+        gap: 5,
     },
-    statusDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+    statusDot: { width: 6, height: 6, borderRadius: 3 },
+    statusLabel: { fontSize: 11, fontWeight: '700' },
+
+    /* Progress bar */
+    progressContainer: { marginTop: 4 },
+    progressTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
+    progressFill: { height: '100%', borderRadius: 2 },
+    progressLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
     },
-    statusText: {
-        ...Typography.small,
-        fontWeight: '600',
+    progressDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        borderWidth: 1.5,
     },
-    orderFooter: {
+
+    /* Items preview */
+    itemsPreview: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: Spacing.sm,
+        borderRadius: Radii.sm,
+        borderWidth: 1,
+    },
+    itemsText: { ...Typography.caption, flex: 1, fontSize: 13, lineHeight: 18 },
+
+    /* Footer */
+    cardFooter: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        borderTopWidth: 1,
     },
-    orderDate: {
-        ...Typography.caption,
-    },
-    trackButton: {
+    dateText: { ...Typography.small },
+    footerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+    priceText: { ...Typography.captionSemibold, fontWeight: '800' },
+    ctaChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-    },
-    trackText: {
-        ...Typography.caption,
-        fontWeight: '600',
-    },
-    reorderButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: Spacing.sm,
-        paddingVertical: 4,
+        gap: 3,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
         borderRadius: Radii.full,
     },
-    completedActions: {
-        flexDirection: 'row',
-        gap: Spacing.xs,
-    },
-    reorderText: {
-        ...Typography.small,
-        fontWeight: '600',
-    },
-    empty: {
+    ctaText: { fontSize: 12, fontWeight: '700' },
+
+    /* Empty state */
+    emptyContainer: {
+        flex: 1,
         alignItems: 'center',
-        paddingTop: Spacing.xxl,
+        justifyContent: 'center',
+        paddingHorizontal: Spacing.xl,
+        gap: Spacing.md,
     },
-    emptyTitle: {
-        ...Typography.title3,
-        marginTop: Spacing.md,
+    emptyIconCircle: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: Spacing.sm,
     },
-    emptyText: {
-        ...Typography.body,
-        marginTop: Spacing.xs,
-        textAlign: 'center',
-    },
-    exploreButton: {
-        marginTop: Spacing.lg,
-        paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.md,
+    emptyTitle: { ...Typography.title3, textAlign: 'center' },
+    emptySubtext: { ...Typography.body, textAlign: 'center', lineHeight: 22, maxWidth: 280 },
+    emptyButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        paddingHorizontal: Spacing.xl,
+        paddingVertical: Spacing.sm + 4,
         borderRadius: Radii.full,
+        marginTop: Spacing.sm,
     },
-    exploreButtonText: {
-        color: '#fff',
-        ...Typography.body,
-        fontWeight: '700',
-    },
+    emptyButtonText: { color: '#fff', ...Typography.bodySemibold },
 });

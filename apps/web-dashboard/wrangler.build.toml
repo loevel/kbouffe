@@ -1,0 +1,20 @@
+#:schema node_modules/wrangler/config-schema.json
+# Config utilisée UNIQUEMENT pour le bundling (dry-run) dans scripts/prepare-pages.js
+# Ne pas utiliser pour déployer directement — utilisez wrangler.toml (Pages).
+
+name = "kbouffe-dashboard-build"
+main = ".open-next/worker.js"
+compatibility_date = "2025-07-01"
+compatibility_flags = ["nodejs_compat"]
+minify = true
+
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+[alias]
+"next/dist/compiled/@vercel/og/index.edge.js" = "./stubs/og-stub.js"
+"next/dist/compiled/@vercel/og/index.node.js" = "./stubs/og-stub.js"
+"framer-motion" = "./stubs/framer-motion-stub.js"
+
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "kbouffe-images"

@@ -1,39 +1,53 @@
-import { Platform } from 'react-native';
-
-const tintColorLight = '#FF6B00'; // Vibrant Orange
-const tintColorDark = '#FF9D5C';
+const tintColorLight = '#FF7A1A';
+const tintColorDark = '#FF9A54';
 
 export const Colors = {
   light: {
-    text: '#1e293b', // Slate-800
-    textMuted: '#64748b', // Slate-500
-    background: '#f8fafc', // Slate-50
-    surface: '#ffffff', // White cards
+    text: '#172033',
+    textMuted: '#667085',
+    background: '#F4F1EA',
+    backgroundAlt: '#FBF8F3',
+    surface: '#FFFCF7',
+    surfaceAlt: '#F7F2EA',
+    surfaceElevated: '#FFFFFF',
     tint: tintColorLight,
-    icon: '#64748b',
-    tabIconDefault: '#94a3b8',
+    icon: '#7A8699',
+    tabIconDefault: '#98A2B3',
     tabIconSelected: tintColorLight,
-    primary: '#FF6B00',
-    primaryLight: '#FFF0E6', // Soft orange background
-    border: '#e2e8f0',
+    primary: '#FF7A1A',
+    primarySoft: '#FFE1CC',
+    primaryLight: '#FFF1E6',
+    border: '#E8DFD2',
+    borderStrong: '#D8C7B2',
     error: '#ef4444',
-    success: '#22c55e',
+    success: '#16A34A',
+    warning: '#D97706',
+    overlay: 'rgba(23, 32, 51, 0.08)',
+    inputBackground: '#FFF8F0',
     transparent: 'transparent',
   },
   dark: {
-    text: '#f1f5f9', // Slate-100
-    textMuted: '#94a3b8', // Slate-400
-    background: '#0f172a', // Slate-900
-    surface: '#1e293b', // Slate-800 cards
+    text: '#F6F2EA',
+    textMuted: '#B9B3A9',
+    background: '#17141D',
+    backgroundAlt: '#1D1924',
+    surface: '#211D29',
+    surfaceAlt: '#2A2434',
+    surfaceElevated: '#312A3D',
     tint: tintColorDark,
-    icon: '#94a3b8',
-    tabIconDefault: '#64748b',
+    icon: '#AAA3B7',
+    tabIconDefault: '#7A738A',
     tabIconSelected: tintColorDark,
-    primary: '#FF9D5C',
-    primaryLight: 'rgba(255, 107, 0, 0.15)',
-    border: '#334155',
+    primary: '#FF9A54',
+    primarySoft: 'rgba(255, 154, 84, 0.22)',
+    primaryLight: 'rgba(255, 154, 84, 0.14)',
+    border: '#3A3348',
+    borderStrong: '#564D68',
     error: '#f87171',
-    success: '#4ade80',
+    success: '#4ADE80',
+    warning: '#FBBF24',
+    overlay: 'rgba(0, 0, 0, 0.3)',
+    inputBackground: '#261F31',
     transparent: 'transparent',
   },
 };
@@ -49,44 +63,48 @@ export const Spacing = {
 
 export const Radii = {
   sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  md: 14,
+  lg: 20,
+  xl: 28,
+  xxl: 36,
   full: 9999,
 };
 
 export const Shadows = {
   sm: {
-    shadowColor: "#0f172a",
+    shadowColor: '#140F1F',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
     elevation: 2,
   },
   md: {
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowColor: '#140F1F',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.09,
+    shadowRadius: 24,
+    elevation: 6,
   },
   lg: {
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowColor: '#140F1F',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.14,
+    shadowRadius: 36,
+    elevation: 12,
   },
 };
 
 export const Typography = {
-  title1: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -0.5 },
-  title2: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.5 },
-  title3: { fontSize: 20, fontWeight: '700' as const },
-  headline: { fontSize: 18, fontWeight: '600' as const },
+  display: { fontSize: 40, fontWeight: '800' as const, letterSpacing: -1.2, lineHeight: 44 },
+  title1: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -0.8, lineHeight: 36 },
+  title2: { fontSize: 26, fontWeight: '700' as const, letterSpacing: -0.6, lineHeight: 30 },
+  title3: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.2, lineHeight: 24 },
+  headline: { fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
+  subtitle2: { fontSize: 17, fontWeight: '600' as const, lineHeight: 22 },
   body: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
   bodySemibold: { fontSize: 16, fontWeight: '600' as const, lineHeight: 24 },
   caption: { fontSize: 14, fontWeight: '400' as const, lineHeight: 20 },
   captionSemibold: { fontSize: 14, fontWeight: '600' as const, lineHeight: 20 },
-  small: { fontSize: 12, fontWeight: '500' as const },
+  small: { fontSize: 12, fontWeight: '500' as const, lineHeight: 16 },
+  smallSemibold: { fontSize: 12, fontWeight: '600' as const, lineHeight: 16 },
 };

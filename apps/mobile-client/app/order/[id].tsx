@@ -1,6 +1,7 @@
 import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing, FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -165,6 +166,7 @@ export default function OrderTrackingScreen() {
                     text: 'Oui, annuler',
                     style: 'destructive',
                     onPress: async () => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                         setIsCancelling(true);
                         try {
                             await cancelOrder(order.id);
@@ -298,7 +300,7 @@ export default function OrderTrackingScreen() {
                             const color = isDone ? theme.primary : theme.border;
 
                             return (
-                                <View key={step.status} style={styles.timelineStep}>
+                                <Animated.View entering={FadeInDown.delay(index * 100).duration(400).springify()} key={step.status} style={styles.timelineStep}>
                                     <View style={styles.timelineIndicator}>
                                         <View style={[
                                             styles.timelineDot,
@@ -319,7 +321,7 @@ export default function OrderTrackingScreen() {
                                             {step.label}
                                         </Text>
                                     </View>
-                                </View>
+                                </Animated.View>
                             );
                         })}
                     </View>
@@ -328,7 +330,7 @@ export default function OrderTrackingScreen() {
                 {/* Order items */}
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>Articles commandés</Text>
                 {order.items.map((item, i) => (
-                    <View key={i} style={[styles.itemRow, { borderColor: theme.border }]}>
+                    <Animated.View entering={FadeInDown.delay(activeSteps.length * 100 + i * 50).duration(400).springify()} key={i} style={[styles.itemRow, { borderColor: theme.border }]}>
                         <View style={[styles.itemQty, { backgroundColor: theme.primary + '15' }]}>
                             <Text style={[styles.itemQtyText, { color: theme.primary }]}>{item.quantity}x</Text>
                         </View>
@@ -336,11 +338,11 @@ export default function OrderTrackingScreen() {
                             <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
                         </View>
                         <Text style={[styles.itemPrice, { color: theme.text }]}>{(item.price * item.quantity).toLocaleString()} FCFA</Text>
-                    </View>
+                    </Animated.View>
                 ))}
 
                 {/* Total */}
-                <View style={[styles.totalCard, { borderColor: theme.border }]}>
+                <Animated.View entering={FadeInDown.delay(500).duration(400).springify()} style={[styles.totalCard, { borderColor: theme.border }]}>
                     <View style={styles.totalRow}>
                         <Text style={[styles.totalLabel, { color: theme.icon }]}>Sous-total</Text>
                         <Text style={[styles.totalValue, { color: theme.text }]}>{order.subtotal.toLocaleString()} FCFA</Text>
@@ -354,7 +356,7 @@ export default function OrderTrackingScreen() {
                         <Text style={[styles.totalBold, { color: theme.text }]}>Total</Text>
                         <Text style={[styles.totalBold, { color: theme.primary }]}>{order.total.toLocaleString()} FCFA</Text>
                     </View>
-                </View>
+                </Animated.View>
 
                 {/* Delivery info */}
                 {order.deliveryAddress && (
@@ -375,7 +377,17 @@ export default function OrderTrackingScreen() {
                         {relatedTickets.map((ticket) => (
                             <Text key={ticket.id} style={[styles.ticketStatus, { color: theme.icon }]}>• {supportTypeLabel[ticket.type]} · {supportStatusLabel[ticket.status]}</Text>
                         ))}
-                        <Pressable style={[styles.supportButton, { backgroundColor: theme.primary + '12', borderColor: theme.primary + '40' }]} onPress={() => router.push({ pathname: '/support/new-ticket', params: { orderId: order.id } })}>
+                        <Pressable 
+                            style={({ pressed }) => [
+                                styles.supportButton, 
+                                { backgroundColor: theme.primary + '12', borderColor: theme.primary + '40' },
+                                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                            ]} 
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push({ pathname: '/support/new-ticket', params: { orderId: order.id } });
+                            }}
+                        >
                             <Text style={[styles.supportButtonText, { color: theme.primary }]}>Signaler un litige / demander un remboursement</Text>
                         </Pressable>
                         <Text style={[styles.refundNotice, { color: theme.icon }]}>Note: Les remboursements et la livraison sont traités directement par le restaurant. Kbouffe n'est pas responsable du transport.</Text>
@@ -384,20 +396,29 @@ export default function OrderTrackingScreen() {
 
                 {/* Review CTA — only when order is done */}
                 {['completed', 'delivered'].includes(order.status) && (
-                    <Pressable
-                        style={[styles.reviewCta, { borderColor: '#f59e0b' + '50', backgroundColor: '#f59e0b' + '10' }]}
-                        onPress={() => router.push({
-                            pathname: '/review/[orderId]' as any,
-                            params: { orderId: order.id, restaurantId: order.restaurantId, restaurantName: order.restaurantName },
-                        })}
-                    >
+                    <Animated.View entering={FadeInDown.delay(600).duration(400).springify()}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.reviewCta, 
+                                { borderColor: '#f59e0b' + '50', backgroundColor: '#f59e0b' + '10' },
+                                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                            ]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                router.push({
+                                    pathname: '/review/[orderId]' as any,
+                                    params: { orderId: order.id, restaurantId: order.restaurantId, restaurantName: order.restaurantName },
+                                });
+                            }}
+                        >
                         <Ionicons name="star" size={22} color="#f59e0b" />
                         <View style={{ flex: 1 }}>
                             <Text style={[styles.reviewCtaTitle, { color: '#92400e' }]}>Votre avis compte !</Text>
                             <Text style={[styles.reviewCtaBody, { color: '#b45309' }]}>Évaluez votre expérience chez {order.restaurantName}</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={18} color="#f59e0b" />
-                    </Pressable>
+                        </Pressable>
+                    </Animated.View>
                 )}
 
                 {/* Cancel order — only when cancellable */}

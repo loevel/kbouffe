@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Pressable, Switch, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { useAuth } from '@/contexts/auth-context';
 import { deleteAccount } from '@/lib/api';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function SettingsScreen() {
     const router = useRouter();
@@ -16,12 +18,14 @@ export default function SettingsScreen() {
     const { user, updateProfile, logout } = useAuth();
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
+    const isDark = colorScheme === 'dark';
 
     const [notifications, setNotifications] = useState(user?.profile?.notificationsEnabled ?? true);
     const [language, setLanguage] = useState<'fr' | 'en'>(user?.profile?.preferredLang === 'en' ? 'en' : 'fr');
     const [deleting, setDeleting] = useState(false);
 
     const handleLanguageChange = () => {
+        Haptics.selectionAsync();
         const newLang = language === 'fr' ? 'en' : 'fr';
         setLanguage(newLang);
         if (updateProfile) {
@@ -34,6 +38,7 @@ export default function SettingsScreen() {
             'Supprimer le compte',
             'Êtes-vous sûr ? Cette action est irréversible. Toutes vos données seront supprimées.',
             [
+                // eslint-disable-next-line @typescript-eslint/no-misused-promises
                 { text: 'Annuler', style: 'cancel' },
                 {
                     text: 'Supprimer',
@@ -86,15 +91,15 @@ export default function SettingsScreen() {
         >
             {/* Header */}
             <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.backButton, { backgroundColor: isDark ? '#ffffff08' : '#f1f5f9' }]}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </Pressable>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>Paramètres</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             {/* Notifications */}
-            <View style={styles.section}>
+            <Animated.View entering={FadeInDown.delay(100).duration(400).springify()} style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: theme.icon }]}>Préférences</Text>
                 <View style={[styles.card, { backgroundColor: theme.surface }]}>
                     <View style={styles.row}>
@@ -115,10 +120,10 @@ export default function SettingsScreen() {
                         />
                     </View>
                 </View>
-            </View>
+            </Animated.View>
 
             {/* Apparence & Langue */}
-            <View style={styles.section}>
+            <Animated.View entering={FadeInDown.delay(200).duration(400).springify()} style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: theme.icon }]}>Application</Text>
                 <View style={[styles.card, { backgroundColor: theme.surface }]}>
                     {/* Thème Selector */}
@@ -150,10 +155,10 @@ export default function SettingsScreen() {
                         </View>
                     </Pressable>
                 </View>
-            </View>
+            </Animated.View>
 
             {/* Aide & Support */}
-            <View style={styles.section}>
+            <Animated.View entering={FadeInDown.delay(300).duration(400).springify()} style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: theme.icon }]}>À propos</Text>
                 <View style={[styles.card, { backgroundColor: theme.surface }]}>
                     <Pressable
@@ -184,10 +189,10 @@ export default function SettingsScreen() {
                         <Ionicons name="chevron-forward" size={20} color={theme.icon} />
                     </Pressable>
                 </View>
-            </View>
+            </Animated.View>
 
             {/* Danger Zone */}
-            <View style={[styles.section, { marginTop: Spacing.xl }]}>
+            <Animated.View entering={FadeInDown.delay(400).duration(400).springify()} style={[styles.section, { marginTop: Spacing.xl }]}>
                 <Pressable
                     style={[styles.deleteButton, deleting && { opacity: 0.6 }]}
                     onPress={handleDeleteAccount}
@@ -202,7 +207,7 @@ export default function SettingsScreen() {
                         {deleting ? 'Suppression…' : 'Supprimer mon compte'}
                     </Text>
                 </Pressable>
-            </View>
+            </Animated.View>
 
             <Text style={[styles.version, { color: theme.icon }]}>Kbouffe v1.0.0 (build 1)</Text>
         </ScrollView>
@@ -221,6 +226,7 @@ const styles = StyleSheet.create({
     backButton: {
         width: 40,
         height: 40,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
     },

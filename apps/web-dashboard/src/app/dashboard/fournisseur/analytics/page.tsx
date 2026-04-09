@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useSupplier } from "../SupplierContext";
 import { SupplierOverview } from "@/components/supplier/SupplierOverview";
 import { ProductAnalytics } from "@/components/supplier/ProductAnalytics";
 import { BuyerSegments } from "@/components/supplier/BuyerSegments";
 import { CategoryPerformance } from "@/components/supplier/CategoryPerformance";
-import { SalesVelocity } from "@/components/supplier/SalesVelocity";
 import { BarChart3, TrendingUp, Users, Package } from "lucide-react";
+
+const SalesVelocity = dynamic(
+    () => import("@/components/supplier/SalesVelocity").then((m) => ({ default: m.SalesVelocity })),
+    { ssr: false, loading: () => <div className="h-64 animate-pulse bg-surface-100 dark:bg-surface-800 rounded-2xl" /> }
+);
 
 export default function SupplierAnalyticsPage() {
   const { supplierId } = useSupplier();

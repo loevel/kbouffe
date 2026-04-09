@@ -1,6 +1,9 @@
 import { StyleSheet, View, Text, FlatList, Image, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, FadeIn, LinearTransition } from 'react-native-reanimated';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,73 +11,177 @@ import { useRestaurants } from '@/hooks/use-restaurants';
 import { useLoyalty } from '@/contexts/loyalty-context';
 import type { MobileRestaurant } from '@/lib/api';
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export default function FavoritesScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
     const { restaurants } = useRestaurants();
-    const { favoriteRestaurantIds, toggleRestaurantFavorite, favoriteProductIds } = useLoyalty();
+    const { favoriteRestaurantIds, toggleRestaurantFavorite } = useLoyalty();
 
     const favorites = restaurants.filter((r) => favoriteRestaurantIds.includes(r.id));
 
-    const renderRestaurant = ({ item }: { item: MobileRestaurant }) => (
-        <Pressable
+    const handleRemoveFavorite = (id: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        toggleRestaurantFavorite(id);
+    };
+
+    const renderRestaurant = ({ item, index }: { item: MobileRestaurant; index: number }) => (
+        <AnimatedPressable
+            entering={FadeInDown.delay(index * 80).duration(400).springify()}
+            layout={LinearTransition.springify()}
             style={({ pressed }) => [
                 styles.card,
-                { backgroundColor: theme.background, borderColor: theme.border },
-                pressed && { opacity: 0.95 },
+                { backgroundColor: theme.surface },
+                Shadows.md,
+                pressed && { transform: [{ scale: 0.97 }] },
             ]}
-            onPress={() => router.push(`/restaurant/${item.slug}`)}
+            onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(`/restaurant/${item.slug}`);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Ouvrir ${item.name}`}
         >
-            <Image source={{ uri: item.coverImage ?? undefined }} style={styles.coverImage} />
-            <Pressable
-                style={[styles.heartButton, { backgroundColor: theme.background }]}
-                onPress={() => toggleRestaurantFavorite(item.id)}
-            >
-                <Ionicons name="heart" size={20} color="#ef4444" />
-            </Pressable>
-            <View style={styles.cardBody}>
-                <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-                <Text style={[styles.cuisine, { color: theme.icon }]}>{item.cuisineType}</Text>
-                <View style={styles.infoRow}>
-                    <Ionicons name="star" size={14} color={theme.primary} />
-                    <Text style={[styles.rating, { color: theme.text }]}>{item.rating?.toFixed(1)}</Text>
-                    <Text style={[styles.reviewCount, { color: theme.icon }]}>({item.reviewCount})</Text>
-                    <View style={styles.dot} />
-                    <Ionicons name="time-outline" size={14} color={theme.icon} />
-                    <Text style={[styles.infoText, { color: theme.icon }]}>{item.estimatedDeliveryTime} min</Text>
-                    <View style={styles.dot} />
-                    <Text style={[styles.infoText, { color: theme.icon }]}>
-                        {item.deliveryFee === 0 ? 'Livraison gratuite' : `${item.deliveryFee} FCFA`}
+            {/* ── Cover image with gradient overlay ── */}
+            <View style={styles.imageContainer}>
+                <Image
+                    source={{ uri: item.coverImage ?? undefined }}
+                    style={styles.coverImage}
+                    resizeMode="cover"
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.55)']}
+                    style={styles.imageGradient}
+                />
+
+                {/* Rating badge */}
+                <View style={styles.ratingBadge}>
+                    <Ionicons name="star" size={12} color="#fbbf24" />
+                    <Text style={styles.ratingBadgeText}>
+                        {(item.rating ?? 0).toFixed(1)}
                     </Text>
+                    <Text style={styles.ratingBadgeCount}>({item.reviewCount ?? 0})</Text>
+                </View>
+
+                {/* Heart remove button */}
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.heartButton,
+                        pressed && { transform: [{ scale: 0.85 }] },
+                    ]}
+                    onPress={() => handleRemoveFavorite(item.id)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Retirer ${item.name} des favoris`}
+                >
+                    <Ionicons name="heart" size={22} color="#ef4444" />
+                </Pressable>
+
+                {/* Restaurant name overlay */}
+                <View style={styles.imageOverlayText}>
+                    <Text style={styles.nameOverlay} numberOfLines={1}>{item.name}</Text>
+                    {item.cuisineType ? (
+                        <Text style={styles.cuisineOverlay}>{item.cuisineType}</Text>
+                    ) : null}
                 </View>
             </View>
-        </Pressable>
+
+            {/* ── Info footer ── */}
+            <View style={styles.cardBody}>
+                <View style={styles.tagsRow}>
+                    <View style={[styles.tag, { backgroundColor: theme.primaryLight }]}>
+                        <Ionicons name="time-outline" size={13} color={theme.primary} />
+                        <Text style={[styles.tagText, { color: theme.primary }]}>
+                            {item.estimatedDeliveryTime ?? 30} min
+                        </Text>
+                    </View>
+                    <View style={[styles.tag, { backgroundColor: item.deliveryFee === 0 ? '#dcfce7' : theme.background }]}>
+                        <Ionicons
+                            name="bicycle-outline"
+                            size={13}
+                            color={item.deliveryFee === 0 ? '#16a34a' : theme.icon}
+                        />
+                        <Text style={[styles.tagText, { color: item.deliveryFee === 0 ? '#16a34a' : theme.icon }]}>
+                            {item.deliveryFee === 0 ? 'Gratuit' : `${item.deliveryFee} FCFA`}
+                        </Text>
+                    </View>
+                    {item.isSponsored && (
+                        <View style={[styles.tag, { backgroundColor: theme.primary + '18' }]}>
+                            <Ionicons name="megaphone-outline" size={12} color={theme.primary} />
+                            <Text style={[styles.tagText, { color: theme.primary }]}>Sponsorisé</Text>
+                        </View>
+                    )}
+                </View>
+            </View>
+        </AnimatedPressable>
     );
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+            {/* ── Header ── */}
+            <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
+                <Pressable
+                    onPress={() => router.back()}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retour"
+                >
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                </Pressable>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Mes favoris</Text>
+                <View style={{ width: 24 }} />
+            </Animated.View>
+
+            {favorites.length > 0 && (
+                <Animated.Text
+                    entering={FadeIn.delay(100).duration(300)}
+                    style={[styles.headerSubtitle, { color: theme.icon }]}
+                >
+                    {favorites.length} restaurant{favorites.length > 1 ? 's' : ''} sauvegardé{favorites.length > 1 ? 's' : ''}
+                </Animated.Text>
+            )}
+
             <FlatList
                 data={favorites}
                 keyExtractor={item => item.id}
                 renderItem={renderRestaurant}
-                contentContainerStyle={{ padding: Spacing.md, paddingBottom: insets.bottom + Spacing.xl, gap: Spacing.md }}
+                contentContainerStyle={{
+                    padding: Spacing.md,
+                    paddingBottom: insets.bottom + Spacing.xl,
+                    gap: Spacing.md,
+                    flexGrow: 1,
+                }}
+                showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <Ionicons name="heart-outline" size={56} color={theme.icon} />
-                        <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucun favori</Text>
-                        <Text style={[styles.emptyText, { color: theme.icon }]}>
-                            Les restaurants que vous aimez apparaîtront ici.
+                    <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.empty}>
+                        <View style={[styles.emptyIconWrapper, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="heart-outline" size={48} color={theme.primary} />
+                        </View>
+                        <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                            Pas encore de favoris
                         </Text>
-                        <Text style={[styles.emptyText, { color: theme.icon }]}>Plats favoris: {favoriteProductIds.length}</Text>
+                        <Text style={[styles.emptyText, { color: theme.icon }]}>
+                            Appuyez sur le cœur d'un restaurant pour le sauvegarder ici et y accéder rapidement.
+                        </Text>
                         <Pressable
-                            style={[styles.exploreBtn, { backgroundColor: theme.primary }]}
-                            onPress={() => router.push('/(tabs)/explore')}
+                            style={({ pressed }) => [
+                                styles.exploreBtn,
+                                { backgroundColor: theme.primary },
+                                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+                            ]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push('/(tabs)/explore');
+                            }}
+                            accessibilityRole="button"
                         >
+                            <Ionicons name="compass-outline" size={18} color="#fff" />
                             <Text style={styles.exploreBtnText}>Explorer les restaurants</Text>
                         </Pressable>
-                    </View>
+                    </Animated.View>
                 }
             />
         </View>
@@ -83,46 +190,160 @@ export default function FavoritesScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    card: {
-        borderRadius: Radii.lg,
-        borderWidth: 1,
-        overflow: 'hidden',
-        ...Shadows.sm,
+
+    // ── Header ──
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.md,
     },
-    coverImage: { width: '100%', height: 140 },
+    headerTitle: { ...Typography.title3 },
+    headerSubtitle: {
+        ...Typography.caption,
+        paddingHorizontal: Spacing.md,
+        marginBottom: Spacing.xs,
+    },
+
+    // ── Card ──
+    card: {
+        borderRadius: Radii.xl,
+        overflow: 'hidden',
+    },
+    imageContainer: {
+        position: 'relative',
+    },
+    coverImage: {
+        width: '100%',
+        height: 180,
+    },
+    imageGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 100,
+    },
+
+    // ── Rating badge (top-left) ──
+    ratingBadge: {
+        position: 'absolute',
+        top: Spacing.sm,
+        left: Spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 4,
+        borderRadius: Radii.full,
+    },
+    ratingBadgeText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    ratingBadgeCount: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 10,
+        fontWeight: '500',
+    },
+
+    // ── Heart button (top-right) ──
     heartButton: {
         position: 'absolute',
         top: Spacing.sm,
         right: Spacing.sm,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        ...Shadows.sm,
+        backgroundColor: 'rgba(255,255,255,0.92)',
+        ...Shadows.md,
     },
-    cardBody: { padding: Spacing.md },
-    name: { ...Typography.body, fontWeight: '600', marginBottom: 2 },
-    cuisine: { ...Typography.caption, marginBottom: Spacing.sm },
-    infoRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
-    rating: { ...Typography.caption, fontWeight: '600' },
-    reviewCount: { ...Typography.small },
-    infoText: { ...Typography.caption },
-    dot: {
-        width: 3,
-        height: 3,
-        borderRadius: 2,
-        backgroundColor: '#cbd5e1',
-        marginHorizontal: 2,
+
+    // ── Name overlay on image ──
+    imageOverlayText: {
+        position: 'absolute',
+        bottom: Spacing.sm,
+        left: Spacing.md,
+        right: Spacing.md,
     },
-    empty: { alignItems: 'center', paddingVertical: Spacing.xxl * 2, gap: Spacing.md },
-    emptyTitle: { ...Typography.title3 },
-    emptyText: { ...Typography.body, textAlign: 'center', paddingHorizontal: Spacing.xl },
+    nameOverlay: {
+        color: '#fff',
+        ...Typography.headline,
+        fontWeight: '700',
+        textShadowColor: 'rgba(0,0,0,0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
+    },
+    cuisineOverlay: {
+        color: 'rgba(255,255,255,0.85)',
+        ...Typography.small,
+        marginTop: 2,
+        textShadowColor: 'rgba(0,0,0,0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
+    },
+
+    // ── Card body ──
+    cardBody: {
+        padding: Spacing.md,
+    },
+    tagsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Spacing.sm,
+    },
+    tag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: Spacing.sm + 2,
+        paddingVertical: 6,
+        borderRadius: Radii.full,
+    },
+    tagText: {
+        ...Typography.small,
+        fontWeight: '600',
+    },
+
+    // ── Empty state ──
+    empty: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: Spacing.xl,
+        gap: Spacing.md,
+    },
+    emptyIconWrapper: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: Spacing.sm,
+    },
+    emptyTitle: { ...Typography.title3, textAlign: 'center' },
+    emptyText: {
+        ...Typography.body,
+        textAlign: 'center',
+        lineHeight: 22,
+    },
     exploreBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
         paddingVertical: Spacing.md,
         paddingHorizontal: Spacing.xl,
         borderRadius: Radii.full,
         marginTop: Spacing.sm,
     },
-    exploreBtnText: { color: '#fff', ...Typography.body, fontWeight: '600' },
+    exploreBtnText: {
+        color: '#fff',
+        ...Typography.body,
+        fontWeight: '700',
+    },
 });

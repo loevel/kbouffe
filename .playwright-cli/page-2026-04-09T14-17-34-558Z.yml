@@ -1,0 +1,69 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Kbouffe Kbouffe" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]:
+            - img "Kbouffe" [ref=e7]
+            - generic [ref=e23]: Kbouffe
+        - link "Créer un compte" [ref=e24] [cursor=pointer]:
+          - /url: /register
+    - main [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - img [ref=e29]
+          - heading "Content de vous revoir." [level=1] [ref=e32]
+          - paragraph [ref=e33]: Choisissez votre espace pour accéder à votre univers Kbouffe.
+        - generic [ref=e34]:
+          - link "Espace Client Client Consulter mes commandes Suivez vos livraisons en temps réel, gérez vos adresses et profitez de vos offres de fidélité personnalisées. Accéder à mon espace" [ref=e36] [cursor=pointer]:
+            - /url: /login/client
+            - generic [ref=e37]:
+              - generic [ref=e38]:
+                - img "Espace Client" [ref=e39]
+                - generic [ref=e41]:
+                  - generic [ref=e42]:
+                    - img [ref=e43]
+                    - text: Client
+                  - heading "Consulter mes commandes" [level=3] [ref=e46]
+              - generic [ref=e47]:
+                - paragraph [ref=e48]: Suivez vos livraisons en temps réel, gérez vos adresses et profitez de vos offres de fidélité personnalisées.
+                - generic [ref=e49]:
+                  - generic [ref=e50]: Accéder à mon espace
+                  - img [ref=e51]
+          - link "Espace Restaurant Restaurateur Gérer mon établissement Accédez à votre tableau de bord, gérez vos menus, analysez vos performances et optimisez vos ventes. Tableau de bord restaurant" [ref=e54] [cursor=pointer]:
+            - /url: /login/restaurant
+            - generic [ref=e55]:
+              - generic [ref=e56]:
+                - img "Espace Restaurant" [ref=e57]
+                - generic [ref=e59]:
+                  - generic [ref=e60]:
+                    - img [ref=e61]
+                    - text: Restaurateur
+                  - heading "Gérer mon établissement" [level=3] [ref=e64]
+              - generic [ref=e65]:
+                - paragraph [ref=e66]: Accédez à votre tableau de bord, gérez vos menus, analysez vos performances et optimisez vos ventes.
+                - generic [ref=e67]:
+                  - generic [ref=e68]: Tableau de bord restaurant
+                  - img [ref=e69]
+          - link "Agriculteur Gérer mon catalogue Gérez votre catalogue, suivez vos commandes et approvisionnez les restaurants de votre région. Mon espace fournisseur" [ref=e72] [cursor=pointer]:
+            - /url: /login/fournisseur
+            - generic [ref=e73]:
+              - generic [ref=e74]:
+                - img [ref=e76]
+                - generic [ref=e92]:
+                  - generic [ref=e93]:
+                    - img [ref=e94]
+                    - text: Agriculteur
+                  - heading "Gérer mon catalogue" [level=3] [ref=e103]
+              - generic [ref=e104]:
+                - paragraph [ref=e105]: Gérez votre catalogue, suivez vos commandes et approvisionnez les restaurants de votre région.
+                - generic [ref=e106]:
+                  - generic [ref=e107]: Mon espace fournisseur
+                  - img [ref=e108]
+        - link "Retour à l'accueil" [ref=e111] [cursor=pointer]:
+          - /url: /
+          - img [ref=e112]
+          - text: Retour à l'accueil
+  - button "Open Next.js Dev Tools" [ref=e119] [cursor=pointer]:
+    - img [ref=e120]

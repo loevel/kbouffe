@@ -572,8 +572,9 @@ storePublicRoutes.get("/:slug", async (c) => {
 
         const rest = results[0];
 
-        // 2. Get categories + products + reviews + showcase sections + team members from Supabase in parallel
-        const [categoriesRes, productsRes, reviewsRes, showcaseRes, membersRes] = await Promise.all([
+        // 2. Get categories + products + reviews (with customer names joined) in parallel
+        //    showcase_sections and restaurant_members are fetched separately / lazily if needed.
+        const [categoriesRes, productsRes, reviewsRes] = await Promise.all([
             supabase
                 .from("categories")
                 .select("id, name, description, sort_order")
@@ -585,56 +586,17 @@ storePublicRoutes.get("/:slug", async (c) => {
                 .eq("restaurant_id", rest.id)
                 .eq("is_available", true)
                 .order("sort_order"),
+            // Join users table to get customer name in one round trip
             supabase
                 .from("reviews")
-                .select("id, rating, comment, response, created_at, customer_id")
+                .select("id, rating, comment, response, created_at, customer_id, users!reviews_customer_id_fkey(full_name)")
                 .eq("restaurant_id", rest.id)
                 .eq("is_visible", true)
                 .order("created_at", { ascending: false })
-                .limit(20),
-            supabase
-                .from("showcase_sections")
-                .select("id, section_type, title, subtitle, content, display_order, is_visible, settings")
-                .eq("restaurant_id", rest.id)
-                .eq("is_visible", true)
-                .order("display_order"),
-            supabase
-                .from("restaurant_members")
-                .select("id, user_id, role, status")
-                .eq("restaurant_id", rest.id)
-                .eq("status", "active"),
+                .limit(10),
         ]);
 
-        // Resolve customer names for reviews
         const reviewData = reviewsRes.data ?? [];
-        const customerIds = [...new Set(reviewData.map(r => r.customer_id).filter(Boolean))];
-        let customerMap: Record<string, string> = {};
-        if (customerIds.length > 0) {
-            const { data: users } = await supabase
-                .from("users")
-                .select("id, full_name")
-                .in("id", customerIds);
-            for (const u of users ?? []) {
-                customerMap[u.id] = u.full_name ?? "Client";
-            }
-        }
-
-        const memberRows = membersRes.data ?? [];
-        const memberUserIds = [...new Set(memberRows.map(m => m.user_id).filter(Boolean))] as string[];
-        let memberUsersMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
-        if (memberUserIds.length > 0) {
-            const { data: memberUsers } = await supabase
-                .from("users")
-                .select("id, full_name, avatar_url")
-                .in("id", memberUserIds);
-
-            for (const user of memberUsers ?? []) {
-                memberUsersMap[user.id] = {
-                    full_name: user.full_name ?? null,
-                    avatar_url: user.avatar_url ?? null,
-                };
-            }
-        }
 
         return c.json({
             restaurant: {
@@ -707,25 +669,14 @@ storePublicRoutes.get("/:slug", async (c) => {
                 }));
                 return { ...product, images, options: options.length > 0 ? options : undefined };
             }),
-            reviews: reviewData.map(r => ({
+            reviews: reviewData.map((r: any) => ({
                 id: r.id,
                 rating: r.rating,
                 comment: r.comment,
                 response: r.response,
                 created_at: r.created_at,
-                customerName: customerMap[r.customer_id] ?? "Client",
+                customerName: r.users?.full_name ?? "Client",
             })),
-            showcaseSections: showcaseRes.data ?? [],
-            teamMembers: memberRows.map((member: any) => {
-                const profile = memberUsersMap[member.user_id];
-                return {
-                    id: member.id,
-                    // SEC-014: user_id (UUID interne) exclu de la réponse publique
-                    role: member.role,
-                    name: profile?.full_name ?? "Membre",
-                    imageUrl: profile?.avatar_url ?? null,
-                };
-            }),
         });
     } catch (error) {
         console.error("[GET /store/:slug] error:", error);
