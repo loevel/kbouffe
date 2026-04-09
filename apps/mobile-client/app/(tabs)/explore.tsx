@@ -1,16 +1,18 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
     StyleSheet, View, Text, TextInput, ScrollView, TouchableOpacity,
-    FlatList, Image, Pressable, Alert
+    FlatList, Image, Pressable, Alert, ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { CustomHeader } from '@/components/CustomHeader';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRestaurants } from '@/hooks/use-restaurants';
 import * as Haptics from 'expo-haptics';
+import { calculateDistance, formatDistance, getUserLocation, type UserLocation } from '@/lib/location-utils';
 
 // Types
 interface RecentSearch {
@@ -44,8 +46,21 @@ export default function ExploreScreen() {
     const theme = Colors[colorScheme];
     const insets = useSafeAreaInsets();
     const { restaurants } = useRestaurants();
+    const mapViewRef = useRef<MapView | null>(null);
 
     const [search, setSearch] = useState('');
+    const [mapMode, setMapMode] = useState(false);
+    const [selectedCuisine, setSelectedCuisine] = useState<string | null>(null);
+    const [selectedDeliveryTime, setSelectedDeliveryTime] = useState<number | null>(null);
+    const [offersOnly, setOffersOnly] = useState(false);
+    const [verifiedOnly, setVerifiedOnly] = useState(false);
+    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+    const [mapRegion, setMapRegion] = useState({
+        latitude: 45.5017,
+        longitude: -73.5673,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
+    });
     const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([
         { id: '1', query: 'poutine', timestamp: Date.now() - 86400000 },
         { id: '2', query: 'poutine', timestamp: Date.now() - 172800000 },
@@ -79,6 +94,61 @@ export default function ExploreScreen() {
         { id: '3', name: 'Crème et yogourt glacés', icon: '🍦' },
         { id: '4', name: 'Cuisine turque', icon: '🍢' },
     ]);
+
+    // Request user location on component mount
+    useEffect(() => {
+        (async () => {
+            const location = await getUserLocation();
+            if (location) {
+                setUserLocation(location);
+                setMapRegion(prev => ({
+                    ...prev,
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                }));
+            }
+        })();
+    }, []);
+
+    // Get unique cuisines from restaurants for filter options
+    const uniqueCuisines = useMemo(() => {
+        const cuisines = new Set(
+            restaurants
+                .map(r => r.cuisineType)
+                .filter((c): c is string => c !== null && c !== undefined)
+        );
+        return Array.from(cuisines).sort();
+    }, [restaurants]);
+
+    // Delivery time filter options
+    const deliveryTimeOptions = [
+        { label: 'Moins de 15 min', value: 15 },
+        { label: 'Moins de 30 min', value: 30 },
+        { label: 'Moins de 45 min', value: 45 },
+    ];
+
+    // Filter restaurants based on selected filters
+    const filteredRestaurants = useMemo(() => {
+        return restaurants.filter(restaurant => {
+            // Cuisine filter
+            if (selectedCuisine && restaurant.cuisineType !== selectedCuisine) {
+                return false;
+            }
+            // Delivery time filter
+            if (selectedDeliveryTime && restaurant.estimatedDeliveryTime > selectedDeliveryTime) {
+                return false;
+            }
+            // Offers filter
+            if (offersOnly && !restaurant.isSponsored) {
+                return false;
+            }
+            // Verified filter
+            if (verifiedOnly && !restaurant.isVerified) {
+                return false;
+            }
+            return true;
+        });
+    }, [restaurants, selectedCuisine, selectedDeliveryTime, offersOnly, verifiedOnly]);
 
     const handleSearch = useCallback((query: string) => {
         if (!query.trim()) return;
@@ -120,16 +190,110 @@ export default function ExploreScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <CustomHeader />
+            <CustomHeader title="Explorer" showSearch={false} />
+
+            {mapMode ? (
+                <View style={styles.mapContainer}>
+                    {filteredRestaurants.length > 0 ? (
+                        <>
+                            <MapView
+                                ref={mapViewRef}
+                                provider={PROVIDER_GOOGLE}
+                                style={styles.map}
+                                initialRegion={
+                                    userLocation
+                                        ? {
+                                            latitude: userLocation.latitude,
+                                            longitude: userLocation.longitude,
+                                            latitudeDelta: 0.1,
+                                            longitudeDelta: 0.1,
+                                        }
+                                        : {
+                                            latitude: filteredRestaurants[0]?.lat ?? 45.5017,
+                                            longitude: filteredRestaurants[0]?.lng ?? -73.5673,
+                                            latitudeDelta: 0.1,
+                                            longitudeDelta: 0.1,
+                                        }
+                                }
+                            >
+                                {filteredRestaurants
+                                    .filter(r => r.lat && r.lng)
+                                    .map((restaurant) => {
+                                        const distance = userLocation
+                                            ? calculateDistance(
+                                                userLocation.latitude,
+                                                userLocation.longitude,
+                                                restaurant.lat!,
+                                                restaurant.lng!
+                                            )
+                                            : null;
+
+                                        const description = `${restaurant.itemCount ?? 0} plats • ${restaurant.estimatedDeliveryTime || '?'} min${
+                                            distance ? ` • ${formatDistance(distance)}` : ''
+                                        }`;
+
+                                        return (
+                                            <Marker
+                                                key={restaurant.id}
+                                                coordinate={{
+                                                    latitude: restaurant.lat!,
+                                                    longitude: restaurant.lng!,
+                                                }}
+                                                title={restaurant.name}
+                                                description={description}
+                                                onPress={() => handleRestaurantPress(restaurant.id)}
+                                            />
+                                        );
+                                    })}
+                            </MapView>
+
+                            {/* Recenter Button */}
+                            {userLocation && (
+                                <TouchableOpacity
+                                    style={[styles.recenterButton, { backgroundColor: theme.primary }]}
+                                    onPress={() => {
+                                        if (mapViewRef.current && userLocation) {
+                                            mapViewRef.current.animateToRegion({
+                                                latitude: userLocation.latitude,
+                                                longitude: userLocation.longitude,
+                                                latitudeDelta: 0.1,
+                                                longitudeDelta: 0.1,
+                                            }, 300);
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        }
+                                    }}
+                                >
+                                    <Ionicons name="locate" size={20} color="#fff" />
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Map Toggle Button */}
+                            <TouchableOpacity
+                                style={[styles.mapToggleFloatingButton, { backgroundColor: theme.primary, paddingTop: insets.top }]}
+                                onPress={() => setMapMode(false)}
+                            >
+                                <Ionicons name="list" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <View style={styles.mapPlaceholder}>
+                            <ActivityIndicator size="large" color={theme.primary} />
+                            <Text style={[styles.mapPlaceholderText, { color: theme.text }]}>
+                                Aucun restaurant trouvé
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            ) : null}
 
             <ScrollView
-                style={styles.content}
+                style={[styles.content, mapMode && { display: 'none' }]}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 100 }}
             >
-                {/* Search Bar */}
-                <View style={[styles.searchBarContainer, { paddingHorizontal: Spacing.md }]}>
-                    <View style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                {/* Search Bar with Map Toggle */}
+                <View style={[styles.searchBarWrapper, { paddingHorizontal: Spacing.md }]}>
+                    <View style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border, flex: 1 }]}>
                         <Ionicons name="search" size={20} color={theme.tabIconDefault} />
                         <TextInput
                             style={[styles.searchInput, { color: theme.text }]}
@@ -138,7 +302,163 @@ export default function ExploreScreen() {
                             value={search}
                             onChangeText={setSearch}
                             onSubmitEditing={() => handleSearch(search)}
+                            returnKeyType="search"
+                            enablesReturnKeyAutomatically
                         />
+                        {search.trim() && (
+                            <TouchableOpacity
+                                onPress={() => handleSearch(search)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                                <Ionicons name="arrow-forward" size={20} color={theme.primary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <View style={[styles.modeToggleGroup, { gap: Spacing.xs }]}>
+                        <TouchableOpacity
+                            style={[
+                                styles.modeToggleButton,
+                                {
+                                    backgroundColor: !mapMode ? theme.primary : theme.surface,
+                                    borderColor: theme.border,
+                                },
+                            ]}
+                            onPress={() => setMapMode(false)}
+                        >
+                            <Ionicons name="list" size={18} color={!mapMode ? theme.background : theme.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
+                                styles.modeToggleButton,
+                                {
+                                    backgroundColor: mapMode ? theme.primary : theme.surface,
+                                    borderColor: theme.border,
+                                },
+                            ]}
+                            onPress={() => setMapMode(true)}
+                        >
+                            <Ionicons name="map" size={18} color={mapMode ? theme.background : theme.primary} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Filter Chips Section */}
+                <View style={styles.filtersSection}>
+                    {/* Cuisine Filter */}
+                    <View style={styles.filterGroup}>
+                        <Text style={[styles.filterLabel, { color: theme.text }]}>Cuisine</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsScroll}>
+                            {uniqueCuisines.map(cuisine => (
+                                <TouchableOpacity
+                                    key={cuisine}
+                                    style={[
+                                        styles.filterChip,
+                                        {
+                                            backgroundColor: selectedCuisine === cuisine ? theme.primary : theme.surface,
+                                            borderColor: theme.border,
+                                        }
+                                    ]}
+                                    onPress={() => {
+                                        setSelectedCuisine(selectedCuisine === cuisine ? null : cuisine);
+                                        Haptics.selectionAsync();
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.filterChipText,
+                                        { color: selectedCuisine === cuisine ? '#fff' : theme.text }
+                                    ]}>
+                                        {cuisine}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+
+                    {/* Delivery Time Filter */}
+                    <View style={styles.filterGroup}>
+                        <Text style={[styles.filterLabel, { color: theme.text }]}>Livraison</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsScroll}>
+                            {deliveryTimeOptions.map(option => (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    style={[
+                                        styles.filterChip,
+                                        {
+                                            backgroundColor: selectedDeliveryTime === option.value ? theme.primary : theme.surface,
+                                            borderColor: theme.border,
+                                        }
+                                    ]}
+                                    onPress={() => {
+                                        setSelectedDeliveryTime(selectedDeliveryTime === option.value ? null : option.value);
+                                        Haptics.selectionAsync();
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.filterChipText,
+                                        { color: selectedDeliveryTime === option.value ? '#fff' : theme.text }
+                                    ]}>
+                                        {option.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+
+                    {/* Offers & Verified Toggle */}
+                    <View style={styles.filterTogglesRow}>
+                        <TouchableOpacity
+                            style={[
+                                styles.filterToggle,
+                                {
+                                    backgroundColor: offersOnly ? theme.primary : theme.surface,
+                                    borderColor: theme.border,
+                                }
+                            ]}
+                            onPress={() => {
+                                setOffersOnly(!offersOnly);
+                                Haptics.selectionAsync();
+                            }}
+                        >
+                            <Ionicons
+                                name={offersOnly ? "gift" : "gift-outline"}
+                                size={16}
+                                color={offersOnly ? '#fff' : theme.primary}
+                                style={{ marginRight: Spacing.xs }}
+                            />
+                            <Text style={[
+                                styles.filterToggleText,
+                                { color: offersOnly ? '#fff' : theme.text }
+                            ]}>
+                                Offres
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.filterToggle,
+                                {
+                                    backgroundColor: verifiedOnly ? theme.primary : theme.surface,
+                                    borderColor: theme.border,
+                                }
+                            ]}
+                            onPress={() => {
+                                setVerifiedOnly(!verifiedOnly);
+                                Haptics.selectionAsync();
+                            }}
+                        >
+                            <Ionicons
+                                name={verifiedOnly ? "checkmark-circle" : "checkmark-circle-outline"}
+                                size={16}
+                                color={verifiedOnly ? '#fff' : theme.primary}
+                                style={{ marginRight: Spacing.xs }}
+                            />
+                            <Text style={[
+                                styles.filterToggleText,
+                                { color: verifiedOnly ? '#fff' : theme.text }
+                            ]}>
+                                Vérifiés
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -172,7 +492,6 @@ export default function ExploreScreen() {
                         Commander à nouveau
                     </Text>
                     <FlatList
-                        horizontal
                         data={favoriteRestaurants}
                         renderItem={({ item }) => (
                             <TouchableOpacity
@@ -194,7 +513,7 @@ export default function ExploreScreen() {
                         )}
                         keyExtractor={item => item.id}
                         scrollEnabled={false}
-                        numColumns={Math.ceil(favoriteRestaurants.length / 2)}
+                        numColumns={2}
                     />
                 </View>
 
@@ -257,6 +576,12 @@ const styles = StyleSheet.create({
     searchBarContainer: {
         paddingVertical: Spacing.md,
     },
+    searchBarWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        paddingVertical: Spacing.md,
+    },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -269,6 +594,59 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: Spacing.sm,
         ...Typography.body,
+    },
+    modeToggleGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    modeToggleButton: {
+        width: 40,
+        height: 40,
+        borderRadius: Radii.lg,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mapToggleButton: {
+        width: 44,
+        height: 44,
+        borderRadius: Radii.xl,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mapContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    map: {
+        flex: 1,
+        width: '100%',
+    },
+    mapToggleFloatingButton: {
+        position: 'absolute',
+        top: 0,
+        right: Spacing.md,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        margin: Spacing.md,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3,
+        elevation: 5,
+    },
+    mapPlaceholder: {
+        alignItems: 'center',
+        gap: Spacing.md,
+    },
+    mapPlaceholderText: {
+        ...Typography.subtitle1,
+        fontWeight: '600',
     },
     section: {
         paddingHorizontal: Spacing.md,
@@ -358,5 +736,69 @@ const styles = StyleSheet.create({
         flex: 1,
         ...Typography.body,
         fontWeight: '500',
+    },
+    filtersSection: {
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.md,
+        gap: Spacing.md,
+    },
+    filterGroup: {
+        gap: Spacing.sm,
+    },
+    filterLabel: {
+        ...Typography.caption,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        fontSize: 11,
+        letterSpacing: 0.5,
+    },
+    filterChipsScroll: {
+        marginHorizontal: -Spacing.md,
+        paddingHorizontal: Spacing.md,
+    },
+    filterChip: {
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.sm,
+        borderRadius: Radii.lg,
+        borderWidth: 1,
+        marginRight: Spacing.sm,
+    },
+    filterChipText: {
+        ...Typography.caption,
+        fontWeight: '600',
+        fontSize: 12,
+    },
+    filterTogglesRow: {
+        flexDirection: 'row',
+        gap: Spacing.md,
+    },
+    filterToggle: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: Spacing.sm,
+        borderRadius: Radii.lg,
+        borderWidth: 1,
+    },
+    filterToggleText: {
+        ...Typography.caption,
+        fontWeight: '600',
+        fontSize: 12,
+    },
+    recenterButton: {
+        position: 'absolute',
+        bottom: Spacing.lg + 60,
+        right: Spacing.md,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3,
+        elevation: 5,
     },
 });
