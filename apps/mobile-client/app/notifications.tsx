@@ -7,19 +7,21 @@ import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getNotifications, markNotificationRead, type AppNotification } from '@/lib/api';
-import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const NOTIF_ICONS: Record<string, { icon: string; color: string }> = {
-    order_update:   { icon: 'receipt',               color: '#3b82f6' },
-    delivery:       { icon: 'bicycle',               color: '#10b981' },
-    promotion:      { icon: 'pricetag',              color: '#f59e0b' },
-    loyalty:        { icon: 'star',                  color: '#a855f7' },
-    reservation:    { icon: 'calendar',              color: '#ec4899' },
-    system:         { icon: 'notifications',         color: '#64748b' },
+// ── Color-coded icon mapping per notification type ───────────────────────────
+const NOTIF_META: Record<string, { icon: string; bgLight: string; bgDark: string; fg: string }> = {
+    order_update:   { icon: 'receipt-outline',           bgLight: '#EFF6FF', bgDark: '#1e293b', fg: '#3b82f6' },
+    delivery:       { icon: 'bicycle-outline',           bgLight: '#ECFDF5', bgDark: '#14261e', fg: '#10b981' },
+    promotion:      { icon: 'megaphone-outline',         bgLight: '#FFFBEB', bgDark: '#2a2008', fg: '#f59e0b' },
+    loyalty:        { icon: 'diamond-outline',            bgLight: '#FAF5FF', bgDark: '#231432', fg: '#a855f7' },
+    reservation:    { icon: 'calendar-outline',          bgLight: '#FDF2F8', bgDark: '#2c1422', fg: '#ec4899' },
+    system:         { icon: 'information-circle-outline', bgLight: '#F8FAFC', bgDark: '#1a1d24', fg: '#64748b' },
 };
 
+// ── Time formatting helpers ──────────────────────────────────────────────────
 function timeAgo(dateStr: string) {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
@@ -43,6 +45,7 @@ function formatGroupDate(dateStr: string) {
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 }
 
+// ── Main component ───────────────────────────────────────────────────────────
 export default function NotificationsScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme() ?? 'light';
@@ -99,43 +102,58 @@ export default function NotificationsScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-                <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.backBtn, { backgroundColor: isDark ? '#ffffff08' : '#f1f5f9' }]}>
-                    <Ionicons name="arrow-back" size={22} color={theme.text} />
+            {/* ── Header ── */}
+            <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md), borderBottomColor: theme.border }]}>
+                <Pressable
+                    onPress={() => router.back()}
+                    hitSlop={12}
+                    style={({ pressed }) => [
+                        styles.headerBtn,
+                        { backgroundColor: theme.surfaceElevated },
+                        Shadows.sm,
+                        pressed && { opacity: 0.7 },
+                    ]}
+                >
+                    <Ionicons name="arrow-back" size={20} color={theme.text} />
                 </Pressable>
+
                 <View style={styles.headerCenter}>
                     <Text style={[styles.headerTitle, { color: theme.text }]}>Notifications</Text>
                     {unreadCount > 0 && (
-                        <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-                            <Text style={styles.badgeText}>{unreadCount}</Text>
+                        <View style={[styles.headerBadge, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.headerBadgeText}>{unreadCount}</Text>
                         </View>
                     )}
                 </View>
+
                 {unreadCount > 0 ? (
                     <Pressable
                         onPress={markAllRead}
-                        hitSlop={8}
+                        hitSlop={12}
                         style={({ pressed }) => [
-                            styles.readAllBtn,
-                            { backgroundColor: theme.primary + '10' },
+                            styles.headerBtn,
+                            { backgroundColor: theme.primaryLight },
                             pressed && { opacity: 0.7 },
                         ]}
                     >
-                        <Ionicons name="checkmark-done" size={16} color={theme.primary} />
+                        <Ionicons name="checkmark-done" size={18} color={theme.primary} />
                     </Pressable>
                 ) : (
                     <View style={{ width: 40 }} />
                 )}
             </View>
 
+            {/* ── Content ── */}
             {loading ? (
                 <View style={styles.loadingWrapper}>
                     <ActivityIndicator color={theme.primary} size="large" />
                 </View>
             ) : (
                 <ScrollView
-                    contentContainerStyle={[styles.scrollContent, notifications.length === 0 && styles.emptyContent]}
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        notifications.length === 0 && styles.emptyContent,
+                    ]}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
                         <RefreshControl
@@ -146,73 +164,105 @@ export default function NotificationsScreen() {
                     }
                 >
                     {notifications.length === 0 ? (
+                        /* ── Empty state ── */
                         <Animated.View
                             entering={FadeInDown.duration(400).springify()}
                             style={styles.emptyState}
                         >
-                            <View style={[styles.emptyIconCircle, { backgroundColor: theme.primary + '12' }]}>
-                                <Ionicons name="notifications-off-outline" size={48} color={theme.primary} />
+                            <View style={[styles.emptyIconRing, { borderColor: theme.border }]}>
+                                <View style={[styles.emptyIconInner, { backgroundColor: theme.primaryLight }]}>
+                                    <Ionicons name="notifications-off-outline" size={36} color={theme.primary} />
+                                </View>
                             </View>
-                            <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune notification</Text>
-                            <Text style={[styles.emptyText, { color: theme.icon }]}>
-                                Vos mises à jour de commandes,{'\n'}promotions et rappels apparaîtront ici.
+                            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                                Aucune notification
+                            </Text>
+                            <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>
+                                Vos mises à jour de commandes, promotions et rappels apparaîtront ici.
                             </Text>
                         </Animated.View>
                     ) : (
+                        /* ── Grouped notifications ── */
                         Object.entries(grouped).map(([dateKey, items], groupIndex) => (
                             <Animated.View
                                 key={dateKey}
-                                entering={FadeInDown.delay(groupIndex * 100).duration(400).springify()}
+                                entering={FadeInDown.delay(groupIndex * 80).duration(350).springify()}
                             >
-                                <Text style={[styles.dateLabel, { color: theme.icon }]}>{formatGroupDate(items[0].createdAt)}</Text>
-                                <View style={[styles.card, { backgroundColor: theme.surface }]}>
-                                    {items.map((notif, index) => {
-                                        const meta = NOTIF_ICONS[notif.type] ?? NOTIF_ICONS.system;
-                                        return (
-                                            <AnimatedPressable
-                                                key={notif.id}
-                                                layout={LinearTransition.springify()}
-                                                style={({ pressed }) => [
-                                                    styles.notifRow,
-                                                    index !== items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border + '30' },
-                                                    !notif.isRead && { backgroundColor: theme.primary + '04' },
-                                                    pressed && { opacity: 0.7 },
-                                                ]}
-                                                onPress={() => handlePress(notif)}
-                                            >
-                                                <View style={[styles.notifIcon, { backgroundColor: meta.color + '15' }]}>
-                                                    <Ionicons name={meta.icon as any} size={20} color={meta.color} />
-                                                </View>
-                                                <View style={styles.notifBody}>
-                                                    <View style={styles.notifTitleRow}>
-                                                        <Text
-                                                            style={[
-                                                                styles.notifTitle,
-                                                                { color: theme.text },
-                                                                !notif.isRead && { fontWeight: '700' },
-                                                            ]}
-                                                            numberOfLines={1}
-                                                        >
-                                                            {notif.title}
-                                                        </Text>
-                                                        {!notif.isRead && (
-                                                            <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
-                                                        )}
-                                                    </View>
-                                                    <Text style={[styles.notifMessage, { color: theme.icon }]} numberOfLines={2}>
-                                                        {notif.message}
+                                {/* Date section header */}
+                                <Text style={[styles.dateLabel, { color: theme.textMuted }]}>
+                                    {formatGroupDate(items[0].createdAt)}
+                                </Text>
+
+                                {/* Notification cards — each notification is its own card */}
+                                {items.map((notif, index) => {
+                                    const meta = NOTIF_META[notif.type] ?? NOTIF_META.system;
+                                    const iconBg = isDark ? meta.bgDark : meta.bgLight;
+
+                                    return (
+                                        <AnimatedPressable
+                                            key={notif.id}
+                                            layout={LinearTransition.springify()}
+                                            style={({ pressed }) => [
+                                                styles.notifCard,
+                                                {
+                                                    backgroundColor: theme.surfaceElevated,
+                                                    borderColor: !notif.isRead ? meta.fg + '30' : theme.border,
+                                                },
+                                                Shadows.sm,
+                                                pressed && { transform: [{ scale: 0.98 }], opacity: 0.85 },
+                                            ]}
+                                            onPress={() => handlePress(notif)}
+                                        >
+                                            {/* Colored accent bar on the left for unread */}
+                                            {!notif.isRead && (
+                                                <View style={[styles.accentBar, { backgroundColor: meta.fg }]} />
+                                            )}
+
+                                            {/* Icon */}
+                                            <View style={[styles.notifIcon, { backgroundColor: iconBg }]}>
+                                                <Ionicons name={meta.icon as any} size={22} color={meta.fg} />
+                                            </View>
+
+                                            {/* Body */}
+                                            <View style={styles.notifBody}>
+                                                <View style={styles.notifTitleRow}>
+                                                    <Text
+                                                        style={[
+                                                            styles.notifTitle,
+                                                            { color: theme.text },
+                                                            !notif.isRead && { fontWeight: '700' },
+                                                        ]}
+                                                        numberOfLines={1}
+                                                    >
+                                                        {notif.title}
                                                     </Text>
-                                                    <Text style={[styles.notifTime, { color: theme.border }]}>
+                                                    {!notif.isRead && (
+                                                        <View style={[styles.unreadDot, { backgroundColor: meta.fg }]} />
+                                                    )}
+                                                </View>
+                                                <Text
+                                                    style={[styles.notifMessage, { color: theme.textMuted }]}
+                                                    numberOfLines={2}
+                                                >
+                                                    {notif.message}
+                                                </Text>
+                                                <View style={styles.notifFooter}>
+                                                    <Ionicons name="time-outline" size={12} color={theme.tabIconDefault} />
+                                                    <Text style={[styles.notifTime, { color: theme.tabIconDefault }]}>
                                                         {timeAgo(notif.createdAt)}
                                                     </Text>
                                                 </View>
-                                                {notif.relatedId && (
-                                                    <Ionicons name="chevron-forward" size={14} color={theme.border} />
-                                                )}
-                                            </AnimatedPressable>
-                                        );
-                                    })}
-                                </View>
+                                            </View>
+
+                                            {/* Chevron for actionable items */}
+                                            {notif.relatedId && (
+                                                <View style={[styles.notifChevron, { backgroundColor: meta.fg + '10' }]}>
+                                                    <Ionicons name="chevron-forward" size={20} color={meta.fg} />
+                                                </View>
+                                            )}
+                                        </AnimatedPressable>
+                                    );
+                                })}
                             </Animated.View>
                         ))
                     )}
@@ -222,102 +272,179 @@ export default function NotificationsScreen() {
     );
 }
 
+// ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    container: { flex: 1 },
+    container: {
+        flex: 1,
+    },
 
-    /* Header */
+    /* ── Header ── */
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: Spacing.md,
         paddingBottom: Spacing.md,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    backBtn: {
+    headerBtn: {
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: Radii.full,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    headerCenter: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-    headerTitle: { ...Typography.title3 },
-    badge: {
-        minWidth: 20,
-        height: 20,
-        borderRadius: 10,
+    headerCenter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.xs,
+    },
+    headerTitle: {
+        ...Typography.title3,
+    },
+    headerBadge: {
+        minWidth: 22,
+        height: 22,
+        borderRadius: 11,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 5,
+        paddingHorizontal: 6,
     },
-    badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-    readAllBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+    headerBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+
+    /* ── Loading ── */
+    loadingWrapper: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
 
-    /* Loading */
-    loadingWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    /* ── Scroll ── */
+    scrollContent: {
+        paddingHorizontal: Spacing.md,
+        paddingTop: Spacing.sm,
+        paddingBottom: Spacing.xxl,
+    },
+    emptyContent: {
+        flex: 1,
+    },
 
-    /* List */
-    scrollContent: { padding: Spacing.md, paddingBottom: Spacing.xxl },
-    emptyContent: { flex: 1 },
-
-    /* Empty State */
+    /* ── Empty state ── */
     emptyState: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: Spacing.xl,
-        gap: Spacing.md,
-        marginTop: Spacing.xxl,
+        gap: Spacing.sm,
+        marginTop: Spacing.xxl * 2,
     },
-    emptyIconCircle: {
-        width: 96,
-        height: 96,
-        borderRadius: 48,
+    emptyIconRing: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        borderWidth: 2,
+        borderStyle: 'dashed',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: Spacing.sm,
+        marginBottom: Spacing.md,
     },
-    emptyTitle: { ...Typography.title3, textAlign: 'center' },
-    emptyText: { ...Typography.body, textAlign: 'center', lineHeight: 22 },
+    emptyIconInner: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyTitle: {
+        ...Typography.title3,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        ...Typography.body,
+        textAlign: 'center',
+        lineHeight: 22,
+        maxWidth: 280,
+    },
 
-    /* Date labels */
+    /* ── Date section label ── */
     dateLabel: {
-        ...Typography.small,
-        fontWeight: '700',
+        ...Typography.smallSemibold,
         textTransform: 'uppercase',
-        letterSpacing: 0.8,
+        letterSpacing: 1,
+        marginTop: Spacing.lg,
         marginBottom: Spacing.sm,
         marginLeft: Spacing.xs,
-        marginTop: Spacing.md,
     },
 
-    /* Card */
-    card: { borderRadius: Radii.xl, overflow: 'hidden', ...Shadows.sm, marginBottom: Spacing.sm },
-
-    /* Notification row */
-    notifRow: {
+    /* ── Notification card ── */
+    notifCard: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: Spacing.md,
+        borderRadius: Radii.xl,
+        borderWidth: 1,
+        marginBottom: Spacing.sm,
         gap: Spacing.md,
+        overflow: 'hidden',
+    },
+    accentBar: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 3,
+        borderTopLeftRadius: Radii.xl,
+        borderBottomLeftRadius: Radii.xl,
     },
     notifIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: Radii.md,
+        width: 46,
+        height: 46,
+        borderRadius: Radii.lg,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    notifBody: { flex: 1 },
-    notifTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
-    notifTitle: { ...Typography.caption, fontWeight: '600', flex: 1 },
-    unreadDot: { width: 8, height: 8, borderRadius: 4 },
-    notifMessage: { ...Typography.small, lineHeight: 18 },
-    notifTime: { ...Typography.small, marginTop: 4, fontSize: 11, fontWeight: '500' },
+    notifBody: {
+        flex: 1,
+    },
+    notifTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 3,
+    },
+    notifTitle: {
+        ...Typography.captionSemibold,
+        flex: 1,
+    },
+    unreadDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    notifMessage: {
+        ...Typography.small,
+        lineHeight: 18,
+        marginBottom: 6,
+    },
+    notifFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    notifTime: {
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    notifChevron: {
+        width: 36,
+        height: 36,
+        borderRadius: Radii.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: Spacing.xs,
+    },
 });
