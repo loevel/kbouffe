@@ -2,7 +2,7 @@ import { StyleSheet, View, Text, Pressable, ScrollView, ActivityIndicator, Image
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { CustomHeader } from '@/components/CustomHeader';
+
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -138,12 +138,6 @@ export default function ProfileScreen() {
     if (!isAuthenticated) {
         return (
             <View style={[styles.container, { backgroundColor: theme.background, flex: 1 }]}>
-                <CustomHeader
-                    title="Mon Profil"
-                    showSearch={false}
-                    showCart={false}
-                    showBack={false}
-                />
                 <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
                 <View style={[styles.emptyGuest, { paddingTop: Spacing.xxl * 2 }]}>
                     <View style={[styles.guestAvatar, { backgroundColor: theme.primary + '15' }]}>
@@ -187,16 +181,10 @@ export default function ProfileScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background, flex: 1 }]}>
-            <CustomHeader
-                title="Mon Profil"
-                showSearch={false}
-                showCart={false}
-                showBack={false}
-            />
             <ScrollView contentContainerStyle={{ paddingBottom: Spacing.xxl + 80 }}>
             {/* ── PROFILE CARD ── */}
             <View style={[styles.profileCard, { backgroundColor: theme.surface, marginHorizontal: Spacing.md, marginVertical: Spacing.md }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: Spacing.lg }}>
+                <View style={styles.profileCardRow}>
                     <Pressable onPress={pickImage} style={[styles.avatar, { backgroundColor: theme.primaryLight }]}>
                         {uploading ? (
                             <ActivityIndicator color={theme.primary} />
@@ -245,13 +233,23 @@ export default function ProfileScreen() {
 
             {/* ── STATISTIQUES ── */}
             <View style={[styles.statsGrid, { paddingHorizontal: Spacing.md, marginBottom: Spacing.lg }]}>
-                <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
+                <Pressable
+                    onPress={() => {
+                        Haptics.selectionAsync();
+                        router.push('/(tabs)/orders');
+                    }}
+                    style={({ pressed }) => [
+                        styles.statCard,
+                        { backgroundColor: theme.surface },
+                        pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
+                    ]}
+                >
                     <View style={[styles.statIconBox, { backgroundColor: theme.primary + '15' }]}>
                         <Ionicons name="receipt" size={20} color={theme.primary} />
                     </View>
                     <Text style={[styles.statValue, { color: theme.text }]}>{totalOrders}</Text>
                     <Text style={[styles.statLabel, { color: theme.textMuted }]}>Commandes</Text>
-                </View>
+                </Pressable>
                 <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
                     <View style={[styles.statIconBox, { backgroundColor: '#10b98115' }]}>
                         <Ionicons name="wallet" size={20} color="#10b981" />
@@ -259,13 +257,23 @@ export default function ProfileScreen() {
                     <Text style={[styles.statValue, { color: theme.text }]}>{totalSpent > 0 ? (totalSpent / 1000).toFixed(0) + 'k' : '0'}</Text>
                     <Text style={[styles.statLabel, { color: theme.textMuted }]}>Dépenses</Text>
                 </View>
-                <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
+                <Pressable
+                    onPress={() => {
+                        Haptics.selectionAsync();
+                        router.push('/profile/favorites');
+                    }}
+                    style={({ pressed }) => [
+                        styles.statCard,
+                        { backgroundColor: theme.surface },
+                        pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
+                    ]}
+                >
                     <View style={[styles.statIconBox, { backgroundColor: '#ef444415' }]}>
                         <Ionicons name="heart" size={20} color="#ef4444" />
                     </View>
                     <Text style={[styles.statValue, { color: theme.text }]}>{favCount}</Text>
                     <Text style={[styles.statLabel, { color: theme.textMuted }]}>Favoris</Text>
-                </View>
+                </Pressable>
             </View>
 
             {/* ── MENU GROUPÉ ── */}
@@ -387,11 +395,14 @@ const styles = StyleSheet.create({
     headerActions: { flexDirection: 'row', gap: Spacing.sm },
     headerActionBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     profileCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
         padding: Spacing.md,
         borderRadius: Radii.xl,
         ...Shadows.sm,
+    },
+    profileCardRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: Spacing.lg,
     },
     avatar: {
         width: 64,
