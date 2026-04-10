@@ -217,9 +217,9 @@ const styles = StyleSheet.create({
     infoBanner: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: Spacing.sm,
+        gap: Spacing.md,
         marginHorizontal: Spacing.md,
-        marginBottom: Spacing.md,
+        marginBottom: Spacing.lg,
         padding: Spacing.md,
         borderRadius: Radii.xl,
         borderWidth: 1,
@@ -235,17 +235,18 @@ const styles = StyleSheet.create({
     infoText: { ...Typography.caption, lineHeight: 20 },
 
     /* Section container */
-    sectionContainer: { paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
+    sectionContainer: { paddingHorizontal: Spacing.md, marginBottom: Spacing.lg },
     sectionLabel: {
         ...Typography.small,
         fontWeight: '700',
         letterSpacing: 0.8,
         marginBottom: Spacing.sm,
         marginLeft: Spacing.xs,
+        marginTop: Spacing.md,
     },
 
     /* Actions card */
-    actionsCard: { borderRadius: Radii.xl, overflow: 'hidden', ...Shadows.sm },
+    actionsCard: { borderRadius: Radii.xl, overflow: 'hidden', ...Shadows.md },
     actionRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -273,8 +274,8 @@ const styles = StyleSheet.create({
     countText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
     /* FAQ */
-    faqCard: { borderRadius: Radii.xl, overflow: 'hidden', ...Shadows.sm },
-    faqItem: { padding: Spacing.md, gap: Spacing.sm },
+    faqCard: { borderRadius: Radii.xl, overflow: 'hidden', ...Shadows.md },
+    faqItem: { padding: Spacing.md, gap: Spacing.md },
     faqHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     faqBullet: {
         width: 26,
@@ -284,18 +285,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     faqQuestion: { ...Typography.captionSemibold, fontWeight: '700', flex: 1 },
-    faqAnswer: { ...Typography.caption, lineHeight: 20, paddingLeft: 26 + Spacing.sm },
+    faqAnswer: { ...Typography.caption, lineHeight: 20, paddingLeft: 26 + Spacing.md, marginTop: Spacing.sm },
 
     /* Contact grid */
     contactGrid: { flexDirection: 'row', gap: Spacing.sm },
     contactCard: {
         flex: 1,
         alignItems: 'center',
-        padding: Spacing.md,
+        padding: Spacing.lg,
         borderRadius: Radii.xl,
         borderWidth: 1,
         gap: 8,
-        ...Shadows.sm,
+        ...Shadows.md,
     },
     contactIconBox: {
         width: 48,
