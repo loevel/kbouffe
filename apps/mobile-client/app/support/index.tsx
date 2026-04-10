@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     actionsCard: { borderRadius: Radii.xl, overflow: 'hidden', ...Shadows.md },
     actionRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         padding: Spacing.md,
         gap: Spacing.md,
     },
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    actionContent: { flex: 1 },
+    actionContent: { flex: 1, paddingTop: 2 },
     actionTitle: { ...Typography.bodySemibold },
     actionSubtitle: { ...Typography.caption, marginTop: 1 },
     countBadge: {
