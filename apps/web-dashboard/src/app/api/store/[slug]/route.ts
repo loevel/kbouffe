@@ -12,7 +12,7 @@ type Params = { params: Promise<{ slug: string }> };
 
 // Colonnes explicites — évite le select("*") et ses ~40 colonnes inutilisées
 const RESTAURANT_COLUMNS = [
-    "id", "name", "slug", "description", "logo_url", "cover_url", "banner_url",
+    "id", "name", "slug", "description", "logo_url", "banner_url",
     "address", "city", "phone", "email", "cuisine_type", "primary_color",
     "opening_hours", "rating", "review_count", "order_count",
     "is_verified", "is_premium", "has_dine_in", "has_reservations", "total_tables",
@@ -41,7 +41,11 @@ export async function GET(_request: NextRequest, { params }: Params) {
             .eq("is_published", true)
             .limit(1);
 
-        if (restError || !results || results.length === 0) {
+        if (restError) {
+            console.error("[store/slug] DB error:", restError.message);
+            return NextResponse.json({ error: "Erreur de chargement du restaurant" }, { status: 500 });
+        }
+        if (!results || results.length === 0) {
             return NextResponse.json({ error: "Restaurant non trouvé" }, { status: 404 });
         }
 
