@@ -1,3 +1,5 @@
+export const PRIMARY = '#7c3aed';
+
 // Brand violet pour le merchant (distinct du orange client)
 export const Colors = {
     light: {

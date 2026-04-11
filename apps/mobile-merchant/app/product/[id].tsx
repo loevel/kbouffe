@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch } from '@/lib/api';
-import Colors from '@/constants/colors';
+import { PRIMARY } from '@/constants/colors';
 
 interface Product {
     id: string;
@@ -68,7 +68,7 @@ export default function ProductDetailScreen() {
     if (loading) {
         return (
             <View style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.primary} />
+                <ActivityIndicator size="large" color={PRIMARY} />
             </View>
         );
     }
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     },
     multiline: { minHeight: 80, textAlignVertical: 'top' },
     saveButton: {
-        backgroundColor: Colors.primary,
+        backgroundColor: PRIMARY,
         borderRadius: 12,
         paddingVertical: 15,
         alignItems: 'center',

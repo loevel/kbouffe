@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch } from '@/lib/api';
-import Colors from '@/constants/colors';
+import { PRIMARY } from '@/constants/colors';
 
 export default function NewProductScreen() {
     const { session, restaurant } = useAuth();
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     },
     multiline: { minHeight: 80, textAlignVertical: 'top' },
     saveButton: {
-        backgroundColor: Colors.primary,
+        backgroundColor: PRIMARY,
         borderRadius: 12,
         paddingVertical: 15,
         alignItems: 'center',
