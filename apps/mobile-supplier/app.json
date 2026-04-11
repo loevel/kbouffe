@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Kbouffe Supplier",
+    "slug": "kbouffe-supplier",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "kbouffe-supplier",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kbouffe.supplier"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#15803d",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.kbouffe.supplier"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#15803d",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#15803d",
+          "dark": {
+            "backgroundColor": "#052e16"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Kbouffe Supplier utilise vos photos pour envoyer vos justificatifs KYC et illustrer vos produits."
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "kbouffe-supplier-project-id"
+      }
+    },
+    "owner": "dreamsevo"
+  }
+}
