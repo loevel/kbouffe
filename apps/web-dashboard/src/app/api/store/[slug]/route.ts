@@ -2,12 +2,29 @@
  * GET /api/store/[slug]
  * Route publique — retourne les infos du restaurant + menu + avis.
  * Pas d'auth requise.
+ * Cache CDN : s-maxage=60, stale-while-revalidate=300
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { hasPremiumStorefront } from "@/lib/premium-features";
 
 type Params = { params: Promise<{ slug: string }> };
+
+// Colonnes explicites — évite le select("*") et ses ~40 colonnes inutilisées
+const RESTAURANT_COLUMNS = [
+    "id", "name", "slug", "description", "logo_url", "cover_url", "banner_url",
+    "address", "city", "phone", "email", "cuisine_type", "primary_color",
+    "opening_hours", "rating", "review_count", "order_count",
+    "is_verified", "is_premium", "has_dine_in", "has_reservations", "total_tables",
+    "delivery_fee", "min_order_amount", "dine_in_service_fee", "corkage_fee_amount",
+    "reservation_slot_duration", "reservation_open_time", "reservation_close_time", "reservation_slot_interval",
+    "order_cancel_policy", "order_cancel_notice_minutes", "order_cancellation_fee_amount",
+    "reservation_cancel_policy", "reservation_cancel_notice_minutes", "reservation_cancellation_fee_amount",
+    "loyalty_enabled", "loyalty_points_per_order", "loyalty_point_value",
+    "loyalty_min_redeem_points", "loyalty_reward_tiers",
+    "meta_pixel_id", "google_analytics_id", "theme_layout",
+    "delivery_base_fee", "delivery_per_km_fee", "max_delivery_radius_km",
+].join(", ");
 
 export async function GET(_request: NextRequest, { params }: Params) {
     try {
@@ -16,10 +33,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
         const supabase = await createAdminClient();
 
-        // 1. Résoudre le restaurant depuis le slug
+        // 1. Résoudre le restaurant (colonnes explicites, pas de select *)
         const { data: results, error: restError } = await supabase
             .from("restaurants")
-            .select("*")
+            .select(RESTAURANT_COLUMNS)
             .eq("slug", slug)
             .eq("is_published", true)
             .limit(1);
@@ -30,11 +47,13 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
         const rest = results[0] as any;
 
-        // 1b. Check premium status for feature gating
-        const hasPremium = await hasPremiumStorefront(supabase, rest.id);
-
-        // 2. Requêtes parallèles : catégories, produits, avis, showcase, membres
-        const [categoriesRes, productsRes, reviewsRes, showcaseRes, membersRes, badgesRes, announcementsRes] = await Promise.all([
+        // 2. Toutes les requêtes en parallèle — hasPremiumStorefront inclus
+        const [
+            hasPremium,
+            categoriesRes, productsRes, reviewsRes,
+            showcaseRes, membersRes, badgesRes, announcementsRes,
+        ] = await Promise.all([
+            hasPremiumStorefront(supabase, rest.id),
             supabase
                 .from("categories")
                 .select("id, name, description, sort_order")
@@ -78,35 +97,33 @@ export async function GET(_request: NextRequest, { params }: Params) {
                 .limit(5),
         ]);
 
-        // 3. Noms clients pour les avis
+        // 3. Résolution des noms — 2 requêtes users en parallèle (étaient séquentielles)
         const reviewData = reviewsRes.data ?? [];
-        const customerIds = [...new Set(reviewData.map((r: any) => r.customer_id).filter(Boolean))];
+        const memberRows = membersRes.data ?? [];
+
+        const customerIds = [...new Set(reviewData.map((r: any) => r.customer_id).filter(Boolean))] as string[];
+        const memberUserIds = [...new Set(memberRows.map((m: any) => m.user_id).filter(Boolean))] as string[];
+
+        const [customerUsersRes, memberUsersRes] = await Promise.all([
+            customerIds.length > 0
+                ? supabase.from("users").select("id, full_name").in("id", customerIds)
+                : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+            memberUserIds.length > 0
+                ? supabase.from("users").select("id, full_name, avatar_url").in("id", memberUserIds)
+                : Promise.resolve({ data: [] as { id: string; full_name: string | null; avatar_url: string | null }[] }),
+        ]);
+
         const customerMap: Record<string, string> = {};
-        if (customerIds.length > 0) {
-            const { data: users } = await supabase
-                .from("users")
-                .select("id, full_name")
-                .in("id", customerIds);
-            for (const u of users ?? []) {
-                customerMap[(u as any).id] = (u as any).full_name ?? "Client";
-            }
+        for (const u of (customerUsersRes.data ?? [])) {
+            customerMap[(u as any).id] = (u as any).full_name ?? "Client";
         }
 
-        // 4. Profils membres
-        const memberRows = membersRes.data ?? [];
-        const memberUserIds = [...new Set(memberRows.map((m: any) => m.user_id).filter(Boolean))] as string[];
         const memberUsersMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
-        if (memberUserIds.length > 0) {
-            const { data: memberUsers } = await supabase
-                .from("users")
-                .select("id, full_name, avatar_url")
-                .in("id", memberUserIds);
-            for (const u of memberUsers ?? []) {
-                memberUsersMap[(u as any).id] = {
-                    full_name: (u as any).full_name ?? null,
-                    avatar_url: (u as any).avatar_url ?? null,
-                };
-            }
+        for (const u of (memberUsersRes.data ?? [])) {
+            memberUsersMap[(u as any).id] = {
+                full_name: (u as any).full_name ?? null,
+                avatar_url: (u as any).avatar_url ?? null,
+            };
         }
 
         return NextResponse.json({
@@ -211,6 +228,11 @@ export async function GET(_request: NextRequest, { params }: Params) {
                     color: a.color,
                 }))
                 : [],
+        }, {
+            headers: {
+                // CDN cache 60s, serve stale up to 5min while revalidating
+                "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+            },
         });
     } catch (error) {
         console.error("[GET /api/store/[slug]] error:", error);

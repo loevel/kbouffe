@@ -265,6 +265,9 @@ interface ProductReviewStats {
     average: number;
 }
 
+// Module-level cache — persiste entre les ouvertures/fermetures du modal
+const _reviewsCache = new Map<string, { reviews: ProductReview[]; stats: ProductReviewStats }>();
+
 // ── Product Detail Modal ───────────────────────────────────────────────
 function ProductDetailModal({
     product,
@@ -309,14 +312,26 @@ function ProductDetailModal({
     const [fullscreen, setFullscreen] = useState(false);
 
     useEffect(() => {
-        fetch(`/api/store/products/${product.id}/reviews`)
+        const cached = _reviewsCache.get(product.id);
+        if (cached) {
+            setReviews(cached.reviews);
+            setStats(cached.stats);
+            setLoadingReviews(false);
+            return;
+        }
+        const ctrl = new AbortController();
+        fetch(`/api/store/products/${product.id}/reviews`, { signal: ctrl.signal })
             .then((r) => r.json())
             .then((data: any) => {
-                setReviews(data.reviews ?? []);
-                setStats(data.stats ?? { count: 0, average: 0 });
+                const rv: ProductReview[] = data.reviews ?? [];
+                const st: ProductReviewStats = data.stats ?? { count: 0, average: 0 };
+                _reviewsCache.set(product.id, { reviews: rv, stats: st });
+                setReviews(rv);
+                setStats(st);
             })
-            .catch(() => {})
+            .catch((e) => { if ((e as Error).name !== "AbortError") console.error(e); })
             .finally(() => setLoadingReviews(false));
+        return () => ctrl.abort();
     }, [product.id]);
 
     // Close on Escape + arrow key navigation
@@ -359,9 +374,25 @@ function ProductDetailModal({
             });
             if (res.ok) {
                 setSubmitted(true);
-                const updated = await fetch(`/api/store/products/${product.id}/reviews`).then(r => r.json()) as any;
-                setReviews(updated.reviews ?? []);
-                setStats(updated.stats ?? stats);
+                // Mise à jour directe du state — évite le re-fetch réseau
+                const newReview: ProductReview = {
+                    id: crypto.randomUUID(),
+                    rating,
+                    comment: comment.trim() || null,
+                    response: null,
+                    created_at: new Date().toISOString(),
+                    customerName: "Vous",
+                };
+                const updatedReviews = [newReview, ...reviews];
+                const updatedStats: ProductReviewStats = {
+                    count: stats.count + 1,
+                    average: parseFloat(
+                        ((stats.average * stats.count + rating) / (stats.count + 1)).toFixed(1)
+                    ),
+                };
+                setReviews(updatedReviews);
+                setStats(updatedStats);
+                _reviewsCache.set(product.id, { reviews: updatedReviews, stats: updatedStats });
             } else {
                 const json = await res.json().catch(() => ({})) as any;
                 setSubmitError(json.error ?? "Erreur lors de l'envoi de l'avis.");
@@ -1110,42 +1141,51 @@ export function StorePageClient({ slug }: { slug: string }) {
         (async () => {
             const supabase = createClient();
             if (!supabase) return;
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            // Pull display name + phone from public.users profile
-            const { data: profile } = await supabase
-                .from("users")
-                .select("full_name, phone")
-                .eq("id", user.id)
-                .maybeSingle();
-            setResName((prev) => prev || profile?.full_name || "");
-            setResPhone((prev) => prev || profile?.phone || user.phone || "");
-            setResEmail((prev) => prev || user.email || "");
+            // getSession() lit depuis le cache local — pas de roundtrip réseau
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) return;
+            const user = session.user;
+            // Utiliser les métadonnées de session en priorité, DB en fallback
+            const metaName = (user.user_metadata?.full_name as string | undefined) ?? "";
+            if (metaName || user.phone || user.email) {
+                setResName((prev) => prev || metaName);
+                setResPhone((prev) => prev || (user.phone ?? ""));
+                setResEmail((prev) => prev || (user.email ?? ""));
+                // Seulement si full_name absent des métadonnées, on hit la DB
+                if (!metaName) {
+                    const { data: profile } = await supabase
+                        .from("users")
+                        .select("full_name, phone")
+                        .eq("id", user.id)
+                        .maybeSingle();
+                    if (profile?.full_name) setResName((prev) => prev || profile.full_name!);
+                    if (profile?.phone) setResPhone((prev) => prev || profile.phone!);
+                }
+            }
             setResAutoFilled(true);
         })();
     }, [reservationOpen, resAutoFilled]);
 
-    // Fetch availability when date or party size changes
+    // Fetch availability avec debounce 400ms — évite les spikes sur changement rapide
     useEffect(() => {
         if (!resDate || !reservationOpen) return;
         let cancelled = false;
-        (async () => {
+        const timer = setTimeout(async () => {
             setAvailLoading(true);
             try {
                 const res = await fetch(`/api/store/${slug}/availability?date=${resDate}&partySize=${resPartySize}`);
-                if (!res.ok) return;
+                if (!res.ok || cancelled) return;
                 const json = await res.json();
                 if (!cancelled) {
                     setAvailability(json);
-                    // Reset zone & time when date changes
                     setResSelectedZone(null);
                     setResTime("");
                 }
             } catch { /* ignore */ } finally {
                 if (!cancelled) setAvailLoading(false);
             }
-        })();
-        return () => { cancelled = true; };
+        }, 400);
+        return () => { cancelled = true; clearTimeout(timer); };
     }, [resDate, resPartySize, reservationOpen, slug]);
 
     // ── PWA White-Label: dynamic theme-color meta + CSS custom properties ──
@@ -2400,9 +2440,10 @@ export function StorePageClient({ slug }: { slug: string }) {
                     product={selectedProduct}
                     restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
                     onClose={() => setSelectedProduct(null)}
-                    onAdd={(selectedOpts, notes, finalPrice) =>
-                        handleAddToCart(selectedProduct, selectedOpts, notes, finalPrice)
-                    }
+                    onAdd={(selectedOpts, notes, finalPrice) => {
+                        handleAddToCart(selectedProduct, selectedOpts, notes, finalPrice);
+                        setSelectedProduct(null);
+                    }}
                     relatedProducts={products.filter((p) => p.id !== selectedProduct.id && p.is_available).slice(0, 6)}
                 />
             )}

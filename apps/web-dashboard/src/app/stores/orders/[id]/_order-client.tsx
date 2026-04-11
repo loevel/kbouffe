@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -241,8 +242,9 @@ export function OrderTrackingClient() {
     const [reviewError, setReviewError] = useState<string | null>(null);
 
     const fetchOrder = useCallback(async () => {
+        const ctrl = new AbortController();
         try {
-            const res = await fetch(`/api/store/orders/${id}`);
+            const res = await fetch(`/api/store/orders/${id}`, { signal: ctrl.signal });
             if (!res.ok) {
                 if (res.status === 404) { setError("Commande introuvable"); return; }
                 setError("Erreur de chargement");
@@ -251,25 +253,38 @@ export function OrderTrackingClient() {
             const data = await res.json();
             const fetched: OrderDetail = data.order;
             setOrder(fetched);
-            // Sync the local store
             updateOrderStatus(fetched.id, fetched.status as Parameters<typeof updateOrderStatus>[1]);
-        } catch {
-            setError("Impossible de charger la commande");
+        } catch (e: unknown) {
+            if ((e as Error).name !== "AbortError") setError("Impossible de charger la commande");
         } finally {
             setLoading(false);
         }
+        return ctrl;
     }, [id, updateOrderStatus]);
 
-    // Initial fetch + polling every 20s if still active
+    // Initial fetch + Supabase Realtime subscription (remplace le polling 20s)
     useEffect(() => {
+        if (!id) return;
         void fetchOrder();
-        const timer = setInterval(() => {
-            if (order && !["delivered", "cancelled"].includes(order.status)) {
-                void fetchOrder();
-            }
-        }, 20_000);
-        return () => clearInterval(timer);
-    }, [fetchOrder, order]);
+
+        const supabase = createClient();
+        if (!supabase) return;
+
+        const channel = supabase
+            .channel(`order-tracking:${id}`)
+            .on(
+                "postgres_changes",
+                { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${id}` },
+                (payload) => {
+                    const updated = payload.new as OrderDetail;
+                    setOrder(updated);
+                    updateOrderStatus(updated.id, updated.status as Parameters<typeof updateOrderStatus>[1]);
+                },
+            )
+            .subscribe();
+
+        return () => { void supabase.removeChannel(channel); };
+    }, [id, fetchOrder, updateOrderStatus]);
 
     const shortRef  = id ? `#KB-${id.slice(-6).toUpperCase()}` : "…";
     const isActive  = order && !["delivered", "cancelled"].includes(order.status);

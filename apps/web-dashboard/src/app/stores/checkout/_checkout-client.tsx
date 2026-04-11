@@ -145,17 +145,17 @@ export function CheckoutPageClient() {
                 const supabase = createClient();
                 if (!supabase) return;
 
-                // Get current user
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (!authUser) return;
-                setUserId(authUser.id);
+                // getSession() lit depuis le cache local (pas de roundtrip réseau)
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) return;
+                setUserId(session.user.id);
 
-                // Fetch user profile
+                // Un seul appel DB pour le profil complet
                 const { data: userProfile } = await supabase
                     .from("users")
                     .select("full_name, phone")
-                    .eq("id", authUser.id)
-                    .single();
+                    .eq("id", session.user.id)
+                    .maybeSingle();
 
                 if (userProfile) {
                     if (userProfile.full_name) setCustomerName(userProfile.full_name);
@@ -163,7 +163,6 @@ export function CheckoutPageClient() {
                 }
             } catch (err) {
                 console.error("[Checkout] Failed to load user data:", err);
-                // Silently fail - user can still enter data manually
             }
         };
 
@@ -365,7 +364,9 @@ export function CheckoutPageClient() {
                             payment_method: d.method,
                         })),
                     }),
-                }).catch(() => {}); // Non-blocking — splits can be managed from dashboard
+                }).catch(() => {
+                    console.warn("[Checkout] Split payment enregistrement échoué — le restaurant peut gérer manuellement.");
+                });
             }
             // Persister dans le store local pour le suivi
             if (orderId && restaurant) {
