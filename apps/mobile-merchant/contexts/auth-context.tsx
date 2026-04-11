@@ -107,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (cancelled) return;
             // INITIAL_SESSION is handled by getSession() above — skip to avoid double load
             if (event === 'INITIAL_SESSION') return;
+            setLoading(true); // prevent premature redirect while profile loads
             setSession(s);
             setUser(s?.user ?? null);
             if (s?.user) {
@@ -115,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 setProfile(null);
             }
-            setLoading(false);
+            if (!cancelled) setLoading(false);
         });
 
         return () => {
