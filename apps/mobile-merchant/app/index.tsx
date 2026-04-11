@@ -13,10 +13,10 @@ export default function IndexScreen() {
         if (loading) return;
         if (!session) {
             router.replace('/(auth)/login');
-        } else if (profile && !profile.restaurantId) {
-            // Logged in but no restaurant — show a "no restaurant" screen
+        } else if (!profile || !profile.restaurantId) {
+            // Logged in but no profile/restaurant found
             router.replace('/(auth)/no-restaurant');
-        } else if (profile) {
+        } else {
             router.replace('/(tabs)');
         }
     }, [session, profile, loading]);

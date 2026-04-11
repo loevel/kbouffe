@@ -90,28 +90,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [user, loadProfile]);
 
     useEffect(() => {
+        let cancelled = false;
+
         supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+            if (cancelled) return;
             setSession(s);
             setUser(s?.user ?? null);
             if (s?.user) {
                 const p = await loadProfile(s.user.id);
-                setProfile(p);
+                if (!cancelled) setProfile(p);
+            }
+            if (!cancelled) setLoading(false);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
+            if (cancelled) return;
+            // INITIAL_SESSION is handled by getSession() above — skip to avoid double load
+            if (event === 'INITIAL_SESSION') return;
+            setSession(s);
+            setUser(s?.user ?? null);
+            if (s?.user) {
+                const p = await loadProfile(s.user.id);
+                if (!cancelled) setProfile(p);
+            } else {
+                setProfile(null);
             }
             setLoading(false);
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, s) => {
-            setSession(s);
-            setUser(s?.user ?? null);
-            if (s?.user) {
-                const p = await loadProfile(s.user.id);
-                setProfile(p);
-            } else {
-                setProfile(null);
-            }
-        });
-
-        return () => subscription.unsubscribe();
+        return () => {
+            cancelled = true;
+            subscription.unsubscribe();
+        };
     }, [loadProfile]);
 
     const signIn = async (phone: string, password: string) => {
