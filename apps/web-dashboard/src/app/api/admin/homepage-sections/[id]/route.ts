@@ -8,11 +8,12 @@ import { withAdmin } from "@/lib/api/helpers";
 
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { ctx, error } = await withAdmin();
     if (error) return error;
 
+    const { id } = await params;
     const body = await request.json();
     const { title, subtitle, type, auto_rule, restaurant_ids, display_style, sort_order, is_active, starts_at, ends_at } = body;
 
@@ -31,7 +32,7 @@ export async function PATCH(
     const { data, error: dbErr } = await ctx.supabase
         .from("homepage_sections")
         .update(updates)
-        .eq("id", params.id)
+        .eq("id", id)
         .select()
         .single();
 
@@ -42,15 +43,17 @@ export async function PATCH(
 
 export async function DELETE(
     _request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { ctx, error } = await withAdmin();
     if (error) return error;
 
+    const { id } = await params;
+
     const { error: dbErr } = await ctx.supabase
         .from("homepage_sections")
         .delete()
-        .eq("id", params.id);
+        .eq("id", id);
 
     if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 });
 
