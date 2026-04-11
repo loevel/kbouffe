@@ -19,7 +19,7 @@ interface AuthContextValue {
     user: User | null;
     profile: MerchantProfile | null;
     loading: boolean;
-    signIn: (phone: string, password: string) => Promise<{ error?: string }>;
+    signIn: (email: string, password: string) => Promise<{ error?: string }>;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -124,8 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, [loadProfile]);
 
-    const signIn = async (phone: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ phone, password });
+    const signIn = async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) return { error: error.message };
         return {};
     };

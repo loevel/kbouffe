@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function LoginScreen() {
-    const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const { signIn } = useAuth();
@@ -17,23 +17,18 @@ export default function LoginScreen() {
     const theme = useTheme();
 
     const handleLogin = async () => {
-        if (!phone.trim() || !password.trim()) {
+        if (!email.trim() || !password.trim()) {
             Alert.alert('Champs requis', 'Veuillez remplir tous les champs.');
             return;
         }
         setLoading(true);
-        // Format phone: ensure starts with +237
-        let formattedPhone = phone.trim();
-        if (!formattedPhone.startsWith('+')) {
-            formattedPhone = '+237' + formattedPhone.replace(/^0+/, '');
-        }
-        const { error } = await signIn(formattedPhone, password);
+        const { error } = await signIn(email.trim().toLowerCase(), password);
         setLoading(false);
         if (error) {
-            Alert.alert('Connexion échouée', 'Numéro ou mot de passe incorrect.');
+            Alert.alert('Connexion échouée', 'Email ou mot de passe incorrect.');
             return;
         }
-        // Navigation handled by useEffect in root or index
+        // Navigation handled by useEffect in index
     };
 
     const s = styles(theme);
@@ -56,14 +51,14 @@ export default function LoginScreen() {
 
                 {/* Form */}
                 <View style={s.form}>
-                    <Text style={s.label}>Numéro de téléphone</Text>
+                    <Text style={s.label}>Adresse email</Text>
                     <TextInput
                         style={s.input}
-                        placeholder="+237 6XX XXX XXX"
+                        placeholder="vous@example.com"
                         placeholderTextColor={theme.textSecondary}
-                        value={phone}
-                        onChangeText={setPhone}
-                        keyboardType="phone-pad"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
                         autoCapitalize="none"
                         autoCorrect={false}
                     />
