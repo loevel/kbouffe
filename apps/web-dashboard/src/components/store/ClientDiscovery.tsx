@@ -520,6 +520,15 @@ export function ClientDiscovery() {
             const params = new URLSearchParams();
             if (filters.cuisineTypes?.length) params.set("cuisine", filters.cuisineTypes[0]);
 
+            // GPS coords take priority; otherwise filter by city
+            if (filters.coords?.lat && filters.coords?.lng) {
+                params.set("lat", String(filters.coords.lat));
+                params.set("lng", String(filters.coords.lng));
+                params.set("radius", String(filters.coords.radius ?? 15));
+            } else if (filters.city) {
+                params.set("city", filters.city);
+            }
+
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 10000);
             const res = await fetch(`/api/homepage-sections?${params}`, { signal: controller.signal });
@@ -535,7 +544,7 @@ export function ClientDiscovery() {
         } finally {
             setLoading(false);
         }
-    }, [filters.cuisineTypes]);
+    }, [filters.cuisineTypes, filters.city, filters.coords]);
 
     useEffect(() => {
         fetchSections();
@@ -610,7 +619,7 @@ export function ClientDiscovery() {
                             Réessayer
                         </button>
                         <button
-                            onClick={() => updateFilters({ cuisineTypes: [], sortBy: "recommended", city: "" })}
+                            onClick={() => updateFilters({ cuisineTypes: [], sortBy: "recommended", city: "Douala", coords: undefined })}
                             className="px-5 py-2.5 rounded-full border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-semibold text-sm hover:border-brand-400 transition-all"
                         >
                             Réinitialiser les filtres

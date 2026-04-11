@@ -3,9 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/homepage-sections
- * Retourne les sections actives de la page d'accueil avec les restaurants résolus.
+ * Retourne les sections actives avec les restaurants résolus.
  * Query params:
- *   ?cuisine — filtre cuisine (passé aux sections auto uniquement)
+ *   ?cuisine  — filtre cuisine
+ *   ?city     — filtre par ville (ex: "Douala")
+ *   ?lat&lng  — filtre par position GPS (en degrés décimaux)
+ *   ?radius   — rayon en km pour le filtre GPS (défaut: 15)
  */
 
 const RESTAURANT_SELECT = `
@@ -37,21 +40,28 @@ function mapRestaurant(row: any) {
 async function resolveSection(
     supabase: any,
     section: any,
-    cuisine: string
+    cuisine: string,
+    city: string,
+    nearbyIds: string[] | null   // null = no GPS filter, [] = GPS active but no results
 ): Promise<any[]> {
     try {
         if (section.type === "manual" && section.restaurant_ids?.length) {
+            let ids = section.restaurant_ids as string[];
+            // Intersect with GPS allowed list when active
+            if (nearbyIds !== null) ids = ids.filter((id) => nearbyIds.includes(id));
+            if (!ids.length) return [];
+
             const { data } = await supabase
                 .from("restaurants")
                 .select(RESTAURANT_SELECT)
                 .eq("is_published", true)
-                .in("id", section.restaurant_ids)
+                .in("id", ids)
                 .limit(20);
 
             if (!data) return [];
             // Preserve manual order
             const byId = Object.fromEntries(data.map((r: any) => [r.id, r]));
-            return section.restaurant_ids
+            return ids
                 .map((id: string) => byId[id])
                 .filter(Boolean)
                 .map(mapRestaurant);
@@ -64,6 +74,9 @@ async function resolveSection(
             .eq("is_published", true);
 
         if (cuisine) query = query.eq("cuisine_type", cuisine);
+        if (city)    query = query.eq("city", city);
+        if (nearbyIds !== null && nearbyIds.length > 0) query = query.in("id", nearbyIds);
+        if (nearbyIds !== null && nearbyIds.length === 0) return []; // GPS active, nothing nearby
 
         switch (section.auto_rule) {
             case "featured":
@@ -91,7 +104,15 @@ async function resolveSection(
         }
 
         const { data } = await query.limit(12);
-        return (data ?? []).map(mapRestaurant);
+        let results = (data ?? []).map(mapRestaurant);
+
+        // For GPS mode: re-sort by distance (nearbyIds already ordered by distance_m)
+        if (nearbyIds !== null && nearbyIds.length > 0) {
+            const order = new Map(nearbyIds.map((id, i) => [id, i]));
+            results = results.sort((a: any, b: any) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
+        }
+
+        return results;
     } catch {
         return [];
     }
@@ -101,8 +122,28 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const cuisine = searchParams.get("cuisine")?.trim() ?? "";
+        const city    = searchParams.get("city")?.trim() ?? "";
+        const latRaw  = searchParams.get("lat");
+        const lngRaw  = searchParams.get("lng");
+        const radiusKm = parseFloat(searchParams.get("radius") ?? "15");
+
+        const lat = latRaw ? parseFloat(latRaw) : null;
+        const lng = lngRaw ? parseFloat(lngRaw) : null;
+        const useGps = lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng);
 
         const supabase = await createClient();
+
+        // Resolve nearby restaurant IDs once (shared across all sections)
+        let nearbyIds: string[] | null = null;
+        if (useGps) {
+            // @ts-expect-error — nearby_restaurant_ids is a custom RPC not yet in generated types
+            const { data: nearby } = await supabase.rpc("nearby_restaurant_ids", {
+                user_lat: lat,
+                user_lng: lng,
+                radius_m: radiusKm * 1000,
+            });
+            nearbyIds = ((nearby as any[]) ?? []).map((r: { id: string }) => r.id);
+        }
 
         const now = new Date().toISOString();
 
@@ -126,7 +167,7 @@ export async function GET(request: NextRequest) {
                 auto_rule: section.auto_rule,
                 display_style: section.display_style ?? "cards",
                 sort_order: section.sort_order,
-                restaurants: await resolveSection(supabase, section, cuisine),
+                restaurants: await resolveSection(supabase, section, cuisine, city, nearbyIds),
             }))
         );
 

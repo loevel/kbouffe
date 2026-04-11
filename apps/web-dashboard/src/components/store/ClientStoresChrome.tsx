@@ -48,7 +48,7 @@ import { toast } from "react-hot-toast";
 import { LanguageSelector } from "./LanguageSelector";
 import { UserMenu } from "./UserMenu";
 
-const CITIES = ["Douala", "Yaoundé", "Garoua", "Kribi", "Bafoussam"];
+const CITIES = ["Douala", "Yaoundé", "Bafoussam", "Garoua", "Kribi", "Limbé", "Nkongsamba", "Dschang", "Maroua", "Baganté", "Bamendjou"];
 
 const HISTORY_KEY = "kbouffe_search_history";
 const MAX_HISTORY = 8;
@@ -144,7 +144,10 @@ export function ClientStoresChrome({
         try {
             const coords = await getCurrentCoordinates();
             const result = await getCityFromCoordinates(coords);
-            updateFilters({ city: result.city });
+            updateFilters({
+                city: result.city,
+                coords: { lat: coords.latitude, lng: coords.longitude, radius: 15 },
+            });
             toast.success(`Position détectée : ${result.city}`);
             setIsCityMenuOpen(false);
         } catch (error: any) {
@@ -337,7 +340,7 @@ export function ClientStoresChrome({
                                         </button>
                                         <div className="space-y-1">
                                             {CITIES.map((city) => (
-                                                <button key={city} onClick={() => { updateFilters({ city }); setIsCityMenuOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors ${filters.city === city ? "bg-brand-500 text-white" : "text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"}`}>
+                                                <button key={city} onClick={() => { updateFilters({ city, coords: undefined }); setIsCityMenuOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors ${filters.city === city ? "bg-brand-500 text-white" : "text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"}`}>
                                                     {city}
                                                 </button>
                                             ))}
@@ -359,7 +362,7 @@ export function ClientStoresChrome({
                                         </button>
                                         <div className="my-1.5 border-t border-surface-100 dark:border-white/5" />
                                         {CITIES.map((city) => (
-                                            <button key={city} onClick={() => { updateFilters({ city }); setIsCityMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${filters.city === city ? "text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10" : "text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"}`}>
+                                            <button key={city} onClick={() => { updateFilters({ city, coords: undefined }); setIsCityMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${filters.city === city ? "text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10" : "text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800"}`}>
                                                 {city}
                                             </button>
                                         ))}

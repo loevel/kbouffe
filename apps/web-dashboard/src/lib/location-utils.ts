@@ -12,15 +12,21 @@ export interface LocationResult {
     raw?: any;
 }
 
-const SUPPORTED_CITIES = ["Douala", "Yaoundé", "Garoua", "Kribi", "Bafoussam"];
+const SUPPORTED_CITIES = ["Douala", "Yaoundé", "Bafoussam", "Garoua", "Kribi", "Limbé", "Nkongsamba", "Dschang", "Maroua", "Baganté", "Bamendjou"];
 
 /** Approximate center coordinates for supported cities */
 const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
-    "Douala":     { lat: 4.0511,  lon: 9.7679 },
-    "Yaoundé":    { lat: 3.8480,  lon: 11.5021 },
-    "Garoua":     { lat: 9.3014,  lon: 13.3936 },
-    "Kribi":      { lat: 2.9491,  lon: 9.9106 },
-    "Bafoussam":  { lat: 5.4764,  lon: 10.4175 },
+    "Douala":      { lat: 4.0511,  lon: 9.7679 },
+    "Yaoundé":     { lat: 3.8480,  lon: 11.5021 },
+    "Garoua":      { lat: 9.3014,  lon: 13.3936 },
+    "Kribi":       { lat: 2.9491,  lon: 9.9106 },
+    "Bafoussam":   { lat: 5.4764,  lon: 10.4175 },
+    "Limbé":       { lat: 4.0182,  lon: 9.2049 },
+    "Nkongsamba":  { lat: 4.9526,  lon: 9.9340 },
+    "Dschang":     { lat: 5.4487,  lon: 10.0536 },
+    "Maroua":      { lat: 10.5916, lon: 14.3159 },
+    "Baganté":     { lat: 5.1667,  lon: 10.5333 },
+    "Bamendjou":   { lat: 5.3833,  lon: 10.4167 },
 };
 
 /** Haversine distance in km */
@@ -131,9 +137,10 @@ export async function getCityFromCoordinates(coords: Coordinates): Promise<Locat
         const region = (data.address?.state || data.address?.region || "").toLowerCase();
         if (region.includes("littoral")) return { city: "Douala", raw: data };
         if (region.includes("centre")) return { city: "Yaoundé", raw: data };
-        if (region.includes("nord")) return { city: "Garoua", raw: data };
+        if (region.includes("nord")) return { city: "Maroua", raw: data };
         if (region.includes("sud")) return { city: "Kribi", raw: data };
         if (region.includes("ouest")) return { city: "Bafoussam", raw: data };
+        if (region.includes("sud-ouest") || region.includes("south west")) return { city: "Limbé", raw: data };
 
         // No match at all — default to Douala
         return { city: "Douala", raw: data };

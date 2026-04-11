@@ -81,6 +81,7 @@ export interface SearchFilters {
     hasPromo: boolean;
     deliveryMode: "delivery" | "pickup" | "reservation";
     city: string;
+    coords?: { lat: number; lng: number; radius: number };
 }
 
 // Store de session utilisateur
