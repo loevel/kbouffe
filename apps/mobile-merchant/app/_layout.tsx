@@ -18,6 +18,7 @@ export default function RootLayout() {
                     <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
                     <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
                     <Stack.Screen name="product/new" options={{ headerShown: false }} />
+                    <Stack.Screen name="reports" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar style="auto" />
             </ThemeProvider>

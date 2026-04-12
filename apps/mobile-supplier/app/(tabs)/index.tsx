@@ -169,16 +169,16 @@ export default function DashboardScreen() {
                     <AlertRow
                         theme={theme}
                         icon="shield-checkmark-outline"
-                        label={profile?.kyc_status === ‘approved’ ? ‘Dossier validé’ : ‘Dossier KYC en attente’}
-                        hint={profile?.kyc_status === ‘approved’ ? ‘Vous pouvez gérer librement votre catalogue.’ : ‘Surveillez les demandes de correction éventuelles.’}
+                        label={profile?.kyc_status === "approved" ? "Dossier validé" : "Dossier KYC en attente"}
+                        hint={profile?.kyc_status === "approved" ? "Vous pouvez gérer librement votre catalogue." : "Surveillez les demandes de correction éventuelles."}
                         fontScale={fontScale}
                         compactMode={settings.compactMode}
                     />
                     <AlertRow
                         theme={theme}
                         icon="warning-outline"
-                        label={lowStock > 0 ? `${lowStock} produit(s) avec stock faible` : ‘Alerte stock maîtrisée’}
-                        hint={lowStock > 0 ? ‘Mettez à jour les quantités disponibles.’ : ‘Aucun produit critique aujourd’hui.’}
+                        label={lowStock > 0 ? `${lowStock} produit(s) avec stock faible` : "Alerte stock maitrisee"}
+                        hint={lowStock > 0 ? "Mettez a jour les quantites disponibles." : "Aucun produit critique aujourd hui."}
                         fontScale={fontScale}
                         compactMode={settings.compactMode}
                     />
