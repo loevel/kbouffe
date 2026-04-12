@@ -10,7 +10,7 @@ import {
     ActivityIndicator,
     ScrollView,
 } from 'react-native';
-
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,6 +22,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '@/contexts/cart-context';
 import { useAuth } from '@/contexts/auth-context';
+import { OrdersListSkeleton } from '@/components/ui/Skeleton';
 
 /* ── Status config ───────────────────────────────────────────────── */
 const statusConfig: Record<MobileOrderStatus, { label: string; color: string; icon: string }> = {
@@ -48,6 +49,24 @@ const ACTIVE_STEPS: MobileOrderStatus[] = ['pending', 'confirmed', 'preparing', 
 function getProgressIndex(status: MobileOrderStatus): number {
     const idx = ACTIVE_STEPS.indexOf(status);
     return idx >= 0 ? idx : 0;
+}
+
+function formatDate(isoStr: string): string {
+    const d = new Date(isoStr);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+
+    if (mins < 1) return "À l'instant";
+    if (mins < 60) return `Il y a ${mins} min`;
+    if (hours < 24) return `Il y a ${hours}h`;
+
+    return d.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
 }
 
 function formatTime(isoStr: string): string {
@@ -196,7 +215,7 @@ export default function OrdersScreen() {
                         <View style={styles.deliveryMeta}>
                             <Ionicons name={deliveryInfo.icon as any} size={11} color={theme.icon} />
                             <Text style={[styles.metaText, { color: theme.icon }]}>
-                                {deliveryInfo.label} à {formatTime(order.createdAt)} • {order.total.toLocaleString('fr-FR')} FCFA
+                                {deliveryInfo.label} • {formatDate(order.createdAt)} • {order.total.toLocaleString('fr-FR')} FCFA
                             </Text>
                         </View>
                     </View>
@@ -403,14 +422,9 @@ export default function OrdersScreen() {
                 })}
             </View>
 
-            {/* Loading */}
+            {/* Loading skeleton */}
             {loading && orders.length === 0 ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator color={theme.primary} size="large" />
-                    <Text style={[styles.loadingText, { color: theme.icon }]}>
-                        Chargement de vos commandes…
-                    </Text>
-                </View>
+                <OrdersListSkeleton />
             ) : (
                 <SectionList
                     sections={sections}

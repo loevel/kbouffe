@@ -17,6 +17,7 @@ import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { LoyaltyProvider } from '@/contexts/loyalty-context';
 import { SupportProvider } from '@/contexts/support-context';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const unstable_settings = {
     anchor: '(tabs)',
@@ -24,11 +25,13 @@ export const unstable_settings = {
 
 export default function RootLayout() {
     return (
-        <AuthProvider>
-            <AppThemeProvider>
-                <LayoutContent />
-            </AppThemeProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+            <AuthProvider>
+                <AppThemeProvider>
+                    <LayoutContent />
+                </AppThemeProvider>
+            </AuthProvider>
+        </ErrorBoundary>
     );
 }
 

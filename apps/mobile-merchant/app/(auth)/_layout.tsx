@@ -14,7 +14,7 @@ export default function AuthLayout() {
         } else {
             router.replace('/(auth)/no-restaurant');
         }
-    }, [session, profile, loading]);
+    }, [session, profile, loading, router]);
 
     return <Stack screenOptions={{ headerShown: false }} />;
 }

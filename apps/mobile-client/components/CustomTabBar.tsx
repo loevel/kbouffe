@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Shadows, Radii, Typography } from '@/constants/theme';
@@ -7,13 +7,18 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCart } from '@/contexts/cart-context';
 import { useOrders } from '@/contexts/orders-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { useAuth } from '@/contexts/auth-context';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isSmallScreen = SCREEN_WIDTH < 360;
+const ICON_SIZE = isSmallScreen ? 20 : 22;
 
 const TAB_ICONS = {
-  index: { active: 'home', inactive: 'home-outline', label: 'Accueil' },
-  explore: { active: 'search', inactive: 'search-outline', label: 'Explorer' },
-  favorites: { active: 'heart', inactive: 'heart-outline', label: 'Favoris' },
-  orders: { active: 'receipt', inactive: 'receipt-outline', label: 'Commandes' },
-  profile: { active: 'person', inactive: 'person-outline', label: 'Profil' },
+  index: { active: 'home' as const, inactive: 'home-outline' as const, label: 'Accueil' },
+  explore: { active: 'search' as const, inactive: 'search-outline' as const, label: 'Explorer' },
+  orders: { active: 'receipt' as const, inactive: 'receipt-outline' as const, label: 'Commandes' },
+  profile: { active: 'person' as const, inactive: 'person-outline' as const, label: 'Profil' },
 };
 
 type TabName = keyof typeof TAB_ICONS;
@@ -24,6 +29,7 @@ export function CustomTabBar({ state, navigation: navProp }: BottomTabBarProps) 
   const insets = useSafeAreaInsets();
   const { items } = useCart();
   const { activeOrderCount } = useOrders();
+  const { user } = useAuth();
 
   const cartCount = items.length;
 
@@ -48,13 +54,15 @@ export function CustomTabBar({ state, navigation: navProp }: BottomTabBarProps) 
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const tabName = route.name as TabName;
-          const config = TAB_ICONS[tabName] ?? {
-            active: 'ellipse',
-            inactive: 'ellipse-outline',
-            label: route.name,
-          };
+
+          // Skip rendering hidden tabs
+          if (!TAB_ICONS[tabName]) return null;
+
+          const config = TAB_ICONS[tabName];
 
           const onPress = () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
             const event = navProp.emit({
               type: 'tabPress',
               target: route.key,
@@ -67,7 +75,7 @@ export function CustomTabBar({ state, navigation: navProp }: BottomTabBarProps) 
           };
 
           const badgeCount =
-            tabName === 'explore' ? cartCount : tabName === 'orders' ? activeOrderCount : 0;
+            tabName === 'index' ? cartCount : tabName === 'orders' ? activeOrderCount : 0;
 
           return (
             <TouchableOpacity
@@ -80,18 +88,32 @@ export function CustomTabBar({ state, navigation: navProp }: BottomTabBarProps) 
                 })
               }
               activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isFocused }}
+              accessibilityLabel={`${config.label}${badgeCount > 0 ? `, ${badgeCount} notification${badgeCount > 1 ? 's' : ''}` : ''}`}
               style={[
                 styles.tabItem,
                 isFocused && {
                   backgroundColor: theme.primaryLight,
+                  transform: [{ scale: 1.05 }],
                 },
               ]}>
               <View style={styles.iconWrapper}>
-                <Ionicons
-                  name={isFocused ? config.active : config.inactive}
-                  size={22}
-                  color={isFocused ? theme.primary : theme.tabIconDefault}
-                />
+                {tabName === 'profile' && user?.avatarUrl ? (
+                  <Image
+                    source={{ uri: user.avatarUrl }}
+                    style={[
+                      styles.avatar,
+                      isFocused && { borderWidth: 2, borderColor: theme.primary },
+                    ]}
+                  />
+                ) : (
+                  <Ionicons
+                    name={isFocused ? config.active : config.inactive}
+                    size={ICON_SIZE}
+                    color={isFocused ? theme.primary : theme.tabIconDefault}
+                  />
+                )}
                 {badgeCount > 0 ? (
                   <View style={[styles.badge, { backgroundColor: theme.primary }]}>
                     <Text style={styles.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
@@ -109,6 +131,10 @@ export function CustomTabBar({ state, navigation: navProp }: BottomTabBarProps) 
                 ]}>
                 {config.label}
               </Text>
+
+              {isFocused && (
+                <View style={[styles.activeIndicator, { backgroundColor: theme.primary }]} />
+              )}
             </TouchableOpacity>
           );
         })}
@@ -145,6 +171,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
   label: {
     ...Typography.smallSemibold,
   },
@@ -163,5 +194,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
+  },
+  activeIndicator: {
+    width: 16,
+    height: 3,
+    borderRadius: 1.5,
+    marginTop: 2,
   },
 });

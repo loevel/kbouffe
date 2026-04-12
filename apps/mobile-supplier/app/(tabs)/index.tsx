@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -13,9 +14,11 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/contexts/auth-context';
+import { useSettings } from '@/contexts/settings-context';
 import { authApiFetch } from '@/lib/api';
 import { formatFCFA, relativeTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { useFontScale, scaled } from '@/hooks/use-font-scale';
 import type { SupplierMessage, SupplierOrder, SupplierProduct } from '@/lib/types';
 
 interface DashboardState {
@@ -36,8 +39,11 @@ export default function DashboardScreen() {
     const theme = useTheme();
     const router = useRouter();
     const { profile } = useAuth();
+    const { settings } = useSettings();
+    const fontScale = useFontScale();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [state, setState] = useState<DashboardState>({
         products: [],
         orders: [],
@@ -78,21 +84,42 @@ export default function DashboardScreen() {
     }, [profile?.id]);
 
     useEffect(() => {
+        let mounted = true;
+
         loadDashboard()
-            .catch(() => undefined)
-            .finally(() => setLoading(false));
+            .then(() => {
+                if (mounted) setErrorMessage(null);
+            })
+            .catch((error) => {
+                if (!mounted) return;
+                const message = error instanceof Error ? error.message : 'Impossible de charger le tableau de bord';
+                setErrorMessage(message);
+                Alert.alert('Erreur', message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
     }, [loadDashboard]);
 
     const onRefresh = async () => {
         setRefreshing(true);
         try {
             await loadDashboard();
+            setErrorMessage(null);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Impossible de rafraîchir les données';
+            setErrorMessage(message);
+            Alert.alert('Erreur', message);
         } finally {
             setRefreshing(false);
         }
     };
 
-    const styles = createStyles(theme);
+    const styles = createStyles(theme, fontScale, settings.compactMode);
     const activeProducts = state.products.filter((product) => product.is_active).length;
     const totalRevenue = state.orders
         .filter((order) => order.delivery_status !== 'cancelled')
@@ -123,11 +150,18 @@ export default function DashboardScreen() {
                     </Text>
                 </View>
 
+                {errorMessage ? (
+                    <View style={styles.errorCard}>
+                        <Text style={styles.errorTitle}>Certaines données ne sont pas à jour</Text>
+                        <Text style={styles.errorText}>{errorMessage}</Text>
+                    </View>
+                ) : null}
+
                 <View style={styles.grid}>
-                    <StatCard title="CA généré" value={formatFCFA(totalRevenue)} icon="cash-outline" theme={theme} />
-                    <StatCard title="Produits actifs" value={String(activeProducts)} icon="cube-outline" theme={theme} />
-                    <StatCard title="Commandes à traiter" value={String(pendingOrders)} icon="receipt-outline" theme={theme} />
-                    <StatCard title="Messages non lus" value={String(state.unreadMessages)} icon="chatbubble-outline" theme={theme} />
+                    <StatCard title="CA généré" value={formatFCFA(totalRevenue)} icon="cash-outline" theme={theme} fontScale={fontScale} compactMode={settings.compactMode} />
+                    <StatCard title="Produits actifs" value={String(activeProducts)} icon="cube-outline" theme={theme} fontScale={fontScale} compactMode={settings.compactMode} />
+                    <StatCard title="Commandes à traiter" value={String(pendingOrders)} icon="receipt-outline" theme={theme} fontScale={fontScale} compactMode={settings.compactMode} />
+                    <StatCard title="Messages non lus" value={String(state.unreadMessages)} icon="chatbubble-outline" theme={theme} fontScale={fontScale} compactMode={settings.compactMode} />
                 </View>
 
                 <View style={styles.alertCard}>
@@ -135,14 +169,18 @@ export default function DashboardScreen() {
                     <AlertRow
                         theme={theme}
                         icon="shield-checkmark-outline"
-                        label={profile?.kyc_status === 'approved' ? 'Dossier validé' : 'Dossier KYC en attente'}
-                        hint={profile?.kyc_status === 'approved' ? 'Vous pouvez gérer librement votre catalogue.' : 'Surveillez les demandes de correction éventuelles.'}
+                        label={profile?.kyc_status === ‘approved’ ? ‘Dossier validé’ : ‘Dossier KYC en attente’}
+                        hint={profile?.kyc_status === ‘approved’ ? ‘Vous pouvez gérer librement votre catalogue.’ : ‘Surveillez les demandes de correction éventuelles.’}
+                        fontScale={fontScale}
+                        compactMode={settings.compactMode}
                     />
                     <AlertRow
                         theme={theme}
                         icon="warning-outline"
-                        label={lowStock > 0 ? `${lowStock} produit(s) avec stock faible` : 'Alerte stock maîtrisée'}
-                        hint={lowStock > 0 ? 'Mettez à jour les quantités disponibles.' : 'Aucun produit critique aujourd’hui.'}
+                        label={lowStock > 0 ? `${lowStock} produit(s) avec stock faible` : ‘Alerte stock maîtrisée’}
+                        hint={lowStock > 0 ? ‘Mettez à jour les quantités disponibles.’ : ‘Aucun produit critique aujourd’hui.’}
+                        fontScale={fontScale}
+                        compactMode={settings.compactMode}
                     />
                 </View>
 
@@ -176,9 +214,9 @@ export default function DashboardScreen() {
                 </View>
 
                 <View style={styles.quickActions}>
-                    <QuickAction theme={theme} icon="add-circle-outline" label="Ajouter un produit" onPress={() => router.push('/product/new')} />
-                    <QuickAction theme={theme} icon="person-circle-outline" label="Compléter le profil" onPress={() => router.push('/(tabs)/profile')} />
-                    <QuickAction theme={theme} icon="chatbubble-ellipses-outline" label="Ouvrir les messages" onPress={() => router.push('/(tabs)/messages')} />
+                    <QuickAction theme={theme} icon="add-circle-outline" label="Ajouter un produit" onPress={() => router.push('/product/new')} fontScale={fontScale} compactMode={settings.compactMode} />
+                    <QuickAction theme={theme} icon="person-circle-outline" label="Compléter le profil" onPress={() => router.push('/(tabs)/profile')} fontScale={fontScale} compactMode={settings.compactMode} />
+                    <QuickAction theme={theme} icon="chatbubble-ellipses-outline" label="Ouvrir les messages" onPress={() => router.push('/(tabs)/messages')} fontScale={fontScale} compactMode={settings.compactMode} />
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -190,13 +228,17 @@ function StatCard({
     value,
     icon,
     theme,
+    fontScale,
+    compactMode,
 }: {
     title: string;
     value: string;
     icon: keyof typeof Ionicons.glyphMap;
     theme: ReturnType<typeof useTheme>;
+    fontScale: number;
+    compactMode: boolean;
 }) {
-    const styles = createStyles(theme);
+    const styles = createStyles(theme, fontScale, compactMode);
     return (
         <View style={styles.statCard}>
             <View style={styles.statIcon}>
@@ -213,13 +255,17 @@ function AlertRow({
     icon,
     label,
     hint,
+    fontScale,
+    compactMode,
 }: {
     theme: ReturnType<typeof useTheme>;
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
     hint: string;
+    fontScale: number;
+    compactMode: boolean;
 }) {
-    const styles = createStyles(theme);
+    const styles = createStyles(theme, fontScale, compactMode);
     return (
         <View style={styles.alertRow}>
             <Ionicons name={icon} size={18} color={theme.primary} />
@@ -236,13 +282,17 @@ function QuickAction({
     icon,
     label,
     onPress,
+    fontScale,
+    compactMode,
 }: {
     theme: ReturnType<typeof useTheme>;
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
     onPress: () => void;
+    fontScale: number;
+    compactMode: boolean;
 }) {
-    const styles = createStyles(theme);
+    const styles = createStyles(theme, fontScale, compactMode);
     return (
         <Pressable style={styles.actionCard} onPress={onPress}>
             <Ionicons name={icon} size={24} color={theme.primary} />
@@ -251,7 +301,11 @@ function QuickAction({
     );
 }
 
-function createStyles(theme: ReturnType<typeof useTheme>) {
+function createStyles(theme: ReturnType<typeof useTheme>, fontScale: number, compactMode: boolean) {
+    const gap = compactMode ? 8 : 16;
+    const padding = compactMode ? 12 : 20;
+    const heroGap = compactMode ? 4 : 6;
+
     return StyleSheet.create({
         container: {
             flex: 1,
@@ -265,27 +319,45 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         },
         content: {
             padding: 16,
-            gap: 16,
+            gap,
         },
         hero: {
             backgroundColor: theme.primary,
-            padding: 20,
+            padding,
             borderRadius: 24,
-            gap: 6,
+            gap: heroGap,
         },
         greeting: {
             color: 'rgba(255,255,255,0.82)',
-            fontSize: 13,
+            fontSize: scaled(13, fontScale),
             fontWeight: '600',
         },
         heroTitle: {
             color: '#fff',
-            fontSize: 26,
+            fontSize: scaled(26, fontScale),
             fontWeight: '800',
         },
         heroSubtitle: {
             color: 'rgba(255,255,255,0.82)',
-            fontSize: 14,
+            fontSize: scaled(14, fontScale),
+        },
+        errorCard: {
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: '#fecaca',
+            backgroundColor: '#fee2e2',
+            padding: 14,
+            gap: 4,
+        },
+        errorTitle: {
+            color: '#b91c1c',
+            fontSize: scaled(13, fontScale),
+            fontWeight: '800',
+        },
+        errorText: {
+            color: '#991b1b',
+            lineHeight: 19,
+            fontSize: scaled(13, fontScale),
         },
         grid: {
             flexDirection: 'row',
@@ -310,12 +382,12 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             justifyContent: 'center',
         },
         statLabel: {
-            fontSize: 12,
+            fontSize: scaled(12, fontScale),
             color: theme.textSecondary,
             fontWeight: '600',
         },
         statValue: {
-            fontSize: 19,
+            fontSize: scaled(19, fontScale),
             fontWeight: '800',
             color: theme.text,
         },
@@ -328,7 +400,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             gap: 12,
         },
         sectionTitle: {
-            fontSize: 18,
+            fontSize: scaled(18, fontScale),
             fontWeight: '700',
             color: theme.text,
         },
@@ -340,11 +412,11 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         alertTitle: {
             color: theme.text,
             fontWeight: '700',
-            fontSize: 14,
+            fontSize: scaled(14, fontScale),
         },
         alertHint: {
             color: theme.textSecondary,
-            fontSize: 12,
+            fontSize: scaled(12, fontScale),
             marginTop: 2,
             lineHeight: 18,
         },
@@ -385,12 +457,12 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         },
         timelineTitle: {
             color: theme.text,
-            fontSize: 14,
+            fontSize: scaled(14, fontScale),
             fontWeight: '700',
         },
         timelineSubtitle: {
             color: theme.textSecondary,
-            fontSize: 12,
+            fontSize: scaled(12, fontScale),
             marginTop: 2,
         },
         quickActions: {
@@ -410,7 +482,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         },
         actionLabel: {
             color: theme.text,
-            fontSize: 13,
+            fontSize: scaled(13, fontScale),
             fontWeight: '700',
             lineHeight: 18,
         },

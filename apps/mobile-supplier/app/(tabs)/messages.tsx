@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Modal,
     Pressable,
     RefreshControl,
@@ -25,6 +26,13 @@ const FILTERS: { key: 'all' | MessageStatus; label: string }[] = [
     { key: 'archived', label: 'Archivés' },
 ];
 
+const STATUS_LABELS: Record<MessageStatus, string> = {
+    unread: 'Non lu',
+    read: 'Lu',
+    replied: 'Répondu',
+    archived: 'Archivé',
+};
+
 export default function MessagesScreen() {
     const theme = useTheme();
     const { profile } = useAuth();
@@ -35,6 +43,7 @@ export default function MessagesScreen() {
     const [selected, setSelected] = useState<SupplierMessage | null>(null);
     const [replyBody, setReplyBody] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadMessages = useCallback(async () => {
         if (!profile?.id) return;
@@ -57,15 +66,36 @@ export default function MessagesScreen() {
     }, [activeFilter, profile?.id]);
 
     useEffect(() => {
+        let mounted = true;
+
         loadMessages()
-            .catch(() => undefined)
-            .finally(() => setLoading(false));
+            .then(() => {
+                if (mounted) setErrorMessage(null);
+            })
+            .catch((error) => {
+                if (!mounted) return;
+                const message = error instanceof Error ? error.message : 'Impossible de charger les messages';
+                setErrorMessage(message);
+                Alert.alert('Erreur', message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
     }, [loadMessages]);
 
     const onRefresh = async () => {
         setRefreshing(true);
         try {
             await loadMessages();
+            setErrorMessage(null);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Impossible de rafraîchir les messages';
+            setErrorMessage(message);
+            Alert.alert('Erreur', message);
         } finally {
             setRefreshing(false);
         }
@@ -100,8 +130,12 @@ export default function MessagesScreen() {
         if (message.status === 'unread') {
             try {
                 await updateMessage(message, 'read');
-            } catch {
-                // Keep modal open even if read marking fails.
+            } catch (error) {
+                const messageText =
+                    error instanceof Error
+                        ? error.message
+                        : 'Le message a été ouvert mais son état n’a pas pu être synchronisé.';
+                Alert.alert('Synchronisation incomplète', messageText);
             }
         }
     };
@@ -144,6 +178,14 @@ export default function MessagesScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
             >
                 <Text style={styles.title}>Messages & devis</Text>
+
+                {errorMessage ? (
+                    <View style={styles.errorCard}>
+                        <Text style={styles.errorTitle}>Synchronisation incomplète</Text>
+                        <Text style={styles.errorText}>{errorMessage}</Text>
+                    </View>
+                ) : null}
+
                 <View style={styles.filters}>
                     {FILTERS.map((item) => (
                         <Pressable key={item.key} style={[styles.filterChip, activeFilter === item.key && styles.filterChipActive]} onPress={() => setActiveFilter(item.key)}>
@@ -162,7 +204,7 @@ export default function MessagesScreen() {
                         <Pressable key={message.id} style={styles.card} onPress={() => openMessage(message)}>
                             <View style={styles.cardHeader}>
                                 <Text style={styles.cardTitle}>{message.subject ?? 'Demande de devis'}</Text>
-                                <Text style={styles.cardStatus}>{message.status}</Text>
+                                <Text style={styles.cardStatus}>{STATUS_LABELS[message.status]}</Text>
                             </View>
                             <Text style={styles.cardMeta}>{message.restaurants?.name ?? 'Restaurant'} · {relativeTime(message.created_at)}</Text>
                             <Text numberOfLines={2} style={styles.cardBody}>{message.body}</Text>
@@ -230,6 +272,24 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             fontSize: 24,
             fontWeight: '800',
             color: theme.text,
+        },
+        errorCard: {
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: '#fecaca',
+            backgroundColor: '#fee2e2',
+            padding: 12,
+            gap: 4,
+        },
+        errorTitle: {
+            color: '#b91c1c',
+            fontWeight: '800',
+            fontSize: 13,
+        },
+        errorText: {
+            color: '#991b1b',
+            lineHeight: 18,
+            fontSize: 12,
         },
         filters: {
             flexDirection: 'row',

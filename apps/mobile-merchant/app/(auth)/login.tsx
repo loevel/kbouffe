@@ -3,7 +3,6 @@ import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -13,7 +12,6 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const { signIn } = useAuth();
-    const router = useRouter();
     const theme = useTheme();
 
     const handleLogin = async () => {
@@ -45,8 +43,8 @@ export default function LoginScreen() {
                     <View style={s.logoBox}>
                         <Text style={s.logoText}>K</Text>
                     </View>
-                    <Text style={s.appName}>Kbouffe Merchant</Text>
-                    <Text style={s.tagline}>Gérez votre restaurant</Text>
+                    <Text style={s.appName}>Kbouffe Gestionnaire</Text>
+                    <Text style={s.tagline}>Pilotez votre restaurant en mobilite</Text>
                 </View>
 
                 {/* Form */}
@@ -82,8 +80,8 @@ export default function LoginScreen() {
                     </TouchableOpacity>
 
                     <Text style={s.hint}>
-                        Vous n'avez pas de compte ?{'\n'}
-                        Contactez l'équipe KBouffe pour créer votre espace restaurant.
+                        Vous n&apos;avez pas de compte ?{'\n'}
+                        Contactez l&apos;equipe KBouffe pour creer votre espace restaurant.
                     </Text>
                 </View>
             </ScrollView>

@@ -148,17 +148,19 @@ restaurantRoutes.get("/badges", async (c) => {
 /** GET /restaurant/search?q=... — Global quick search across orders, products, customers */
 restaurantRoutes.get("/search", async (c) => {
     const restaurantId = c.var.restaurantId;
-    const q = (c.req.query("q") ?? "").trim();
+    // Strip leading # so "#A3F2C1" and "A3F2C1" both work
+    const q = (c.req.query("q") ?? "").trim().replace(/^#/, "");
     const supabase = c.var.supabase;
 
     if (q.length < 2) return c.json({ results: [] });
 
     const [ordersRes, productsRes, customersRes] = await Promise.all([
+        // Orders: search by customer_name, customer_phone, or last 6 chars of UUID cast to text
         supabase
             .from("orders")
-            .select("id, status, total, customer_name, created_at")
+            .select("id, status, total, customer_name, customer_phone, created_at")
             .eq("restaurant_id", restaurantId)
-            .or(`id.ilike.%${q}%,customer_name.ilike.%${q}%`)
+            .or(`customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`)
             .order("created_at", { ascending: false })
             .limit(5),
         supabase
@@ -167,11 +169,14 @@ restaurantRoutes.get("/search", async (c) => {
             .eq("restaurant_id", restaurantId)
             .ilike("name", `%${q}%`)
             .limit(5),
+        // Customers scoped to this restaurant via orders (distinct by customer_id)
         supabase
-            .from("users")
-            .select("id, full_name, phone, email")
-            .ilike("full_name", `%${q}%`)
-            .limit(3),
+            .from("orders")
+            .select("customer_id, customer_name, customer_phone")
+            .eq("restaurant_id", restaurantId)
+            .or(`customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`)
+            .not("customer_id", "is", null)
+            .limit(10),
     ]);
 
     type SearchResult = { type: "order" | "product" | "customer"; id: string; title: string; subtitle?: string; href: string };
@@ -184,7 +189,7 @@ restaurantRoutes.get("/search", async (c) => {
             id: o.id as string,
             title: `Commande #${shortId}`,
             subtitle: `${o.customer_name ?? "Client"} — ${(o.total as number)?.toLocaleString("fr-FR")} FCFA`,
-            href: `/dashboard/orders`,
+            href: `/dashboard/orders?highlight=${o.id}`,
         });
     }
     for (const p of productsRes.data ?? []) {
@@ -193,17 +198,25 @@ restaurantRoutes.get("/search", async (c) => {
             id: p.id as string,
             title: p.name as string,
             subtitle: `${(p.price as number)?.toLocaleString("fr-FR")} FCFA`,
-            href: `/dashboard/menu`,
+            href: `/dashboard/menu?highlight=${p.id}`,
         });
     }
-    for (const u of customersRes.data ?? []) {
-        results.push({
-            type: "customer",
-            id: u.id as string,
-            title: u.full_name as string,
-            subtitle: (u.phone ?? u.email) as string | undefined,
-            href: `/dashboard/customers`,
-        });
+
+    // Deduplicate customers by customer_id
+    const seenCustomers = new Set<string>();
+    for (const row of customersRes.data ?? []) {
+        const cid = row.customer_id as string;
+        if (!seenCustomers.has(cid)) {
+            seenCustomers.add(cid);
+            results.push({
+                type: "customer",
+                id: cid,
+                title: (row.customer_name ?? "Client inconnu") as string,
+                subtitle: (row.customer_phone ?? undefined) as string | undefined,
+                href: `/dashboard/customers?id=${cid}`,
+            });
+        }
+        if (seenCustomers.size >= 3) break;
     }
 
     return c.json({ results: results.slice(0, 10) });

@@ -15,20 +15,44 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authApiFetch } from '@/lib/api';
 import { formatFCFA } from '@/lib/format';
-import type { SupplierKycStatus, SupplierProduct } from '@/lib/types';
+import { useFontScale, scaled } from '@/hooks/use-font-scale';
+import type { SupplierKycStatus, SupplierProduct, SupplierProductCategory } from '@/lib/types';
 import { useTheme } from '@/hooks/use-theme';
+
+const CATEGORY_LABELS: Record<SupplierProductCategory, string> = {
+    legumes: 'Légumes',
+    fruits: 'Fruits',
+    cereales: 'Céréales',
+    viande: 'Viandes',
+    poisson: 'Poissons',
+    produits_laitiers: 'Produits laitiers',
+    epices: 'Épices',
+    huiles: 'Huiles',
+    condiments: 'Condiments',
+    autres: 'Autres',
+};
+
+function toErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+}
 
 export default function ProductsScreen() {
     const router = useRouter();
     const theme = useTheme();
+    const fontScale = useFontScale();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [products, setProducts] = useState<SupplierProduct[]>([]);
     const [kycStatus, setKycStatus] = useState<SupplierKycStatus>('pending');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadProducts = useCallback(async () => {
         const response = await authApiFetch('/api/marketplace/suppliers/me/products');
-        const payload = await response.json();
+        const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+            products?: SupplierProduct[];
+            kyc_status?: SupplierKycStatus;
+        };
 
         if (!response.ok) {
             throw new Error(payload.error ?? 'Impossible de charger les produits');
@@ -39,50 +63,99 @@ export default function ProductsScreen() {
     }, []);
 
     useEffect(() => {
+        let mounted = true;
+
         loadProducts()
-            .catch(() => undefined)
-            .finally(() => setLoading(false));
+            .then(() => {
+                if (mounted) setErrorMessage(null);
+            })
+            .catch((error) => {
+                if (!mounted) return;
+                const message = toErrorMessage(error, 'Impossible de charger les produits');
+                setErrorMessage(message);
+                Alert.alert('Erreur', message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
     }, [loadProducts]);
 
     const onRefresh = async () => {
         setRefreshing(true);
         try {
             await loadProducts();
+            setErrorMessage(null);
+        } catch (error) {
+            const message = toErrorMessage(error, 'Impossible de rafraîchir les produits');
+            setErrorMessage(message);
+            Alert.alert('Erreur', message);
         } finally {
             setRefreshing(false);
         }
     };
 
     const toggleProduct = async (product: SupplierProduct) => {
-        const response = await authApiFetch(`/api/marketplace/suppliers/supplier-products/${product.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ is_active: !product.is_active, photos: product.photos }),
-        });
-        const payload = await response.json();
+        try {
+            const response = await authApiFetch(`/api/marketplace/suppliers/supplier-products/${product.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ is_active: !product.is_active, photos: product.photos }),
+            });
+            const payload = (await response.json().catch(() => ({}))) as {
+                error?: string;
+                product?: SupplierProduct;
+            };
 
-        if (!response.ok) {
-            Alert.alert('Erreur', payload.error ?? 'Impossible de modifier le statut');
-            return;
+            if (!response.ok || !payload.product) {
+                throw new Error(payload.error ?? 'Impossible de modifier le statut');
+            }
+
+            setProducts((current) => current.map((item) => (item.id === product.id ? payload.product! : item)));
+        } catch (error) {
+            Alert.alert('Erreur', toErrorMessage(error, 'Impossible de modifier le statut'));
         }
-
-        setProducts((current) => current.map((item) => (item.id === product.id ? payload.product : item)));
     };
 
     const deleteProduct = async (product: SupplierProduct) => {
-        const response = await authApiFetch(`/api/marketplace/suppliers/supplier-products/${product.id}`, {
-            method: 'DELETE',
-        });
-        const payload = await response.json();
+        try {
+            const response = await authApiFetch(`/api/marketplace/suppliers/supplier-products/${product.id}`, {
+                method: 'DELETE',
+            });
+            const payload = (await response.json().catch(() => ({}))) as {
+                error?: string;
+            };
 
-        if (!response.ok) {
-            Alert.alert('Erreur', payload.error ?? 'Suppression impossible');
-            return;
+            if (!response.ok) {
+                throw new Error(payload.error ?? 'Suppression impossible');
+            }
+
+            setProducts((current) => current.filter((item) => item.id !== product.id));
+        } catch (error) {
+            Alert.alert('Erreur', toErrorMessage(error, 'Suppression impossible'));
         }
-
-        setProducts((current) => current.filter((item) => item.id !== product.id));
     };
 
-    const styles = createStyles(theme);
+    const confirmDeleteProduct = (product: SupplierProduct) => {
+        Alert.alert(
+            'Supprimer le produit',
+            `Voulez-vous supprimer "${product.name}" du catalogue ?`,
+            [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                    text: 'Supprimer',
+                    style: 'destructive',
+                    onPress: () => {
+                        void deleteProduct(product);
+                    },
+                },
+            ],
+        );
+    };
+
+    const styles = createStyles(theme, fontScale);
 
     if (loading) {
         return (
@@ -103,34 +176,58 @@ export default function ProductsScreen() {
                         <Text style={styles.title}>Catalogue fournisseur</Text>
                         <Text style={styles.subtitle}>Publiez vos disponibilités et maintenez vos stocks à jour.</Text>
                     </View>
-                    <Pressable style={[styles.addButton, kycStatus !== 'approved' && styles.addButtonDisabled]} onPress={() => router.push('/product/new')} disabled={kycStatus !== 'approved'}>
+                    <Pressable
+                        style={[styles.addButton, kycStatus !== 'approved' && styles.addButtonDisabled]}
+                        onPress={() => router.push('/product/new')}
+                        disabled={kycStatus !== 'approved'}
+                    >
                         <Ionicons name="add" size={20} color="#fff" />
                     </Pressable>
                 </View>
 
+                {errorMessage ? (
+                    <View style={styles.errorCard}>
+                        <Text style={styles.errorTitle}>Synchronisation incomplète</Text>
+                        <Text style={styles.errorText}>{errorMessage}</Text>
+                    </View>
+                ) : null}
+
                 {kycStatus !== 'approved' ? (
                     <View style={styles.warningCard}>
                         <Text style={styles.warningTitle}>Ajout bloqué tant que le KYC n’est pas approuvé</Text>
-                        <Text style={styles.warningText}>Vous pouvez préparer votre dossier, mais la publication de nouveaux produits reste suspendue.</Text>
+                        <Text style={styles.warningText}>
+                            Vous pouvez préparer votre dossier, mais la publication de nouveaux produits reste suspendue.
+                        </Text>
                     </View>
                 ) : null}
 
                 {products.length === 0 ? (
                     <View style={styles.emptyCard}>
                         <Text style={styles.emptyTitle}>Aucun produit publié</Text>
-                        <Text style={styles.emptyText}>Ajoutez votre premier produit pour apparaître dans l’espace d’approvisionnement KBouffe.</Text>
+                        <Text style={styles.emptyText}>
+                            Ajoutez votre premier produit pour apparaître dans l’espace d’approvisionnement KBouffe.
+                        </Text>
                     </View>
                 ) : (
                     products.map((product) => (
                         <View key={product.id} style={styles.card}>
                             <Pressable style={styles.cardMain} onPress={() => router.push(`/product/${product.id}`)}>
-                                {product.photos?.[0] ? <Image source={{ uri: product.photos[0] }} style={styles.image} /> : <View style={styles.imagePlaceholder}><Ionicons name="image-outline" size={22} color={theme.textSecondary} /></View>}
+                                {product.photos?.[0] ? (
+                                    <Image source={{ uri: product.photos[0] }} style={styles.image} />
+                                ) : (
+                                    <View style={styles.imagePlaceholder}>
+                                        <Ionicons name="image-outline" size={22} color={theme.textSecondary} />
+                                    </View>
+                                )}
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.cardTitle}>{product.name}</Text>
                                     <Text style={styles.cardMeta}>
-                                        {product.category} · {formatFCFA(product.price_per_unit)} / {product.unit}
+                                        {(CATEGORY_LABELS[product.category] ?? product.category)} · {formatFCFA(product.price_per_unit)} /{' '}
+                                        {product.unit}
                                     </Text>
-                                    <Text style={styles.cardMeta}>Stock : {product.available_quantity ?? 'Non précisé'}</Text>
+                                    <Text style={styles.cardMeta}>
+                                        Stock : {product.available_quantity != null ? product.available_quantity : 'Non précisé'}
+                                    </Text>
                                 </View>
                             </Pressable>
 
@@ -141,7 +238,7 @@ export default function ProductsScreen() {
                                 <Pressable style={styles.outlineButton} onPress={() => router.push(`/product/${product.id}`)}>
                                     <Text style={styles.outlineButtonText}>Modifier</Text>
                                 </Pressable>
-                                <Pressable style={styles.deleteButton} onPress={() => deleteProduct(product)}>
+                                <Pressable style={styles.deleteButton} onPress={() => confirmDeleteProduct(product)}>
                                     <Text style={styles.deleteButtonText}>Supprimer</Text>
                                 </Pressable>
                             </View>
@@ -153,7 +250,7 @@ export default function ProductsScreen() {
     );
 }
 
-function createStyles(theme: ReturnType<typeof useTheme>) {
+function createStyles(theme: ReturnType<typeof useTheme>, fontScale: number) {
     return StyleSheet.create({
         container: {
             flex: 1,
@@ -175,7 +272,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             alignItems: 'flex-start',
         },
         title: {
-            fontSize: 24,
+            fontSize: scaled(24, fontScale),
             fontWeight: '800',
             color: theme.text,
         },
@@ -195,6 +292,23 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         addButtonDisabled: {
             opacity: 0.5,
         },
+        errorCard: {
+            borderRadius: 18,
+            padding: 16,
+            backgroundColor: '#fee2e2',
+            borderWidth: 1,
+            borderColor: '#fecaca',
+            gap: 4,
+        },
+        errorTitle: {
+            color: '#b91c1c',
+            fontWeight: '800',
+            fontSize: scaled(14, fontScale),
+        },
+        errorText: {
+            color: '#991b1b',
+            lineHeight: 20,
+        },
         warningCard: {
             borderRadius: 18,
             padding: 16,
@@ -206,7 +320,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         warningTitle: {
             color: theme.warning,
             fontWeight: '800',
-            fontSize: 15,
+            fontSize: scaled(15, fontScale),
         },
         warningText: {
             color: theme.textSecondary,
@@ -221,7 +335,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             gap: 6,
         },
         emptyTitle: {
-            fontSize: 18,
+            fontSize: scaled(18, fontScale),
             fontWeight: '700',
             color: theme.text,
         },
@@ -257,7 +371,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         cardTitle: {
             color: theme.text,
             fontWeight: '800',
-            fontSize: 16,
+            fontSize: scaled(16, fontScale),
         },
         cardMeta: {
             color: theme.textSecondary,

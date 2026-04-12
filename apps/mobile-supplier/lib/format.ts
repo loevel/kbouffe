@@ -1,5 +1,12 @@
+export function formatAmount(amount: number | null | undefined, currency: 'XAF' | 'EUR' | 'USD' = 'XAF'): string {
+    const num = amount ?? 0;
+    if (currency === 'EUR') return `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num)} €`;
+    if (currency === 'USD') return `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num)}`;
+    return `${new Intl.NumberFormat('fr-FR').format(num)} FCFA`;
+}
+
 export function formatFCFA(amount: number | null | undefined) {
-    return `${new Intl.NumberFormat('fr-FR').format(amount ?? 0)} FCFA`;
+    return formatAmount(amount, 'XAF');
 }
 
 export function formatDate(value: string | null | undefined) {

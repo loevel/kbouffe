@@ -1,148 +1,38 @@
-import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
-    type ReactNode,
-} from 'react';
-import { getAccountOrders } from '@/lib/api';
+/**
+ * orders-context — shim over the Zustand orders store.
+ *
+ * All consumers (useOrders / OrdersProvider) keep working unchanged.
+ * State now lives in stores/orders-store.ts.
+ */
+import { useEffect, type ReactNode } from 'react';
 import { useAuth } from './auth-context';
+import { useOrdersStore } from '@/stores/orders-store';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-export type MobileOrderStatus =
-    | 'pending'
-    | 'confirmed'
-    | 'accepted'
-    | 'preparing'
-    | 'ready'
-    | 'delivering'
-    | 'delivered'
-    | 'completed'
-    | 'cancelled';
+export type { MobileOrderStatus, StoredOrder } from '@/stores/orders-store';
 
-export interface StoredOrder {
-    id: string;
-    restaurantId: string;
-    restaurantName: string;
-    restaurantLat?: number | null;
-    restaurantLng?: number | null;
-    status: MobileOrderStatus;
-    deliveryType: 'delivery' | 'pickup' | 'dine_in';
-    items: { productId: string; name: string; price: number; quantity: number }[];
-    subtotal: number;
-    deliveryFee: number;
-    total: number;
-    customerName: string;
-    customerPhone: string;
-    deliveryAddress?: string | null;
-    notes?: string | null;
-    createdAt: string;
-}
-
-interface OrdersContextType {
-    orders: StoredOrder[];
-    loading: boolean;
-    activeOrderCount: number;
-    refreshOrders: () => Promise<void>;
-    updateOrderStatus: (id: string, status: MobileOrderStatus) => void;
-    getOrderById: (id: string) => StoredOrder | undefined;
-}
-
-// ── Context ───────────────────────────────────────────────────────────────────
-const OrdersContext = createContext<OrdersContextType | null>(null);
-
+/** Initialises the store on mount and reloads when auth changes. */
 export function OrdersProvider({ children }: { children: ReactNode }) {
     const { isAuthenticated } = useAuth();
-    const [orders, setOrders] = useState<StoredOrder[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    const mapDeliveryType = (value: string | null | undefined): StoredOrder['deliveryType'] => {
-        if (value === 'pickup' || value === 'dine_in') return value;
-        return 'delivery';
-    };
-
-    const mapOrderStatus = (value: string | null | undefined): MobileOrderStatus => {
-        switch (value) {
-            case 'confirmed':
-            case 'accepted':
-            case 'preparing':
-            case 'ready':
-            case 'delivering':
-            case 'delivered':
-            case 'completed':
-            case 'cancelled':
-                return value;
-            default:
-                return 'pending';
-        }
-    };
-
-    const refreshOrders = useCallback(async () => {
-        if (!isAuthenticated) {
-            setOrders([]);
-            return;
-        }
-        setLoading(true);
-        try {
-            const data = await getAccountOrders();
-            const mapped: StoredOrder[] = data.map(o => ({
-                id: o.id,
-                restaurantId: o.restaurant_id ?? '',
-                restaurantName: o.restaurant_name ?? 'Restaurant',
-                restaurantLat: o.restaurant_lat ?? null,
-                restaurantLng: o.restaurant_lng ?? null,
-                status: mapOrderStatus(o.status),
-                deliveryType: mapDeliveryType(o.delivery_type),
-                items: o.items,
-                subtotal: o.subtotal,
-                deliveryFee: o.delivery_fee,
-                total: o.total,
-                customerName: o.customer_name,
-                customerPhone: o.customer_phone,
-                deliveryAddress: o.delivery_address,
-                notes: o.notes,
-                createdAt: o.created_at
-            }));
-            setOrders(mapped);
-        } catch (error) {
-            console.error('Error fetching orders:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [isAuthenticated]);
-
-    const updateOrderStatus = useCallback((id: string, status: MobileOrderStatus) => {
-        setOrders((current) => current.map((order) => (
-            order.id === id ? { ...order, status } : order
-        )));
-    }, []);
+    const refreshOrders = useOrdersStore((s) => s.refreshOrders);
 
     useEffect(() => {
-        void refreshOrders();
-    }, [refreshOrders]);
+        void refreshOrders(isAuthenticated);
+    }, [isAuthenticated, refreshOrders]);
 
-    const getOrderById = useCallback(
-        (id: string) => orders.find((o) => o.id === id),
-        [orders],
-    );
-
-    const activeOrderCount = useMemo(
-        () => orders.filter((order) => !['completed', 'delivered', 'cancelled'].includes(order.status)).length,
-        [orders],
-    );
-
-    const value = useMemo(
-        () => ({ orders, loading, activeOrderCount, refreshOrders, updateOrderStatus, getOrderById }),
-        [orders, loading, activeOrderCount, refreshOrders, updateOrderStatus, getOrderById],
-    );
-
-    return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;
+    return <>{children}</>;
 }
 
+/** Drop-in replacement — same shape as the old context value. */
 export function useOrders() {
-    const ctx = useContext(OrdersContext);
-    if (!ctx) throw new Error('useOrders must be used within OrdersProvider');
-    return ctx;
+    const store = useOrdersStore();
+    const { isAuthenticated } = useAuth();
+
+    return {
+        orders:           store.orders,
+        loading:          store.loading,
+        activeOrderCount: store.activeOrderCount(),
+        refreshOrders:    () => store.refreshOrders(isAuthenticated),
+        updateOrderStatus: store.updateOrderStatus,
+        getOrderById:     store.getOrderById,
+    };
 }

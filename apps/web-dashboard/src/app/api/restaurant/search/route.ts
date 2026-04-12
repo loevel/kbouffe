@@ -12,180 +12,118 @@ interface SearchResult {
 /**
  * GET /api/restaurant/search?q=query
  *
- * Recherche globale dans :
- *   - Commandes (par numéro ou restaurant)
- *   - Produits (par nom)
- *   - Clients (par nom)
+ * Recherche globale dans : commandes, produits, clients
+ * Scoped au restaurant du marchand authentifié.
  */
 export async function GET(request: NextRequest) {
     try {
         const supabase = await createClient();
 
-        // Vérifier authentification
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
-            return NextResponse.json(
-                { error: "Non authentifié" },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
         }
 
-        // Récupérer le restaurant_id
-        const { data: dbUser, error: userError } = await supabase
+        // Résolution du restaurant_id via users.restaurant_id
+        const { data: profile, error: profileError } = await supabase
             .from("users")
             .select("restaurant_id")
             .eq("id", user.id)
-            .single();
+            .maybeSingle();
 
-        if (userError || !dbUser?.restaurant_id) {
-            return NextResponse.json(
-                { error: "Restaurant non trouvé" },
-                { status: 404 }
-            );
+        if (profileError || !profile?.restaurant_id) {
+            return NextResponse.json({ error: "Restaurant non trouvé" }, { status: 404 });
         }
 
-        const restaurantId = dbUser.restaurant_id;
-        const query = request.nextUrl.searchParams.get("q")?.trim() || "";
+        const restaurantId = profile.restaurant_id as string;
 
-        if (query.length < 2) {
+        // Strip leading # so "#A3F2C1" and "A3F2C1" both work
+        const q = (request.nextUrl.searchParams.get("q") ?? "").trim().replace(/^#/, "");
+
+        if (q.length < 2) {
             return NextResponse.json({ results: [] });
         }
 
+        const pattern = `%${q}%`;
+
+        // 3 requêtes parallèles — toutes scopées au restaurant
+        const [ordersRes, productsRes, customersRes] = await Promise.all([
+            // Commandes : par nom ou téléphone client
+            supabase
+                .from("orders")
+                .select("id, status, total, customer_name, customer_phone, created_at")
+                .eq("restaurant_id", restaurantId)
+                .or(`customer_name.ilike.${pattern},customer_phone.ilike.${pattern}`)
+                .order("created_at", { ascending: false })
+                .limit(5),
+
+            // Produits : par nom
+            supabase
+                .from("products")
+                .select("id, name, price")
+                .eq("restaurant_id", restaurantId)
+                .ilike("name", pattern)
+                .limit(5),
+
+            // Clients dédupliqués depuis les commandes du restaurant
+            supabase
+                .from("orders")
+                .select("customer_id, customer_name, customer_phone")
+                .eq("restaurant_id", restaurantId)
+                .or(`customer_name.ilike.${pattern},customer_phone.ilike.${pattern}`)
+                .not("customer_id", "is", null)
+                .limit(10),
+        ]);
+
         const results: SearchResult[] = [];
 
-        // ════════════════════════════════════════════════════════════════════
-        // 1. Rechercher dans les commandes
-        // ════════════════════════════════════════════════════════════════════
-        const orderPattern = `%${query}%`;
+        // Commandes
+        for (const o of ordersRes.data ?? []) {
+            const shortId = (o.id as string).slice(-6).toUpperCase();
+            results.push({
+                type: "order",
+                id: o.id as string,
+                title: `Commande #${shortId}`,
+                subtitle: `${o.customer_name ?? "Client"} — ${new Intl.NumberFormat("fr-FR").format(o.total as number)} FCFA`,
+                href: `/dashboard/orders?highlight=${o.id}`,
+            });
+        }
 
-        // Chercher par numéro de commande
-        const { data: ordersByNumber } = await supabase
-            .from("orders")
-            .select("id, order_number, restaurant_id, total_price, created_at")
-            .eq("restaurant_id", restaurantId)
-            .ilike("order_number", orderPattern)
-            .limit(5);
+        // Produits
+        for (const p of productsRes.data ?? []) {
+            results.push({
+                type: "product",
+                id: p.id as string,
+                title: p.name as string,
+                subtitle: `${new Intl.NumberFormat("fr-FR").format(p.price as number)} FCFA`,
+                href: `/dashboard/menu?highlight=${p.id}`,
+            });
+        }
 
-        if (ordersByNumber) {
-            ordersByNumber.forEach((order: any) => {
+        // Clients (dédupliqués par customer_id)
+        const seen = new Set<string>();
+        for (const row of customersRes.data ?? []) {
+            const cid = row.customer_id as string;
+            if (!seen.has(cid)) {
+                seen.add(cid);
                 results.push({
-                    type: "order",
-                    id: order.id,
-                    title: `Commande #${order.order_number}`,
-                    subtitle: `${new Intl.NumberFormat("fr-FR").format(order.total_price)} FCFA • ${new Date(order.created_at).toLocaleDateString("fr-FR")}`,
-                    href: `/dashboard/orders/${order.id}`,
+                    type: "customer",
+                    id: cid,
+                    title: (row.customer_name ?? "Client inconnu") as string,
+                    subtitle: (row.customer_phone ?? undefined) as string | undefined,
+                    href: `/dashboard/customers?id=${cid}`,
                 });
-            });
+            }
+            if (seen.size >= 3) break;
         }
 
-        // ════════════════════════════════════════════════════════════════════
-        // 2. Rechercher dans les produits
-        // ════════════════════════════════════════════════════════════════════
-        const { data: products } = await supabase
-            .from("menu_items")
-            .select("id, name, description, base_price, restaurant_id")
-            .eq("restaurant_id", restaurantId)
-            .ilike("name", orderPattern)
-            .limit(5);
-
-        if (products) {
-            products.forEach((product: any) => {
-                results.push({
-                    type: "product",
-                    id: product.id,
-                    title: product.name,
-                    subtitle: product.description ? `${product.description.substring(0, 40)}...` : `${product.base_price} FCFA`,
-                    href: `/dashboard/menu/${product.id}`,
-                });
-            });
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // 3. Rechercher dans les clients/utilisateurs
-        // ════════════════════════════════════════════════════════════════════
-        // Chercher par prénom
-        const { data: customersByFirstName } = await supabase
-            .from("customers")
-            .select("id, first_name, last_name, email, phone")
-            .eq("restaurant_id", restaurantId)
-            .ilike("first_name", orderPattern)
-            .limit(5);
-
-        const customerIds = new Set<string>();
-
-        if (customersByFirstName) {
-            customersByFirstName.forEach((customer: any) => {
-                if (!customerIds.has(customer.id)) {
-                    customerIds.add(customer.id);
-                    const fullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim();
-                    results.push({
-                        type: "customer",
-                        id: customer.id,
-                        title: fullName || customer.email || "Client",
-                        subtitle: customer.phone || customer.email,
-                        href: `/dashboard/customers/${customer.id}`,
-                    });
-                }
-            });
-        }
-
-        // Chercher par nom de famille
-        const { data: customersByLastName } = await supabase
-            .from("customers")
-            .select("id, first_name, last_name, email, phone")
-            .eq("restaurant_id", restaurantId)
-            .ilike("last_name", orderPattern)
-            .limit(5);
-
-        if (customersByLastName) {
-            customersByLastName.forEach((customer: any) => {
-                if (!customerIds.has(customer.id)) {
-                    customerIds.add(customer.id);
-                    const fullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim();
-                    results.push({
-                        type: "customer",
-                        id: customer.id,
-                        title: fullName || customer.email || "Client",
-                        subtitle: customer.phone || customer.email,
-                        href: `/dashboard/customers/${customer.id}`,
-                    });
-                }
-            });
-        }
-
-        // Chercher par email
-        const { data: customersByEmail } = await supabase
-            .from("customers")
-            .select("id, first_name, last_name, email, phone")
-            .eq("restaurant_id", restaurantId)
-            .ilike("email", orderPattern)
-            .limit(5);
-
-        if (customersByEmail) {
-            customersByEmail.forEach((customer: any) => {
-                if (!customerIds.has(customer.id)) {
-                    customerIds.add(customer.id);
-                    const fullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim();
-                    results.push({
-                        type: "customer",
-                        id: customer.id,
-                        title: fullName || customer.email || "Client",
-                        subtitle: customer.phone || customer.email,
-                        href: `/dashboard/customers/${customer.id}`,
-                    });
-                }
-            });
-        }
-
-        // Limiter le nombre total de résultats
-        const limitedResults = results.slice(0, 10);
-
-        return NextResponse.json({ results: limitedResults });
-    } catch (error: any) {
+        return NextResponse.json({ results: results.slice(0, 10) });
+    } catch (error: unknown) {
         console.error("Erreur recherche:", error);
         return NextResponse.json(
-            { error: error.message || "Erreur lors de la recherche" },
+            { error: "Erreur lors de la recherche" },
             { status: 500 }
         );
     }
 }
+

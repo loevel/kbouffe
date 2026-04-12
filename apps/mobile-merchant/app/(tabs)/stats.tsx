@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -38,7 +38,7 @@ export default function StatsScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         if (!profile?.restaurantId) return;
         const start = new Date();
         start.setHours(0, 0, 0, 0);
@@ -60,9 +60,9 @@ export default function StatsScreen() {
             pendingCount: orders.filter((o: any) => ['pending', 'accepted', 'preparing', 'ready', 'delivering'].includes(o.status)).length,
             cancelledCount: orders.filter((o: any) => o.status === 'cancelled').length,
         });
-    };
+    }, [profile?.restaurantId]);
 
-    useEffect(() => { fetchStats().finally(() => setLoading(false)); }, [profile?.restaurantId]);
+    useEffect(() => { fetchStats().finally(() => setLoading(false)); }, [fetchStats]);
 
     const onRefresh = async () => { setRefreshing(true); await fetchStats(); setRefreshing(false); };
 
@@ -80,7 +80,7 @@ export default function StatsScreen() {
                 <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
             ) : (
                 <ScrollView contentContainerStyle={s.scroll} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}>
-                    <Text style={[s.sectionTitle, { color: theme.text }]}>Aujourd'hui</Text>
+                    <Text style={[s.sectionTitle, { color: theme.text }]}>Aujourd&apos;hui</Text>
                     <View style={s.grid}>
                         <StatCard label="Commandes totales" value={String(today?.ordersCount ?? 0)} icon="📋" color={theme.primary} />
                         <StatCard label="Chiffre d'affaires" value={`${(today?.revenue ?? 0).toLocaleString()} F`} icon="💰" color={theme.success} />

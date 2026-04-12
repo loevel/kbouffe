@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const loadProfile = useCallback(async (userId: string) => {
         // Load user + restaurant info in parallel
         const [userRes, memberRes] = await Promise.all([
-            supabase.from('users').select('id, name, phone, email, role').eq('id', userId).maybeSingle(),
+            supabase.from('users').select('id, full_name, phone, email, role, restaurant_id').eq('id', userId).maybeSingle(),
             supabase
                 .from('restaurant_members')
                 .select('restaurant_id, role, restaurants(id, name, slug)')
@@ -68,11 +68,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
+        // Fallback: restaurant_id directly on the user row
+        if (!restaurantId && (u as any)?.restaurant_id) {
+            restaurantId = (u as any).restaurant_id;
+            memberRole = memberRole ?? 'owner';
+        }
+
         if (!u) return null;
 
         return {
             id: u.id,
-            name: u.name,
+            name: (u as any).full_name,
             phone: u.phone,
             email: u.email,
             role: u.role,

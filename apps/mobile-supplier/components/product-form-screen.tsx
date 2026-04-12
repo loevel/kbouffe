@@ -49,6 +49,32 @@ interface Props {
     productId?: string;
 }
 
+async function readJson<T>(response: Response): Promise<T> {
+    return (await response.json().catch(() => ({}))) as T;
+}
+
+async function fetchProductById(id: string) {
+    const directResponse = await authApiFetch(`/api/marketplace/suppliers/supplier-products/${id}`);
+    const directPayload = await readJson<{ error?: string; product?: SupplierProduct }>(directResponse);
+
+    if (directResponse.ok) {
+        return directPayload.product ?? null;
+    }
+
+    if (![404, 405].includes(directResponse.status)) {
+        throw new Error(directPayload.error ?? 'Impossible de charger le produit');
+    }
+
+    const listResponse = await authApiFetch('/api/marketplace/suppliers/me/products');
+    const listPayload = await readJson<{ error?: string; products?: SupplierProduct[] }>(listResponse);
+
+    if (!listResponse.ok) {
+        throw new Error(listPayload.error ?? 'Impossible de charger le produit');
+    }
+
+    return (listPayload.products ?? []).find((item) => item.id === id) ?? null;
+}
+
 export function ProductFormScreen({ productId }: Props) {
     const theme = useTheme();
     const router = useRouter();
@@ -70,14 +96,8 @@ export function ProductFormScreen({ productId }: Props) {
     useEffect(() => {
         if (!productId) return;
 
-        authApiFetch('/api/marketplace/suppliers/me/products')
-            .then(async (response) => {
-                const payload = await response.json();
-                if (!response.ok) {
-                    throw new Error(payload.error ?? 'Impossible de charger le produit');
-                }
-
-                const product = (payload.products as SupplierProduct[]).find((item) => item.id === productId);
+        fetchProductById(productId)
+            .then((product) => {
                 if (!product) {
                     throw new Error('Produit introuvable');
                 }
@@ -93,8 +113,9 @@ export function ProductFormScreen({ productId }: Props) {
                 setIsOrganic(product.is_organic);
                 setPhotos(product.photos ?? []);
             })
-            .catch((error: Error) => {
-                Alert.alert('Erreur', error.message);
+            .catch((error) => {
+                const message = error instanceof Error ? error.message : 'Impossible de charger le produit';
+                Alert.alert('Erreur', message);
                 router.back();
             })
             .finally(() => setLoading(false));
@@ -145,23 +166,48 @@ export function ProductFormScreen({ productId }: Props) {
             return;
         }
 
+        if (name.trim().length < 2) {
+            Alert.alert('Nom invalide', 'Le nom du produit doit contenir au moins 2 caractères.');
+            return;
+        }
+
+        const parsedPrice = Number(price.trim());
+        const parsedMinOrderQuantity = Number(minOrderQuantity.trim());
+        const normalizedAvailableQuantity = availableQuantity.trim();
+
+        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+            Alert.alert('Prix invalide', 'Le prix unitaire doit être supérieur à 0 FCFA.');
+            return;
+        }
+
+        if (!Number.isInteger(parsedMinOrderQuantity) || parsedMinOrderQuantity <= 0) {
+            Alert.alert('Quantité minimale invalide', 'La quantité minimum doit être un entier supérieur à 0.');
+            return;
+        }
+
+        let parsedAvailableQuantity: number | null = null;
+        if (normalizedAvailableQuantity) {
+            const nextAvailableQuantity = Number(normalizedAvailableQuantity);
+            if (!Number.isInteger(nextAvailableQuantity) || nextAvailableQuantity < 0) {
+                Alert.alert('Stock invalide', 'Le stock disponible doit être un entier positif ou nul.');
+                return;
+            }
+
+            parsedAvailableQuantity = nextAvailableQuantity;
+        }
+
         const payload = {
             name: name.trim(),
             category,
-            price_per_unit: Number(price),
+            price_per_unit: parsedPrice,
             unit,
-            min_order_quantity: Number(minOrderQuantity || 1),
-            available_quantity: availableQuantity ? Number(availableQuantity) : null,
+            min_order_quantity: parsedMinOrderQuantity,
+            available_quantity: parsedAvailableQuantity,
             origin_region: originRegion,
             description: description.trim() || null,
             is_organic: isOrganic,
             photos,
         };
-
-        if (!Number.isFinite(payload.price_per_unit) || payload.price_per_unit <= 0) {
-            Alert.alert('Prix invalide', 'Le prix unitaire doit être supérieur à 0 FCFA.');
-            return;
-        }
 
         setSaving(true);
         try {
@@ -174,14 +220,14 @@ export function ProductFormScreen({ productId }: Props) {
                     body: JSON.stringify(payload),
                 },
             );
-            const body = await response.json();
+            const body = await readJson<{ error?: string }>(response);
 
             if (!response.ok) {
                 throw new Error(body.error ?? 'Enregistrement impossible');
             }
 
             Alert.alert('Succès', productId ? 'Produit mis à jour.' : 'Produit ajouté au catalogue.');
-            router.replace('/(tabs)/products');
+            router.replace('/(tabs)/catalog');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Erreur serveur';
             Alert.alert('Erreur', message);

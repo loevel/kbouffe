@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { authApiFetch } from '@/lib/api';
 import { formatDate, formatFCFA } from '@/lib/format';
+import { useFontScale, scaled } from '@/hooks/use-font-scale';
 import type { SupplierDeliveryStatus, SupplierOrder } from '@/lib/types';
 
 const FILTERS: { key: 'all' | SupplierDeliveryStatus; label: string }[] = [
@@ -36,10 +37,13 @@ const STATUS_LABELS: Record<SupplierDeliveryStatus, string> = {
 export default function OrdersScreen() {
     const router = useRouter();
     const theme = useTheme();
+    const fontScale = useFontScale();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [orders, setOrders] = useState<SupplierOrder[]>([]);
     const [filter, setFilter] = useState<'all' | SupplierDeliveryStatus>('all');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
     const loadOrders = useCallback(async () => {
         const response = await authApiFetch('/api/marketplace/suppliers/me/orders');
@@ -53,15 +57,36 @@ export default function OrdersScreen() {
     }, []);
 
     useEffect(() => {
+        let mounted = true;
+
         loadOrders()
-            .catch(() => undefined)
-            .finally(() => setLoading(false));
+            .then(() => {
+                if (mounted) setErrorMessage(null);
+            })
+            .catch((error) => {
+                if (!mounted) return;
+                const message = error instanceof Error ? error.message : 'Impossible de charger les commandes';
+                setErrorMessage(message);
+                Alert.alert('Erreur', message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
     }, [loadOrders]);
 
     const onRefresh = async () => {
         setRefreshing(true);
         try {
             await loadOrders();
+            setErrorMessage(null);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Impossible de rafraîchir les commandes';
+            setErrorMessage(message);
+            Alert.alert('Erreur', message);
         } finally {
             setRefreshing(false);
         }
@@ -71,22 +96,32 @@ export default function OrdersScreen() {
         const next = order.delivery_status === 'pending' ? 'confirmed' : order.delivery_status === 'confirmed' ? 'delivered' : null;
         if (!next) return;
 
-        const response = await authApiFetch(`/api/marketplace/suppliers/me/orders/${order.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ delivery_status: next }),
-        });
-        const payload = await response.json();
+        setUpdatingOrderId(order.id);
+        try {
+            const response = await authApiFetch(`/api/marketplace/suppliers/me/orders/${order.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ delivery_status: next }),
+            });
+            const payload = (await response.json().catch(() => ({}))) as {
+                error?: string;
+                order?: SupplierOrder;
+            };
 
-        if (!response.ok) {
-            Alert.alert('Erreur', payload.error ?? 'Impossible de mettre à jour la commande');
-            return;
+            if (!response.ok || !payload.order) {
+                throw new Error(payload.error ?? 'Impossible de mettre à jour la commande');
+            }
+
+            setOrders((current) => current.map((item) => (item.id === order.id ? payload.order! : item)));
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Impossible de mettre à jour la commande';
+            Alert.alert('Erreur', message);
+        } finally {
+            setUpdatingOrderId(null);
         }
-
-        setOrders((current) => current.map((item) => (item.id === order.id ? payload.order : item)));
     };
 
     const filteredOrders = filter === 'all' ? orders : orders.filter((order) => order.delivery_status === filter);
-    const styles = createStyles(theme);
+    const styles = createStyles(theme, fontScale);
 
     if (loading) {
         return (
@@ -103,6 +138,14 @@ export default function OrdersScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
             >
                 <Text style={styles.title}>Commandes fournisseur</Text>
+
+                {errorMessage ? (
+                    <View style={styles.errorCard}>
+                        <Text style={styles.errorTitle}>Synchronisation incomplète</Text>
+                        <Text style={styles.errorText}>{errorMessage}</Text>
+                    </View>
+                ) : null}
+
                 <View style={styles.filters}>
                     {FILTERS.map((item) => (
                         <Pressable key={item.key} style={[styles.filterChip, filter === item.key && styles.filterChipActive]} onPress={() => setFilter(item.key)}>
@@ -132,8 +175,16 @@ export default function OrdersScreen() {
                                     Livraison prévue : {formatDate(order.expected_delivery_date)} · Reçue le {formatDate(order.created_at)}
                                 </Text>
                                 {nextLabel ? (
-                                    <Pressable style={styles.actionButton} onPress={() => changeStatus(order)}>
-                                        <Text style={styles.actionButtonText}>{nextLabel}</Text>
+                                    <Pressable
+                                        style={[styles.actionButton, updatingOrderId === order.id && styles.actionButtonDisabled]}
+                                        onPress={() => changeStatus(order)}
+                                        disabled={updatingOrderId === order.id}
+                                    >
+                                        {updatingOrderId === order.id ? (
+                                            <ActivityIndicator color="#fff" />
+                                        ) : (
+                                            <Text style={styles.actionButtonText}>{nextLabel}</Text>
+                                        )}
                                     </Pressable>
                                 ) : null}
                             </Pressable>
@@ -145,7 +196,7 @@ export default function OrdersScreen() {
     );
 }
 
-function createStyles(theme: ReturnType<typeof useTheme>) {
+function createStyles(theme: ReturnType<typeof useTheme>, fontScale: number) {
     return StyleSheet.create({
         container: {
             flex: 1,
@@ -162,9 +213,27 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             gap: 14,
         },
         title: {
-            fontSize: 24,
+            fontSize: scaled(24, fontScale),
             fontWeight: '800',
             color: theme.text,
+        },
+        errorCard: {
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: '#fecaca',
+            backgroundColor: '#fee2e2',
+            padding: 12,
+            gap: 4,
+        },
+        errorTitle: {
+            color: '#b91c1c',
+            fontWeight: '800',
+            fontSize: scaled(13, fontScale),
+        },
+        errorText: {
+            color: '#991b1b',
+            lineHeight: 18,
+            fontSize: scaled(12, fontScale),
         },
         filters: {
             flexDirection: 'row',
@@ -186,7 +255,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         filterText: {
             color: theme.text,
             fontWeight: '700',
-            fontSize: 13,
+            fontSize: scaled(13, fontScale),
         },
         filterTextActive: {
             color: '#fff',
@@ -201,7 +270,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             gap: 6,
         },
         emptyTitle: {
-            fontSize: 18,
+            fontSize: scaled(18, fontScale),
             fontWeight: '700',
             color: theme.text,
         },
@@ -224,7 +293,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         },
         cardTitle: {
             flex: 1,
-            fontSize: 16,
+            fontSize: scaled(16, fontScale),
             fontWeight: '800',
             color: theme.text,
         },
@@ -243,6 +312,9 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             backgroundColor: theme.primary,
             paddingVertical: 12,
             alignItems: 'center',
+        },
+        actionButtonDisabled: {
+            opacity: 0.65,
         },
         actionButtonText: {
             color: '#fff',

@@ -27,6 +27,36 @@ const SUPPLIER_TYPES: { value: SupplierType; label: string; hint: string }[] = [
     { value: 'wholesaler', label: 'Grossiste', hint: 'Fournisseur structuré B2B' },
 ];
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidCameroonPhone(value: string) {
+    const digits = value.replace(/\D/g, '');
+
+    if (digits.length === 9) {
+        return /^[2368]\d{8}$/.test(digits);
+    }
+
+    if (digits.length === 12 && digits.startsWith('237')) {
+        return /^[2368]\d{8}$/.test(digits.slice(3));
+    }
+
+    return false;
+}
+
+function toE164CameroonPhone(value: string) {
+    const digits = value.replace(/\D/g, '');
+
+    if (digits.length === 9) {
+        return `+237${digits}`;
+    }
+
+    if (digits.length === 12 && digits.startsWith('237')) {
+        return `+${digits}`;
+    }
+
+    return value.trim();
+}
+
 export default function RegisterScreen() {
     const router = useRouter();
     const theme = useTheme();
@@ -39,7 +69,7 @@ export default function RegisterScreen() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [contactName, setContactName] = useState('');
-    const [phone, setPhone] = useState('');
+    const [phone, setPhone] = useState(session?.user.phone ?? '');
     const [businessName, setBusinessName] = useState('');
     const [supplierType, setSupplierType] = useState<SupplierType>('individual_farmer');
     const [region, setRegion] = useState<string>(CAMEROON_REGIONS[0]);
@@ -94,8 +124,11 @@ export default function RegisterScreen() {
     };
 
     const handleSubmit = async () => {
+        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedPhone = toE164CameroonPhone(phone);
+
         if (accountRequired) {
-            if (!fullName.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
+            if (!fullName.trim() || !normalizedEmail || !phone.trim() || !password || !confirmPassword) {
                 Alert.alert('Champs requis', 'Complétez les informations de compte.');
                 return;
             }
@@ -109,7 +142,17 @@ export default function RegisterScreen() {
             }
         }
 
-        if (!businessName.trim() || !normalizedContactName || !phone.trim() || !locality.trim()) {
+        if (!EMAIL_REGEX.test(normalizedEmail)) {
+            Alert.alert('Email invalide', 'Veuillez saisir une adresse email valide.');
+            return;
+        }
+
+        if (!isValidCameroonPhone(phone)) {
+            Alert.alert('Téléphone invalide', 'Utilisez un numéro camerounais valide (format +2376XXXXXXXX).');
+            return;
+        }
+
+        if (!businessName.trim() || !normalizedContactName || !normalizedPhone || !locality.trim()) {
             Alert.alert('Champs requis', 'Complétez le nom commercial, le contact, le téléphone et la localité.');
             return;
         }
@@ -130,8 +173,8 @@ export default function RegisterScreen() {
             if (accountRequired) {
                 const accountResult = await registerAccount({
                     fullName: fullName.trim(),
-                    email: email.trim().toLowerCase(),
-                    phone: phone.trim(),
+                    email: normalizedEmail,
+                    phone: normalizedPhone,
                     password,
                 });
 
@@ -155,8 +198,8 @@ export default function RegisterScreen() {
                         name: businessName.trim(),
                         type: supplierType,
                         contact_name: normalizedContactName,
-                        phone: phone.trim(),
-                        email: email.trim().toLowerCase(),
+                        phone: normalizedPhone,
+                        email: normalizedEmail,
                         description: description.trim() || undefined,
                         region,
                         locality: locality.trim(),
@@ -171,15 +214,17 @@ export default function RegisterScreen() {
                 token,
             );
 
-            const payload = await response.json();
+            const payload = (await response.json().catch(() => ({}))) as {
+                error?: string;
+                message?: string;
+            };
 
             if (!response.ok) {
                 throw new Error(payload.error ?? 'Inscription fournisseur impossible');
             }
 
             await refreshProfile();
-            Alert.alert('Onboarding finalisé', payload.message ?? 'Votre demande a été envoyée.');
-            router.replace('/(auth)/awaiting-approval');
+            router.replace('/(auth)/ready');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Erreur serveur';
             Alert.alert('Impossible de terminer l’onboarding', message);

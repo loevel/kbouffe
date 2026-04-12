@@ -16,11 +16,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/contexts/auth-context';
+import { useFontScale, scaled } from '@/hooks/use-font-scale';
 import { authApiFetch, uploadImage } from '@/lib/api';
+
+const KYC_STATUS_LABELS = {
+    pending: 'En attente',
+    approved: 'Approuvé',
+    rejected: 'Rejeté',
+    suspended: 'Suspendu',
+} as const;
 
 export default function ProfileScreen() {
     const router = useRouter();
     const theme = useTheme();
+    const fontScale = useFontScale();
     const { profile, session, refreshProfile, signOut } = useAuth();
     const [locality, setLocality] = useState(profile?.locality ?? '');
     const [address, setAddress] = useState(profile?.address ?? '');
@@ -80,7 +89,7 @@ export default function ProfileScreen() {
         }
     };
 
-    const styles = createStyles(theme);
+    const styles = createStyles(theme, fontScale);
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -101,7 +110,9 @@ export default function ProfileScreen() {
                         <View style={{ flex: 1 }}>
                             <Text style={styles.name}>{profile?.name ?? 'Profil fournisseur'}</Text>
                             <Text style={styles.meta}>{profile?.contact_name ?? 'Contact principal'}</Text>
-                            <Text style={styles.badge}>KYC : {profile?.kyc_status ?? 'pending'}</Text>
+                            <Text style={styles.badge}>
+                                KYC : {profile?.kyc_status ? KYC_STATUS_LABELS[profile.kyc_status] : KYC_STATUS_LABELS.pending}
+                            </Text>
                         </View>
                     </View>
 
@@ -160,7 +171,7 @@ function InfoRow({
     );
 }
 
-function createStyles(theme: ReturnType<typeof useTheme>) {
+function createStyles(theme: ReturnType<typeof useTheme>, fontScale: number) {
     return StyleSheet.create({
         container: {
             flex: 1,
@@ -172,7 +183,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
             paddingBottom: 32,
         },
         title: {
-            fontSize: 24,
+            fontSize: scaled(24, fontScale),
             fontWeight: '800',
             color: theme.text,
         },
@@ -204,7 +215,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         },
         name: {
             color: theme.text,
-            fontSize: 19,
+            fontSize: scaled(19, fontScale),
             fontWeight: '800',
         },
         meta: {
@@ -219,12 +230,12 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         },
         sectionTitle: {
             color: theme.text,
-            fontSize: 18,
+            fontSize: scaled(18, fontScale),
             fontWeight: '700',
         },
         label: {
             color: theme.text,
-            fontSize: 13,
+            fontSize: scaled(13, fontScale),
             fontWeight: '700',
         },
         input: {
@@ -250,7 +261,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         primaryButtonText: {
             color: '#fff',
             fontWeight: '700',
-            fontSize: 16,
+            fontSize: scaled(16, fontScale),
         },
         secondaryButton: {
             borderRadius: 16,
@@ -275,7 +286,7 @@ function createStyles(theme: ReturnType<typeof useTheme>) {
         warningTitle: {
             color: '#c2410c',
             fontWeight: '800',
-            fontSize: 15,
+            fontSize: scaled(15, fontScale),
         },
         warningText: {
             color: '#9a3412',

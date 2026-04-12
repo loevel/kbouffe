@@ -10,7 +10,7 @@ export default function NoAccountScreen() {
       <Text style={styles.emoji}>🌾</Text>
       <Text style={[styles.title, { color: theme.text }]}>Compte non configuré</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>
-        Votre compte n'est pas encore lié à un profil fournisseur.{'\n'}Contactez l'équipe KBouffe pour finaliser votre inscription.
+        Votre compte n&apos;est pas encore lié à un profil fournisseur.{'\n'}Contactez l&apos;équipe KBouffe pour finaliser votre inscription.
       </Text>
       <TouchableOpacity style={[styles.btn, { backgroundColor: theme.primary }]} onPress={signOut}>
         <Text style={styles.btnText}>Se déconnecter</Text>

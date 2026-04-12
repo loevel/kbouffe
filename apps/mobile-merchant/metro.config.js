@@ -41,8 +41,37 @@ const singletonPaths = Object.fromEntries(
     })
 );
 
+// @react-navigation/* exists both in the workspace root and nested inside
+// expo-router's own node_modules. expo-router's NavigationContainer provides
+// a LinkingContext from its own copy; if @react-navigation/bottom-tabs resolves
+// the other copy it gets a different Context object → "Couldn't find a
+// LinkingContext context" crash. Force all navigation packages to resolve from
+// expo-router's nested node_modules so every package shares the same instance.
+const expoRouterRoot = path.resolve(projectRoot, 'node_modules/expo-router');
+const navSingletons = [
+    '@react-navigation/native',
+    '@react-navigation/core',
+    '@react-navigation/bottom-tabs',
+    '@react-navigation/stack',
+    '@react-navigation/elements',
+];
+const navSingletonPaths = Object.fromEntries(
+    navSingletons.map((pkg) => {
+        try {
+            return [pkg, require.resolve(pkg, { paths: [expoRouterRoot] })];
+        } catch {
+            // fall through to workspace root if not found nested in expo-router
+            try {
+                return [pkg, require.resolve(pkg, { paths: [projectRoot] })];
+            } catch {
+                return [pkg, null];
+            }
+        }
+    })
+);
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-    const override = singletonPaths[moduleName];
+    const override = singletonPaths[moduleName] ?? navSingletonPaths[moduleName];
     if (override) {
         return { filePath: override, type: 'sourceFile' };
     }

@@ -19,7 +19,7 @@ export default function IndexScreen() {
         } else {
             router.replace('/(tabs)');
         }
-    }, [session, profile, loading]);
+    }, [session, profile, loading, router]);
 
     return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>

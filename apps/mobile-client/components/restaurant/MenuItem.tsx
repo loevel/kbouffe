@@ -12,7 +12,7 @@ interface Props {
     onAdd: () => void;
 }
 
-export function MenuItem({ item, onAdd }: Props) {
+export const MenuItem = React.memo(function MenuItem({ item, onAdd }: Props) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
 
@@ -83,11 +83,10 @@ export function MenuItem({ item, onAdd }: Props) {
             )}
         </Pressable>
     );
-}
+});
 
 const styles = StyleSheet.create({
     container: {
-        flexDirection: 'row',
         padding: Spacing.md,
         borderRadius: Radii.lg,
         borderWidth: 1,

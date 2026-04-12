@@ -4,7 +4,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/colors';
 import { View, Text, StyleSheet } from 'react-native';
 
-function TabIcon({ name, color, focused, badge }: { name: any; color: string; focused: boolean; badge?: number }) {
+type TabIconName = keyof typeof Ionicons.glyphMap;
+
+function TabIcon({ name, color, badge }: { name: TabIconName; color: string; badge?: number }) {
     return (
         <View>
             <Ionicons name={name} size={24} color={color} />
@@ -36,47 +38,58 @@ export default function TabsLayout() {
                 tabBarActiveTintColor: colors.primary,
                 tabBarInactiveTintColor: colors.tabIconDefault,
                 tabBarStyle: {
-                    backgroundColor: colorScheme === 'dark' ? '#1e293b' : '#ffffff',
-                    borderTopColor: colorScheme === 'dark' ? '#334155' : '#e2e8f0',
-                    paddingBottom: 4,
-                    height: 60,
+                    backgroundColor: colors.surface,
+                    borderTopColor: colors.border,
+                    paddingBottom: 8,
+                    paddingTop: 6,
+                    height: 68,
                 },
+                tabBarItemStyle: { paddingVertical: 2 },
+                tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
+                tabBarHideOnKeyboard: true,
                 headerShown: false,
             }}
         >
             <Tabs.Screen
+                name="index"
+                options={{
+                    title: 'Aperçu',
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} color={color} />,
+                }}
+            />
+            <Tabs.Screen
                 name="orders"
                 options={{
                     title: 'Commandes',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'receipt' : 'receipt-outline'} color={color} focused={focused} />,
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'receipt' : 'receipt-outline'} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="menu"
                 options={{
                     title: 'Menu',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'restaurant' : 'restaurant-outline'} color={color} focused={focused} />,
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'restaurant' : 'restaurant-outline'} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="stats"
                 options={{
                     title: 'Stats',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} color={color} focused={focused} />,
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="notifications"
                 options={{
                     title: 'Alertes',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'notifications' : 'notifications-outline'} color={color} focused={focused} />,
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'notifications' : 'notifications-outline'} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="settings"
                 options={{
                     title: 'Paramètres',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'settings' : 'settings-outline'} color={color} focused={focused} />,
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'settings' : 'settings-outline'} color={color} />,
                 }}
             />
         </Tabs>

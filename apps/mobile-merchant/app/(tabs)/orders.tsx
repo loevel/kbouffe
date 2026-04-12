@@ -1,23 +1,22 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, StyleSheet,
     RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 
-type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
+type OrderStatus = string;
 
 interface Order {
     id: string;
     order_number: string;
     status: OrderStatus;
     total_amount: number;
-    delivery_type: 'delivery' | 'pickup' | 'dine_in';
+    delivery_type: 'delivery' | 'pickup' | 'dine_in' | string;
     created_at: string;
     customer_name?: string;
     customer_phone?: string;
@@ -25,17 +24,107 @@ interface Order {
     table_number?: string;
 }
 
-const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: string; next?: OrderStatus; nextLabel?: string }> = {
-    pending:    { label: 'En attente',   color: '#d97706', bg: '#fef3c7', next: 'accepted',   nextLabel: 'Accepter' },
-    accepted:   { label: 'Accepté',     color: '#2563eb', bg: '#dbeafe', next: 'preparing',  nextLabel: 'En préparation' },
-    preparing:  { label: 'Préparation', color: '#7c3aed', bg: '#ede9fe', next: 'ready',      nextLabel: 'Prêt' },
-    ready:      { label: 'Prêt',        color: '#16a34a', bg: '#dcfce7', next: 'delivering',  nextLabel: 'En livraison' },
-    delivering: { label: 'Livraison',   color: '#0891b2', bg: '#cffafe' },
-    delivered:  { label: 'Livré',       color: '#64748b', bg: '#f1f5f9' },
-    cancelled:  { label: 'Annulé',      color: '#dc2626', bg: '#fee2e2' },
+interface StatusConfig {
+    label: string;
+    color: string;
+    bg: string;
+}
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
+    draft:            { label: 'Brouillon', color: '#475569', bg: '#e2e8f0' },
+    scheduled:        { label: 'Planifiée', color: '#7c3aed', bg: '#ede9fe' },
+    pending:          { label: 'En attente', color: '#d97706', bg: '#fef3c7' },
+    accepted:         { label: 'Acceptée', color: '#2563eb', bg: '#dbeafe' },
+    preparing:        { label: 'Préparation', color: '#7c3aed', bg: '#ede9fe' },
+    ready:            { label: 'Prête', color: '#16a34a', bg: '#dcfce7' },
+    out_for_delivery: { label: 'En livraison', color: '#0891b2', bg: '#cffafe' },
+    delivering:       { label: 'En livraison', color: '#0891b2', bg: '#cffafe' },
+    delivered:        { label: 'Livrée', color: '#64748b', bg: '#f1f5f9' },
+    completed:        { label: 'Terminée', color: '#64748b', bg: '#f1f5f9' },
+    cancelled:        { label: 'Annulée', color: '#dc2626', bg: '#fee2e2' },
+    refunded:         { label: 'Remboursée', color: '#b45309', bg: '#ffedd5' },
 };
 
-const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'delivering'];
+const DEFAULT_STATUS_CONFIG: StatusConfig = { label: 'Statut inconnu', color: '#64748b', bg: '#f1f5f9' };
+
+const TERMINAL_STATUSES = new Set<OrderStatus>(['delivered', 'completed', 'cancelled', 'refunded']);
+
+const STATUS_FALLBACKS: Record<string, string[]> = {
+    out_for_delivery: ['delivering'],
+    delivering: ['out_for_delivery'],
+    delivered: ['completed'],
+    completed: ['delivered'],
+};
+
+function asOrderNumber(row: Record<string, unknown>) {
+    const value = row.order_number ?? row.invoice_number;
+    if (typeof value === 'string' && value.trim().length > 0) return value;
+    const id = row.id;
+    return typeof id === 'string' ? id.slice(-6).toUpperCase() : '—';
+}
+
+function asAmount(value: unknown) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapOrderRow(row: Record<string, unknown>): Order {
+    return {
+        id: typeof row.id === 'string' ? row.id : asOrderNumber(row),
+        order_number: asOrderNumber(row),
+        status: typeof row.status === 'string' ? row.status : 'pending',
+        total_amount: asAmount(row.total_amount ?? row.total),
+        delivery_type: typeof row.delivery_type === 'string' ? row.delivery_type : 'delivery',
+        created_at: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
+        customer_name: typeof row.customer_name === 'string' ? row.customer_name : undefined,
+        customer_phone: typeof row.customer_phone === 'string' ? row.customer_phone : undefined,
+        table_number: typeof row.table_number === 'string'
+            ? row.table_number
+            : typeof row.table_number === 'number'
+                ? String(row.table_number)
+                : undefined,
+    };
+}
+
+function getStatusConfig(status: OrderStatus) {
+    return STATUS_CONFIG[status] ?? DEFAULT_STATUS_CONFIG;
+}
+
+function getNextStatus(order: Order): OrderStatus | null {
+    switch (order.status) {
+        case 'pending':
+            return 'accepted';
+        case 'accepted':
+            return 'preparing';
+        case 'preparing':
+            return 'ready';
+        case 'ready':
+            return order.delivery_type === 'delivery' ? 'out_for_delivery' : 'delivered';
+        case 'out_for_delivery':
+        case 'delivering':
+            return 'delivered';
+        default:
+            return null;
+    }
+}
+
+function getNextLabel(order: Order): string | null {
+    switch (order.status) {
+        case 'pending':
+            return 'Accepter';
+        case 'accepted':
+            return 'En préparation';
+        case 'preparing':
+            return 'Marquer prête';
+        case 'ready':
+            return order.delivery_type === 'delivery' ? 'En livraison' : 'Marquer livrée';
+        case 'out_for_delivery':
+        case 'delivering':
+            return 'Marquer livrée';
+        default:
+            return null;
+    }
+}
 
 export default function OrdersScreen() {
     const { profile } = useAuth();
@@ -44,35 +133,45 @@ export default function OrdersScreen() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [filter, setFilter] = useState<'active' | 'all'>('active');
 
     const fetchOrders = useCallback(async () => {
-        if (!profile?.restaurantId) return;
-        const query = supabase
+        if (!profile?.restaurantId) {
+            setOrders([]);
+            return;
+        }
+
+        const { data, error } = await supabase
             .from('orders')
-            .select(`
-                id, order_number, status, total_amount, delivery_type,
-                created_at, table_number,
-                users!customer_id(name, phone)
-            `)
+            .select('*')
             .eq('restaurant_id', profile.restaurantId)
             .order('created_at', { ascending: false })
             .limit(50);
 
-        if (filter === 'active') query.in('status', ACTIVE_STATUSES);
+        if (error) throw error;
 
-        const { data } = await query;
-        setOrders(
-            (data ?? []).map((o: any) => ({
-                ...o,
-                customer_name: o.users?.name,
-                customer_phone: o.users?.phone,
-            }))
-        );
-    }, [profile?.restaurantId, filter]);
+        setOrders((data ?? []).map((row) => mapOrderRow(row as Record<string, unknown>)));
+        setErrorMessage(null);
+    }, [profile?.restaurantId]);
 
     useEffect(() => {
-        fetchOrders().finally(() => setLoading(false));
+        let mounted = true;
+
+        setLoading(true);
+        fetchOrders()
+            .catch((error) => {
+                if (!mounted) return;
+                setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les commandes');
+                setOrders([]);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
     }, [fetchOrders]);
 
     // Supabase Realtime subscription
@@ -86,28 +185,53 @@ export default function OrdersScreen() {
                 table: 'orders',
                 filter: `restaurant_id=eq.${profile.restaurantId}`,
             }, () => {
-                fetchOrders();
+                fetchOrders().catch((error) => {
+                    setErrorMessage(error instanceof Error ? error.message : 'Impossible de synchroniser les commandes');
+                });
             })
             .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, [profile?.restaurantId, fetchOrders]);
 
     const advanceStatus = async (order: Order) => {
-        const cfg = STATUS_CONFIG[order.status];
-        if (!cfg.next) return;
+        if (!profile?.restaurantId) return;
+        const nextStatus = getNextStatus(order);
+        const nextLabel = getNextLabel(order);
+        if (!nextStatus || !nextLabel) return;
+
         Alert.alert(
             `Confirmer`,
-            `Passer la commande #${order.order_number} à "${cfg.nextLabel}" ?`,
+            `Passer la commande #${order.order_number} à "${nextLabel}" ?`,
             [
                 { text: 'Annuler', style: 'cancel' },
                 {
-                    text: cfg.nextLabel ?? 'Confirmer',
+                    text: nextLabel,
                     onPress: async () => {
-                        await supabase.from('orders').update({ status: cfg.next }).eq('id', order.id);
-                        // Optimistic update
-                        setOrders((prev) =>
-                            prev.map((o) => o.id === order.id ? { ...o, status: cfg.next! } : o)
-                        );
+                        const candidates = [nextStatus, ...(STATUS_FALLBACKS[nextStatus] ?? [])];
+                        let appliedStatus: string | null = null;
+                        let lastError: string | null = null;
+
+                        for (const candidate of candidates) {
+                            const { error } = await supabase
+                                .from('orders')
+                                .update({ status: candidate })
+                                .eq('id', order.id)
+                                .eq('restaurant_id', profile.restaurantId);
+
+                            if (!error) {
+                                appliedStatus = candidate;
+                                break;
+                            }
+
+                            lastError = error.message;
+                        }
+
+                        if (!appliedStatus) {
+                            Alert.alert('Erreur', lastError ?? 'Impossible de mettre à jour la commande');
+                            return;
+                        }
+
+                        setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: appliedStatus! } : o)));
                     },
                 },
             ]
@@ -116,14 +240,25 @@ export default function OrdersScreen() {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchOrders();
-        setRefreshing(false);
+        try {
+            await fetchOrders();
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : 'Impossible de rafraîchir les commandes');
+        } finally {
+            setRefreshing(false);
+        }
     };
+
+    const filteredOrders = useMemo(
+        () => (filter === 'active' ? orders.filter((order) => !TERMINAL_STATUSES.has(order.status)) : orders),
+        [filter, orders]
+    );
 
     const s = styles(theme);
 
     const renderOrder = ({ item }: { item: Order }) => {
-        const cfg = STATUS_CONFIG[item.status];
+        const cfg = getStatusConfig(item.status);
+        const nextLabel = getNextLabel(item);
         const time = new Date(item.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const deliveryIcons: Record<string, string> = { delivery: '🛵', pickup: '🏃', dine_in: '🍽️' };
 
@@ -142,18 +277,18 @@ export default function OrdersScreen() {
                 <View style={s.cardBody}>
                     <Text style={s.customerName}>{item.customer_name ?? 'Client'}</Text>
                     <Text style={s.deliveryType}>
-                        {deliveryIcons[item.delivery_type]} {item.delivery_type === 'dine_in' ? `Table ${item.table_number ?? '?'}` : item.delivery_type === 'pickup' ? 'À emporter' : 'Livraison'}
+                        {deliveryIcons[item.delivery_type] ?? '📦'} {item.delivery_type === 'dine_in' ? `Table ${item.table_number ?? '?'}` : item.delivery_type === 'pickup' ? 'À emporter' : 'Livraison'}
                     </Text>
                 </View>
 
                 <View style={s.cardFooter}>
                     <Text style={s.amount}>{item.total_amount?.toLocaleString()} FCFA</Text>
-                    {cfg.next && (
+                    {nextLabel && (
                         <TouchableOpacity
                             style={[s.advanceBtn, { backgroundColor: cfg.color }]}
                             onPress={() => advanceStatus(item)}
                         >
-                            <Text style={s.advanceBtnText}>{cfg.nextLabel}</Text>
+                            <Text style={s.advanceBtnText}>{nextLabel}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -185,7 +320,7 @@ export default function OrdersScreen() {
                 <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
             ) : (
                 <FlatList
-                    data={orders}
+                    data={filteredOrders}
                     keyExtractor={(o) => o.id}
                     renderItem={renderOrder}
                     contentContainerStyle={s.list}
@@ -194,7 +329,7 @@ export default function OrdersScreen() {
                         <View style={s.empty}>
                             <Text style={s.emptyIcon}>📋</Text>
                             <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-                                {filter === 'active' ? 'Aucune commande en cours' : 'Aucune commande'}
+                                {errorMessage ?? (filter === 'active' ? 'Aucune commande en cours' : 'Aucune commande')}
                             </Text>
                         </View>
                     }

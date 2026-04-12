@@ -38,9 +38,16 @@ export default function SupportTicketsScreen() {
     return (
         <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + Spacing.md }]}> 
             <View style={styles.header}>
-                <Text style={[styles.title, { color: theme.text }]}>Mes tickets</Text>
+                <Pressable
+                    onPress={() => router.back()}
+                    hitSlop={8}
+                    style={[styles.backBtn, { backgroundColor: colorScheme === 'dark' ? '#ffffff08' : '#e2e8f0' }]}
+                >
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
+                </Pressable>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Mes tickets</Text>
                 <Pressable onPress={() => router.push('/support/new-ticket')}>
-                    <Ionicons name="add-circle-outline" size={24} color={theme.primary} />
+                    <Ionicons name="add-circle" size={26} color={theme.primary} />
                 </Pressable>
             </View>
 
@@ -88,9 +95,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: Spacing.md,
-        marginBottom: Spacing.sm,
+        paddingBottom: Spacing.md,
     },
-    title: { ...Typography.title2 },
+    backBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        ...Typography.title3,
+    },
     card: {
         borderWidth: 1,
         borderRadius: Radii.lg,

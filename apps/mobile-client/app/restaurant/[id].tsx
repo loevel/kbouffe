@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
     ActivityIndicator,
     StyleSheet,
@@ -57,6 +57,13 @@ export default function RestaurantScreen() {
     const [activeImageIdx, setActiveImageIdx] = useState(0);
     const [activeDeliveryType, setActiveDeliveryType] = useState<'delivery' | 'pickup'>('delivery');
     const [activeCategoryIdx, setActiveCategoryIdx] = useState(0);
+
+    // Refs for category navigation
+    const sectionListRef = useRef<SectionList>(null);
+    const categoryTabsRef = useRef<ScrollView>(null);
+    const tabOffsetsRef = useRef<number[]>([]);
+    // Keep a stable ref to sections so viewability callback doesn't need to re-register
+    const sectionsRef = useRef<typeof sections>([]);
 
     // Favorites state — seeded from auth context loyalty data
     const { user } = useAuth();
@@ -143,9 +150,17 @@ export default function RestaurantScreen() {
 
     const categoryNames = useMemo(() => {
         if (!data?.products) return [];
-        const cats = new Set<string>();
-        data.products.forEach((p) => cats.add(p.category ?? 'Autres'));
-        return Array.from(cats);
+        // Build set of category names that actually have products
+        const withProducts = new Set<string>();
+        data.products.forEach((p) => withProducts.add(p.category ?? 'Autres'));
+        // Respect sort_order from the official categories list
+        const sorted = (data.categories ?? [])
+            .filter((c) => withProducts.has(c.name))
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((c) => c.name);
+        // Append catch-all at the end
+        if (withProducts.has('Autres')) sorted.push('Autres');
+        return sorted;
     }, [data]);
 
     const sections = useMemo(() => {
@@ -166,6 +181,9 @@ export default function RestaurantScreen() {
         });
     }, [data, categoryNames]);
 
+    // Sync sections ref so the stable viewability callback always reads fresh sections
+    useEffect(() => { sectionsRef.current = sections; }, [sections]);
+
     const handleAddProduct = (product: MobileProduct) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
@@ -178,6 +196,37 @@ export default function RestaurantScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         router.push('/cart');
     }, [router]);
+
+    const handleCategoryPress = useCallback((idx: number) => {
+        Haptics.selectionAsync();
+        setActiveCategoryIdx(idx);
+        // Scroll SectionList to the chosen section
+        if (sectionsRef.current[idx]?.data.length > 0) {
+            sectionListRef.current?.scrollToLocation({
+                sectionIndex: idx,
+                itemIndex: 0,
+                viewOffset: 4,
+                animated: true,
+            });
+        }
+        // Center the pressed tab in the horizontal tabs ScrollView
+        const offset = tabOffsetsRef.current[idx];
+        if (offset != null) {
+            categoryTabsRef.current?.scrollTo({ x: Math.max(0, offset - 60), animated: true });
+        }
+    }, []);
+
+    // Stable callback — reads sections via ref to avoid re-registering on SectionList
+    const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+        if (!viewableItems.length) return;
+        const first = viewableItems.find((v: any) => v.section);
+        if (first?.section) {
+            const idx = sectionsRef.current.findIndex(s => s.title === first.section.title);
+            if (idx >= 0) setActiveCategoryIdx(idx);
+        }
+    }).current;
+
+    const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 30 }).current;
 
     const handleHeroScroll = useCallback((e: any) => {
         const idx = Math.round(e.nativeEvent.contentOffset.x / HERO_W);
@@ -425,6 +474,7 @@ export default function RestaurantScreen() {
 
             {/* Category Tabs */}
             <ScrollView
+                ref={categoryTabsRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.categoryTabs}
@@ -436,7 +486,8 @@ export default function RestaurantScreen() {
                             styles.categoryTab,
                             activeCategoryIdx === idx && [styles.categoryTabActive, { backgroundColor: theme.primary }],
                         ]}
-                        onPress={() => setActiveCategoryIdx(idx)}
+                        onPress={() => handleCategoryPress(idx)}
+                        onLayout={(e) => { tabOffsetsRef.current[idx] = e.nativeEvent.layout.x; }}
                     >
                         <Text
                             style={[
@@ -462,6 +513,7 @@ export default function RestaurantScreen() {
                 </View>
             ) : (
                 <SectionList
+                    ref={sectionListRef}
                     sections={sections}
                     keyExtractor={(item, idx) => idx.toString()}
                     renderItem={({ item: [product, product2], index }) => (
@@ -478,7 +530,11 @@ export default function RestaurantScreen() {
                             </View>
                         </View>
                     )}
-                    renderSectionHeader={() => null}
+                    renderSectionHeader={({ section: { title } }) => (
+                        <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
+                            <Text style={[styles.sectionHeaderText, { color: theme.text }]}>{title}</Text>
+                        </View>
+                    )}
                     ListHeaderComponent={renderHeader}
                     contentContainerStyle={[
                         styles.listContent,
@@ -491,6 +547,18 @@ export default function RestaurantScreen() {
                     initialNumToRender={4}
                     onScroll={handleAnimatedScroll}
                     scrollEventThrottle={16}
+                    onViewableItemsChanged={onViewableItemsChanged}
+                    viewabilityConfig={viewabilityConfig}
+                    onScrollToIndexFailed={() => {
+                        // Retry after a frame if section isn't rendered yet
+                        setTimeout(() => {
+                            sectionListRef.current?.scrollToLocation({
+                                sectionIndex: activeCategoryIdx,
+                                itemIndex: 0,
+                                animated: true,
+                            });
+                        }, 100);
+                    }}
                 />
             )}
 
@@ -689,6 +757,17 @@ const styles = StyleSheet.create({
     },
     categoryTabActive: {},
     categoryTabLabel: { ...Typography.small, fontWeight: '600' },
+
+    /* Section headers in SectionList */
+    sectionHeader: {
+        paddingHorizontal: Spacing.md,
+        paddingTop: Spacing.md,
+        paddingBottom: Spacing.xs ?? 4,
+    },
+    sectionHeaderText: {
+        ...Typography.body,
+        fontWeight: '700',
+    },
 
     /* Products */
     productRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.md },

@@ -26,7 +26,7 @@ function useKeyDown(key: string, callback: () => void) {
     }, [key, callback]);
 }
 
-const ICON_MAP: Record<SearchResult["type"], any> = {
+const ICON_MAP: Record<SearchResult["type"], React.ElementType> = {
     order: ShoppingBag,
     product: UtensilsCrossed,
     customer: Users,
@@ -42,7 +42,9 @@ export function GlobalSearch() {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
+    const [activeIdx, setActiveIdx] = useState(-1);
     const inputRef = useRef<HTMLInputElement>(null);
+    const listRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
 
     const openSearch = useCallback(() => {
@@ -53,15 +55,20 @@ export function GlobalSearch() {
     useKeyDown("k", openSearch);
 
     useEffect(() => {
-        if (!open) { setQuery(""); setResults([]); }
+        if (!open) { setQuery(""); setResults([]); setActiveIdx(-1); }
     }, [open]);
 
+    // Reset active index when results change
+    useEffect(() => { setActiveIdx(-1); }, [results]);
+
     useEffect(() => {
-        if (query.trim().length < 2) { setResults([]); return; }
+        // Strip leading # so "#A3F2C1" → "A3F2C1" before sending to API
+        const cleaned = query.trim().replace(/^#/, "");
+        if (cleaned.length < 2) { setResults([]); return; }
         const timer = setTimeout(async () => {
             setLoading(true);
             try {
-                const res = await authFetch(`/api/restaurant/search?q=${encodeURIComponent(query)}`);
+                const res = await authFetch(`/api/restaurant/search?q=${encodeURIComponent(cleaned)}`);
                 if (res.ok) {
                     const json = await res.json();
                     setResults(json.results ?? []);
@@ -77,6 +84,29 @@ export function GlobalSearch() {
         router.push(result.href);
         setOpen(false);
     }
+
+    function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+        if (e.key === "Escape") { setOpen(false); return; }
+        if (results.length === 0) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveIdx((i) => Math.min(i + 1, results.length - 1));
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIdx((i) => Math.max(i - 1, 0));
+        } else if (e.key === "Enter" && activeIdx >= 0) {
+            e.preventDefault();
+            navigate(results[activeIdx]);
+        }
+    }
+
+    // Scroll active item into view
+    useEffect(() => {
+        if (activeIdx < 0 || !listRef.current) return;
+        const item = listRef.current.querySelectorAll("[data-result]")[activeIdx] as HTMLElement | undefined;
+        item?.scrollIntoView({ block: "nearest" });
+    }, [activeIdx]);
 
     if (!open) {
         return (
@@ -105,7 +135,10 @@ export function GlobalSearch() {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Chercher commande #, produit, client…"
                         className="flex-1 text-sm bg-transparent outline-none text-surface-900 dark:text-white placeholder:text-surface-400"
-                        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+                        onKeyDown={handleKeyDown}
+                        aria-autocomplete="list"
+                        aria-controls="search-results"
+                        aria-activedescendant={activeIdx >= 0 ? `search-result-${activeIdx}` : undefined}
                     />
                     <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                         <X size={16} className="text-surface-400" />
@@ -113,20 +146,25 @@ export function GlobalSearch() {
                 </div>
 
                 {/* Results */}
-                <div className="max-h-80 overflow-y-auto">
+                <div ref={listRef} id="search-results" role="listbox" className="max-h-80 overflow-y-auto">
                     {loading && (
                         <div className="p-6 text-center text-sm text-surface-400">Recherche…</div>
                     )}
-                    {!loading && query.length >= 2 && results.length === 0 && (
+                    {!loading && query.trim().replace(/^#/, "").length >= 2 && results.length === 0 && (
                         <div className="p-6 text-center text-sm text-surface-400">Aucun résultat pour « {query} »</div>
                     )}
-                    {!loading && results.map((r) => {
+                    {!loading && results.map((r, idx) => {
                         const Icon = ICON_MAP[r.type];
+                        const isActive = idx === activeIdx;
                         return (
                             <button
                                 key={`${r.type}-${r.id}`}
+                                id={`search-result-${idx}`}
+                                role="option"
+                                aria-selected={isActive}
+                                data-result
                                 onClick={() => navigate(r)}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors text-left"
+                                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${isActive ? "bg-brand-50 dark:bg-brand-500/10" : "hover:bg-surface-50 dark:hover:bg-surface-800"}`}
                             >
                                 <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0">
                                     <Icon size={16} className="text-brand-500" />
@@ -146,19 +184,23 @@ export function GlobalSearch() {
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 text-xs text-surface-500 px-2">
                                     <ShoppingBag size={12} />
-                                    <span>N° commande : #12345</span>
+                                    <span>N° commande : #A3F2C1</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-surface-500 px-2">
                                     <UtensilsCrossed size={12} />
-                                    <span>Produit : Pizza, Burger</span>
+                                    <span>Produit : Pizza, Poulet DG</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-surface-500 px-2">
                                     <Users size={12} />
-                                    <span>Client : Jean, Alice</span>
+                                    <span>Client : Jean, +237 6…</span>
                                 </div>
                             </div>
                             <div className="text-xs text-surface-500 text-center pt-2 border-t border-surface-100 dark:border-surface-800">
                                 Raccourci clavier : <kbd className="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-xs">⌘K</kbd>
+                                <span className="mx-2">·</span>
+                                <kbd className="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-xs">↑↓</kbd> naviguer
+                                <span className="mx-2">·</span>
+                                <kbd className="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-xs">↵</kbd> ouvrir
                             </div>
                         </div>
                     )}

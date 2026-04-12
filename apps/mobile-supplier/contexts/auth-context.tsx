@@ -29,7 +29,10 @@ async function fetchSupplierProfile(token: string) {
 
     if (response.status === 404) return null;
 
-    const payload = await response.json();
+    const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        supplier?: SupplierProfile;
+    };
 
     if (!response.ok) {
         throw new Error(payload.error ?? 'Impossible de charger le profil fournisseur');
@@ -69,8 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     const nextProfile = await fetchSupplierProfile(initialSession.access_token);
                     if (!cancelled) setProfile(nextProfile);
-                } catch {
+                } catch (error) {
                     if (!cancelled) setProfile(null);
+                    console.error('Initial profile fetch failed', error);
                 }
             }
 
@@ -90,8 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     const nextProfile = await fetchSupplierProfile(nextSession.access_token);
                     if (!cancelled) setProfile(nextProfile);
-                } catch {
+                } catch (error) {
                     if (!cancelled) setProfile(null);
+                    console.error('Auth state profile refresh failed', error);
                 }
             } else {
                 setProfile(null);
@@ -136,7 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }),
         });
 
-        const payload = await response.json();
+        const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+        };
 
         if (!response.ok) {
             return { error: payload.error ?? 'Impossible de créer le compte' };

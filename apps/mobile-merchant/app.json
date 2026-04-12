@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Kbouffe Merchant",
+    "name": "Kbouffe Gestionnaire",
     "slug": "kbouffe-merchant",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,7 +19,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.kbouffe.merchant"
+      "package": "com.kbouffe.merchant",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "single",
@@ -52,14 +56,16 @@
         {
           "cameraPermission": "Kbouffe Merchant utilise la caméra pour scanner les codes QR des commandes."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "kbouffe-merchant-project-id"
+        "projectId": "48f45444-59bf-417c-bc7f-0fc88f98b641"
       }
     },
     "owner": "dreamsevo"

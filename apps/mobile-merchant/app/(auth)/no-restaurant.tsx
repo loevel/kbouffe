@@ -10,7 +10,7 @@ export default function NoRestaurantScreen() {
             <Text style={styles.emoji}>🏪</Text>
             <Text style={[styles.title, { color: theme.text }]}>Aucun restaurant associé</Text>
             <Text style={[styles.body, { color: theme.textSecondary }]}>
-                Votre compte n'est pas encore lié à un restaurant. Contactez l'équipe KBouffe.
+                Votre compte n&apos;est pas encore lié à un restaurant. Contactez l&apos;équipe KBouffe.
             </Text>
             <TouchableOpacity style={[styles.btn, { backgroundColor: theme.primary }]} onPress={signOut}>
                 <Text style={styles.btnText}>Se déconnecter</Text>

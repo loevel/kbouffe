@@ -13,10 +13,11 @@ export default function RootLayout() {
                 <Stack>
                     <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="settings" options={{ headerShown: false }} />
                     <Stack.Screen name="order/[id]" options={{ headerShown: false }} />
                     <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
-                    <Stack.Screen name="product/new" options={{ headerShown: false }} />
                     <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
+                    <Stack.Screen name="product/new" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar style="auto" />
             </ThemeProvider>

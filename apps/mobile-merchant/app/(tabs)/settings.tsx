@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { getMemberRoleLabel } from '@/lib/member-role';
 
 export default function SettingsScreen() {
     const { profile, signOut } = useAuth();
@@ -36,20 +37,20 @@ export default function SettingsScreen() {
                     <View style={s.restaurantInfo}>
                         <Text style={[s.restaurantName, { color: theme.text }]}>{profile?.restaurantName ?? 'Restaurant'}</Text>
                         <Text style={[s.restaurantRole, { color: theme.textSecondary }]}>
-                            {profile?.memberRole ?? 'Gérant'} · {profile?.phone ?? ''}
+                            {getMemberRoleLabel(profile?.memberRole)} · {profile?.phone ?? ''}
                         </Text>
                     </View>
                 </View>
 
                 {/* Menu items */}
                 {[
-                    { label: 'Horaires d\'ouverture', icon: 'time-outline', onPress: () => {} },
-                    { label: 'Informations du restaurant', icon: 'business-outline', onPress: () => {} },
-                    { label: 'Zones de livraison', icon: 'map-outline', onPress: () => {} },
-                    { label: 'Modes de paiement', icon: 'card-outline', onPress: () => {} },
-                    { label: 'Notifications push', icon: 'notifications-outline', onPress: () => {} },
+                    { label: 'Horaires d\'ouverture', icon: 'time-outline', href: '/settings/hours' },
+                    { label: 'Informations du restaurant', icon: 'business-outline', href: '/settings/restaurant' },
+                    { label: 'Zones de livraison', icon: 'map-outline', href: '/settings/zones' },
+                    { label: 'Modes de paiement', icon: 'card-outline', href: '/settings/payments' },
+                    { label: 'Notifications push', icon: 'notifications-outline', href: '/settings/notifications' },
                 ].map((item) => (
-                    <TouchableOpacity key={item.label} style={s.menuItem} onPress={item.onPress}>
+                    <TouchableOpacity key={item.label} style={s.menuItem} onPress={() => router.push(item.href as never)}>
                         <Ionicons name={item.icon as any} size={20} color={theme.primary} />
                         <Text style={[s.menuLabel, { color: theme.text }]}>{item.label}</Text>
                         <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
@@ -61,7 +62,7 @@ export default function SettingsScreen() {
                     <Text style={[s.menuLabel, { color: '#dc2626' }]}>Se déconnecter</Text>
                 </TouchableOpacity>
 
-                <Text style={[s.version, { color: theme.textSecondary }]}>Kbouffe Merchant v1.0.0</Text>
+                <Text style={[s.version, { color: theme.textSecondary }]}>Kbouffe Gestionnaire v1.0.0</Text>
             </ScrollView>
         </SafeAreaView>
     );

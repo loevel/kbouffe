@@ -14,7 +14,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { authApiFetch } from '@/lib/api';
 import { formatDate, formatFCFA } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
-import type { SupplierOrder } from '@/lib/types';
+import type { SupplierDeliveryStatus, SupplierOrder } from '@/lib/types';
+
+const STATUS_LABELS: Record<SupplierDeliveryStatus, string> = {
+    pending: 'En attente',
+    confirmed: 'Confirmée',
+    delivered: 'Livrée',
+    disputed: 'En litige',
+    cancelled: 'Annulée',
+};
+
+async function readJson<T>(response: Response): Promise<T> {
+    return (await response.json().catch(() => ({}))) as T;
+}
+
+async function fetchOrderById(orderId: string) {
+    const directResponse = await authApiFetch(`/api/marketplace/suppliers/me/orders/${orderId}`);
+    const directPayload = await readJson<{ error?: string; order?: SupplierOrder }>(directResponse);
+
+    if (directResponse.ok) {
+        return directPayload.order ?? null;
+    }
+
+    if (![404, 405].includes(directResponse.status)) {
+        throw new Error(directPayload.error ?? 'Impossible de charger la commande');
+    }
+
+    const listResponse = await authApiFetch('/api/marketplace/suppliers/me/orders');
+    const listPayload = await readJson<{ error?: string; orders?: SupplierOrder[] }>(listResponse);
+
+    if (!listResponse.ok) {
+        throw new Error(listPayload.error ?? 'Impossible de charger la commande');
+    }
+
+    return (listPayload.orders ?? []).find((item) => item.id === orderId) ?? null;
+}
 
 export default function OrderDetailScreen() {
     const router = useRouter();
@@ -25,23 +59,35 @@ export default function OrderDetailScreen() {
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
-        authApiFetch('/api/marketplace/suppliers/me/orders')
-            .then(async (response) => {
-                const payload = await response.json();
-                if (!response.ok) {
-                    throw new Error(payload.error ?? 'Impossible de charger la commande');
-                }
-                const found = (payload.orders as SupplierOrder[]).find((item) => item.id === id) ?? null;
-                setOrder(found);
+        let mounted = true;
+
+        fetchOrderById(id)
+            .then((nextOrder) => {
+                if (mounted) setOrder(nextOrder);
             })
-            .catch((error: Error) => Alert.alert('Erreur', error.message))
-            .finally(() => setLoading(false));
+            .catch((error) => {
+                if (!mounted) return;
+                const message = error instanceof Error ? error.message : 'Impossible de charger la commande';
+                Alert.alert('Erreur', message);
+            })
+            .finally(() => {
+                if (mounted) setLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
     }, [id]);
 
     const changeStatus = async () => {
         if (!order) return;
 
-        const next = order.delivery_status === 'pending' ? 'confirmed' : order.delivery_status === 'confirmed' ? 'delivered' : null;
+        const next =
+            order.delivery_status === 'pending'
+                ? 'confirmed'
+                : order.delivery_status === 'confirmed'
+                  ? 'delivered'
+                  : null;
         if (!next) return;
 
         setUpdating(true);
@@ -50,9 +96,9 @@ export default function OrderDetailScreen() {
                 method: 'PATCH',
                 body: JSON.stringify({ delivery_status: next }),
             });
-            const payload = await response.json();
+            const payload = await readJson<{ error?: string; order?: SupplierOrder }>(response);
 
-            if (!response.ok) {
+            if (!response.ok || !payload.order) {
                 throw new Error(payload.error ?? 'Impossible de mettre à jour la commande');
             }
 
@@ -83,7 +129,12 @@ export default function OrderDetailScreen() {
         );
     }
 
-    const nextLabel = order.delivery_status === 'pending' ? 'Confirmer la commande' : order.delivery_status === 'confirmed' ? 'Marquer comme livrée' : null;
+    const nextLabel =
+        order.delivery_status === 'pending'
+            ? 'Confirmer la commande'
+            : order.delivery_status === 'confirmed'
+              ? 'Marquer comme livrée'
+              : null;
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -94,18 +145,24 @@ export default function OrderDetailScreen() {
                     </Pressable>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.title}>{order.supplier_products?.name ?? 'Commande fournisseur'}</Text>
-                        <Text style={styles.subtitle}>Suivez la progression et la livraison de cette commande.</Text>
+                        <Text style={styles.subtitle}>
+                            Suivez la progression et la livraison de cette commande.
+                        </Text>
                     </View>
                 </View>
 
                 <View style={styles.card}>
-                    <DetailRow label="Statut" value={order.delivery_status} theme={theme} />
+                    <DetailRow label="Statut" value={STATUS_LABELS[order.delivery_status]} theme={theme} />
                     <DetailRow label="Quantité" value={`${order.quantity} ${order.unit}`} theme={theme} />
                     <DetailRow label="Prix unitaire" value={formatFCFA(order.unit_price)} theme={theme} />
                     <DetailRow label="Montant total" value={formatFCFA(order.total_price)} theme={theme} />
                     <DetailRow label="Créée le" value={formatDate(order.created_at)} theme={theme} />
                     <DetailRow label="Livraison prévue" value={formatDate(order.expected_delivery_date)} theme={theme} />
-                    <DetailRow label="Livraison effective" value={formatDate(order.actual_delivery_date)} theme={theme} />
+                    <DetailRow
+                        label="Livraison effective"
+                        value={formatDate(order.actual_delivery_date)}
+                        theme={theme}
+                    />
                 </View>
 
                 {order.notes ? (
@@ -117,7 +174,11 @@ export default function OrderDetailScreen() {
 
                 {nextLabel ? (
                     <Pressable style={styles.primaryButton} onPress={changeStatus} disabled={updating}>
-                        {updating ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{nextLabel}</Text>}
+                        {updating ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.primaryButtonText}>{nextLabel}</Text>
+                        )}
                     </Pressable>
                 ) : null}
             </ScrollView>
@@ -137,7 +198,9 @@ function DetailRow({
     return (
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
             <Text style={{ color: theme.textSecondary }}>{label}</Text>
-            <Text style={{ color: theme.text, fontWeight: '700', textTransform: 'capitalize', flexShrink: 1, textAlign: 'right' }}>{value}</Text>
+            <Text style={{ color: theme.text, fontWeight: '700', flexShrink: 1, textAlign: 'right' }}>
+                {value}
+            </Text>
         </View>
     );
 }

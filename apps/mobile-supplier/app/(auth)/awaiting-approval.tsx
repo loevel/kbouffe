@@ -29,6 +29,13 @@ const STATUS_COPY = {
     },
 } as const;
 
+const STATUS_LABELS = {
+    pending: 'En attente',
+    rejected: 'Rejeté',
+    suspended: 'Suspendu',
+    approved: 'Approuvé',
+} as const;
+
 export default function AwaitingApprovalScreen() {
     const router = useRouter();
     const theme = useTheme();
@@ -72,7 +79,9 @@ export default function AwaitingApprovalScreen() {
                     </View>
                     <View style={styles.row}>
                         <Text style={styles.rowLabel}>Statut KYC</Text>
-                        <Text style={[styles.badge, status === 'rejected' && styles.badgeRejected]}>{status}</Text>
+                        <Text style={[styles.badge, status === 'rejected' && styles.badgeRejected]}>
+                            {STATUS_LABELS[status]}
+                        </Text>
                     </View>
 
                     {profile?.kyc_rejection_reason ? (

@@ -12,7 +12,7 @@ interface Props {
     onAdd: () => void;
 }
 
-export function MenuItemGrid({ item, onAdd }: Props) {
+export const MenuItemGrid = React.memo(function MenuItemGrid({ item, onAdd }: Props) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = Colors[colorScheme];
 
@@ -67,7 +67,7 @@ export function MenuItemGrid({ item, onAdd }: Props) {
             </View>
         </Pressable>
     );
-}
+});
 
 const styles = StyleSheet.create({
     container: {
