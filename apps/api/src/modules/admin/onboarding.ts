@@ -215,9 +215,14 @@ adminOnboardingRoutes.post("/remind/:id", async (c) => {
         }
     }
 
-    await logAdminAction(supabase, adminId, "send_onboarding_reminder", "restaurant", restaurantId, {
-        email: recipientEmail,
-        emailSent,
+    await logAdminAction(c, {
+        action: "send_onboarding_reminder",
+        targetType: "restaurant",
+        targetId: restaurantId,
+        details: {
+            email: recipientEmail,
+            emailSent,
+        },
     });
 
     return c.json({

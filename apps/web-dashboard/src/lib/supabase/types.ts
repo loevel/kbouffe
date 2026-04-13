@@ -5834,6 +5834,7 @@ export type Database = {
         | "mobile_money_mtn"
         | "mobile_money_orange"
         | "cash"
+        | "gift_card"
         | "mixed"
       payment_status: "pending" | "paid" | "failed" | "refunded"
       payout_status: "pending" | "paid" | "failed"
@@ -5982,6 +5983,7 @@ export const Constants = {
         "mobile_money_mtn",
         "mobile_money_orange",
         "cash",
+        "gift_card",
         "mixed",
       ],
       payment_status: ["pending", "paid", "failed", "refunded"],

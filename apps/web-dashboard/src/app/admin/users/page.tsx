@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
     UserCircle,
@@ -18,31 +18,26 @@ import {
     Shield,
     Mail,
     Trash,
+    Ban,
+    UserCheck,
+    Download,
 } from "lucide-react";
 import { Badge, Button, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { AddUserDialog } from "@/components/admin/users/AddUserDialog";
+import { SensitiveField } from "@/components/admin/SensitiveField";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { BulkActionBar } from "@/components/admin/BulkActionBar";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-
-interface UserRow {
-    id: string;
-    email: string;
-    fullName: string | null;
-    phone: string | null;
-    avatarUrl: string | null;
-    role: string;
-    adminRole: string | null;
-    restaurantId: string | null;
-    createdAt: string;
-    lastLoginAt: string | null;
-}
-
-interface Pagination {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-}
+import { useAdminUsers, useAdminStats } from "@/hooks/admin";
+import { useBulkSelection } from "@/hooks/use-bulk-selection";
+import type { AdminUserRow as UserRow } from "@/hooks/admin";
+import { useDebounce } from "@/hooks/use-debounce";
+import { DateRangePicker, type DateRange } from "@/components/admin/DateRangePicker";
+import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
+import { AdminTableSkeleton } from "@/components/admin/AdminTableSkeleton";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { ExportCSVButton } from "@/components/admin/ExportCSVButton";
 
 const roleBadgeConfig: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info" | "brand"; color: string }> = {
     customer: { label: "Client", variant: "info", color: "text-blue-500 bg-blue-500/10" },
@@ -62,40 +57,51 @@ const itemVariants = {
 };
 
 export default function AdminUsersPage() {
-    const [users, setUsers] = useState<UserRow[]>([]);
-    const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
-    const [stats, setStats] = useState<{ total: number; customers: number; merchants: number; drivers: number } | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
     const [query, setQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
+    const [statusFilter, setStatusFilter] = useState<"all" | "active" | "banned">("all");
+    const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
     const [isAddUserOpen, setIsAddUserOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<UserRow | null>(null);
     const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+    const [isBulkBanOpen, setIsBulkBanOpen] = useState(false);
 
+    const debouncedQuery = useDebounce(query, 300);
 
-    const fetchUsers = useCallback(async (page = 1) => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                limit: "20",
-                ...(query && { q: query }),
-                ...(roleFilter !== "all" && { role: roleFilter }),
-            });
-            const res = await adminFetch(`/api/admin/users?${params}`);
-            const json = await res.json();
-            setUsers(json.data ?? []);
-            setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
-            
-            const statsRes = await adminFetch("/api/admin/stats");
-            const statsJson = await statsRes.json();
-            setStats(statsJson.users);
-        } catch {
-            console.error("Failed to fetch users");
-        } finally {
-            setLoading(false);
-        }
-    }, [query, roleFilter]);
+    const { users, total, page, totalPages, loading, refetch } = useAdminUsers({
+        search: debouncedQuery || undefined,
+        role: roleFilter !== "all" ? (roleFilter as "client" | "merchant" | "livreur" | "admin") : undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        dateFrom: dateRange.from || undefined,
+        dateTo: dateRange.to || undefined,
+        page: currentPage,
+        limit: 20,
+    });
+    const { stats: adminStats } = useAdminStats();
+    const stats = adminStats?.users ?? null;
+    const pagination = { page, total, totalPages, limit: 20 };
+
+    const bulk = useBulkSelection(users);
+
+    const activeFilterCount = useMemo(() => [
+        debouncedQuery !== "",
+        roleFilter !== "all",
+        statusFilter !== "all",
+        dateRange.from !== "" || dateRange.to !== "",
+    ].filter(Boolean).length, [debouncedQuery, roleFilter, statusFilter, dateRange]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [debouncedQuery, roleFilter, statusFilter, dateRange]);
+
+    const handleReset = () => {
+        setQuery("");
+        setRoleFilter("all");
+        setStatusFilter("all");
+        setDateRange({ from: "", to: "" });
+        setCurrentPage(1);
+    };
 
     const deleteUser = async (id: string) => {
         if (!userToDelete) return;
@@ -104,7 +110,7 @@ export default function AdminUsersPage() {
             const res = await adminFetch(`/api/admin/users/${id}`, { method: "DELETE" });
             if (res.ok) {
                 toast.success("Utilisateur supprimé");
-                fetchUsers(pagination.page);
+                refetch();
                 setIsConfirmDeleteOpen(false);
                 setUserToDelete(null);
             } else {
@@ -121,10 +127,48 @@ export default function AdminUsersPage() {
         setIsConfirmDeleteOpen(true);
     };
 
-    useEffect(() => {
-        const timer = setTimeout(() => fetchUsers(1), 300);
-        return () => clearTimeout(timer);
-    }, [fetchUsers]);
+    const performBulkAction = async (action: "ban" | "unban") => {
+        if (bulk.selectedCount === 0) return;
+        try {
+            await adminFetch("/api/admin/users/bulk", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: bulk.selectedIds, action }),
+            });
+            toast.success(
+                action === "ban"
+                    ? `${bulk.selectedCount} compte(s) suspendu(s)`
+                    : `${bulk.selectedCount} compte(s) réactivé(s)`
+            );
+            bulk.clearSelection();
+            refetch();
+        } catch {
+            toast.error("Erreur lors de l'opération");
+        } finally {
+            setIsBulkBanOpen(false);
+        }
+    };
+
+    const exportUsersCsv = () => {
+        const headers = ["ID", "Email", "Nom", "Rôle", "Inscrit le"];
+        const rows = users.map((u) => [
+            u.id,
+            u.email,
+            u.fullName ?? "",
+            u.role,
+            new Date(u.createdAt).toLocaleDateString("fr-FR"),
+        ]);
+        const csv = [headers, ...rows]
+            .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+            .join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `utilisateurs-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
 
     const getRoleIcon = (role: string) => {
         if (role === "merchant") return <Store size={14} />;
@@ -155,6 +199,7 @@ export default function AdminUsersPage() {
                 </div>
                 
                 <div className="flex flex-wrap gap-3">
+                    <ExportCSVButton data={users} filename="utilisateurs" />
                     <Button 
                         variant="outline" 
                         className="h-14 px-6 rounded-2xl border-surface-200 dark:border-surface-700 font-black uppercase text-[10px] tracking-widest gap-2 bg-white dark:bg-surface-900 shadow-sm"
@@ -174,37 +219,69 @@ export default function AdminUsersPage() {
             </motion.div>
 
             {/* Smart Toolbar */}
-            <motion.div 
-                variants={itemVariants}
-                className="flex flex-col lg:flex-row gap-4 bg-white dark:bg-surface-900 p-2 rounded-3xl border border-surface-200 dark:border-surface-800 shadow-sm"
-            >
-                <div className="relative flex-1 group">
-                    <Search size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-surface-400 group-focus-within:text-brand-500 transition-colors" />
-                    <input
-                        type="text"
-                        placeholder="Rechercher par identité, contact ou rôle..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="w-full pl-14 pr-6 py-4 text-sm rounded-2xl bg-surface-50 dark:bg-surface-800/50 text-surface-900 dark:text-white border-none focus:ring-4 focus:ring-brand-500/10 outline-none transition-all font-bold placeholder:text-surface-400"
-                    />
-                </div>
-                
-                <div className="flex items-center gap-2 p-1 bg-surface-50 dark:bg-surface-800/50 rounded-2xl">
-                    {["all", "customer", "merchant", "driver", "admin"].map((role) => (
-                        <button
-                            key={role}
-                            onClick={() => setRoleFilter(role)}
-                            className={cn(
-                                "px-5 py-2.5 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest",
-                                roleFilter === role
-                                    ? "bg-white dark:bg-surface-900 text-brand-500 shadow-sm border border-brand-500/10"
-                                    : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
-                            )}
-                        >
-                            {role === "all" ? "Globale" : roleBadgeConfig[role]?.label || role}
-                        </button>
-                    ))}
-                </div>
+            <motion.div variants={itemVariants}>
+                <AdminFilterBar onReset={handleReset} activeFilterCount={activeFilterCount}>
+                    {/* Row 1: Search + Role filter */}
+                    <div className="flex flex-col lg:flex-row gap-3 w-full">
+                        <div className="relative flex-1 group">
+                            <Search size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-surface-400 group-focus-within:text-brand-500 transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Rechercher par identité, contact ou rôle..."
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                className="w-full pl-14 pr-6 py-3.5 text-sm rounded-2xl bg-surface-50 dark:bg-surface-800/50 text-surface-900 dark:text-white border-none focus:ring-4 focus:ring-brand-500/10 outline-none transition-all font-bold placeholder:text-surface-400"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2 p-1 bg-surface-50 dark:bg-surface-800/50 rounded-2xl">
+                            {["all", "customer", "merchant", "driver", "admin"].map((role) => (
+                                <button
+                                    key={role}
+                                    onClick={() => setRoleFilter(role)}
+                                    className={cn(
+                                        "px-4 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest",
+                                        roleFilter === role
+                                            ? "bg-white dark:bg-surface-900 text-brand-500 shadow-sm border border-brand-500/10"
+                                            : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
+                                    )}
+                                >
+                                    {role === "all" ? "Globale" : roleBadgeConfig[role]?.label || role}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Row 2: Status filter + Date range */}
+                    <div className="flex flex-wrap items-end gap-4 w-full pt-3 border-t border-surface-100 dark:border-surface-800">
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-black text-surface-400 uppercase tracking-widest px-0.5">Statut</span>
+                            <div className="flex items-center gap-1 p-1 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
+                                {(["all", "active", "banned"] as const).map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={() => setStatusFilter(s)}
+                                        className={cn(
+                                            "px-3 py-1.5 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest",
+                                            statusFilter === s
+                                                ? "bg-white dark:bg-surface-900 text-brand-500 shadow-sm"
+                                                : "text-surface-400 hover:text-surface-900 dark:hover:text-white"
+                                        )}
+                                    >
+                                        {s === "all" ? "Tous" : s === "active" ? "Actif" : "Inactif"}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <DateRangePicker
+                            from={dateRange.from}
+                            to={dateRange.to}
+                            onChange={(r) => setDateRange(r)}
+                            label="Inscription"
+                        />
+                    </div>
+                </AdminFilterBar>
             </motion.div>
 
             {/* User Ledger Table */}
@@ -226,27 +303,17 @@ export default function AdminUsersPage() {
                         <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
                             <AnimatePresence mode="popLayout">
                                 {loading && users.length === 0 ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <tr key={i} className="animate-pulse">
-                                            <td colSpan={5} className="px-10 py-8">
-                                                <div className="h-12 bg-surface-100 dark:bg-surface-800 rounded-2xl w-full" />
-                                            </td>
-                                        </tr>
-                                    ))
+                                    <AdminTableSkeleton rows={8} cols={6} />
                                 ) : users.length === 0 ? (
-                                    <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                        <td colSpan={5} className="text-center py-32">
-                                            <div className="flex flex-col items-center gap-6">
-                                                <div className="w-20 h-20 rounded-[2rem] bg-surface-50 dark:bg-surface-800 flex items-center justify-center text-surface-200 dark:text-surface-700">
-                                                    <Search size={40} />
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-sm font-black uppercase tracking-widest text-surface-900 dark:text-white">Aucun profil ne correspond</p>
-                                                    <p className="text-xs text-surface-400 font-medium">Ajustez vos filtres ou votre recherche pour plus de résultats.</p>
-                                                </div>
-                                            </div>
+                                    <tr>
+                                        <td colSpan={5}>
+                                            <AdminEmptyState
+                                                title="Aucun profil ne correspond"
+                                                description="Ajustez vos filtres ou votre recherche pour plus de résultats."
+                                                action={{ label: "Nouvel Utilisateur", onClick: () => setIsAddUserOpen(true) }}
+                                            />
                                         </td>
-                                    </motion.tr>
+                                    </tr>
                                 ) : (
                                     users.map((u, idx) => {
                                         const rc = roleBadgeConfig[u.role] ?? roleBadgeConfig.customer;
@@ -259,8 +326,19 @@ export default function AdminUsersPage() {
                                                 animate="visible"
                                                 exit={{ opacity: 0, scale: 0.98 }}
                                                 transition={{ delay: idx * 0.04 }}
-                                                className="group hover:bg-surface-50 dark:hover:bg-surface-800/30 transition-all cursor-pointer"
+                                                className={cn(
+                                                    "group hover:bg-surface-50 dark:hover:bg-surface-800/30 transition-all cursor-pointer",
+                                                    bulk.isSelected(u.id) && "bg-brand-500/5 dark:bg-brand-500/10"
+                                                )}
                                             >
+                                                <td className="pl-6 py-6" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={bulk.isSelected(u.id)}
+                                                        onChange={() => bulk.toggleItem(u.id)}
+                                                        className="w-4 h-4 rounded cursor-pointer accent-brand-500"
+                                                    />
+                                                </td>
                                                 <td className="px-10 py-6">
                                                     <div className="flex items-center gap-5">
                                                         <div className="relative shrink-0">
@@ -299,7 +377,12 @@ export default function AdminUsersPage() {
                                                         </div>
                                                         <div className="flex items-center gap-2 px-3 py-1 bg-surface-100 dark:bg-surface-800 rounded-lg group-hover:bg-brand-500/5 transition-colors w-fit">
                                                             <Phone size={12} className="text-surface-400" />
-                                                            <span className="text-[11px] font-bold text-surface-700 dark:text-surface-300">{u.phone || "Non-répertorié"}</span>
+                                                            <SensitiveField
+                                                                value={u.phone ?? ""}
+                                                                revealValue={u.phoneRaw ?? undefined}
+                                                                visibleTo={["super_admin", "support"]}
+                                                                className="text-[11px] font-bold text-surface-700 dark:text-surface-300"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </td>
@@ -353,7 +436,7 @@ export default function AdminUsersPage() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                onClick={() => fetchUsers(pagination.page - 1)} 
+                                onClick={() => setCurrentPage(p => p - 1)} 
                                 disabled={pagination.page <= 1}
                                 className="h-12 px-8 rounded-2xl border-surface-200 dark:border-surface-700 font-black uppercase text-[11px] tracking-[0.2em] bg-white dark:bg-surface-900 shadow-sm"
                             >
@@ -362,7 +445,7 @@ export default function AdminUsersPage() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                onClick={() => fetchUsers(pagination.page + 1)} 
+                                onClick={() => setCurrentPage(p => p + 1)} 
                                 disabled={pagination.page >= pagination.totalPages}
                                 className="h-12 px-8 rounded-2xl border-surface-200 dark:border-surface-700 font-black uppercase text-[11px] tracking-[0.2em] bg-white dark:bg-surface-900 shadow-sm"
                             >
@@ -412,13 +495,36 @@ export default function AdminUsersPage() {
                 </div>
             </motion.div>
 
+            <BulkActionBar
+                selectedCount={bulk.selectedCount}
+                onClearSelection={bulk.clearSelection}
+                actions={[
+                    {
+                        label: "Suspendre",
+                        icon: <Ban size={14} />,
+                        onClick: () => setIsBulkBanOpen(true),
+                        variant: "danger",
+                    },
+                    {
+                        label: "Activer",
+                        icon: <UserCheck size={14} />,
+                        onClick: () => performBulkAction("unban"),
+                    },
+                    {
+                        label: "Exporter",
+                        icon: <Download size={14} />,
+                        onClick: exportUsersCsv,
+                    },
+                ]}
+            />
+
             <AddUserDialog 
                 isOpen={isAddUserOpen} 
                 onClose={() => setIsAddUserOpen(false)} 
-                onSuccess={() => fetchUsers(pagination.page)}
+                onSuccess={() => refetch()}
             />
 
-            {isConfirmDeleteOpen && userToDelete && (
+            {isBulkBanOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -428,27 +534,44 @@ export default function AdminUsersPage() {
                     >
                         <div className="flex items-center gap-4">
                             <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                                <Trash size={28} />
+                                <Ban size={28} />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black text-surface-900 dark:text-white">Confirmer la suppression</h3>
-                                <p className="text-sm text-surface-400 font-medium">Cette action est irréversible.</p>
+                                <h3 className="text-xl font-black text-surface-900 dark:text-white">
+                                    Suspendre {bulk.selectedCount} utilisateur{bulk.selectedCount > 1 ? "s" : ""} ?
+                                </h3>
+                                <p className="text-sm text-surface-400 font-medium">Cette action peut être annulée ultérieurement.</p>
                             </div>
                         </div>
-                        <p className="text-black/40 dark:text-white/30 text-xs font-bold leading-relaxed">
-                            Vous êtes sur le point de supprimer définitivement le compte de &lt;b&gt;{userToDelete?.email}&lt;/b&gt;.
-                            Cette action est irréversible et effacera toutes les données associées.
+                        <p className="text-surface-500 text-sm leading-relaxed">
+                            Les utilisateurs sélectionnés ne pourront plus se connecter à la plateforme.
                         </p>
                         <div className="flex justify-end gap-3">
-                            <Button variant="outline" onClick={() => setIsConfirmDeleteOpen(false)}>
+                            <Button variant="outline" onClick={() => setIsBulkBanOpen(false)}>
                                 Annuler
                             </Button>
-                            <Button variant="danger" onClick={() => deleteUser(userToDelete.id)}>
-                                Supprimer
+                            <Button variant="danger" onClick={() => performBulkAction("ban")}>
+                                Suspendre {bulk.selectedCount} compte{bulk.selectedCount > 1 ? "s" : ""}
                             </Button>
                         </div>
                     </motion.div>
                 </div>
+            )}
+
+            {isConfirmDeleteOpen && userToDelete && (
+                <ConfirmDialog
+                    open={isConfirmDeleteOpen}
+                    onClose={() => {
+                        setIsConfirmDeleteOpen(false);
+                        setUserToDelete(null);
+                    }}
+                    onConfirm={() => deleteUser(userToDelete.id)}
+                    title="Supprimer le compte"
+                    description={`Vous êtes sur le point de supprimer définitivement le compte de ${userToDelete.email}. Cette action est irréversible.`}
+                    confirmLabel="Supprimer définitivement"
+                    variant="danger"
+                    requireTyping={userToDelete.emailRaw ?? userToDelete.email}
+                />
             )}
         </motion.div>
     );

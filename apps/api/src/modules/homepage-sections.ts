@@ -11,7 +11,7 @@ export const homepageSectionsPublicRoutes = new Hono<{ Bindings: Env; Variables:
 
 const RESTAURANT_SELECT = `
     id, name, slug, logo_url, banner_url, cuisine_type,
-    rating, review_count, is_verified, is_premium, is_sponsored
+    rating, review_count, is_verified, is_premium, is_sponsored, compliance_status
 `;
 
 function mapRestaurant(row: any) {
@@ -37,6 +37,7 @@ async function resolveSection(supabase: any, section: any, cuisine: string): Pro
                 .from("restaurants")
                 .select(RESTAURANT_SELECT)
                 .eq("is_published", true)
+                .eq("compliance_status", "compliant")
                 .in("id", section.restaurant_ids)
                 .limit(20);
 
@@ -51,7 +52,8 @@ async function resolveSection(supabase: any, section: any, cuisine: string): Pro
         let query = supabase
             .from("restaurants")
             .select(RESTAURANT_SELECT)
-            .eq("is_published", true);
+            .eq("is_published", true)
+            .eq("compliance_status", "compliant");
 
         if (cuisine) query = query.eq("cuisine_type", cuisine);
 

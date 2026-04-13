@@ -61,11 +61,19 @@ export async function POST(request: NextRequest) {
     const notificationsEnabled = Object.values(settings).some(
       (channel) => channel.email || channel.push
     );
+    const now = new Date().toISOString();
 
     const { error: updateError } = await supabase
       .from("users")
       .update({
         notifications_enabled: notificationsEnabled,
+        ...(notificationsEnabled
+          ? {}
+          : {
+              sms_notifications_enabled: false,
+              email_notifications_enabled: false,
+              marketing_last_opt_out_at: now,
+            }),
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
@@ -73,6 +81,29 @@ export async function POST(request: NextRequest) {
     if (updateError) {
         console.error("Erreur update Supabase notifications preferences:", updateError);
         return NextResponse.json({ error: "Erreur lors de la sauvegarde" }, { status: 500 });
+    }
+
+    if (!notificationsEnabled) {
+      await supabase.from("marketing_consent_registry").insert([
+        {
+          user_id: user.id,
+          channel: "sms",
+          consent_status: "opt_out",
+          source: "self_service",
+          consent_reason: "Préférences notifications désactivées",
+          created_at: now,
+          updated_at: now,
+        },
+        {
+          user_id: user.id,
+          channel: "email",
+          consent_status: "opt_out",
+          source: "self_service",
+          consent_reason: "Préférences notifications désactivées",
+          created_at: now,
+          updated_at: now,
+        },
+      ]);
     }
 
     return NextResponse.json({

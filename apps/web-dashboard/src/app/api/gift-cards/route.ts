@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, apiError } from "@/lib/api/helpers";
+import { createAdminClient } from "@/lib/supabase/server";
 
 /** Generate a unique gift card code — format: GC-XXXX-XXXX */
 function generateCode(): string {
@@ -17,12 +18,13 @@ function generateCode(): string {
 export async function GET(request: NextRequest) {
     const { ctx, error } = await withAuth();
     if (error) return error;
+    const adminDb = await createAdminClient();
 
     const { searchParams } = new URL(request.url);
     const isActiveParam = searchParams.get("is_active");
 
     try {
-        let query = ctx.supabase
+        let query = adminDb
             .from("gift_cards")
             .select("*")
             .eq("restaurant_id", ctx.restaurantId)
@@ -52,6 +54,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     const { ctx, error } = await withAuth();
     if (error) return error;
+    const adminDb = await createAdminClient();
 
     try {
         const body = await request.json();
@@ -66,20 +69,28 @@ export async function POST(request: NextRequest) {
         let code = "";
         for (let attempt = 0; attempt < 5; attempt++) {
             const candidate = generateCode();
-            const { data: existing } = await ctx.supabase
+            const { data: existing } = await adminDb
                 .from("gift_cards")
                 .select("id")
+                .eq("restaurant_id", ctx.restaurantId)
                 .eq("code", candidate)
                 .maybeSingle();
             if (!existing) { code = candidate; break; }
         }
         if (!code) return apiError("Impossible de générer un code unique. Réessayez.", 500);
 
-        const { data: giftCard, error: insertErr } = await ctx.supabase
+        const { data: userRow } = await adminDb
+            .from("users")
+            .select("id")
+            .eq("id", ctx.userId)
+            .maybeSingle();
+        const createdBy = userRow?.id ?? null;
+
+        const { data: giftCard, error: insertErr } = await adminDb
             .from("gift_cards")
             .insert({
                 restaurant_id: ctx.restaurantId,
-                created_by: ctx.userId,
+                created_by: createdBy,
                 code,
                 initial_balance,
                 current_balance: initial_balance,
@@ -97,7 +108,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Record the initial issuance movement
-        await ctx.supabase.from("gift_card_movements").insert({
+        await adminDb.from("gift_card_movements").insert({
             gift_card_id: giftCard.id,
             amount: initial_balance,
             balance_after: initial_balance,

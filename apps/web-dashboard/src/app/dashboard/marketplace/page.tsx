@@ -37,7 +37,8 @@ export default function MarketplacePage() {
                 const restaurantRes = await fetch("/api/restaurant");
                 if (restaurantRes.ok) {
                     const restaurantData = await restaurantRes.json();
-                    setRestaurantId(restaurantData.id);
+                    const resolvedRestaurantId = restaurantData?.restaurant?.id ?? restaurantData?.id ?? null;
+                    setRestaurantId(resolvedRestaurantId);
                 }
 
                 // Fetch packs

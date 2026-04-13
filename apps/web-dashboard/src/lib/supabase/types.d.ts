@@ -1819,7 +1819,7 @@ export type Database = {
         Enums: {
             delivery_type: "delivery" | "pickup" | "dine_in";
             order_status: "pending" | "accepted" | "preparing" | "ready" | "completed" | "cancelled";
-            payment_method: "mobile_money_mtn" | "mobile_money_orange" | "cash";
+            payment_method: "mobile_money_mtn" | "mobile_money_orange" | "cash" | "gift_card" | "mixed";
             payment_status: "pending" | "paid" | "failed" | "refunded";
             payout_status: "pending" | "paid" | "failed";
             user_role: "merchant" | "customer" | "admin" | "support";
@@ -1883,7 +1883,7 @@ export declare const Constants: {
         readonly Enums: {
             readonly delivery_type: readonly ["delivery", "pickup", "dine_in"];
             readonly order_status: readonly ["pending", "accepted", "preparing", "ready", "completed", "cancelled"];
-            readonly payment_method: readonly ["mobile_money_mtn", "mobile_money_orange", "cash"];
+            readonly payment_method: readonly ["mobile_money_mtn", "mobile_money_orange", "cash", "gift_card", "mixed"];
             readonly payment_status: readonly ["pending", "paid", "failed", "refunded"];
             readonly payout_status: readonly ["pending", "paid", "failed"];
             readonly user_role: readonly ["merchant", "customer", "admin", "support"];

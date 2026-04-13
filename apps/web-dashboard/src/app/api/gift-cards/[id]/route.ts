@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, apiError } from "@/lib/api/helpers";
+import { createAdminClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/gift-cards/[id]
@@ -7,16 +8,17 @@ import { withAuth, apiError } from "@/lib/api/helpers";
  */
 export async function GET(
     _request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { ctx, error } = await withAuth();
     if (error) return error;
+    const adminDb = await createAdminClient();
 
-    const { id } = params;
+    const { id } = await params;
 
     try {
         // Fetch the card (ownership check via restaurant_id)
-        const { data: card, error: cardErr } = await ctx.supabase
+        const { data: card, error: cardErr } = await adminDb
             .from("gift_cards")
             .select("*")
             .eq("id", id)
@@ -28,7 +30,7 @@ export async function GET(
         }
 
         // Fetch movement history
-        const { data: movements } = await ctx.supabase
+        const { data: movements } = await adminDb
             .from("gift_card_movements")
             .select("*")
             .eq("gift_card_id", id)
@@ -50,15 +52,16 @@ export async function GET(
  */
 export async function DELETE(
     _request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { ctx, error } = await withAuth();
     if (error) return error;
+    const adminDb = await createAdminClient();
 
-    const { id } = params;
+    const { id } = await params;
 
     try {
-        const { error: updateErr } = await ctx.supabase
+        const { error: updateErr } = await adminDb
             .from("gift_cards")
             .update({ is_active: false, updated_at: new Date().toISOString() })
             .eq("id", id)
@@ -70,14 +73,14 @@ export async function DELETE(
         }
 
         // Record an expiration movement
-        const { data: card } = await ctx.supabase
+        const { data: card } = await adminDb
             .from("gift_cards")
             .select("current_balance")
             .eq("id", id)
             .single();
 
         if (card) {
-            await ctx.supabase.from("gift_card_movements").insert({
+            await adminDb.from("gift_card_movements").insert({
                 gift_card_id: id,
                 amount: 0,
                 balance_after: card.current_balance,
@@ -99,12 +102,13 @@ export async function DELETE(
  */
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { ctx, error } = await withAuth();
     if (error) return error;
+    const adminDb = await createAdminClient();
 
-    const { id } = params;
+    const { id } = await params;
 
     try {
         const body = await request.json();
@@ -114,7 +118,7 @@ export async function PATCH(
             if (body[field] !== undefined) updateData[field] = body[field];
         }
 
-        const { data, error: updateErr } = await ctx.supabase
+        const { data, error: updateErr } = await adminDb
             .from("gift_cards")
             .update(updateData)
             .eq("id", id)

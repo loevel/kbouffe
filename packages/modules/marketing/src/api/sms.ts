@@ -30,6 +30,26 @@ function normalizeToE164(msisdn: string): string {
     return `+237${digits}`;
 }
 
+function isWithinQuietHours(nowHHMM: string, quietStart: string, quietEnd: string): boolean {
+    if (quietStart <= quietEnd) {
+        return nowHHMM >= quietStart && nowHHMM < quietEnd;
+    }
+    return nowHHMM >= quietStart || nowHHMM < quietEnd;
+}
+
+function currentCameroonTimeHHMM(): string {
+    const parts = new Intl.DateTimeFormat("fr-FR", {
+        timeZone: "Africa/Douala",
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+    }).formatToParts(new Date());
+
+    const hour = parts.find((p) => p.type === "hour")?.value ?? "00";
+    const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+    return `${hour}:${minute}`;
+}
+
 smsRoutes.post("/send", async (c) => {
     try {
         const body = (await c.req.json()) as SmsPayload;
@@ -49,7 +69,7 @@ smsRoutes.post("/send", async (c) => {
             c.env.SUPABASE_SERVICE_ROLE_KEY ?? c.env.SUPABASE_ANON_KEY,
         );
 
-        const now = new Date().toISOString();
+        const nowIso = new Date().toISOString();
         const { data: campaign } = await supabase
             .from("ad_campaigns")
             .select("id, status, starts_at, ends_at, restaurant_id")
@@ -64,7 +84,7 @@ smsRoutes.post("/send", async (c) => {
             );
         }
 
-        if (campaign.status !== "active" || campaign.starts_at > now || campaign.ends_at < now) {
+        if (campaign.status !== "active" || campaign.starts_at > nowIso || campaign.ends_at < nowIso) {
             return c.json(
                 { error: "La campagne n'est pas active. Vérifiez son statut et ses dates." },
                 403,
@@ -96,7 +116,7 @@ smsRoutes.post("/send", async (c) => {
 
         const { data: user } = await supabase
             .from("users")
-            .select("id, sms_notifications_enabled")
+            .select("id, sms_notifications_enabled, marketing_quiet_hours_start, marketing_quiet_hours_end, marketing_frequency_per_day, marketing_frequency_per_week, marketing_frequency_per_month")
             .eq("phone", normalizedPhone)
             .maybeSingle();
 
@@ -107,10 +127,84 @@ smsRoutes.post("/send", async (c) => {
             );
         }
 
+        const now = new Date();
+
+        const { data: suppression } = await supabase
+            .from("marketing_suppression_list")
+            .select("id, reason, suppressed_until")
+            .eq("user_id", (user as any).id)
+            .eq("channel", "sms")
+            .eq("is_active", true)
+            .maybeSingle();
+
+        if (suppression) {
+            const until = suppression.suppressed_until ? new Date(suppression.suppressed_until as string) : null;
+            if (!until || until > now) {
+                return c.json({ error: "Ce destinataire a exercé son droit d'opposition aux SMS marketing." }, 403);
+            }
+        }
+
+        const currentTime = currentCameroonTimeHHMM();
+        const quietStart = (user as any).marketing_quiet_hours_start ?? "20:00:00";
+        const quietEnd = (user as any).marketing_quiet_hours_end ?? "08:00:00";
+
+        if (isWithinQuietHours(currentTime, quietStart.slice(0, 5), quietEnd.slice(0, 5))) {
+            return c.json(
+                { error: "L'envoi est bloqué pendant les heures de repos configurées par le client." },
+                403,
+            );
+        }
+
+        const [dayWindow, weekWindow, monthWindow] = await Promise.all([
+            supabase
+                .from("marketing_delivery_events")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", (user as any).id)
+                .eq("channel", "sms")
+                .in("delivery_status", ["queued", "sent"])
+                .gte("created_at", new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()),
+            supabase
+                .from("marketing_delivery_events")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", (user as any).id)
+                .eq("channel", "sms")
+                .in("delivery_status", ["queued", "sent"])
+                .gte("created_at", new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+            supabase
+                .from("marketing_delivery_events")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", (user as any).id)
+                .eq("channel", "sms")
+                .in("delivery_status", ["queued", "sent"])
+                .gte("created_at", new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+        ]);
+
+        if ((dayWindow.count ?? 0) >= ((user as any).marketing_frequency_per_day ?? 1)) {
+            return c.json({ error: "Limite d'envoi quotidien atteint pour ce destinataire." }, 403);
+        }
+        if ((weekWindow.count ?? 0) >= ((user as any).marketing_frequency_per_week ?? 3)) {
+            return c.json({ error: "Limite d'envoi hebdomadaire atteinte pour ce destinataire." }, 403);
+        }
+        if ((monthWindow.count ?? 0) >= ((user as any).marketing_frequency_per_month ?? 8)) {
+            return c.json({ error: "Limite d'envoi mensuelle atteinte pour ce destinataire." }, 403);
+        }
+
         // ── 5. Envoi en file d'attente ──
         await enqueueSms(c.env, {
             to: normalizedPhone,
             content: body.message.trim(),
+        });
+
+        await supabase.from("marketing_delivery_events").insert({
+            user_id: (user as any).id,
+            campaign_id: campaign.id,
+            channel: "sms",
+            delivery_status: "queued",
+            contact_value: normalizedPhone,
+            metadata: {
+                source: "campaign_sms_send",
+                message_length: body.message.trim().length,
+            },
         });
 
         return c.json({ success: true, queued: true, campaign_id: campaign.id });

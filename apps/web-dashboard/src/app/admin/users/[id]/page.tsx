@@ -29,11 +29,21 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+function maskPhone(phone: string | null | undefined): string | null {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return phone;
+    if (digits.length <= 4) return "••••";
+    return `${digits.slice(0, 3)}•••${digits.slice(-2)}`;
+}
+
 interface UserDetail {
     id: string;
     email: string;
+    emailRaw?: string | null;
     fullName: string | null;
     phone: string | null;
+    phoneRaw?: string | null;
     avatarUrl: string | null;
     role: string;
     adminRole: string | null;
@@ -86,7 +96,7 @@ export default function AdminUserDetailPage() {
                     setUser(data);
                     setEditData({
                         fullName: data.fullName || "",
-                        phone: data.phone || "",
+                        phone: data.phoneRaw || data.phone || "",
                     });
                 }
             } finally {
@@ -121,7 +131,13 @@ export default function AdminUserDetailPage() {
             });
             if (res.ok) {
                 const updated = await res.json();
-                setUser({ ...user, ...editData, updatedAt: updated.updatedAt });
+                setUser({
+                    ...user,
+                    fullName: editData.fullName,
+                    phone: editData.phone ? maskPhone(editData.phone) : null,
+                    phoneRaw: editData.phone || null,
+                    updatedAt: updated.updatedAt,
+                });
                 setIsEditing(false);
                 toast.success("Profil mis á jour");
             } else {
@@ -153,8 +169,8 @@ export default function AdminUserDetailPage() {
 
     const handleDeleteUser = async () => {
         if (!user) return;
-        const confirmEmail = prompt(`Pour confirmer la suppression, veuillez saisir l'adresse email de l'utilisateur (${user.email}) :`);
-        if (confirmEmail !== user.email) {
+        const confirmEmail = prompt(`Pour confirmer la suppression, veuillez saisir l'adresse email de l'utilisateur (${user.emailRaw || user.email}) :`);
+        if (confirmEmail !== (user.emailRaw || user.email)) {
             if (confirmEmail !== null) toast.error("L'email ne correspond pas");
             return;
         }

@@ -44,6 +44,10 @@ export interface Env {
 
     /** Cloudflare Workers AI binding */
     AI?: Ai;
+    /** Resend API key for transactional emails */
+    RESEND_API_KEY?: string;
+    /** Public dashboard URL used in admin-generated links */
+    DASHBOARD_URL?: string;
 }
 
 /**

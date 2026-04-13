@@ -23,6 +23,7 @@
  *   PATCH  /admin/brands/restaurants/:restaurantId/kyc — Approuver/rejeter KYC
  */
 import { Hono } from "hono";
+import { z } from "zod";
 import { CoreEnv as Env, CoreVariables as Variables } from "./types";
 
 export const brandsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -154,28 +155,76 @@ brandsAdminRoutes.get("/", async (c) => {
     return c.json({ brands: data ?? [] });
 });
 
+const kycReviewSchema = z
+    .object({
+        status: z.enum(["approved", "rejected"]),
+        rejection_reason: z.string().optional(),
+    })
+    .refine(
+        (d) => d.status !== "rejected" || (typeof d.rejection_reason === "string" && d.rejection_reason.trim().length > 0),
+        { message: "Le motif de rejet est requis", path: ["rejection_reason"] },
+    );
+
 /**
  * PATCH /admin/brands/restaurants/:restaurantId/kyc
  * Approuver ou rejeter le KYC d'un restaurant
  */
 brandsAdminRoutes.patch("/restaurants/:restaurantId/kyc", async (c) => {
-    const body = await c.req.json();
-    const { status, notes } = body;
+    const restaurantId = c.req.param("restaurantId");
+    const body = await c.req.json().catch(() => ({}));
 
-    if (!["approved", "rejected"].includes(status)) {
-        return c.json({ error: "Statut invalide. Valeurs: approved | rejected" }, 400);
+    const parsed = kycReviewSchema.safeParse(body);
+    if (!parsed.success) {
+        const msg = parsed.error.errors[0]?.message ?? "Données invalides";
+        return c.json({ error: msg }, 400);
     }
 
-    const { error } = await c.var.supabase
+    const { status, rejection_reason } = parsed.data;
+    const now = new Date().toISOString();
+
+    const updates: Record<string, unknown> = {
+        kyc_status: status,
+        kyc_reviewed_at: now,
+        kyc_reviewer_id: c.var.userId,
+        updated_at: now,
+    };
+    if (status === "rejected" && rejection_reason) {
+        updates.kyc_rejection_reason = rejection_reason.trim();
+    }
+    if (status === "approved") {
+        updates.is_verified = true;
+    }
+
+    const { data: restaurant, error } = await c.var.supabase
         .from("restaurants")
-        .update({
-            kyc_status: status,
-            kyc_notes: notes ?? null,
-            kyc_reviewed_at: new Date().toISOString(),
-            kyc_reviewer_id: c.var.userId,
-        })
-        .eq("id", c.req.param("restaurantId"));
+        .update(updates)
+        .eq("id", restaurantId)
+        .select("id, name, owner_id")
+        .maybeSingle();
 
     if (error) return c.json({ error: error.message }, 500);
+    if (!restaurant) return c.json({ error: "Restaurant introuvable" }, 404);
+
+    // Audit log
+    await c.var.supabase.from("admin_audit_log").insert({
+        admin_id: c.var.userId,
+        action: status === "approved" ? "kyc_approved" : "kyc_rejected",
+        target_type: "restaurant",
+        target_id: restaurantId,
+        details: { status, rejection_reason: rejection_reason ?? null, restaurant_name: restaurant.name },
+    });
+
+    // Notify restaurant owner via restaurant_notifications
+    await c.var.supabase.from("restaurant_notifications").insert({
+        restaurant_id: restaurantId,
+        title: status === "approved" ? "KYC approuvé ✅" : "KYC rejeté ❌",
+        body:
+            status === "approved"
+                ? "Votre dossier KYC a été approuvé. Votre restaurant est maintenant vérifié."
+                : `Votre dossier KYC a été rejeté. Motif : ${rejection_reason}`,
+        type: "kyc_review",
+        payload: { status, rejection_reason: rejection_reason ?? null },
+    });
+
     return c.json({ success: true, message: `KYC ${status === "approved" ? "approuvé" : "rejeté"}` });
 });

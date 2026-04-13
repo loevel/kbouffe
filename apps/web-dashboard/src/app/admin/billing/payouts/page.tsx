@@ -13,6 +13,8 @@ import {
     Store,
 } from "lucide-react";
 import { Badge, adminFetch } from "@kbouffe/module-core/ui";
+import { SensitiveField } from "@/components/admin/SensitiveField";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 interface PayoutRow {
     id: string;
@@ -55,6 +57,7 @@ export default function AdminPayoutsPage() {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState("all");
     const [updating, setUpdating] = useState<string | null>(null);
+    const [payoutToFail, setPayoutToFail] = useState<PayoutRow | null>(null);
 
     const fetchPayouts = useCallback(async (page = 1) => {
         setLoading(true);
@@ -155,7 +158,12 @@ export default function AdminPayoutsPage() {
                                                     <span className="font-medium text-surface-900 dark:text-white">{p.restaurantName ?? "—"}</span>
                                                 </div>
                                                 {p.recipientPhone && (
-                                                    <p className="text-xs text-surface-400 mt-0.5">{p.recipientPhone}</p>
+                                                    <p className="text-xs text-surface-400 mt-0.5">
+                                                        <SensitiveField
+                                                            value={p.recipientPhone}
+                                                            visibleTo={["super_admin", "support"]}
+                                                        />
+                                                    </p>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-right text-surface-600 dark:text-surface-300">{formatFCFA(p.grossAmount)}</td>
@@ -192,7 +200,7 @@ export default function AdminPayoutsPage() {
                                                             Valider
                                                         </button>
                                                         <button
-                                                            onClick={() => updateStatus(p.id, "failed")}
+                                                            onClick={() => setPayoutToFail(p)}
                                                             disabled={updating === p.id}
                                                             className="px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
                                                         >
@@ -237,6 +245,30 @@ export default function AdminPayoutsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Confirm fail payout dialog */}
+            <ConfirmDialog
+                open={payoutToFail !== null}
+                onClose={() => setPayoutToFail(null)}
+                onConfirm={() => {
+                    if (payoutToFail) {
+                        updateStatus(payoutToFail.id, "failed");
+                        setPayoutToFail(null);
+                    }
+                }}
+                title="Marquer comme échoué"
+                description={
+                    payoutToFail
+                        ? `Confirmer l'échec du paiement de ${formatFCFA(payoutToFail.amount)} pour ${payoutToFail.restaurantName ?? "ce restaurant"} ?`
+                        : ""
+                }
+                confirmLabel="Confirmer l'échec"
+                variant="danger"
+            />
         </>
     );
 }
+
+// Unused imports kept for tree-shaking
+const _Wallet = Wallet;
+const _Search = Search;

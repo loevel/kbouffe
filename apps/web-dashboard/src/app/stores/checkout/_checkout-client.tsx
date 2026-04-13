@@ -15,12 +15,11 @@ import {
     MapPin,
     Navigation,
     Package,
+    Gift,
     ShoppingBag,
     Smartphone,
     Utensils,
     Users,
-    Plus,
-    Trash2,
     Zap,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
@@ -30,7 +29,7 @@ import { createClient } from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type DeliveryType    = "delivery" | "pickup" | "dine_in";
-type PaymentMethod   = "cash" | "mobile_money_mtn" | "mobile_money_orange";
+type PaymentMethod   = "cash" | "mobile_money_mtn" | "mobile_money_orange" | "gift_card";
 
 const SERVICE_FEE = 250;
 
@@ -59,7 +58,22 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; desc: string; icon: R
         desc:  "Paiement via Orange Money",
         icon:  <Smartphone size={20} className="text-orange-500" />,
     },
+    {
+        id:    "gift_card",
+        label: "Carte cadeau",
+        desc:  "Payez totalement ou partiellement avec votre carte cadeau",
+        icon:  <Gift size={20} className="text-emerald-500" />,
+    },
 ];
+const SPLIT_PAYMENT_OPTIONS = PAYMENT_OPTIONS.filter((opt) => opt.id !== "gift_card");
+
+interface GiftCardValidation {
+    gift_card_id: string;
+    code: string;
+    current_balance: number;
+    amount_applicable: number;
+    remaining_to_pay: number;
+}
 
 const DELIVERY_LABELS: Record<DeliveryType, string> = {
     delivery: "Livraison",
@@ -137,6 +151,9 @@ export function CheckoutPageClient() {
     const [isSplitPayment, setIsSplitPayment] = useState(false);
     const [splitCount, setSplitCount]         = useState(2);
     const [splitDrafts, setSplitDrafts]       = useState<{ label: string; amount: string; method: PaymentMethod }[]>([]);
+    const [giftCardCode, setGiftCardCode] = useState("");
+    const [giftCardValidation, setGiftCardValidation] = useState<GiftCardValidation | null>(null);
+    const [validatingGiftCard, setValidatingGiftCard] = useState(false);
 
     // ── Load user data on mount ────────────────────────────────────────────
     useEffect(() => {
@@ -169,6 +186,12 @@ export function CheckoutPageClient() {
         loadUserData();
     }, []);
 
+    useEffect(() => {
+        if (paymentMethod !== "gift_card") {
+            setGiftCardValidation(null);
+        }
+    }, [paymentMethod]);
+
     // ── Geolocation handler ────────────────────────────────────────────────
     const handleUseCurrentLocation = async () => {
         setIsLocating(true);
@@ -196,7 +219,7 @@ export function CheckoutPageClient() {
                         // Permission not yet requested - will be requested by getCurrentPosition
                         console.log("Permission will be requested by browser");
                     }
-                } catch (permErr) {
+                } catch {
                     console.log("Permissions API not available, will request on getPosition");
                 }
             }
@@ -316,10 +339,60 @@ export function CheckoutPageClient() {
 
     const splitDraftTotal = splitDrafts.reduce((sum, d) => sum + (parseInt(d.amount) || 0), 0);
     const isSplitValid = isSplitPayment ? (splitDraftTotal === total && splitDrafts.every((d) => parseInt(d.amount) > 0)) : true;
+    const isGiftCardReady = paymentMethod !== "gift_card" || Boolean(giftCardValidation);
+    const canContinueFromPayment = isSplitPayment ? isSplitValid : isGiftCardReady;
+
+    const validateGiftCard = async () => {
+        if (!restaurant?.id) {
+            setError("Restaurant introuvable.");
+            return;
+        }
+        const code = giftCardCode.trim().toUpperCase();
+        if (!code) {
+            setError("Veuillez saisir un code de carte cadeau.");
+            return;
+        }
+
+        setError(null);
+        setValidatingGiftCard(true);
+        try {
+            const res = await fetch("/api/gift-cards/validate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    code,
+                    restaurant_id: restaurant.id,
+                    order_total: total,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.valid) {
+                setGiftCardValidation(null);
+                setError(data.error ?? "Carte cadeau invalide.");
+                return;
+            }
+            setGiftCardValidation({
+                gift_card_id: data.gift_card_id,
+                code: data.code ?? code,
+                current_balance: data.current_balance ?? 0,
+                amount_applicable: data.amount_applicable ?? 0,
+                remaining_to_pay: data.remaining_to_pay ?? 0,
+            });
+        } catch {
+            setGiftCardValidation(null);
+            setError("Erreur réseau pendant la validation de la carte cadeau.");
+        } finally {
+            setValidatingGiftCard(false);
+        }
+    };
 
     // ── Submit order ───────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!restaurant) { setError("Restaurant introuvable."); return; }
+        if (!isSplitPayment && paymentMethod === "gift_card" && !giftCardValidation) {
+            setError("Validez la carte cadeau avant de confirmer la commande.");
+            return;
+        }
         setError(null);
         setSubmitting(true);
         try {
@@ -332,6 +405,7 @@ export function CheckoutPageClient() {
                 customerName:    customerName.trim(),
                 customerPhone:   customerPhone.trim(),
                 paymentMethod:   isSplitPayment ? "cash" : paymentMethod,
+                giftCardCode:   !isSplitPayment && paymentMethod === "gift_card" ? giftCardCode.trim().toUpperCase() : undefined,
                 subtotal,
                 deliveryFee,
                 total,
@@ -350,6 +424,8 @@ export function CheckoutPageClient() {
             }
             const orderId = data.order?.id ?? data.id ?? data.orderId;
             const confirmedScheduledFor: string | null = data.scheduledFor ?? null;
+            const parsedRemaining = Number(data.remainingToPay);
+            const totalDueNow = Number.isFinite(parsedRemaining) ? parsedRemaining : total;
 
             // Create split payments if enabled (fire-and-forget — restaurant will manage confirmation)
             if (isSplitPayment && orderId) {
@@ -375,7 +451,7 @@ export function CheckoutPageClient() {
                     restaurantId:   restaurant.id,
                     restaurantName: restaurant.name,
                     restaurantSlug: restaurant.slug,
-                    total,
+                    total:          totalDueNow,
                     itemCount:      items.reduce((n, i) => n + i.quantity, 0),
                     status:         "pending",
                     deliveryType,
@@ -386,7 +462,7 @@ export function CheckoutPageClient() {
             const confirmUrl = new URL("/stores/confirmation", window.location.origin);
             confirmUrl.searchParams.set("orderId", orderId);
             confirmUrl.searchParams.set("restaurant", restaurant.name);
-            confirmUrl.searchParams.set("total", String(total));
+            confirmUrl.searchParams.set("total", String(totalDueNow));
             if (confirmedScheduledFor) confirmUrl.searchParams.set("scheduledFor", confirmedScheduledFor);
             router.push(confirmUrl.pathname + confirmUrl.search);
         } catch {
@@ -645,6 +721,40 @@ export function CheckoutPageClient() {
                                         </button>
                                     ))}
                                 </div>
+
+                                {paymentMethod === "gift_card" && (
+                                    <div className="mt-4 rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/70 dark:bg-emerald-500/10 p-4 space-y-3">
+                                        <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                                            Saisissez votre code de carte cadeau
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                value={giftCardCode}
+                                                onChange={(e) => {
+                                                    setGiftCardCode(e.target.value.toUpperCase());
+                                                    setGiftCardValidation(null);
+                                                }}
+                                                placeholder="Ex: GC-ABCD-EFGH"
+                                                className="flex-1 h-11 px-3 rounded-xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={validateGiftCard}
+                                                disabled={validatingGiftCard || !giftCardCode.trim()}
+                                                className="px-4 h-11 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                                            >
+                                                {validatingGiftCard ? "Validation..." : "Valider"}
+                                            </button>
+                                        </div>
+                                        {giftCardValidation && (
+                                            <div className="text-xs space-y-1 text-emerald-700 dark:text-emerald-300">
+                                                <p>Solde: <span className="font-semibold">{formatCFA(giftCardValidation.current_balance)}</span></p>
+                                                <p>Appliqué à cette commande: <span className="font-semibold">{formatCFA(giftCardValidation.amount_applicable)}</span></p>
+                                                <p>Reste à payer: <span className="font-semibold">{formatCFA(giftCardValidation.remaining_to_pay)}</span></p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </section>
                         )}
 
@@ -696,7 +806,7 @@ export function CheckoutPageClient() {
                                                 onChange={(e) => updateSplitDraft(idx, "method", e.target.value)}
                                                 className="h-8 px-2 rounded-lg bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                             >
-                                                {PAYMENT_OPTIONS.map((pm) => (
+                                                {SPLIT_PAYMENT_OPTIONS.map((pm) => (
                                                     <option key={pm.id} value={pm.id}>{pm.label}</option>
                                                 ))}
                                             </select>
@@ -732,8 +842,16 @@ export function CheckoutPageClient() {
                         )}
 
                         <button
-                            onClick={() => { if (isSplitValid) setStep("review"); else setError("Le total des parts doit correspondre au total de la commande."); }}
-                            disabled={!isSplitValid}
+                            onClick={() => {
+                                if (canContinueFromPayment) {
+                                    setStep("review");
+                                } else if (!isSplitValid) {
+                                    setError("Le total des parts doit correspondre au total de la commande.");
+                                } else {
+                                    setError("Validez d'abord votre carte cadeau.");
+                                }
+                            }}
+                            disabled={!canContinueFromPayment}
                             className="w-full h-13 py-3.5 flex items-center justify-center bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-bold rounded-2xl shadow-lg shadow-brand-500/25 transition-colors"
                         >
                             Continuer &rarr; R&eacute;capitulatif
@@ -776,6 +894,10 @@ export function CheckoutPageClient() {
                                 label="Paiement"
                                 value={isSplitPayment
                                     ? `Partage (${splitDrafts.length} personnes)`
+                                    : paymentMethod === "gift_card" && giftCardValidation
+                                    ? giftCardValidation.remaining_to_pay > 0
+                                        ? `Carte cadeau + solde (${formatCFA(giftCardValidation.remaining_to_pay)})`
+                                        : "Carte cadeau (totalement couvert)"
                                     : PAYMENT_OPTIONS.find((p) => p.id === paymentMethod)?.label ?? paymentMethod
                                 }
                             />
@@ -819,6 +941,18 @@ export function CheckoutPageClient() {
                                     <span>Frais de service</span>
                                     <span className="font-medium text-surface-900 dark:text-white">{formatCFA(SERVICE_FEE)}</span>
                                 </div>
+                                {paymentMethod === "gift_card" && giftCardValidation && (
+                                    <>
+                                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                            <span>Carte cadeau appliquée</span>
+                                            <span className="font-medium">- {formatCFA(giftCardValidation.amount_applicable)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-surface-600 dark:text-surface-400">
+                                            <span>Reste à payer</span>
+                                            <span className="font-medium text-surface-900 dark:text-white">{formatCFA(giftCardValidation.remaining_to_pay)}</span>
+                                        </div>
+                                    </>
+                                )}
                                 <div className="pt-3 border-t border-surface-100 dark:border-surface-800 flex justify-between">
                                     <span className="font-bold text-surface-900 dark:text-white text-base">Total</span>
                                     <span className="font-extrabold text-surface-900 dark:text-white text-base">{formatCFA(total)}</span>
@@ -834,7 +968,12 @@ export function CheckoutPageClient() {
                             {submitting ? (
                                 <><Loader2 size={18} className="animate-spin" /> Envoi en cours…</>
                             ) : (
-                                <><CheckCircle2 size={18} /> Confirmer la commande • {formatCFA(total)}</>
+                                <>
+                                    <CheckCircle2 size={18} />
+                                    {paymentMethod === "gift_card" && giftCardValidation
+                                        ? `Confirmer • Reste à payer ${formatCFA(giftCardValidation.remaining_to_pay)}`
+                                        : `Confirmer la commande • ${formatCFA(total)}`}
+                                </>
                             )}
                         </button>
 

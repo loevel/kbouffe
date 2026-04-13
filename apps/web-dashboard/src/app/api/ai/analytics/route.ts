@@ -5,18 +5,148 @@
  * Returns: { insights: { title, description, action, priority }[], summary: string }
  */
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth, apiError } from "@/lib/api/helpers";
+import { withAuth } from "@/lib/api/helpers";
 import { checkAiRateLimit, logAiUsage } from "@/lib/ai-rate-limiter";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-export async function POST(request: NextRequest) {
-    if (!GEMINI_API_KEY) {
-        return NextResponse.json({ error: "Gemini API key non configuree" }, { status: 500 });
+type AdvisorPriority = "high" | "medium" | "low";
+type AdvisorCategory = "revenue" | "menu" | "marketing" | "operations" | "pricing";
+
+interface AdvisorInsight {
+    title: string;
+    description: string;
+    action: string;
+    priority: AdvisorPriority;
+    category: AdvisorCategory;
+}
+
+type AdvisorStatsPayload = {
+    totalProducts: number;
+    activeProducts: number;
+    totalOrders: number;
+    completedOrders: number;
+    cancelledOrders: number;
+    cancelRate: number;
+    totalRevenue: number;
+    avgOrderValue: number;
+    avgPrice: number;
+    recentOrders: number;
+    thisWeekRevenue: number;
+    prevWeekRevenue: number;
+    revenueGrowth: number;
+    peakHour: string | null;
+    bestSellers: Array<{ name: string; qty: number; revenue: number }>;
+    productsWithoutImages: number;
+    ordersByDay: Record<string, number>;
+};
+
+function buildFallbackInsights(args: {
+    stats: AdvisorStatsPayload;
+    promoProductsCount: number;
+    bestSellerName: string | null;
+}): { summary: string; insights: AdvisorInsight[] } {
+    const { stats, promoProductsCount, bestSellerName } = args;
+    const insights: AdvisorInsight[] = [];
+
+    if (stats.totalOrders < 20) {
+        insights.push({
+            title: "Acquisition client a renforcer",
+            description: "Le volume de commandes est encore faible. Il faut concentrer les efforts sur la visibilite locale et les offres d'appel.",
+            action: "Lancer une offre premiere commande et 2 campagnes WhatsApp/SMS geo-ciblees cette semaine.",
+            priority: "high",
+            category: "marketing",
+        });
     }
 
+    if (stats.cancelRate >= 12) {
+        insights.push({
+            title: "Taux d'annulation eleve",
+            description: `Votre taux d'annulation (${stats.cancelRate}%) reduit directement la satisfaction client et le chiffre d'affaires.`,
+            action: "Verifier les delais de preparation, confirmer les ruptures en amont et activer un script de confirmation des commandes sensibles.",
+            priority: "high",
+            category: "operations",
+        });
+    }
+
+    if (stats.avgOrderValue > 0 && stats.avgOrderValue < 5000) {
+        insights.push({
+            title: "Panier moyen ameliorable",
+            description: `Le panier moyen (${stats.avgOrderValue} FCFA) peut etre augmente avec des combinaisons plat + boisson + dessert.`,
+            action: "Creer 2 menus combo avec remise legere (5-8%) et proposer l'upsell au checkout.",
+            priority: "medium",
+            category: "pricing",
+        });
+    }
+
+    if (stats.productsWithoutImages > 0) {
+        insights.push({
+            title: "Produits sans photo",
+            description: `${stats.productsWithoutImages} produit(s) n'ont pas d'image, ce qui penalise le taux de conversion.`,
+            action: "Ajouter des photos sur les top ventes en priorite pour augmenter les clics et commandes.",
+            priority: "medium",
+            category: "menu",
+        });
+    }
+
+    if (promoProductsCount === 0 && stats.activeProducts >= 8) {
+        insights.push({
+            title: "Aucune promotion active",
+            description: "Sans offre visible, il est plus difficile de declencher des commandes impulsives.",
+            action: "Mettre 2 produits en promotion courte (48h) avec badge visible sur le menu.",
+            priority: "medium",
+            category: "revenue",
+        });
+    }
+
+    if (bestSellerName) {
+        insights.push({
+            title: "Capitaliser sur vos meilleures ventes",
+            description: `${bestSellerName} performe deja bien. Vous pouvez augmenter sa marge et son volume via des variantes premium.`,
+            action: `Creer une variante premium de ${bestSellerName} et la placer en tete de categorie.`,
+            priority: "low",
+            category: "menu",
+        });
+    }
+
+    if (stats.revenueGrowth < 0) {
+        insights.push({
+            title: "Croissance hebdomadaire negative",
+            description: `Le CA semaine sur semaine est en baisse (${stats.revenueGrowth}%). Une action rapide est recommandee.`,
+            action: "Planifier une campagne weekend + relance clients inactifs avec code promo limite.",
+            priority: "high",
+            category: "revenue",
+        });
+    }
+
+    const prioritized = insights
+        .sort((a, b) => {
+            const rank = { high: 0, medium: 1, low: 2 } as const;
+            return rank[a.priority] - rank[b.priority];
+        })
+        .slice(0, 6);
+
+    if (prioritized.length === 0) {
+        prioritized.push({
+            title: "Performance stable a optimiser",
+            description: "Les indicateurs sont globalement stables. Vous pouvez maintenant optimiser l'execution commerciale pour accelerer la croissance.",
+            action: "Tester une offre hebdomadaire marquee et suivre l'evolution du panier moyen sur 14 jours.",
+            priority: "medium",
+            category: "revenue",
+        });
+    }
+
+    const summary =
+        stats.totalOrders === 0
+            ? "Pas assez de commandes pour une analyse predictive complete. Voici des recommandations prioritaires basees sur votre catalogue actuel."
+            : `Analyse automatique basee sur ${stats.totalOrders} commandes recentes. Priorite: stabiliser les operations puis accelerer la croissance du chiffre d'affaires.`;
+
+    return { summary, insights: prioritized };
+}
+
+export async function POST(request: NextRequest) {
     const auth = await withAuth();
     if (auth.error) return auth.error;
     const { supabase, restaurantId } = auth.ctx;
@@ -152,6 +282,42 @@ export async function POST(request: NextRequest) {
         const cancelledOrders = orders?.filter((o: any) => o.status === "cancelled")?.length ?? 0;
         const cancelRate = totalOrders > 0 ? Math.round((cancelledOrders / totalOrders) * 100) : 0;
 
+        const statsPayload: AdvisorStatsPayload = {
+            totalProducts,
+            activeProducts,
+            totalOrders,
+            completedOrders: completedOrders.length,
+            cancelledOrders,
+            cancelRate,
+            totalRevenue,
+            avgOrderValue,
+            avgPrice,
+            recentOrders: recentOrders.length,
+            thisWeekRevenue,
+            prevWeekRevenue,
+            revenueGrowth,
+            peakHour: peakHour ? `${peakHour[0]}h` : null,
+            bestSellers,
+            productsWithoutImages,
+            ordersByDay,
+        };
+
+        const fallbackPayload = buildFallbackInsights({
+            stats: statsPayload,
+            promoProductsCount: promoProducts.length,
+            bestSellerName: bestSellers[0]?.name ?? null,
+        });
+
+        if (!GEMINI_API_KEY) {
+            return NextResponse.json({
+                summary: fallbackPayload.summary,
+                insights: fallbackPayload.insights,
+                stats: statsPayload,
+                fallback: true,
+                fallbackReason: "Gemini API key non configuree",
+            });
+        }
+
         // Build context for Gemini
         const dataContext = `
 DONNEES DU RESTAURANT "${restaurant?.name ?? "Restaurant"}":
@@ -233,7 +399,13 @@ Regles:
         if (!res.ok) {
             const errText = await res.text();
             console.error("[ai/analytics] Gemini error:", res.status, errText);
-            return NextResponse.json({ error: "Erreur du service IA" }, { status: 502 });
+            return NextResponse.json({
+                summary: fallbackPayload.summary,
+                insights: fallbackPayload.insights,
+                stats: statsPayload,
+                fallback: true,
+                fallbackReason: `Gemini indisponible (${res.status})`,
+            });
         }
 
         const data = await res.json();
@@ -245,7 +417,13 @@ Regles:
             parsed = JSON.parse(cleaned);
         } catch {
             console.error("[ai/analytics] Parse error:", rawText);
-            return NextResponse.json({ error: "Impossible de generer l'analyse" }, { status: 422 });
+            return NextResponse.json({
+                summary: fallbackPayload.summary,
+                insights: fallbackPayload.insights,
+                stats: statsPayload,
+                fallback: true,
+                fallbackReason: "Reponse IA invalide",
+            });
         }
 
         await logAiUsage(supabase, restaurantId, "ai_analytics");
@@ -253,25 +431,7 @@ Regles:
         return NextResponse.json({
             summary: parsed.summary ?? "",
             insights: parsed.insights ?? [],
-            stats: {
-                totalProducts,
-                activeProducts,
-                totalOrders,
-                completedOrders: completedOrders.length,
-                cancelledOrders,
-                cancelRate,
-                totalRevenue,
-                avgOrderValue,
-                avgPrice,
-                recentOrders: recentOrders.length,
-                thisWeekRevenue,
-                prevWeekRevenue,
-                revenueGrowth,
-                peakHour: peakHour ? `${peakHour[0]}h` : null,
-                bestSellers,
-                productsWithoutImages,
-                ordersByDay,
-            },
+            stats: statsPayload,
         });
     } catch (error) {
         console.error("[ai/analytics] Unexpected:", error);

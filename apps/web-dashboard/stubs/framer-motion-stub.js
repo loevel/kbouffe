@@ -15,16 +15,30 @@ const MOTION_PROPS = new Set([
   "onViewportEnter","onViewportLeave","viewport","transformTemplate",
 ]);
 
-const noopMotion = new Proxy({}, {
-  get: (_, tag) => forwardRef(({ children, ...props }, ref) => {
-    const domProps = {};
-    for (const key in props) {
-      if (!MOTION_PROPS.has(key)) domProps[key] = props[key];
-    }
-    return createElement(tag || "div", { ...domProps, ref }, children);
-  })
+const motionCache = Object.create(null);
+
+const noopMotion = new Proxy(motionCache, {
+  get: (target, tag) => {
+    if (typeof tag !== "string") return target[tag];
+    if (target[tag]) return target[tag];
+
+    const MotionComponent = forwardRef(({ children, ...props }, ref) => {
+      const domProps = {};
+      for (const key in props) {
+        if (!MOTION_PROPS.has(key)) domProps[key] = props[key];
+      }
+      return createElement(tag || "div", { ...domProps, ref }, children);
+    });
+
+    MotionComponent.displayName = `motion.${tag}`;
+    target[tag] = MotionComponent;
+    return MotionComponent;
+  },
 });
-tags.forEach(tag => { noopMotion[tag] = noopMotion[tag]; });
+
+tags.forEach((tag) => {
+  noopMotion[tag] = noopMotion[tag];
+});
 
 export const motion = noopMotion;
 export const AnimatePresence = ({ children }) => children;

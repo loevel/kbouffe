@@ -39,6 +39,43 @@ const fieldMapping: Record<string, string> = {
   descriptionI18n: "description_i18n",
 };
 
+async function resolveRestaurantId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string | null> {
+  const { data: dbUser } = await supabase
+    .from("users")
+    .select("restaurant_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (dbUser?.restaurant_id) {
+    return dbUser.restaurant_id;
+  }
+
+  const { data: ownedRestaurant } = await supabase
+    .from("restaurants")
+    .select("id")
+    .eq("owner_id", userId)
+    .maybeSingle();
+
+  if (ownedRestaurant?.id) {
+    return ownedRestaurant.id;
+  }
+
+  const { data: memberData } = await supabase
+    // @ts-expect-error — table can be absent from generated types
+    .from("restaurant_members")
+    .select("restaurant_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+
+  // @ts-expect-error — inferred type may not include restaurant_id
+  return memberData?.restaurant_id ?? null;
+}
+
 /**
  * PATCH /api/restaurant
  * Met à jour le restaurant du marchand authentifié
@@ -57,21 +94,13 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
-    // Trouver le restaurant de l'utilisateur dans Supabase
-    const { data: dbUser, error: userError } = await supabase
-      .from("users")
-      .select("restaurant_id")
-      .eq("id", user.id)
-      .single();
-
-    if (userError || !dbUser || !dbUser.restaurant_id) {
+    const restaurantId = await resolveRestaurantId(supabase, user.id);
+    if (!restaurantId) {
       return NextResponse.json(
         { error: "Restaurant non trouvé" },
         { status: 404 }
       );
     }
-
-    const restaurantId = dbUser.restaurant_id;
 
     // Champs autorisés à mettre à jour
     const allowedFields = [
@@ -164,14 +193,8 @@ export async function GET() {
       );
     }
 
-    // Trouver le restaurant de l'utilisateur
-    const { data: dbUser, error: userError } = await supabase
-      .from("users")
-      .select("restaurant_id")
-      .eq("id", user.id)
-      .single();
-
-    if (userError || !dbUser || !dbUser.restaurant_id) {
+    const restaurantId = await resolveRestaurantId(supabase, user.id);
+    if (!restaurantId) {
       return NextResponse.json(
         { error: "Restaurant non trouvé" },
         { status: 404 }
@@ -181,7 +204,7 @@ export async function GET() {
     const { data: restaurant, error: restaurantError } = await supabase
       .from("restaurants")
       .select("*")
-      .eq("id", dbUser.restaurant_id)
+      .eq("id", restaurantId)
       .single();
 
     if (restaurantError) {
@@ -191,6 +214,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      id: restaurant.id,
       restaurant: restaurant,
     });
   } catch (error: any) {
@@ -201,4 +225,3 @@ export async function GET() {
     );
   }
 }
-

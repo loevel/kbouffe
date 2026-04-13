@@ -6,6 +6,22 @@ import type { Env, Variables } from "../../types";
 
 export const adminUsersRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+function maskEmail(email: string | null | undefined): string | null {
+    if (!email) return null;
+    const [localPart, domain] = email.split("@");
+    if (!domain) return email;
+    if (localPart.length <= 2) return `${localPart[0] ?? "*"}***@${domain}`;
+    return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
+function maskPhone(phone: string | null | undefined): string | null {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return phone;
+    if (digits.length <= 4) return "••••";
+    return `${digits.slice(0, 3)}•••${digits.slice(-2)}`;
+}
+
 const createUserSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
@@ -55,7 +71,7 @@ adminUsersRoutes.post("/", async (c) => {
     if (authError) return c.json({ error: authError.message }, 400);
 
     // 2. Insert into Supabase public.users
-    const newUser = {
+    const dbUser = {
         id: authUser.user.id,
         email,
         full_name: fullName || null,
@@ -70,7 +86,7 @@ adminUsersRoutes.post("/", async (c) => {
 
     const { error: dbError } = await supabaseAdmin
         .from("users")
-        .insert(newUser);
+        .insert(dbUser);
 
     if (dbError) {
         await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
@@ -81,10 +97,16 @@ adminUsersRoutes.post("/", async (c) => {
         action: "create_user", 
         targetType: "user", 
         targetId: authUser.user.id, 
-        details: { email, role, adminRole } 
+        details: { email: maskEmail(email), role, adminRole } 
     });
 
-    return c.json(newUser, 201);
+    return c.json({
+        ...dbUser,
+        email: maskEmail(email),
+        emailRaw: email,
+        phone: maskPhone(phone),
+        phoneRaw: phone || null,
+    }, 201);
 });
 
 adminUsersRoutes.get("/", async (c) => {
@@ -93,6 +115,9 @@ adminUsersRoutes.get("/", async (c) => {
 
     const q = c.req.query("q") ?? "";
     const roleFilter = c.req.query("role") ?? "all";
+    const statusFilter = c.req.query("status") ?? "all";
+    const fromDate = c.req.query("from") ?? c.req.query("date_from") ?? "";
+    const toDate = c.req.query("to") ?? c.req.query("date_to") ?? "";
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
     const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
     const sortField = c.req.query("sort") ?? "created_at";
@@ -111,6 +136,13 @@ adminUsersRoutes.get("/", async (c) => {
     if (roleFilter !== "all") {
         query = query.eq("role", roleFilter);
     }
+    if (statusFilter === "active") {
+        query = query.not("last_login_at", "is", null);
+    } else if (statusFilter === "banned" || statusFilter === "inactive") {
+        query = query.is("last_login_at", null);
+    }
+    if (fromDate) query = query.gte("created_at", fromDate);
+    if (toDate) query = query.lte("created_at", toDate + "T23:59:59.999Z");
 
     // Apply sorting
     const supabaseSortField = sortField === "name" ? "full_name" : (sortField === "created" ? "created_at" : sortField);
@@ -131,9 +163,11 @@ adminUsersRoutes.get("/", async (c) => {
     // Map Supabase fields to frontend expected camelCase
     const formattedData = supabaseData.map((u: any) => ({
         id: u.id,
-        email: u.email,
+        email: maskEmail(u.email),
+        emailRaw: u.email,
         fullName: u.full_name,
-        phone: u.phone,
+        phone: maskPhone(u.phone),
+        phoneRaw: u.phone,
         avatarUrl: u.avatar_url,
         role: u.role,
         adminRole: u.admin_role,
@@ -219,9 +253,11 @@ adminUsersRoutes.get("/:id", async (c) => {
 
     return c.json({
         id: user.id,
-        email: user.email,
+        email: maskEmail(user.email),
+        emailRaw: user.email,
         fullName: user.full_name,
-        phone: user.phone,
+        phone: maskPhone(user.phone),
+        phoneRaw: user.phone,
         avatarUrl: user.avatar_url,
         role: user.role,
         adminRole: user.admin_role,
@@ -265,11 +301,21 @@ adminUsersRoutes.patch("/:id", async (c) => {
 
     if (error) return c.json({ error: error.message }, 500);
 
-    await logAdminAction(c, { action: "update_user", targetType: "user", targetId: id, details: updates });
+    await logAdminAction(c, {
+        action: "update_user",
+        targetType: "user",
+        targetId: id,
+        details: {
+            ...updates,
+            email: "email" in updates ? maskEmail(updates.email) : undefined,
+            phone: "phone" in updates ? maskPhone(updates.phone) : undefined,
+        },
+    });
 
     return c.json({
         id: updated.id,
-        email: updated.email,
+        email: maskEmail(updated.email),
+        emailRaw: updated.email,
         fullName: updated.full_name,
         role: updated.role,
         adminRole: updated.admin_role,
@@ -373,7 +419,7 @@ adminUsersRoutes.post("/:id/impersonate", async (c) => {
         action: "impersonate_user", 
         targetType: "user", 
         targetId: id,
-        details: { email: user.email }
+        details: { email: maskEmail(user.email) }
     });
 
     return c.json({ 

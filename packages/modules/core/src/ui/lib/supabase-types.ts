@@ -31,7 +31,7 @@ export type UserRole = "merchant" | "customer";
 
 export type PayoutStatus = "pending" | "paid" | "failed";
 
-export type PaymentMethod = "mobile_money_mtn" | "mobile_money_orange" | "cash";
+export type PaymentMethod = "mobile_money_mtn" | "mobile_money_orange" | "cash" | "gift_card" | "mixed";
 
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 

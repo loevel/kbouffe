@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
     Store,
@@ -21,35 +21,21 @@ import {
     Trash2,
     AlertTriangle,
     LogIn,
+    ShieldCheck,
+    ShieldOff,
+    Power,
+    Download,
 } from "lucide-react";
 import { Badge, Button, useLocale, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-
-interface Restaurant {
-    id: string;
-    name: string;
-    slug: string;
-    city: string;
-    cuisineType: string;
-    rating: number;
-    reviewCount: number;
-    orderCount: number;
-    isActive: boolean;
-    isVerified: boolean;
-    isPremium: boolean;
-    isSponsored: boolean;
-    kycStatus: "pending" | "approved" | "rejected";
-    createdAt: string;
-    ownerId: string;
-}
-
-interface Pagination {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-}
+import { useBulkSelection } from "@/hooks/use-bulk-selection";
+import { BulkActionBar } from "@/components/admin/BulkActionBar";
+import { useAdminRestaurants } from "@/hooks/admin";
+import type { AdminRestaurantRow as Restaurant } from "@/hooks/admin";
+import { AdminTableSkeleton } from "@/components/admin/AdminTableSkeleton";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { ExportCSVButton } from "@/components/admin/ExportCSVButton";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -63,53 +49,109 @@ const itemVariants = {
 
 export default function AdminRestaurantsPage() {
     const { t } = useLocale();
-    const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-    const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
-    const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
     const [query, setQuery] = useState("");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
-    const [verifiedFilter, setVerifiedFilter] = useState("all");
-    const [error, setError] = useState<string | null>(null);
+    const [kycStatusFilter, setKycStatusFilter] = useState("all");
     const [toggling, setToggling] = useState<string | null>(null);
-    
+
     // Deletion state
     const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
     const [restaurantToDelete, setRestaurantToDelete] = useState<Restaurant | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const fetchRestaurants = useCallback(async (page = 1) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                limit: "20",
-                ...(query && { q: query }),
-                ...(statusFilter !== "all" && { status: statusFilter }),
-                ...(verifiedFilter !== "all" && { verified: verifiedFilter }),
-            });
-            
-            const res = await adminFetch(`/api/admin/restaurants?${params}`);
-            const json = await res.json();
-            
-            if (!res.ok) {
-                throw new Error(json.error || `Erreur ${res.status}`);
-            }
+    // Bulk action state
+    const [bulkConfirmAction, setBulkConfirmAction] = useState<"block" | null>(null);
 
-            setRestaurants(json.data ?? []);
-            setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
-        } catch (err: any) {
-            console.error("Failed to fetch restaurants:", err);
-            setError(err.message || "Échec du chargement des restaurants");
-        } finally {
-            setLoading(false);
-        }
-    }, [query, statusFilter, verifiedFilter]);
+    const { restaurants, total, page, totalPages, loading, error, refetch } = useAdminRestaurants({
+        search: debouncedQuery || undefined,
+        status: statusFilter !== "all" ? (statusFilter as "active" | "blocked") : undefined,
+        kyc_status: kycStatusFilter !== "all" ? (kycStatusFilter as "pending" | "approved" | "rejected" | "incomplete") : undefined,
+        page: currentPage,
+        limit: 20,
+    });
+    const pagination = { page, total, totalPages, limit: 20 };
+
+    const bulk = useBulkSelection(restaurants);
+    const selectAllRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        const timer = setTimeout(() => fetchRestaurants(1), 300);
+        const timer = setTimeout(() => {
+            setDebouncedQuery(query);
+            setCurrentPage(1);
+        }, 300);
         return () => clearTimeout(timer);
-    }, [fetchRestaurants]);
+    }, [query]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [statusFilter, kycStatusFilter]);
+
+    useEffect(() => {
+        if (selectAllRef.current) {
+            selectAllRef.current.indeterminate = bulk.isIndeterminate;
+        }
+    }, [bulk.isIndeterminate]);
+
+    useEffect(() => {
+        bulk.clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page, query, statusFilter, kycStatusFilter]);
+
+    const exportRestaurantsCsv = () => {
+        const selected = restaurants.filter((r) => bulk.isSelected(r.id));
+        const header = "ID,Nom,Slug,Ville,Type,KYC,Actif,Vérifié,Créé le\n";
+        const rows = selected
+            .map((r) =>
+                [
+                    r.id,
+                    `"${r.name}"`,
+                    r.slug,
+                    `"${r.city}"`,
+                    r.cuisineType,
+                    r.kycStatus,
+                    r.isActive ? "oui" : "non",
+                    r.isVerified ? "oui" : "non",
+                    r.createdAt,
+                ].join(",")
+            )
+            .join("\n");
+        const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `restaurants_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const performBulkRestaurantAction = async (action: "approve_kyc" | "block" | "activate") => {
+        if (bulk.selectedIds.length === 0) return;
+        try {
+            const res = await adminFetch("/api/admin/restaurants/bulk", {
+                method: "PATCH",
+                body: JSON.stringify({ ids: bulk.selectedIds, action }),
+            });
+            if (res.ok) {
+                const json = await res.json();
+                const labels: Record<string, string> = {
+                    approve_kyc: "KYC approuvé",
+                    block: "bloqué",
+                    activate: "activé",
+                };
+                toast.success(`${json.count} restaurant(s) ${labels[action]}`);
+                bulk.clearSelection();
+                refetch();
+            } else {
+                const err = await res.json();
+                toast.error(err.error || "Erreur lors de l'opération");
+            }
+        } catch {
+            toast.error("Erreur réseau");
+        }
+        setBulkConfirmAction(null);
+    };
 
     const toggleField = async (id: string, field: string, value: boolean) => {
         setToggling(id);
@@ -119,11 +161,12 @@ export default function AdminRestaurantsPage() {
                 body: JSON.stringify({ [field]: value }),
             });
 
-            if (!res.ok) throw new Error("Update failed");
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || "Update failed");
+            }
 
-            setRestaurants((prev) =>
-                prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-            );
+            refetch();
             toast.success("Mise à jour réussie");
         } catch (err: any) {
             console.error("Toggle failed:", err);
@@ -146,8 +189,7 @@ export default function AdminRestaurantsPage() {
                 throw new Error(json.error || "Échec de la suppression");
             }
 
-            setRestaurants(prev => prev.filter(r => r.id !== restaurantToDelete.id));
-            setPagination(prev => ({ ...prev, total: prev.total - 1 }));
+            refetch();
             toast.success("Restaurant supprimé avec succès");
             setIsConfirmDeleteOpen(false);
         } catch (err: any) {
@@ -185,6 +227,19 @@ export default function AdminRestaurantsPage() {
                 return <Badge variant="danger" className="gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border-none shadow-sm"><XCircle size={10} /> Rejeté</Badge>;
             default:
                 return <Badge variant="warning" className="gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border-none shadow-sm animate-pulse">En attente</Badge>;
+        }
+    };
+
+    const getComplianceBadge = (status?: string) => {
+        switch (status) {
+            case "compliant":
+                return <Badge variant="success" className="gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border-none shadow-sm">Licences OK</Badge>;
+            case "blocked":
+                return <Badge variant="danger" className="gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border-none shadow-sm">Bloqué</Badge>;
+            case "in_review":
+                return <Badge variant="warning" className="gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border-none shadow-sm">À vérifier</Badge>;
+            default:
+                return <Badge variant="outline" className="gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border-none shadow-sm">En attente</Badge>;
         }
     };
 
@@ -246,21 +301,23 @@ export default function AdminRestaurantsPage() {
                             className="w-full pl-10 pr-6 py-3.5 text-xs rounded-xl appearance-none bg-surface-50 dark:bg-surface-800/50 text-surface-900 dark:text-white border-none focus:ring-4 focus:ring-brand-500/10 outline-none cursor-pointer font-black uppercase tracking-widest"
                         >
                             <option value="all">S: Tous les statuts</option>
-                            <option value="active">S: Ouverts</option>
-                            <option value="inactive">S: Fermés</option>
+                            <option value="active">S: Actifs</option>
+                            <option value="blocked">S: Bloqués</option>
                         </select>
                     </div>
 
                     <div className="relative w-full sm:w-48">
                         <Shield size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400" />
                         <select
-                            value={verifiedFilter}
-                            onChange={(e) => setVerifiedFilter(e.target.value)}
+                            value={kycStatusFilter}
+                            onChange={(e) => setKycStatusFilter(e.target.value)}
                             className="w-full pl-10 pr-6 py-3.5 text-xs rounded-xl appearance-none bg-surface-50 dark:bg-surface-800/50 text-surface-900 dark:text-white border-none focus:ring-4 focus:ring-brand-500/10 outline-none cursor-pointer font-black uppercase tracking-widest"
                         >
-                            <option value="all">V: Vérification</option>
-                            <option value="true">V: Certifiés</option>
-                            <option value="false">V: Non-certifiés</option>
+                            <option value="all">K: Tous statuts</option>
+                            <option value="pending">K: En attente</option>
+                            <option value="approved">K: Approuvés</option>
+                            <option value="rejected">K: Rejetés</option>
+                            <option value="incomplete">K: Incomplets</option>
                         </select>
                     </div>
                 </div>
@@ -275,9 +332,18 @@ export default function AdminRestaurantsPage() {
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
                             <tr className="border-b border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/30">
+                                <th className="pl-6 py-6 w-12">
+                                    <input
+                                        type="checkbox"
+                                        ref={selectAllRef}
+                                        checked={bulk.isAllSelected}
+                                        onChange={bulk.toggleAll}
+                                        className="w-4 h-4 rounded cursor-pointer accent-brand-500"
+                                    />
+                                </th>
                                 <th className="text-left px-10 py-6 font-black text-[10px] uppercase tracking-[0.2em] text-surface-400">Établissement</th>
                                 <th className="text-left px-8 py-6 font-black text-[10px] uppercase tracking-[0.2em] text-surface-400">Localisation</th>
-                                <th className="text-center px-6 py-6 font-black text-[10px] uppercase tracking-[0.2em] text-surface-400">Conformité KYC</th>
+                                <th className="text-center px-6 py-6 font-black text-[10px] uppercase tracking-[0.2em] text-surface-400">Conformité KYC / licences</th>
                                 <th className="text-center px-6 py-6 font-black text-[10px] uppercase tracking-[0.2em] text-surface-400">Indice Performance</th>
                                 <th className="text-center px-6 py-6 font-black text-[10px] uppercase tracking-[0.2em] text-surface-400">Disponibilité</th>
                                 <th className="text-right px-10 py-6"></th>
@@ -288,14 +354,14 @@ export default function AdminRestaurantsPage() {
                                 {loading && restaurants.length === 0 ? (
                                     Array.from({ length: 5 }).map((_, idx) => (
                                         <tr key={idx} className="animate-pulse">
-                                            <td colSpan={6} className="px-10 py-8">
+                                            <td colSpan={7} className="px-10 py-8">
                                                 <div className="h-12 bg-surface-100 dark:bg-surface-800 rounded-2xl w-full" />
                                             </td>
                                         </tr>
                                     ))
                                 ) : error ? (
                                     <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                        <td colSpan={6} className="text-center py-32">
+                                        <td colSpan={7} className="text-center py-32">
                                             <div className="flex flex-col items-center gap-6">
                                                 <div className="w-20 h-20 rounded-[2.5rem] bg-danger-50 dark:bg-danger-500/10 flex items-center justify-center text-danger-500">
                                                     <XCircle size={40} />
@@ -306,7 +372,7 @@ export default function AdminRestaurantsPage() {
                                                     <Button 
                                                         variant="outline" 
                                                         size="sm" 
-                                                        onClick={() => fetchRestaurants(1)}
+                                                        onClick={() => refetch()}
                                                         className="mt-4 border-danger-500/20 text-danger-500 hover:bg-danger-50 text-[10px] font-black uppercase tracking-widest px-6"
                                                     >
                                                         Réessayer
@@ -317,7 +383,7 @@ export default function AdminRestaurantsPage() {
                                     </motion.tr>
                                 ) : restaurants.length === 0 ? (
                                     <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                        <td colSpan={6} className="text-center py-32">
+                                        <td colSpan={7} className="text-center py-32">
                                             <div className="flex flex-col items-center gap-6">
                                                 <div className="w-20 h-20 rounded-[2.5rem] bg-surface-50 dark:bg-surface-800 flex items-center justify-center text-surface-200 dark:text-surface-700">
                                                     <Store size={40} />
@@ -339,8 +405,19 @@ export default function AdminRestaurantsPage() {
                                             animate="visible"
                                             exit={{ opacity: 0, scale: 0.98 }}
                                             transition={{ delay: idx * 0.04 }}
-                                            className="group hover:bg-surface-50 dark:hover:bg-brand-500/5 transition-all cursor-pointer"
+                                            className={cn(
+                                                "group hover:bg-surface-50 dark:hover:bg-brand-500/5 transition-all cursor-pointer",
+                                                bulk.isSelected(r.id) && "bg-brand-500/5 dark:bg-brand-500/10"
+                                            )}
                                         >
+                                            <td className="pl-6 py-6" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={bulk.isSelected(r.id)}
+                                                    onChange={() => bulk.toggleItem(r.id)}
+                                                    className="w-4 h-4 rounded cursor-pointer accent-brand-500"
+                                                />
+                                            </td>
                                             <td className="px-10 py-6">
                                                 <div className="flex items-center gap-5">
                                                     <div className="relative shrink-0">
@@ -375,10 +452,13 @@ export default function AdminRestaurantsPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-6 text-center">
-                                                <div className="flex justify-center">
-                                                    {getKycBadge(r.kycStatus)}
-                                                </div>
-                                            </td>
+                                                    <div className="flex justify-center">
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            {getKycBadge(r.kycStatus)}
+                                                            {getComplianceBadge(r.complianceStatus)}
+                                                        </div>
+                                                    </div>
+                                                </td>
                                             <td className="px-6 py-6 text-center">
                                                 <div className="flex flex-col items-center gap-2">
                                                     <div className="flex items-center gap-1.5 bg-surface-100 dark:bg-surface-800 px-3 py-1.5 rounded-2xl shadow-sm border border-transparent group-hover:border-amber-500/20 transition-all">
@@ -477,7 +557,7 @@ export default function AdminRestaurantsPage() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                onClick={() => fetchRestaurants(pagination.page - 1)} 
+                                onClick={() => setCurrentPage(p => p - 1)} 
                                 disabled={pagination.page <= 1}
                                 className="h-12 px-8 rounded-2xl border-surface-200 dark:border-surface-700 font-black uppercase text-[11px] tracking-[0.2em] bg-white dark:bg-surface-900 shadow-sm"
                             >
@@ -486,7 +566,7 @@ export default function AdminRestaurantsPage() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                onClick={() => fetchRestaurants(pagination.page + 1)} 
+                                onClick={() => setCurrentPage(p => p + 1)} 
                                 disabled={pagination.page >= pagination.totalPages}
                                 className="h-12 px-8 rounded-2xl border-surface-200 dark:border-surface-700 font-black uppercase text-[11px] tracking-[0.2em] bg-white dark:bg-surface-900 shadow-sm"
                             >
@@ -528,6 +608,71 @@ export default function AdminRestaurantsPage() {
                 </div>
             </motion.div>
 
+            <BulkActionBar
+                selectedCount={bulk.selectedCount}
+                onClearSelection={bulk.clearSelection}
+                actions={[
+                    {
+                        label: "Approuver KYC",
+                        icon: <ShieldCheck size={14} />,
+                        onClick: () => performBulkRestaurantAction("approve_kyc"),
+                    },
+                    {
+                        label: "Activer",
+                        icon: <Power size={14} />,
+                        onClick: () => performBulkRestaurantAction("activate"),
+                    },
+                    {
+                        label: "Bloquer",
+                        icon: <ShieldOff size={14} />,
+                        onClick: () => setBulkConfirmAction("block"),
+                        variant: "danger",
+                    },
+                    {
+                        label: "Exporter",
+                        icon: <Download size={14} />,
+                        onClick: exportRestaurantsCsv,
+                    },
+                ]}
+            />
+
+            {/* Bulk Block Confirmation */}
+            {bulkConfirmAction === "block" && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white dark:bg-surface-900 p-8 rounded-3xl shadow-2xl max-w-md w-full space-y-6 border border-surface-200 dark:border-surface-800"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                                <AlertTriangle size={28} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-surface-900 dark:text-white">
+                                    Bloquer {bulk.selectedCount} établissement{bulk.selectedCount > 1 ? "s" : ""} ?
+                                </h3>
+                                <p className="text-sm text-surface-400 font-medium">Les restaurants seront désactivés.</p>
+                            </div>
+                        </div>
+                        <p className="text-surface-500 text-sm leading-relaxed">
+                            Ces établissements ne seront plus visibles par les clients sur la plateforme.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => setBulkConfirmAction(null)}>
+                                Annuler
+                            </Button>
+                            <Button
+                                className="bg-red-500 hover:bg-red-600 text-white"
+                                onClick={() => performBulkRestaurantAction("block")}
+                            >
+                                Bloquer {bulk.selectedCount} restaurant{bulk.selectedCount > 1 ? "s" : ""}
+                            </Button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
             {/* Delete Confirmation Modal */}
             <AnimatePresence>
                 {isConfirmDeleteOpen && restaurantToDelete && (
@@ -551,7 +696,7 @@ export default function AdminRestaurantsPage() {
                                         <AlertTriangle size={28} />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-black text-surface-900 dark:text-white uppercase tracking-tight">Supprimer l'établissement ?</h3>
+                                        <h3 className="text-xl font-black text-surface-900 dark:text-white uppercase tracking-tight">Supprimer l&apos;établissement ?</h3>
                                         <p className="text-xs font-bold text-surface-400 uppercase tracking-widest">Action Irréversible</p>
                                     </div>
                                 </div>

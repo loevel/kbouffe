@@ -42,14 +42,45 @@ notificationsRoutes.post("/preferences", async (c) => {
 
     const settings = (body.settings ?? {}) as Record<string, NotificationChannel>;
     const notificationsEnabled = Object.values(settings).some((ch) => ch.email || ch.push);
+    const now = new Date().toISOString();
 
     await c.var.supabase
         .from("users")
         .update({ 
             notifications_enabled: notificationsEnabled, 
-            updated_at: new Date().toISOString() 
+            ...(notificationsEnabled
+                ? {}
+                : {
+                    sms_notifications_enabled: false,
+                    email_notifications_enabled: false,
+                    marketing_last_opt_out_at: now,
+                }),
+            updated_at: now,
         })
         .eq("id", c.var.userId);
+
+    if (!notificationsEnabled) {
+        await c.var.supabase.from("marketing_consent_registry").insert([
+            {
+                user_id: c.var.userId,
+                channel: "sms",
+                consent_status: "opt_out",
+                source: "self_service",
+                consent_reason: "Préférences notifications désactivées",
+                created_at: now,
+                updated_at: now,
+            },
+            {
+                user_id: c.var.userId,
+                channel: "email",
+                consent_status: "opt_out",
+                source: "self_service",
+                consent_reason: "Préférences notifications désactivées",
+                created_at: now,
+                updated_at: now,
+            },
+        ]);
+    }
 
     return c.json({
         success: true,

@@ -160,7 +160,7 @@ export function buildInvoiceSummary(breakdown: TvaBreakdown): Array<{ label: str
 }
 
 /**
- * Calcule les totaux agrégés pour la déclaration TVA trimestrielle DGI.
+ * Calcule les totaux agrégés pour la déclaration TVA mensuelle DGI.
  *
  * @param invoices  Liste des factures de la période (status = 'issued' | 'paid').
  */

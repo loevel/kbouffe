@@ -5,6 +5,22 @@ import type { Env, Variables } from "../../types";
 
 export const adminSupportRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+function maskEmail(email: string | null | undefined): string | null {
+    if (!email) return null;
+    const [localPart, domain] = email.split("@");
+    if (!domain) return email;
+    if (localPart.length <= 2) return `${localPart[0] ?? "*"}***@${domain}`;
+    return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
+function maskPhone(phone: string | null | undefined): string | null {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return phone;
+    if (digits.length <= 4) return "••••";
+    return `${digits.slice(0, 3)}•••${digits.slice(-2)}`;
+}
+
 adminSupportRoutes.get("/", async (c) => {
     const denied = requireDomain(c, "support");
     if (denied) return denied;
@@ -52,7 +68,7 @@ adminSupportRoutes.get("/", async (c) => {
         createdAt: t.created_at,
         resolvedAt: t.resolved_at,
         reporterName: t.reporter?.full_name,
-        reporterEmail: t.reporter?.email,
+        reporterEmail: maskEmail(t.reporter?.email),
         assigneeName: t.assignee?.full_name
     }));
 
@@ -132,9 +148,9 @@ adminSupportRoutes.get("/:id", async (c) => {
         createdAt: t.created_at,
         resolvedAt: t.resolved_at,
         reporterName: t.reporter?.full_name,
-        reporterEmail: t.reporter?.email,
-        reporterPhone: t.reporter?.phone,
+        reporterEmail: maskEmail(t.reporter?.email),
+        reporterPhone: maskPhone(t.reporter?.phone),
         assigneeName: t.assignee?.full_name,
-        assigneeEmail: t.assignee?.email
+        assigneeEmail: maskEmail(t.assignee?.email)
     });
 });

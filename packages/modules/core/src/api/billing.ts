@@ -4,7 +4,7 @@
  * Conformité DGI Cameroun :
  *   - TVA 19,25% sur tous les services KBouffe (CGI Art.125)
  *   - Factures numérotées séquentiellement (format KBF-YYYY-MM-NNNNN)
- *   - Déclaration TVA trimestrielle obligatoire auprès de la DGI
+ *   - Déclaration TVA mensuelle avec preuve de dépôt immuable
  *
  * Routes merchant (nécessitent authMiddleware) :
  *   GET  /billing/invoices            — Liste des factures du restaurant
@@ -15,8 +15,8 @@
  *   GET  /admin/billing/invoices      — Toutes les factures (tous restaurants)
  *   POST /admin/billing/invoices      — Émettre une facture manuellement
  *   POST /admin/billing/invoices/subscription — Générer facture depuis abonnement
- *   GET  /admin/billing/tva-declaration       — Synthèse TVA pour DGI
- *   POST /admin/billing/tva-declaration/file  — Marquer une déclaration comme déposée
+ *   GET  /admin/billing/tva-declaration       — Synthèse TVA mensuelle pour DGI
+ *   POST /admin/billing/tva-declaration/file  — Déposer une déclaration mensuelle
  */
 
 import { Hono } from "hono";
@@ -39,6 +39,115 @@ function getAdminClient(env: Env) {
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function startOfMonthIso(year: number, monthIndex: number) {
+  return new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0)).toISOString();
+}
+
+function endOfMonthIso(year: number, monthIndex: number) {
+  return new Date(Date.UTC(year, monthIndex + 1, 0, 23, 59, 59, 999)).toISOString();
+}
+
+function buildMonthlyPeriodRange(period?: string, from?: string, to?: string) {
+  if (period) {
+    const monthMatch = period.match(/^(\d{4})-(\d{2})$/);
+    if (!monthMatch) {
+      throw new Error("Le paramètre period doit être au format YYYY-MM");
+    }
+
+    const year = Number(monthMatch[1]);
+    const month = Number(monthMatch[2]);
+    if (month < 1 || month > 12) {
+      throw new Error("Le mois de la période est invalide");
+    }
+
+    return {
+      label: period,
+      from: startOfMonthIso(year, month - 1),
+      to: endOfMonthIso(year, month - 1),
+    };
+  }
+
+  if (!from || !to) {
+    throw new Error("Fournir 'period' (YYYY-MM) ou 'from' et 'to' pour un mois complet");
+  }
+
+  const start = new Date(from);
+  const end = new Date(to);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error("Les dates de période sont invalides");
+  }
+
+  if (start.getUTCFullYear() !== end.getUTCFullYear() || start.getUTCMonth() !== end.getUTCMonth()) {
+    throw new Error("La déclaration TVA doit couvrir un seul mois");
+  }
+
+  const year = start.getUTCFullYear();
+  const month = start.getUTCMonth() + 1;
+  const label = `${year}-${String(month).padStart(2, "0")}`;
+
+  return {
+    label,
+    from: startOfMonthIso(year, month - 1),
+    to: endOfMonthIso(year, month - 1),
+  };
+}
+
+function fiscalIdentityReady(restaurant: Record<string, unknown> | null | undefined) {
+  const kycStatus = String(restaurant?.kyc_status ?? "").toLowerCase();
+  const niu = String(restaurant?.nif ?? restaurant?.kyc_niu ?? "").trim();
+  const rccm = String(restaurant?.rccm ?? restaurant?.kyc_rccm ?? "").trim();
+
+  return kycStatus === "approved" && Boolean(niu) && Boolean(rccm);
+}
+
+function buildPayoutEvidence(input: {
+  previousStatus?: string | null;
+  nextStatus: string;
+  paymentReference?: string | null;
+  providerName?: string | null;
+  notes?: string | null;
+  actorId?: string | null;
+  extra?: Record<string, unknown>;
+}) {
+  return {
+    transition: {
+      from: input.previousStatus ?? null,
+      to: input.nextStatus,
+    },
+    payment_reference: input.paymentReference ?? null,
+    provider_name: input.providerName ?? null,
+    notes: input.notes ?? null,
+    actor_id: input.actorId ?? null,
+    ...input.extra,
+  };
+}
+
+async function createPayoutEvent(admin: ReturnType<typeof getAdminClient>, payload: {
+  payout_id: string;
+  restaurant_id: string;
+  event_type: "created" | "submitted" | "processing" | "paid" | "failed" | "note" | "evidence";
+  status_from?: string | null;
+  status_to?: string | null;
+  provider_name?: string | null;
+  provider_reference?: string | null;
+  evidence?: Record<string, unknown>;
+  recorded_by?: string | null;
+}) {
+  const { error } = await admin.from("payout_events" as never).insert({
+    payout_id: payload.payout_id,
+    restaurant_id: payload.restaurant_id,
+    event_type: payload.event_type,
+    status_from: payload.status_from ?? null,
+    status_to: payload.status_to ?? null,
+    provider_name: payload.provider_name ?? null,
+    provider_reference: payload.provider_reference ?? null,
+    evidence: payload.evidence ?? {},
+    recorded_by: payload.recorded_by ?? null,
+  } as never);
+
+  if (error) throw error;
 }
 
 // ── Routes merchant ───────────────────────────────────────────────────────
@@ -119,22 +228,29 @@ export const adminBillingRoutes = new Hono<{ Bindings: Env; Variables: Variables
 // GET /admin/billing/invoices
 adminBillingRoutes.get("/invoices", async (c) => {
   const admin = getAdminClient(c.env);
-  const { status, type, from, to } = c.req.query();
+  const { status, type, from, to, restaurant_id } = c.req.query();
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
+  const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "50")));
 
   let query = (admin.from("platform_invoices" as never) as any)
-    .select("id, invoice_number, invoice_type, restaurant_id, restaurant_name, description, amount_ht, tva_amount, amount_ttc, status, issued_at, paid_at")
+    .select("id, invoice_number, invoice_type, restaurant_id, restaurant_name, description, amount_ht, tva_amount, amount_ttc, status, issued_at, paid_at", { count: "exact" })
     .order("issued_at", { ascending: false })
-    .limit(100);
+    .range((page - 1) * limit, page * limit - 1);
 
   if (status) query = query.eq("status", status);
   if (type)   query = query.eq("invoice_type", type);
   if (from)   query = query.gte("issued_at", from);
   if (to)     query = query.lte("issued_at", to);
+  if (restaurant_id) query = query.eq("restaurant_id", restaurant_id);
 
-  const { data, error } = await query;
+  const { data, count: total, error } = await query;
   if (error) return c.json({ error: "Erreur récupération factures admin" }, 500);
 
-  return c.json({ success: true, invoices: data ?? [] });
+  return c.json({
+    success: true,
+    invoices: data ?? [],
+    pagination: { page, limit, total: total ?? 0, totalPages: Math.ceil((total ?? 0) / limit) },
+  });
 });
 
 // POST /admin/billing/invoices — Émettre une facture manuellement
@@ -153,9 +269,16 @@ adminBillingRoutes.post("/invoices", async (c) => {
   // Récupérer infos restaurant pour snapshot fiscal
   const { data: resto } = await admin
     .from("restaurants")
-    .select("name, address, nif, rccm")
+    .select("name, address, nif, rccm, kyc_status, kyc_niu, kyc_rccm")
     .eq("id", body.restaurant_id)
     .single();
+
+  if (!fiscalIdentityReady(resto as Record<string, unknown> | null | undefined)) {
+    return c.json({
+      error: "Identité fiscale du restaurant non vérifiée",
+      details: "KYC approuvé et identifiants fiscaux NIU/RCCM requis avant émission de facture",
+    }, 409);
+  }
 
   const tva_rate_bps = body.tva_rate_bps ?? TVA_RATES_BY_SERVICE[body.invoice_type];
   const breakdown = computeTva(body.amount_ht, tva_rate_bps === 0);
@@ -255,38 +378,24 @@ adminBillingRoutes.post("/invoices/subscription", async (c) => {
   return adminBillingRoutes.fetch(invoiceReq, c.env, c.executionCtx);
 });
 
-// GET /admin/billing/tva-declaration?period=2026-Q1  — Synthèse TVA DGI
+// GET /admin/billing/tva-declaration?period=2026-04  — Synthèse TVA DGI mensuelle
 adminBillingRoutes.get("/tva-declaration", async (c) => {
   const admin = getAdminClient(c.env);
   const { period, from, to } = c.req.query();
 
-  // Résoudre les dates si period fournie (ex: "2026-Q1")
-  let dateFrom = from;
-  let dateTo = to;
-
-  if (period) {
-    const match = period.match(/^(\d{4})-Q([1-4])$/);
-    if (match) {
-      const year = parseInt(match[1]);
-      const quarter = parseInt(match[2]);
-      const startMonth = (quarter - 1) * 3 + 1;
-      const endMonth = startMonth + 2;
-      dateFrom = `${year}-${String(startMonth).padStart(2, "0")}-01`;
-      const lastDay = new Date(year, endMonth, 0).getDate();
-      dateTo = `${year}-${String(endMonth).padStart(2, "0")}-${lastDay}`;
-    }
-  }
-
-  if (!dateFrom || !dateTo) {
-    return c.json({ error: "Fournir 'period' (ex: 2026-Q1) ou 'from' et 'to'" }, 400);
+  let range;
+  try {
+    range = buildMonthlyPeriodRange(period, from, to);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : "Période invalide" }, 400);
   }
 
   const { data, error } = await admin
     .from("platform_invoices" as never)
     .select("amount_ht, tva_amount, amount_ttc, invoice_type, status, issued_at, restaurant_name")
     .in("status", ["issued", "paid"])
-    .gte("issued_at", dateFrom)
-    .lte("issued_at", dateTo)
+    .gte("issued_at", range.from)
+    .lte("issued_at", range.to)
     .order("issued_at");
 
   if (error) return c.json({ error: "Erreur récupération factures TVA" }, 500);
@@ -307,9 +416,10 @@ adminBillingRoutes.get("/tva-declaration", async (c) => {
   return c.json({
     success: true,
     declaration: {
-      period: period ?? `${dateFrom} → ${dateTo}`,
-      period_start: dateFrom,
-      period_end: dateTo,
+      period: range.label,
+      period_start: range.from,
+      period_end: range.to,
+      period_type: "monthly",
       ...aggregated,
       by_type: byType,
       formatted: {
@@ -317,7 +427,7 @@ adminBillingRoutes.get("/tva-declaration", async (c) => {
         total_tva: formatFcfa(aggregated.total_tva),
         total_ttc: formatFcfa(aggregated.total_ttc),
         tva_rate:  "19,25 %",
-        note: "Déclaration à déposer auprès de la DGI Cameroun chaque trimestre.",
+        note: "Déclaration à déposer auprès de la DGI Cameroun chaque mois.",
       },
     },
     invoices,
@@ -337,30 +447,91 @@ adminBillingRoutes.post("/tva-declaration/file", async (c) => {
     return c.json({ error: "period_label, period_start, period_end sont requis" }, 400);
   }
 
+  const periodStartDate = new Date(body.period_start);
+  const periodEndDate = new Date(body.period_end);
+  if (
+    Number.isNaN(periodStartDate.getTime()) ||
+    Number.isNaN(periodEndDate.getTime()) ||
+    periodStartDate.getUTCFullYear() !== periodEndDate.getUTCFullYear() ||
+    periodStartDate.getUTCMonth() !== periodEndDate.getUTCMonth()
+  ) {
+    return c.json({ error: "La déclaration TVA doit couvrir un seul mois" }, 400);
+  }
+
+  const expectedLabel = `${periodStartDate.getUTCFullYear()}-${String(periodStartDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  if (body.period_label !== expectedLabel) {
+    return c.json({ error: "period_label doit respecter le format YYYY-MM du mois déclaré" }, 400);
+  }
+
   const admin = getAdminClient(c.env);
+  const { data: existingDeclaration } = await admin
+    .from("tva_declarations" as never)
+    .select("id, status")
+    .eq("period_label", body.period_label)
+    .maybeSingle();
+
+  if ((existingDeclaration as { status?: string } | null)?.status === "filed") {
+    return c.json({ error: "Cette déclaration TVA mensuelle a déjà été déposée" }, 409);
+  }
 
   // Calculer les totaux de la période
   const { data: invoices } = await admin
     .from("platform_invoices" as never)
-    .select("amount_ht, tva_amount, amount_ttc")
+    .select("id, invoice_number, amount_ht, tva_amount, amount_ttc, invoice_type, status, issued_at, restaurant_id, restaurant_name")
     .in("status", ["issued", "paid"])
     .gte("issued_at", body.period_start)
     .lte("issued_at", body.period_end);
 
   const totals = computeTvaDeclaration((invoices ?? []) as Array<{ amount_ht: number; tva_amount: number; amount_ttc: number }>);
+  const filingSnapshot = {
+    source: "admin/billing/tva-declaration/file",
+    filed_at: new Date().toISOString(),
+    period_label: body.period_label,
+    period_start: body.period_start,
+    period_end: body.period_end,
+    invoices: (invoices ?? []).map((invoice: any) => ({
+      id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      invoice_type: invoice.invoice_type,
+      restaurant_id: invoice.restaurant_id,
+      restaurant_name: invoice.restaurant_name,
+      amount_ht: invoice.amount_ht,
+      tva_amount: invoice.tva_amount,
+      amount_ttc: invoice.amount_ttc,
+      status: invoice.status,
+      issued_at: invoice.issued_at,
+    })),
+  };
 
-  const { data, error } = await admin
+  const { data: storedDeclaration, error: storeError } = await admin
     .from("tva_declarations" as never)
     .upsert({
       period_label:   body.period_label,
-      period_type:    "quarterly",
+      period_type:    "monthly",
       period_start:   body.period_start,
       period_end:     body.period_end,
       ...totals,
-      status:         "filed",
-      filed_at:       new Date().toISOString(),
+      status:         "draft",
+      filed_at:       null,
+      filed_by:       null,
       dgi_reference:  body.dgi_reference ?? null,
+      filing_snapshot: filingSnapshot,
     } as never, { onConflict: "period_label" })
+    .select()
+    .single();
+
+  if (storeError) return c.json({ error: "Erreur préparation déclaration TVA" }, 500);
+
+  const { data, error } = await admin
+    .from("tva_declarations" as never)
+    .update({
+      status: "filed",
+      filed_at: new Date().toISOString(),
+      filed_by: c.var.userId,
+      dgi_reference: body.dgi_reference ?? null,
+      filing_snapshot: filingSnapshot,
+    } as never)
+    .eq("id", (storedDeclaration as any).id)
     .select()
     .single();
 

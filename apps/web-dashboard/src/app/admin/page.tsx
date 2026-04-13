@@ -29,6 +29,17 @@ import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
+import {
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    BarChart,
+    Bar,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+} from "recharts";
 
 interface PlatformStats {
     restaurants: { total: number; active: number; pending: number };
@@ -43,6 +54,29 @@ interface PlatformStats {
             isActive: boolean;
             createdAt: string;
         }>;
+    };
+}
+
+interface AdminChartPoint {
+    date: string;
+    label: string;
+    gmv: number;
+    orders: number;
+    newRestaurants: number;
+    aiCalls: number;
+    subscriptionRevenue: number;
+}
+
+interface AdminChartsPayload {
+    period: "7d" | "30d" | "90d";
+    generatedAt: string;
+    series: AdminChartPoint[];
+    summary: {
+        gmv: { current: number; previous: number; growthRate: number };
+        orders: { current: number; previous: number; growthRate: number };
+        newRestaurants: { current: number; previous: number; growthRate: number };
+        aiCalls: { current: number; previous: number; growthRate: number };
+        subscriptionRevenue: { current: number; previous: number; growthRate: number };
     };
 }
 
@@ -94,10 +128,21 @@ function KpiCard({ label, value, sub, icon: Icon, variant }: KpiCardProps) {
     );
 }
 
+function formatCompactCurrency(value: number): string {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M FCFA`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k FCFA`;
+    return `${value.toLocaleString("fr-FR")} FCFA`;
+}
+
+function formatGrowth(growthRate: number): string {
+    return `${growthRate >= 0 ? "+" : ""}${growthRate}%`;
+}
+
 export default function AdminDashboardPage() {
     const { t } = useLocale();
     const { adminRole } = useAdmin();
     const [stats, setStats] = useState<PlatformStats | null>(null);
+    const [charts, setCharts] = useState<AdminChartsPayload | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Executive Brief state
@@ -122,8 +167,17 @@ export default function AdminDashboardPage() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await adminFetch("/api/admin/stats");
-                if (res.ok) setStats(await res.json());
+                const [statsResponse, chartsResponse] = await Promise.all([
+                    adminFetch("/api/admin/stats"),
+                    adminFetch("/api/admin/stats/charts?period=30d"),
+                ]);
+
+                if (statsResponse.ok) {
+                    setStats(await statsResponse.json());
+                }
+                if (chartsResponse.ok) {
+                    setCharts(await chartsResponse.json());
+                }
             } catch (err) {
                 console.error("Failed to fetch admin stats:", err);
             } finally {
@@ -264,6 +318,137 @@ export default function AdminDashboardPage() {
                                 {(s?.aiUsage.monthCalls ?? 0).toLocaleString("fr-FR")}
                             </p>
                             <p className="text-xs text-surface-400 mt-1">appels Gemini</p>
+                        </motion.div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-12">
+                        <motion.div
+                            variants={itemVariants}
+                            className="bg-white dark:bg-surface-900 rounded-[2rem] border border-surface-200 dark:border-surface-800 shadow-sm overflow-hidden"
+                        >
+                            <div className="px-8 py-6 border-b border-surface-100 dark:border-surface-800 flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 className="text-lg font-black text-surface-900 dark:text-white uppercase tracking-tight">
+                                        Traction plateforme
+                                    </h3>
+                                    <p className="text-xs font-black text-surface-400 uppercase tracking-widest mt-1">
+                                        GMV · MRR encaissé · 30 derniers jours
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                                        {formatGrowth(charts?.summary.gmv.growthRate ?? 0)}
+                                    </p>
+                                    <p className="text-xs text-surface-400">
+                                        vs période précédente
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 px-8 pt-6">
+                                <div className="rounded-2xl bg-emerald-500/10 px-4 py-3">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                                        GMV période
+                                    </p>
+                                    <p className="text-xl font-black text-surface-900 dark:text-white mt-1">
+                                        {formatCompactCurrency(charts?.summary.gmv.current ?? 0)}
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl bg-violet-500/10 px-4 py-3">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-violet-700 dark:text-violet-300">
+                                        Revenu packs
+                                    </p>
+                                    <p className="text-xl font-black text-surface-900 dark:text-white mt-1">
+                                        {formatCompactCurrency(charts?.summary.subscriptionRevenue.current ?? 0)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="h-80 px-4 py-4">
+                                {charts ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={charts.series} margin={{ top: 10, right: 16, left: 8, bottom: 8 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                            <XAxis dataKey="label" stroke="#94a3b8" style={{ fontSize: "12px" }} />
+                                            <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} tickFormatter={(value: number) => `${Math.round(value / 1000)}k`} />
+                                            <Tooltip contentStyle={{ borderRadius: "16px", borderColor: "#e2e8f0" }} />
+                                            <Line type="monotone" dataKey="gmv" stroke="#10b981" strokeWidth={3} dot={false} name="gmv" />
+                                            <Line type="monotone" dataKey="subscriptionRevenue" stroke="#8b5cf6" strokeWidth={2} dot={false} name="subscriptionRevenue" />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="h-full animate-pulse rounded-[1.5rem] bg-surface-100 dark:bg-surface-800" />
+                                )}
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            variants={itemVariants}
+                            className="bg-white dark:bg-surface-900 rounded-[2rem] border border-surface-200 dark:border-surface-800 shadow-sm overflow-hidden"
+                        >
+                            <div className="px-8 py-6 border-b border-surface-100 dark:border-surface-800 flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 className="text-lg font-black text-surface-900 dark:text-white uppercase tracking-tight">
+                                        Activité & acquisition
+                                    </h3>
+                                    <p className="text-xs font-black text-surface-400 uppercase tracking-widest mt-1">
+                                        Commandes · onboarding · appels IA
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-black text-brand-500">
+                                        {formatGrowth(charts?.summary.orders.growthRate ?? 0)}
+                                    </p>
+                                    <p className="text-xs text-surface-400">
+                                        volume commandes
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3 px-8 pt-6">
+                                <div className="rounded-2xl bg-brand-500/10 px-4 py-3">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-brand-500">
+                                        Commandes
+                                    </p>
+                                    <p className="text-xl font-black text-surface-900 dark:text-white mt-1">
+                                        {(charts?.summary.orders.current ?? 0).toLocaleString("fr-FR")}
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl bg-blue-500/10 px-4 py-3">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-300">
+                                        Nouveaux restos
+                                    </p>
+                                    <p className="text-xl font-black text-surface-900 dark:text-white mt-1">
+                                        {(charts?.summary.newRestaurants.current ?? 0).toLocaleString("fr-FR")}
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl bg-amber-500/10 px-4 py-3">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-300">
+                                        Appels IA
+                                    </p>
+                                    <p className="text-xl font-black text-surface-900 dark:text-white mt-1">
+                                        {(charts?.summary.aiCalls.current ?? 0).toLocaleString("fr-FR")}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="h-80 px-4 py-4">
+                                {charts ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={charts.series} margin={{ top: 10, right: 16, left: 8, bottom: 8 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                            <XAxis dataKey="label" stroke="#94a3b8" style={{ fontSize: "12px" }} />
+                                            <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} />
+                                            <Tooltip contentStyle={{ borderRadius: "16px", borderColor: "#e2e8f0" }} />
+                                            <Bar dataKey="orders" fill="#f97316" radius={[8, 8, 0, 0]} name="orders" />
+                                            <Bar dataKey="newRestaurants" fill="#3b82f6" radius={[8, 8, 0, 0]} name="newRestaurants" />
+                                            <Bar dataKey="aiCalls" fill="#f59e0b" radius={[8, 8, 0, 0]} name="aiCalls" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="h-full animate-pulse rounded-[1.5rem] bg-surface-100 dark:bg-surface-800" />
+                                )}
+                            </div>
                         </motion.div>
                     </div>
 

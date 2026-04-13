@@ -12,6 +12,7 @@ import { adminSystemRoutes } from "./system";
 import { adminOrdersRoutes } from "./orders";
 import { adminCatalogRoutes } from "./catalog";
 import { adminMarketplaceRoutes } from "./marketplace";
+import { adminBackupRoutes } from "./backup";
 import { adminAiUsageRoutes } from "./ai-usage";
 import { adminSubscriptionsRoutes } from "./subscriptions";
 import { adminOnboardingRoutes } from "./onboarding";
@@ -20,6 +21,37 @@ import { adminCopilotRoutes } from "./copilot";
 import { createClient } from "@supabase/supabase-js";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+const CANCELLED_ORDER_STATUSES = new Set(["cancelled", "refunded"]);
+
+type ChartPeriod = "7d" | "30d" | "90d";
+
+function parseChartPeriod(raw: string | undefined): ChartPeriod {
+    if (raw === "7d" || raw === "90d") return raw;
+    return "30d";
+}
+
+function startOfUtcDay(date: Date): Date {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function addUtcDays(date: Date, days: number): Date {
+    const next = new Date(date);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next;
+}
+
+function toUtcDayKey(date: Date): string {
+    return date.toISOString().slice(0, 10);
+}
+
+function toLabel(date: Date): string {
+    return new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        timeZone: "UTC",
+    }).format(date);
+}
 
 adminRoutes.get("/profile", async (c) => {
     return c.json({
@@ -211,6 +243,196 @@ adminRoutes.get("/stats/segments", async (c) => {
     return c.json({ data: segments });
 });
 
+adminRoutes.get("/stats/charts", async (c) => {
+    const denied = requireDomain(c, "stats");
+    if (denied) return denied;
+
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const period = parseChartPeriod(c.req.query("period"));
+    const days = period === "7d" ? 7 : period === "90d" ? 90 : 30;
+
+    const now = new Date();
+    const currentStart = addUtcDays(startOfUtcDay(now), -(days - 1));
+    const previousStart = addUtcDays(currentStart, -days);
+
+    const [
+        ordersRes,
+        restaurantsRes,
+        aiUsageRes,
+        subscriptionsRes,
+    ] = await Promise.all([
+        supabase.from("orders")
+            .select("created_at, total, status")
+            .gte("created_at", previousStart.toISOString())
+            .order("created_at", { ascending: true })
+            .limit(50_000),
+        supabase.from("restaurants")
+            .select("created_at")
+            .gte("created_at", previousStart.toISOString())
+            .order("created_at", { ascending: true })
+            .limit(20_000),
+        supabase.from("ai_usage_logs")
+            .select("created_at")
+            .gte("created_at", previousStart.toISOString())
+            .order("created_at", { ascending: true })
+            .limit(50_000),
+        supabase.from("marketplace_purchases")
+            .select("created_at, amount_paid, status")
+            .gte("created_at", previousStart.toISOString())
+            .order("created_at", { ascending: true })
+            .limit(20_000),
+    ]);
+
+    if (ordersRes.error || restaurantsRes.error || aiUsageRes.error || subscriptionsRes.error) {
+        console.error("Admin charts query error:", {
+            orders: ordersRes.error,
+            restaurants: restaurantsRes.error,
+            aiUsage: aiUsageRes.error,
+            subscriptions: subscriptionsRes.error,
+        });
+        return c.json({ error: "Erreur lors du chargement des graphiques" }, 500);
+    }
+
+    const bucketMap = new Map<string, {
+        date: string;
+        label: string;
+        gmv: number;
+        orders: number;
+        newRestaurants: number;
+        aiCalls: number;
+        subscriptionRevenue: number;
+    }>();
+
+    for (let index = 0; index < days; index += 1) {
+        const day = addUtcDays(currentStart, index);
+        const key = toUtcDayKey(day);
+        bucketMap.set(key, {
+            date: key,
+            label: toLabel(day),
+            gmv: 0,
+            orders: 0,
+            newRestaurants: 0,
+            aiCalls: 0,
+            subscriptionRevenue: 0,
+        });
+    }
+
+    const currentTotals = {
+        gmv: 0,
+        orders: 0,
+        newRestaurants: 0,
+        aiCalls: 0,
+        subscriptionRevenue: 0,
+    };
+    const previousTotals = {
+        gmv: 0,
+        orders: 0,
+        newRestaurants: 0,
+        aiCalls: 0,
+        subscriptionRevenue: 0,
+    };
+
+    for (const order of ordersRes.data ?? []) {
+        const createdAt = new Date((order as { created_at: string }).created_at);
+        const total = Number((order as { total?: number | null }).total ?? 0);
+        const status = (order as { status?: string | null }).status ?? "";
+        const isCancelled = CANCELLED_ORDER_STATUSES.has(status);
+        const bucketKey = toUtcDayKey(startOfUtcDay(createdAt));
+        const isCurrent = createdAt >= currentStart;
+
+        if (isCurrent) {
+            const bucket = bucketMap.get(bucketKey);
+            if (bucket) {
+                bucket.orders += 1;
+                if (!isCancelled) bucket.gmv += total;
+            }
+            currentTotals.orders += 1;
+            if (!isCancelled) currentTotals.gmv += total;
+        } else {
+            previousTotals.orders += 1;
+            if (!isCancelled) previousTotals.gmv += total;
+        }
+    }
+
+    for (const restaurant of restaurantsRes.data ?? []) {
+        const createdAt = new Date((restaurant as { created_at: string }).created_at);
+        const bucketKey = toUtcDayKey(startOfUtcDay(createdAt));
+        if (createdAt >= currentStart) {
+            const bucket = bucketMap.get(bucketKey);
+            if (bucket) bucket.newRestaurants += 1;
+            currentTotals.newRestaurants += 1;
+        } else {
+            previousTotals.newRestaurants += 1;
+        }
+    }
+
+    for (const usage of aiUsageRes.data ?? []) {
+        const createdAt = new Date((usage as { created_at: string }).created_at);
+        const bucketKey = toUtcDayKey(startOfUtcDay(createdAt));
+        if (createdAt >= currentStart) {
+            const bucket = bucketMap.get(bucketKey);
+            if (bucket) bucket.aiCalls += 1;
+            currentTotals.aiCalls += 1;
+        } else {
+            previousTotals.aiCalls += 1;
+        }
+    }
+
+    for (const subscription of subscriptionsRes.data ?? []) {
+        const createdAt = new Date((subscription as { created_at: string }).created_at);
+        const amount = Number((subscription as { amount_paid?: number | null }).amount_paid ?? 0);
+        const status = (subscription as { status?: string | null }).status ?? "";
+        if (status !== "active") continue;
+
+        const bucketKey = toUtcDayKey(startOfUtcDay(createdAt));
+        if (createdAt >= currentStart) {
+            const bucket = bucketMap.get(bucketKey);
+            if (bucket) bucket.subscriptionRevenue += amount;
+            currentTotals.subscriptionRevenue += amount;
+        } else {
+            previousTotals.subscriptionRevenue += amount;
+        }
+    }
+
+    const growth = (current: number, previous: number) => {
+        if (previous <= 0) return current > 0 ? 100 : 0;
+        return Math.round(((current - previous) / previous) * 100);
+    };
+
+    return c.json({
+        period,
+        generatedAt: now.toISOString(),
+        series: Array.from(bucketMap.values()),
+        summary: {
+            gmv: {
+                current: Math.round(currentTotals.gmv),
+                previous: Math.round(previousTotals.gmv),
+                growthRate: growth(currentTotals.gmv, previousTotals.gmv),
+            },
+            orders: {
+                current: currentTotals.orders,
+                previous: previousTotals.orders,
+                growthRate: growth(currentTotals.orders, previousTotals.orders),
+            },
+            newRestaurants: {
+                current: currentTotals.newRestaurants,
+                previous: previousTotals.newRestaurants,
+                growthRate: growth(currentTotals.newRestaurants, previousTotals.newRestaurants),
+            },
+            aiCalls: {
+                current: currentTotals.aiCalls,
+                previous: previousTotals.aiCalls,
+                growthRate: growth(currentTotals.aiCalls, previousTotals.aiCalls),
+            },
+            subscriptionRevenue: {
+                current: Math.round(currentTotals.subscriptionRevenue),
+                previous: Math.round(previousTotals.subscriptionRevenue),
+                growthRate: growth(currentTotals.subscriptionRevenue, previousTotals.subscriptionRevenue),
+            },
+        },
+    });
+});
+
 // Mount the sub-routes
 adminRoutes.route("/users", adminUsersRoutes);
 adminRoutes.route("/restaurants", adminRestaurantsRoutes);
@@ -220,6 +442,7 @@ adminRoutes.route("/billing", adminBillingRoutes);
 adminRoutes.route("/moderation", adminModerationRoutes);
 adminRoutes.route("/marketing", adminMarketingRoutes);
 adminRoutes.route("/system", adminSystemRoutes);
+adminRoutes.route("/backup", adminBackupRoutes);
 adminRoutes.route("/orders", adminOrdersRoutes);
 adminRoutes.route("/catalog", adminCatalogRoutes);
 adminRoutes.route("/marketplace", adminMarketplaceRoutes);

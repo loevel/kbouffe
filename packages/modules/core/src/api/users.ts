@@ -234,10 +234,11 @@ usersRoutes.patch("/profile", async (c) => {
 
     if (error) {
         console.error("[PATCH /account/profile] Update failed for user", userId, error);
+        const isDevelopment = (c.env as { ENVIRONMENT?: string }).ENVIRONMENT === "development";
         return c.json({
             error: error.message,
             code: error.code,
-            details: process.env.ENVIRONMENT === 'development' ? error.details : undefined
+            details: isDevelopment ? error.details : undefined
         }, 500);
     }
 
@@ -686,8 +687,9 @@ usersRoutes.get("/offers", async (c) => {
         description: string | null;
         expires_at: string | null;
         restaurant_id: string | null;
-        restaurants: { name: string; slug: string } | null;
+        restaurants: { name: string; slug: string }[] | null;
     }) => {
+        const restaurant = Array.isArray(c.restaurants) ? c.restaurants[0] ?? null : c.restaurants;
         const kind = c.kind === 'percent' ? 'percentage' : (c.kind ?? 'percentage');
         let displayValue = '';
         if (kind === 'percentage') displayValue = `${c.value ?? 0}%`;
@@ -705,8 +707,8 @@ usersRoutes.get("/offers", async (c) => {
             code: c.code,
             expiresAt: c.expires_at,
             restaurantId: c.restaurant_id,
-            restaurantName: c.restaurants?.name ?? null,
-            restaurantSlug: c.restaurants?.slug ?? null,
+            restaurantName: restaurant?.name ?? null,
+            restaurantSlug: restaurant?.slug ?? null,
             minOrderAmount: c.min_order,
         };
     });

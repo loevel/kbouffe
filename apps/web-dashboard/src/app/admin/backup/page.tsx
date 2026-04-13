@@ -22,9 +22,51 @@ import {
     AlertTriangle,
     Info,
 } from "lucide-react";
-import { adminFetch } from "@kbouffe/module-core/ui";
+import { adminFetch, toast } from "@kbouffe/module-core/ui";
 
 type TableStat = { table: string; count: number | null };
+
+type BackupJob = {
+    id: string;
+    tables: string[];
+    format: "json" | "csv";
+    status: string;
+    dateFrom: string | null;
+    dateTo: string | null;
+    rowCount: number;
+    fileName: string | null;
+    fileSizeBytes: number;
+    errorMessage: string | null;
+    createdAt: string;
+    completedAt: string | null;
+};
+
+type RestoreRequest = {
+    id: string;
+    backupJobId: string | null;
+    restoreScope: string;
+    sourceReference: string | null;
+    reason: string;
+    status: string;
+    reviewNotes: string | null;
+    createdAt: string;
+    updatedAt: string;
+    reviewedAt: string | null;
+};
+
+type BackupStatsResponse = {
+    tables?: TableStat[];
+    total_rows?: number;
+    checked_at?: string | null;
+};
+
+type BackupHistoryResponse = {
+    jobs?: BackupJob[];
+};
+
+type RestoreRequestsResponse = {
+    requests?: RestoreRequest[];
+};
 
 const TABLE_ICONS: Record<string, any> = {
     restaurants: Store,
@@ -56,13 +98,40 @@ const TABLE_LABELS: Record<string, string> = {
     social_posts: "Publications sociales",
 };
 
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) return fallback;
+
+    const payload = await response.json() as { error?: string };
+    return payload.error ?? fallback;
+}
+
+function formatFileSize(value: number): string {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} MB`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)} KB`;
+    return `${value} B`;
+}
+
+function statusClassName(status: string): string {
+    if (status === "completed" || status === "approved") {
+        return "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-300";
+    }
+    if (status === "failed" || status === "rejected" || status === "cancelled") {
+        return "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300";
+    }
+    return "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300";
+}
+
 export default function AdminBackupPage() {
     const [stats, setStats] = useState<TableStat[]>([]);
     const [totalRows, setTotalRows] = useState(0);
     const [checkedAt, setCheckedAt] = useState<string | null>(null);
     const [loadingStats, setLoadingStats] = useState(true);
+    const [statsError, setStatsError] = useState<string | null>(null);
+    const [history, setHistory] = useState<BackupJob[]>([]);
+    const [restoreRequests, setRestoreRequests] = useState<RestoreRequest[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(true);
 
-    // Export config
     const [selectedTables, setSelectedTables] = useState<string[]>(["all"]);
     const [format, setFormat] = useState<"json" | "csv">("json");
     const [fromDate, setFromDate] = useState("");
@@ -70,53 +139,100 @@ export default function AdminBackupPage() {
     const [downloading, setDownloading] = useState(false);
     const [lastExport, setLastExport] = useState<string | null>(null);
 
+    const [restoreScope, setRestoreScope] = useState<"full" | "orders" | "catalog" | "users" | "other">("orders");
+    const [restoreReason, setRestoreReason] = useState("");
+    const [restoreSourceReference, setRestoreSourceReference] = useState("");
+    const [submittingRestore, setSubmittingRestore] = useState(false);
+
     const fetchStats = useCallback(async () => {
         setLoadingStats(true);
+        setStatsError(null);
+
         try {
-            const res = await adminFetch("/api/admin/backup/stats");
-            const data = await res.json();
-            setStats(data.tables ?? []);
-            setTotalRows(data.total_rows ?? 0);
-            setCheckedAt(data.checked_at ?? null);
-        } catch {
-            // silent
+            const response = await adminFetch("/api/admin/backup/stats");
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response, "Impossible de charger l'état des sauvegardes"));
+            }
+
+            const payload = await response.json() as BackupStatsResponse;
+            setStats(payload.tables ?? []);
+            setTotalRows(payload.total_rows ?? 0);
+            setCheckedAt(payload.checked_at ?? null);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Impossible de charger l'état des sauvegardes";
+            setStatsError(message);
+            toast.error(message);
         } finally {
             setLoadingStats(false);
         }
     }, []);
 
-    useEffect(() => { fetchStats(); }, [fetchStats]);
+    const fetchHistory = useCallback(async () => {
+        setLoadingHistory(true);
 
-    const allTableNames = stats.map(s => s.table);
+        try {
+            const [historyResponse, restoreResponse] = await Promise.all([
+                adminFetch("/api/admin/backup/history?limit=8"),
+                adminFetch("/api/admin/backup/restore-requests?limit=6"),
+            ]);
+
+            if (!historyResponse.ok) {
+                throw new Error(await readErrorMessage(historyResponse, "Impossible de charger l'historique des exports"));
+            }
+            if (!restoreResponse.ok) {
+                throw new Error(await readErrorMessage(restoreResponse, "Impossible de charger les demandes de restauration"));
+            }
+
+            const historyPayload = await historyResponse.json() as BackupHistoryResponse;
+            const restorePayload = await restoreResponse.json() as RestoreRequestsResponse;
+
+            setHistory(historyPayload.jobs ?? []);
+            setRestoreRequests(restorePayload.requests ?? []);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Impossible de charger l'historique";
+            toast.error(message);
+        } finally {
+            setLoadingHistory(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void fetchStats();
+        void fetchHistory();
+    }, [fetchStats, fetchHistory]);
+
+    const allTableNames = stats.map((item) => item.table);
 
     const toggleTable = (table: string) => {
         if (table === "all") {
             setSelectedTables(["all"]);
             return;
         }
-        setSelectedTables(prev => {
-            const without = prev.filter(t => t !== "all");
-            if (without.includes(table)) {
-                const next = without.filter(t => t !== table);
+
+        setSelectedTables((previous) => {
+            const withoutAll = previous.filter((value) => value !== "all");
+            if (withoutAll.includes(table)) {
+                const next = withoutAll.filter((value) => value !== table);
                 return next.length === 0 ? ["all"] : next;
             }
-            const next = [...without, table];
+
+            const next = [...withoutAll, table];
             return next.length === allTableNames.length ? ["all"] : next;
         });
     };
 
-    const effectiveTables =
-        selectedTables.includes("all")
-            ? "all"
-            : selectedTables.join(",");
+    const effectiveTables = selectedTables.includes("all")
+        ? "all"
+        : selectedTables.join(",");
 
     const handleExport = async () => {
         if (format === "csv" && !selectedTables.includes("all") && selectedTables.length !== 1) {
-            alert("Le format CSV ne supporte qu'une seule table. Sélectionnez une table ou passez en JSON.");
+            toast.error("Le format CSV ne supporte qu'une seule table. Sélectionnez une table ou passez en JSON.");
             return;
         }
 
         setDownloading(true);
+
         try {
             const params = new URLSearchParams({
                 tables: effectiveTables,
@@ -125,36 +241,72 @@ export default function AdminBackupPage() {
                 ...(toDate && { to: toDate }),
             });
 
-            const res = await adminFetch(`/api/admin/backup/export?${params}`);
-            if (!res.ok) {
-                const err = await res.json();
-                alert(err.error ?? "Erreur lors de l'export");
-                return;
+            const response = await adminFetch(`/api/admin/backup/export?${params.toString()}`);
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response, "Erreur lors de l'export"));
             }
 
-            const disposition = res.headers.get("Content-Disposition") ?? "";
+            const disposition = response.headers.get("Content-Disposition") ?? "";
             const match = disposition.match(/filename="([^"]+)"/);
             const filename = match?.[1] ?? `kbouffe-backup.${format}`;
 
-            const blob = await res.blob();
+            const blob = await response.blob();
             const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = filename;
-            a.click();
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = filename;
+            anchor.click();
             URL.revokeObjectURL(url);
 
             setLastExport(new Date().toLocaleString("fr-FR"));
-        } catch {
-            alert("Erreur de connexion. Réessayez.");
+            toast.success("Export généré avec succès");
+            void fetchStats();
+            void fetchHistory();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Erreur de connexion. Réessayez.";
+            toast.error(message);
         } finally {
             setDownloading(false);
         }
     };
 
+    const handleCreateRestoreRequest = async () => {
+        if (restoreReason.trim().length < 10) {
+            toast.error("Décrivez la raison de restauration en au moins 10 caractères.");
+            return;
+        }
+
+        setSubmittingRestore(true);
+
+        try {
+            const response = await adminFetch("/api/admin/backup/restore-requests", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    restore_scope: restoreScope,
+                    reason: restoreReason.trim(),
+                    source_reference: restoreSourceReference.trim() || undefined,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response, "Impossible d'enregistrer la demande de restauration"));
+            }
+
+            setRestoreReason("");
+            setRestoreSourceReference("");
+            toast.success("Demande de restauration enregistrée");
+            void fetchHistory();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Impossible d'enregistrer la demande";
+            toast.error(message);
+        } finally {
+            setSubmittingRestore(false);
+        }
+    };
+
     return (
         <div className="space-y-8 max-w-5xl pb-16">
-            {/* Header */}
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-surface-900 dark:text-white flex items-center gap-3">
@@ -164,28 +316,29 @@ export default function AdminBackupPage() {
                         Backup & Export des données
                     </h1>
                     <p className="text-surface-500 dark:text-surface-400 mt-1">
-                        Exportez tout ou partie des données de la plateforme kBouffe au format JSON ou CSV.
+                        Exportez, historisez et préparez les restaurations sensibles depuis l&apos;interface admin.
                     </p>
                 </div>
                 <button
                     type="button"
-                    onClick={fetchStats}
-                    disabled={loadingStats}
+                    onClick={() => {
+                        void fetchStats();
+                        void fetchHistory();
+                    }}
+                    disabled={loadingStats || loadingHistory}
                     className="p-2 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                 >
-                    <RefreshCw size={16} className={loadingStats ? "animate-spin" : ""} />
+                    <RefreshCw size={16} className={loadingStats || loadingHistory ? "animate-spin" : ""} />
                 </button>
             </div>
 
-            {/* Warning */}
             <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
                 <ShieldAlert size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-amber-700 dark:text-amber-300">
-                    <strong>Données sensibles :</strong> les fichiers exportés contiennent des informations personnelles (emails, adresses, commandes). Ne pas partager ces fichiers. Stockez-les dans un emplacement sécurisé.
+                    <strong>Données sensibles :</strong> les fichiers exportés contiennent des informations personnelles. Ne partagez pas ces snapshots et stockez-les hors-ligne dans un coffre sécurisé.
                 </div>
             </div>
 
-            {/* Table stats */}
             <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
                 <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800 flex items-center justify-between">
                     <h2 className="font-semibold text-surface-900 dark:text-white flex items-center gap-2">
@@ -203,10 +356,15 @@ export default function AdminBackupPage() {
                         )}
                     </div>
                 </div>
+                {statsError && (
+                    <div className="px-6 py-3 border-b border-red-100 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 text-sm text-red-700 dark:text-red-300">
+                        {statsError}
+                    </div>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 divide-x divide-y divide-surface-100 dark:divide-surface-800">
                     {loadingStats
-                        ? Array.from({ length: 12 }).map((_, i) => (
-                            <div key={i} className="p-4 animate-pulse">
+                        ? Array.from({ length: 12 }).map((_, index) => (
+                            <div key={index} className="p-4 animate-pulse">
                                 <div className="h-4 bg-surface-100 dark:bg-surface-800 rounded w-24 mb-2" />
                                 <div className="h-6 bg-surface-100 dark:bg-surface-800 rounded w-16" />
                             </div>
@@ -230,17 +388,161 @@ export default function AdminBackupPage() {
                 </div>
             </div>
 
-            {/* Export configurator */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800 flex items-center justify-between">
+                        <h2 className="font-semibold text-surface-900 dark:text-white">Exports récents</h2>
+                        <span className="text-xs text-surface-400 uppercase tracking-widest">Historique</span>
+                    </div>
+                    <div className="divide-y divide-surface-100 dark:divide-surface-800">
+                        {loadingHistory ? (
+                            Array.from({ length: 4 }).map((_, index) => (
+                                <div key={index} className="p-4 animate-pulse">
+                                    <div className="h-4 w-40 rounded bg-surface-100 dark:bg-surface-800 mb-2" />
+                                    <div className="h-3 w-28 rounded bg-surface-100 dark:bg-surface-800" />
+                                </div>
+                            ))
+                        ) : history.length === 0 ? (
+                            <div className="p-6 text-sm text-surface-500 dark:text-surface-400">
+                                Aucun export enregistré pour le moment.
+                            </div>
+                        ) : history.map((job) => (
+                            <div key={job.id} className="p-4 space-y-2">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p className="font-medium text-surface-900 dark:text-white">
+                                            {job.fileName ?? `Export ${job.format.toUpperCase()}`}
+                                        </p>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                                            {job.tables.length === allTableNames.length ? "Toutes les tables" : job.tables.join(", ")}
+                                        </p>
+                                    </div>
+                                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize ${statusClassName(job.status)}`}>
+                                        {job.status}
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-surface-500 dark:text-surface-400">
+                                    <span>{job.rowCount.toLocaleString("fr-FR")} lignes</span>
+                                    <span>{formatFileSize(job.fileSizeBytes)}</span>
+                                    <span>{new Date(job.createdAt).toLocaleString("fr-FR")}</span>
+                                </div>
+                                {job.errorMessage && (
+                                    <p className="text-xs text-red-600 dark:text-red-400">{job.errorMessage}</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800">
+                        <h2 className="font-semibold text-surface-900 dark:text-white">Demandes de restauration</h2>
+                        <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
+                            Chaque restauration doit être justifiée, validée et exécutée manuellement.
+                        </p>
+                    </div>
+                    <div className="p-6 space-y-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                                    Périmètre
+                                </label>
+                                <select
+                                    value={restoreScope}
+                                    onChange={(event) => setRestoreScope(event.target.value as "full" | "orders" | "catalog" | "users" | "other")}
+                                    className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="orders">Commandes</option>
+                                    <option value="catalog">Catalogue</option>
+                                    <option value="users">Utilisateurs</option>
+                                    <option value="full">Plateforme complète</option>
+                                    <option value="other">Autre</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                                    Référence source
+                                </label>
+                                <input
+                                    type="text"
+                                    value={restoreSourceReference}
+                                    onChange={(event) => setRestoreSourceReference(event.target.value)}
+                                    placeholder="Ex: backup JSON 2026-04-16 ou fenêtre PITR 09:30"
+                                    className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                                Raison métier / incident
+                            </label>
+                            <textarea
+                                value={restoreReason}
+                                onChange={(event) => setRestoreReason(event.target.value)}
+                                rows={4}
+                                placeholder="Décrivez précisément l'incident, les données impactées et la fenêtre de restauration attendue."
+                                className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        </div>
+
+                        <button
+                            type="button"
+                            disabled={submittingRestore}
+                            onClick={handleCreateRestoreRequest}
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-900 dark:bg-white text-white dark:text-surface-900 font-semibold text-sm transition-colors disabled:opacity-60"
+                        >
+                            {submittingRestore ? <Loader2 size={16} className="animate-spin" /> : <ShieldAlert size={16} />}
+                            Créer une demande de restauration
+                        </button>
+
+                        <div className="space-y-3 pt-2">
+                            {restoreRequests.length === 0 ? (
+                                <p className="text-sm text-surface-500 dark:text-surface-400">
+                                    Aucune demande en cours.
+                                </p>
+                            ) : restoreRequests.map((request) => (
+                                <div key={request.id} className="rounded-xl border border-surface-200 dark:border-surface-800 p-4 space-y-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-medium text-surface-900 dark:text-white capitalize">
+                                                {request.restoreScope.replace("_", " ")}
+                                            </p>
+                                            <p className="text-xs text-surface-500 dark:text-surface-400">
+                                                {new Date(request.createdAt).toLocaleString("fr-FR")}
+                                            </p>
+                                        </div>
+                                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize ${statusClassName(request.status)}`}>
+                                            {request.status}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-surface-600 dark:text-surface-400">{request.reason}</p>
+                                    {request.sourceReference && (
+                                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                                            Source : {request.sourceReference}
+                                        </p>
+                                    )}
+                                    {request.reviewNotes && (
+                                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                                            Note de revue : {request.reviewNotes}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
                 <div className="px-6 py-4 border-b border-surface-100 dark:border-surface-800">
                     <h2 className="font-semibold text-surface-900 dark:text-white flex items-center gap-2">
                         <Download size={16} className="text-indigo-500" />
-                        Configurer l'export
+                        Configurer l&apos;export
                     </h2>
                 </div>
 
                 <div className="p-6 space-y-6">
-                    {/* Table selection */}
                     <div>
                         <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">
                             Tables à exporter
@@ -257,9 +559,10 @@ export default function AdminBackupPage() {
                             >
                                 Toutes ({allTableNames.length})
                             </button>
-                            {allTableNames.map(table => {
+                            {allTableNames.map((table) => {
                                 const selected = selectedTables.includes("all") || selectedTables.includes(table);
                                 const Icon = TABLE_ICONS[table] ?? Database;
+
                                 return (
                                     <button
                                         key={table}
@@ -279,7 +582,6 @@ export default function AdminBackupPage() {
                         </div>
                     </div>
 
-                    {/* Format + Date range */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
@@ -319,25 +621,24 @@ export default function AdminBackupPage() {
                             <input
                                 type="date"
                                 value={fromDate}
-                                onChange={e => setFromDate(e.target.value)}
+                                onChange={(event) => setFromDate(event.target.value)}
                                 className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                                <span className="flex items-center gap-1.5"><Calendar size={13} /> Jusqu'au</span>
+                                <span className="flex items-center gap-1.5"><Calendar size={13} /> Jusqu&apos;au</span>
                             </label>
                             <input
                                 type="date"
                                 value={toDate}
-                                onChange={e => setToDate(e.target.value)}
+                                onChange={(event) => setToDate(event.target.value)}
                                 className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2.5 text-sm text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
                     </div>
 
-                    {/* Summary */}
                     <div className="flex items-start gap-3 p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700">
                         <Info size={16} className="text-surface-400 flex-shrink-0 mt-0.5" />
                         <div className="text-sm text-surface-600 dark:text-surface-400">
@@ -354,7 +655,6 @@ export default function AdminBackupPage() {
                         </div>
                     </div>
 
-                    {/* Download button */}
                     <button
                         type="button"
                         onClick={handleExport}
@@ -383,7 +683,6 @@ export default function AdminBackupPage() {
                 </div>
             </div>
 
-            {/* Disaster recovery info */}
             <div className="bg-gradient-to-br from-surface-900 to-black rounded-2xl p-8 text-white space-y-4">
                 <div className="flex items-center gap-2 text-indigo-400">
                     <ShieldAlert size={18} />
@@ -395,25 +694,25 @@ export default function AdminBackupPage() {
                         {
                             level: "Niveau 1",
                             title: "Supabase PITR",
-                            desc: "Point-in-time recovery automatique (plan Pro). Restauration jusqu'à 7 jours en arrière.",
+                            desc: "Point-in-time recovery automatique. Restauration jusqu'à 7 jours en arrière après validation.",
                             color: "border-green-500/30 bg-green-500/5",
                             badge: "Automatique",
                             badgeColor: "bg-green-500/20 text-green-300",
                         },
                         {
                             level: "Niveau 2",
-                            title: "Export manuel",
-                            desc: "Cet outil. Téléchargez un snapshot JSON complet à tout moment. Stockez hors-ligne.",
+                            title: "Exports historisés",
+                            desc: "Chaque export est tracé côté backend avec volume, statut et fichier généré.",
                             color: "border-indigo-500/30 bg-indigo-500/5",
-                            badge: "Manuel",
+                            badge: "Actif",
                             badgeColor: "bg-indigo-500/20 text-indigo-300",
                         },
                         {
                             level: "Niveau 3",
-                            title: "Archive D1 Cloudflare",
-                            desc: "Audit logs archivés automatiquement dans Cloudflare D1 — immuable et séparé.",
+                            title: "Workflow de restauration",
+                            desc: "Demandes formalisées, revues et auditées avant toute intervention manuelle en production.",
                             color: "border-orange-500/30 bg-orange-500/5",
-                            badge: "Bientôt",
+                            badge: "Contrôlé",
                             badgeColor: "bg-orange-500/20 text-orange-300",
                         },
                     ].map(({ level, title, desc, color, badge, badgeColor }) => (

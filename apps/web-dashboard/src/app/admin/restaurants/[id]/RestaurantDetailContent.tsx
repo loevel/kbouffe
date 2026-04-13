@@ -80,12 +80,33 @@ interface RestaurantDetail {
     // KYC Fields
     kycNiu: string | null;
     kycRccm: string | null;
-    kycNiuUrl: string | null;
-    kycRccmUrl: string | null;
-    kycIdUrl: string | null;
-    kycStatus: "pending" | "approved" | "rejected";
+    kycDocuments?: {
+        niu: boolean;
+        rccm: boolean;
+        id: boolean;
+    };
+    kycStatus: "pending" | "approved" | "rejected" | "documents_submitted" | "incomplete" | "submitted";
     kycRejectionReason: string | null;
     kycSubmittedAt: string | null;
+    complianceStatus?: "pending" | "in_review" | "compliant" | "blocked";
+    complianceBlockReason?: string | null;
+    requiredLicenses?: number;
+    verifiedLicenses?: number;
+    canPublish?: boolean;
+    licenses?: Array<{
+        id: string;
+        licenseType: string;
+        licenseNumber: string;
+        issuingAuthority: string;
+        status: "pending" | "verified" | "rejected" | "expired";
+        requiredForPublication: boolean;
+        evidenceUrl: string | null;
+        notes: string | null;
+        expiresAt: string | null;
+        verifiedAt: string | null;
+        verifiedBy: string | null;
+        isExpired: boolean;
+    }>;
 }
 
 interface TeamMember {
@@ -133,6 +154,8 @@ export default function AdminRestaurantDetailPage() {
     const [togglingModule, setTogglingModule] = useState<string | null>(null);
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
+    const [licenses, setLicenses] = useState<NonNullable<RestaurantDetail["licenses"]>>([]);
+    const [loadingLicenses, setLoadingLicenses] = useState(false);
 
     // IA & Packs state
     type PacksUsageData = {
@@ -161,6 +184,21 @@ export default function AdminRestaurantDetailPage() {
                     const data = await res.json();
                     setRestaurant(data);
                     setEditForm(data);
+                }
+
+                setLoadingLicenses(true);
+                const licRes = await adminFetch(`/api/admin/restaurants/${id}/licenses`);
+                if (licRes.ok) {
+                    const data = await licRes.json();
+                    const initialLicenses = (data.licenses && data.licenses.length > 0)
+                        ? data.licenses
+                        : [
+                            { id: "draft-rccm", licenseType: "rccm", licenseNumber: "", issuingAuthority: "Greffe / RCCM", status: "pending", requiredForPublication: true, evidenceUrl: null, notes: null, expiresAt: null, verifiedAt: null, verifiedBy: null, isExpired: false },
+                            { id: "draft-niu", licenseType: "niu", licenseNumber: "", issuingAuthority: "DGI", status: "pending", requiredForPublication: true, evidenceUrl: null, notes: null, expiresAt: null, verifiedAt: null, verifiedBy: null, isExpired: false },
+                            { id: "draft-sanitary", licenseType: "sanitary", licenseNumber: "", issuingAuthority: "MINSANTE", status: "pending", requiredForPublication: true, evidenceUrl: null, notes: null, expiresAt: null, verifiedAt: null, verifiedBy: null, isExpired: false },
+                        ];
+                    setLicenses(initialLicenses as NonNullable<RestaurantDetail["licenses"]>);
+                    setRestaurant((prev) => prev ? { ...prev, licenses: initialLicenses as NonNullable<RestaurantDetail["licenses"]>, complianceStatus: data.compliance?.status, complianceBlockReason: data.compliance?.blockReason, canPublish: data.compliance?.canPublish, requiredLicenses: data.compliance?.requiredLicenses, verifiedLicenses: data.compliance?.verifiedLicenses } : prev);
                 }
 
                 // Fetch members
@@ -194,6 +232,7 @@ export default function AdminRestaurantDetailPage() {
                 setLoadingMembers(false);
                 setLoadingModules(false);
                 setLoadingPacksUsage(false);
+                setLoadingLicenses(false);
             }
         })();
     }, [id]);
@@ -238,7 +277,8 @@ export default function AdminRestaurantDetailPage() {
                 }
                 toast.success("Mise à jour réussie");
             } else {
-                toast.error("Échec de la mise à jour");
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.error || "Échec de la mise à jour");
             }
         } catch (err) {
             toast.error("Une erreur est survenue");
@@ -296,6 +336,66 @@ export default function AdminRestaurantDetailPage() {
 
     const toggleField = (field: string, value: boolean) => {
         updateRestaurant({ [field]: value });
+    };
+
+    const openKycDocument = async (documentType: "niu" | "rccm" | "id") => {
+        try {
+            const res = await adminFetch(`/api/admin/restaurants/${id}/kyc/documents/${documentType}`);
+            if (!res.ok) {
+                toast.error("Document indisponible");
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, "_blank", "noopener,noreferrer");
+            setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        } catch {
+            toast.error("Impossible d'ouvrir le document");
+        }
+    };
+
+    const saveLicenses = async () => {
+        if (!licenses?.length) return;
+        setToggling(true);
+        try {
+            const res = await adminFetch(`/api/admin/restaurants/${id}/licenses`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    licenses: licenses.map((license) => ({
+                        license_type: license.licenseType,
+                        license_number: license.licenseNumber,
+                        issuing_authority: license.issuingAuthority,
+                        status: license.status,
+                        required_for_publication: license.requiredForPublication,
+                        evidence_url: license.evidenceUrl || null,
+                        notes: license.notes || null,
+                        expires_at: license.expiresAt || null,
+                    })),
+                }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setLicenses(data.licenses || []);
+                setRestaurant((prev) => prev ? { ...prev, licenses: data.licenses || [], complianceStatus: data.compliance?.status, complianceBlockReason: data.compliance?.blockReason, canPublish: data.compliance?.canPublish } : prev);
+                toast.success("Licences enregistrées");
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.error || "Échec de l'enregistrement");
+            }
+        } catch {
+            toast.error("Une erreur est survenue");
+        } finally {
+            setToggling(false);
+        }
+    };
+
+    const updateLicense = (licenseType: string, field: string, value: string | boolean) => {
+        setLicenses((prev = []) => prev.map((license) => {
+            if (license.licenseType !== licenseType) return license;
+            return { ...license, [field]: value } as NonNullable<RestaurantDetail["licenses"]>[number];
+        }));
     };
 
     const handleVerify = () => {
@@ -382,6 +482,10 @@ export default function AdminRestaurantDetailPage() {
         switch (status) {
             case "approved": return <Badge variant="success" className="gap-1.5 px-3 py-1"><CheckCircle size={14} /> Vérifié</Badge>;
             case "rejected": return <Badge variant="danger" className="gap-1.5 px-3 py-1"><XCircle size={14} /> Rejeté</Badge>;
+            case "documents_submitted":
+            case "submitted":
+            case "incomplete":
+                return <Badge variant="warning" className="gap-1.5 px-3 py-1"><Clock size={14} /> En revue</Badge>;
             default: return <Badge variant="warning" className="gap-1.5 px-3 py-1 animate-pulse"><Clock size={14} /> En attente</Badge>;
         }
     };
@@ -815,6 +919,23 @@ export default function AdminRestaurantDetailPage() {
                         </div>
 
                         <div className="p-6 md:p-8 space-y-8">
+                            <div className="p-4 rounded-2xl border border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/40 flex flex-col gap-2">
+                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-surface-500">État de conformité</p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <Badge variant={r.complianceStatus === "compliant" ? "success" : r.complianceStatus === "blocked" ? "danger" : "warning"} className="text-[10px]">
+                                            {r.complianceStatus === "compliant" ? "Conforme" : r.complianceStatus === "blocked" ? "Bloqué" : "En revue"}
+                                        </Badge>
+                                        <span className="text-xs text-surface-500">
+                                            {r.verifiedLicenses ?? 0}/{r.requiredLicenses ?? 0} licences vérifiées
+                                        </span>
+                                    </div>
+                                </div>
+                                {r.complianceBlockReason && (
+                                    <p className="text-xs text-amber-700 dark:text-amber-300">{r.complianceBlockReason}</p>
+                                )}
+                            </div>
+
                             {/* Document Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* NIU */}
@@ -825,15 +946,14 @@ export default function AdminRestaurantDetailPage() {
                                     </div>
                                     <div className="p-4 rounded-2xl bg-surface-50 dark:bg-surface-800/50 border border-surface-100 dark:border-surface-800 group-hover:border-brand-500/20 transition-colors">
                                         <p className="text-base font-mono font-bold text-surface-900 dark:text-white mb-3">{r.kycNiu || "Non spécifié"}</p>
-                                        {r.kycNiuUrl ? (
-                                            <a 
-                                                href={r.kycNiuUrl} 
-                                                target="_blank" 
-                                                rel="noreferrer" 
+                                        {r.kycDocuments?.niu ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => openKycDocument("niu")}
                                                 className="flex items-center gap-2 text-xs font-semibold text-brand-500 hover:text-brand-600 bg-brand-500/10 dark:bg-brand-500/5 px-3 py-2 rounded-xl transition-all w-fit"
                                             >
                                                 <ExternalLink size={14} /> Voir le certificat
-                                            </a>
+                                            </button>
                                         ) : (
                                             <div className="flex items-center gap-2 text-xs text-surface-400 italic">
                                                 <Info size={12} /> Document manquant
@@ -850,15 +970,14 @@ export default function AdminRestaurantDetailPage() {
                                     </div>
                                     <div className="p-4 rounded-2xl bg-surface-50 dark:bg-surface-800/50 border border-surface-100 dark:border-surface-800 group-hover:border-brand-500/20 transition-colors">
                                         <p className="text-base font-mono font-bold text-surface-900 dark:text-white mb-3">{r.kycRccm || "Non spécifié"}</p>
-                                        {r.kycRccmUrl ? (
-                                            <a 
-                                                href={r.kycRccmUrl} 
-                                                target="_blank" 
-                                                rel="noreferrer" 
+                                        {r.kycDocuments?.rccm ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => openKycDocument("rccm")}
                                                 className="flex items-center gap-2 text-xs font-semibold text-brand-500 hover:text-brand-600 bg-brand-500/10 dark:bg-brand-500/5 px-3 py-2 rounded-xl transition-all w-fit"
                                             >
                                                 <ExternalLink size={14} /> Voir l'extrait RCCM
-                                            </a>
+                                            </button>
                                         ) : (
                                             <div className="flex items-center gap-2 text-xs text-surface-400 italic">
                                                 <Info size={12} /> Document manquant
@@ -883,19 +1002,94 @@ export default function AdminRestaurantDetailPage() {
                                                 <p className="text-[10px] text-surface-500">Doit correspondre au nom du propriétaire du compte</p>
                                             </div>
                                         </div>
-                                        {r.kycIdUrl ? (
-                                            <a 
-                                                href={r.kycIdUrl} 
-                                                target="_blank" 
-                                                rel="noreferrer" 
+                                        {r.kycDocuments?.id ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => openKycDocument("id")}
                                                 className="flex items-center gap-2 text-xs font-semibold text-brand-500 hover:text-brand-600 bg-brand-500/10 dark:bg-brand-500/5 px-4 py-2 rounded-xl transition-all"
                                             >
                                                 Inspecter <ChevronRight size={14} />
-                                            </a>
+                                            </button>
                                         ) : (
                                             <span className="text-xs text-surface-400 bg-surface-100 dark:bg-surface-800 px-3 py-1 rounded-full">En attente</span>
                                         )}
                                     </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 rounded-2xl border border-surface-100 dark:border-surface-800 bg-white dark:bg-surface-900 space-y-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-surface-900 dark:text-white">Licences restaurant</h4>
+                                        <p className="text-xs text-surface-500">Capture structurée des licences requises avant publication</p>
+                                    </div>
+                                    <Button size="sm" onClick={saveLicenses} disabled={toggling || loadingLicenses} className="rounded-xl">
+                                        {loadingLicenses ? "Chargement..." : "Enregistrer les licences"}
+                                    </Button>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4">
+                                    {(licenses ?? []).map((license) => (
+                                        <div key={license.id} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 rounded-2xl bg-surface-50 dark:bg-surface-800/40 border border-surface-100 dark:border-surface-800">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] uppercase font-bold text-surface-400">Type</label>
+                                                <input value={license.licenseType.toUpperCase()} disabled className="w-full px-3 py-2 rounded-xl bg-surface-100 dark:bg-surface-800 text-sm font-bold" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] uppercase font-bold text-surface-400">Numéro</label>
+                                                <input
+                                                    value={license.licenseNumber}
+                                                    onChange={(e) => updateLicense(license.licenseType, "licenseNumber", e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm"
+                                                    placeholder="Numéro de licence"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] uppercase font-bold text-surface-400">Autorité</label>
+                                                <input
+                                                    value={license.issuingAuthority}
+                                                    onChange={(e) => updateLicense(license.licenseType, "issuingAuthority", e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm"
+                                                    placeholder="Autorité émettrice"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] uppercase font-bold text-surface-400">Statut</label>
+                                                <select
+                                                    value={license.status}
+                                                    onChange={(e) => updateLicense(license.licenseType, "status", e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm"
+                                                >
+                                                    <option value="pending">En attente</option>
+                                                    <option value="verified">Vérifiée</option>
+                                                    <option value="rejected">Rejetée</option>
+                                                    <option value="expired">Expirée</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1 md:col-span-2">
+                                                <label className="text-[10px] uppercase font-bold text-surface-400">Expiration</label>
+                                                <input
+                                                    type="date"
+                                                    value={license.expiresAt ? license.expiresAt.slice(0, 10) : ""}
+                                                    onChange={(e) => updateLicense(license.licenseType, "expiresAt", e.target.value ? `${e.target.value}T00:00:00.000Z` : "")}
+                                                    className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm"
+                                                />
+                                            </div>
+                                            <div className="space-y-1 md:col-span-2">
+                                                <label className="text-[10px] uppercase font-bold text-surface-400">Notes</label>
+                                                <input
+                                                    value={license.notes || ""}
+                                                    onChange={(e) => updateLicense(license.licenseType, "notes", e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm"
+                                                    placeholder="Commentaire de vérification"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-4 flex items-center justify-between pt-2 text-xs text-surface-500">
+                                                <span>{license.requiredForPublication ? "Obligatoire pour publication" : "Facultative"}</span>
+                                                <span>{license.isExpired ? "Expirée" : "Valide"}</span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
@@ -1452,4 +1646,3 @@ function AdminCatalogContent({ restaurantId }: { restaurantId: string }) {
         </div>
     );
 }
-

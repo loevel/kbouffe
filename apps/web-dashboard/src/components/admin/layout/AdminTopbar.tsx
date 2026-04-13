@@ -20,6 +20,25 @@ const themeOptions: { value: Theme; icon: typeof Sun }[] = [
     { value: "system", icon: Monitor },
 ];
 
+const adminRoleBadgeConfig: Record<string, { label: string; className: string }> = {
+    super_admin: {
+        label: "Super Admin",
+        className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+    },
+    support: {
+        label: "Support",
+        className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    },
+    sales: {
+        label: "Ventes",
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    },
+    moderator: {
+        label: "Moderation",
+        className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+    },
+};
+
 export function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
     const session = useUserSession((s) => s.session);
     const { adminRole } = useAdmin();
@@ -28,6 +47,7 @@ export function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
 
     const currentThemeIcon = themeOptions.find((o) => o.value === theme)?.icon ?? Monitor;
     const ThemeIcon = currentThemeIcon;
+    const roleBadge = adminRole ? adminRoleBadgeConfig[adminRole] : null;
 
     const handleSignOut = async () => {
         // Use same signout flow as merchant dashboard
@@ -54,9 +74,16 @@ export function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
                         <h2 className="text-sm font-semibold text-surface-900 dark:text-white">
                             {t.admin?.title ?? "Platform Admin"}
                         </h2>
-                        <p className="text-xs text-surface-500 dark:text-surface-400 capitalize">
-                            {adminRole?.replace("_", " ") ?? "admin"}
-                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 capitalize">
+                                {session?.name ?? "Administrateur"}
+                            </p>
+                            {roleBadge && (
+                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${roleBadge.className}`}>
+                                    {roleBadge.label}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

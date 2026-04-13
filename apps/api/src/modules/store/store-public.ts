@@ -15,7 +15,7 @@ export const storePublicRoutes = new Hono<{ Bindings: Env }>();
 storePublicRoutes.route("/", publicReservationsRoutes);
 
 const ALLOWED_DELIVERY_TYPES = ["delivery", "pickup", "dine_in"] as const;
-const ALLOWED_PAYMENT_METHODS = ["cash", "mobile_money_mtn", "mobile_money_orange"] as const;
+const ALLOWED_PAYMENT_METHODS = ["cash", "mobile_money_mtn", "mobile_money_orange", "gift_card"] as const;
 
 type DeliveryType = (typeof ALLOWED_DELIVERY_TYPES)[number];
 type PaymentMethod = (typeof ALLOWED_PAYMENT_METHODS)[number];
@@ -135,6 +135,9 @@ storePublicRoutes.post("/order", async (c) => {
         if (!body.customerPhone?.trim()) return c.json({ error: "customerPhone requis" }, 400);
         if (!ALLOWED_DELIVERY_TYPES.includes(body.deliveryType)) return c.json({ error: "deliveryType invalide" }, 400);
         if (!ALLOWED_PAYMENT_METHODS.includes(body.paymentMethod)) return c.json({ error: "paymentMethod invalide" }, 400);
+        if (body.paymentMethod === "gift_card" && !body.giftCardCode?.trim()) {
+            return c.json({ error: "Code carte cadeau requis" }, 400);
+        }
 
         const supabase = getAdminClient(c.env);
 
@@ -232,6 +235,8 @@ storePublicRoutes.post("/order", async (c) => {
         let giftCardId: string | null = null;
         let giftCardAmount = 0;
         let finalTotal = computedTotal;
+        let finalPaymentMethod: PaymentMethod | "mixed" = body.paymentMethod;
+        let finalPaymentStatus: "pending" | "paid" = "pending";
 
         if (body.giftCardCode?.trim()) {
             const giftCardCode = body.giftCardCode.trim().toUpperCase();
@@ -264,6 +269,10 @@ storePublicRoutes.post("/order", async (c) => {
             giftCardId = giftCard.id as string;
             giftCardAmount = Math.min(giftCard.current_balance as number, computedTotal);
             finalTotal = computedTotal - giftCardAmount;
+            if (body.paymentMethod === "gift_card") {
+                finalPaymentMethod = finalTotal > 0 ? "mixed" : "gift_card";
+                finalPaymentStatus = finalTotal > 0 ? "pending" : "paid";
+            }
         }
 
         // 1. Create the Order
@@ -287,8 +296,8 @@ storePublicRoutes.post("/order", async (c) => {
                 status: "pending",
                 delivery_type: body.deliveryType,
                 delivery_address: body.deliveryAddress ?? null,
-                payment_method: body.paymentMethod,
-                payment_status: "pending",
+                payment_method: finalPaymentMethod,
+                payment_status: finalPaymentStatus,
                 notes: body.notes ?? null,
                 table_number: body.tableNumber ?? null,
             } as any)
@@ -564,6 +573,7 @@ storePublicRoutes.get("/:slug", async (c) => {
             .select("*")
             .eq("slug", slug)
             .eq("is_published", true)
+            .eq("compliance_status", "compliant")
             .limit(1);
 
         if (restError || !results || results.length === 0) {

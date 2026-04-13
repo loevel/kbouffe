@@ -35,9 +35,10 @@ storesRoutes.get("/", async (c) => {
             id, name, slug, description, logo_url, cover_url, 
             address, city, cuisine_type, price_range, rating, 
             review_count, order_count, is_verified, is_premium, 
-            is_sponsored, has_dine_in, is_published
+            is_sponsored, has_dine_in, is_published, compliance_status
         `)
-        .eq("is_published", true);
+        .eq("is_published", true)
+        .eq("compliance_status", "compliant");
 
     if (cuisine) {
         query = query.eq("cuisine_type", cuisine);
@@ -115,6 +116,7 @@ storesRoutes.get("/:slug", async (c) => {
         .select("*")
         .eq("slug", slug)
         .eq("is_published", true)
+        .eq("compliance_status", "compliant")
         .limit(1);
 
     if (error || !results || results.length === 0) {

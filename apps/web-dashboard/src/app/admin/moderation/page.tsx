@@ -21,9 +21,13 @@ import {
     Check,
     ShieldAlert,
     ShieldOff,
+    Trash2,
+    CheckCircle,
 } from "lucide-react";
-import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
+import { Badge, Button, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
+import { useBulkSelection } from "@/hooks/use-bulk-selection";
+import { BulkActionBar } from "@/components/admin/BulkActionBar";
 
 // ── AI Review Analysis ────────────────────────────────────────────────────────
 interface ReviewAIResult {
@@ -88,6 +92,9 @@ export default function AdminModerationPage() {
     const [ratingFilter, setRatingFilter] = useState("all");
     const [visibleFilter, setVisibleFilter] = useState("all");
     const [toggling, setToggling] = useState<string | null>(null);
+    const [isConfirmDeleteBulkOpen, setIsConfirmDeleteBulkOpen] = useState(false);
+
+    const bulk = useBulkSelection(reviews);
 
     // AI moderation state per review
     const [aiResults, setAiResults] = useState<Record<string, ReviewAIResult>>({});
@@ -140,6 +147,35 @@ export default function AdminModerationPage() {
     useEffect(() => {
         fetchReviews(1);
     }, [fetchReviews]);
+
+    useEffect(() => {
+        bulk.clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pagination.page, ratingFilter, visibleFilter]);
+
+    const performBulkReviewAction = async (action: "hide" | "show" | "delete") => {
+        if (bulk.selectedIds.length === 0) return;
+        try {
+            const res = await adminFetch("/api/admin/moderation/reviews/bulk", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: bulk.selectedIds, action }),
+            });
+            if (res.ok) {
+                const json = await res.json();
+                const labels: Record<string, string> = { hide: "masqué", show: "validé", delete: "supprimé" };
+                toast.success(`${json.count} avis ${labels[action]}(s)`);
+                bulk.clearSelection();
+                fetchReviews(pagination.page);
+            } else {
+                const err = await res.json();
+                toast.error(err.error || "Erreur");
+            }
+        } catch {
+            toast.error("Erreur réseau");
+        }
+        setIsConfirmDeleteBulkOpen(false);
+    };
 
     const toggleVisibility = async (id: string, isVisible: boolean) => {
         setToggling(id);
@@ -263,7 +299,8 @@ export default function AdminModerationPage() {
                                     "group bg-white dark:bg-surface-900 rounded-3xl border p-6 transition-all",
                                     r.isVisible
                                         ? "border-surface-200 dark:border-surface-800 hover:shadow-lg hover:shadow-surface-200/20 dark:hover:shadow-black/20"
-                                        : "border-red-500/20 bg-red-50/20 dark:bg-red-950/5"
+                                        : "border-red-500/20 bg-red-50/20 dark:bg-red-950/5",
+                                    bulk.isSelected(r.id) && "ring-2 ring-brand-500/30"
                                 )}
                             >
                                 <div className="flex flex-col md:flex-row gap-6">
@@ -271,6 +308,12 @@ export default function AdminModerationPage() {
                                         {/* Status & Rating */}
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={bulk.isSelected(r.id)}
+                                                    onChange={() => bulk.toggleItem(r.id)}
+                                                    className="w-4 h-4 rounded cursor-pointer accent-brand-500 shrink-0"
+                                                />
                                                 <RatingStars rating={r.rating} />
                                                 <span className="w-1 h-1 rounded-full bg-surface-200" />
                                                 <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest">{new Date(r.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>

@@ -5,18 +5,129 @@
  * Returns: { calendar: { day, platform, contentIdea, hashtags, bestTime }[] }
  */
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth, apiError } from "@/lib/api/helpers";
+import { withAuth } from "@/lib/api/helpers";
 import { checkAiRateLimit, logAiUsage } from "@/lib/ai-rate-limiter";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const VALID_PLATFORMS = ["facebook", "instagram", "tiktok", "telegram", "whatsapp"] as const;
+const VALID_TYPES = ["product_highlight", "promo", "behind_scenes", "interactive", "storytelling", "motivation"] as const;
+const DAYS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"] as const;
+
+type CalendarType = (typeof VALID_TYPES)[number];
+type CalendarPlatform = (typeof VALID_PLATFORMS)[number];
+
+interface CalendarEntry {
+    day: string;
+    date: string;
+    platform: CalendarPlatform;
+    type: CalendarType;
+    contentIdea: string;
+    caption: string;
+    hashtags: string[];
+    bestTime: string;
+    productName?: string | null;
+}
+
+function normalizePlatforms(input: unknown): CalendarPlatform[] {
+    if (!Array.isArray(input)) return ["facebook", "instagram", "tiktok"];
+    const filtered = input
+        .map((p) => String(p).toLowerCase().trim())
+        .filter((p): p is CalendarPlatform => (VALID_PLATFORMS as readonly string[]).includes(p));
+    return filtered.length > 0 ? filtered : ["facebook", "instagram", "tiktok"];
+}
+
+function parseWeekStart(input: unknown): string {
+    const raw = typeof input === "string" ? input : "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    return new Date().toISOString().split("T")[0];
+}
+
+function sanitizeCalendarEntry(entry: any, index: number, weekStartDate: string, platforms: CalendarPlatform[]): CalendarEntry | null {
+    const weekStart = new Date(`${weekStartDate}T00:00:00.000Z`);
+    const candidateDate = typeof entry?.date === "string" ? entry.date : "";
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(candidateDate)
+        ? candidateDate
+        : new Date(weekStart.getTime() + (index % 7) * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    const dayFromDate = DAYS_FR[new Date(`${parsedDate}T00:00:00.000Z`).getUTCDay() === 0 ? 6 : new Date(`${parsedDate}T00:00:00.000Z`).getUTCDay() - 1];
+    const day = typeof entry?.day === "string" && entry.day.trim() ? entry.day.trim() : dayFromDate;
+
+    const platformRaw = String(entry?.platform ?? "").toLowerCase().trim();
+    const platform = (VALID_PLATFORMS as readonly string[]).includes(platformRaw)
+        ? (platformRaw as CalendarPlatform)
+        : platforms[index % platforms.length];
+
+    const typeRaw = String(entry?.type ?? "").toLowerCase().trim();
+    const type = (VALID_TYPES as readonly string[]).includes(typeRaw)
+        ? (typeRaw as CalendarType)
+        : VALID_TYPES[index % VALID_TYPES.length];
+
+    const contentIdea = String(entry?.contentIdea ?? "").trim();
+    const caption = String(entry?.caption ?? "").trim();
+    const hashtags = Array.isArray(entry?.hashtags)
+        ? entry.hashtags.map((h: unknown) => String(h).trim()).filter(Boolean)
+        : [];
+    const bestTime = String(entry?.bestTime ?? "").trim() || "12:00";
+    const productName = entry?.productName ? String(entry.productName) : null;
+
+    if (!contentIdea && !caption) return null;
+
+    return {
+        day,
+        date: parsedDate,
+        platform,
+        type,
+        contentIdea: contentIdea || "Publication recommandee pour votre audience locale.",
+        caption: caption || "Nouveau contenu recommande pour vos clients cette semaine.",
+        hashtags,
+        bestTime,
+        productName,
+    };
+}
+
+function buildFallbackCalendar(args: {
+    weekStartDate: string;
+    platforms: CalendarPlatform[];
+    restaurantName: string;
+    products: Array<{ name?: string | null; is_limited_edition?: boolean | null }>;
+}): CalendarEntry[] {
+    const { weekStartDate, platforms, restaurantName, products } = args;
+    const weekStart = new Date(`${weekStartDate}T00:00:00.000Z`);
+    const limited = products.find((p) => Boolean(p.is_limited_edition))?.name ?? null;
+    const featured = products.find((p) => p.name)?.name ?? "plat signature";
+    const ideas = [
+        { type: "motivation", idea: "Message de debut de semaine et engagement local." },
+        { type: "product_highlight", idea: `Mise en avant du produit ${featured}.` },
+        { type: "promo", idea: "Promotion courte sur un menu populaire." },
+        { type: "behind_scenes", idea: "Coulisses de la preparation en cuisine." },
+        { type: "storytelling", idea: "Histoire du restaurant et de ses saveurs." },
+        { type: "interactive", idea: "Sondage client sur le prochain plat a promouvoir." },
+        { type: "product_highlight", idea: "Suggestion brunch / repas familial du dimanche." },
+    ] as const;
+
+    return DAYS_FR.map((day, i) => {
+        const date = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        const slot = ideas[i];
+        const platform = platforms[i % platforms.length];
+        const productMention = limited && i === 2 ? limited : featured;
+
+        return {
+            day,
+            date,
+            platform,
+            type: slot.type,
+            contentIdea: slot.idea,
+            caption: `${day} chez ${restaurantName}: ${slot.idea} Venez decouvrir ${productMention} et profitez de nos offres de la semaine.`,
+            hashtags: ["#Kbouffe", "#Restaurant", "#Cameroun", "#Food", "#BonPlan"],
+            bestTime: i >= 5 ? "18:00" : "12:00",
+            productName: productMention,
+        };
+    });
+}
 
 export async function POST(request: NextRequest) {
-    if (!GEMINI_API_KEY) {
-        return NextResponse.json({ error: "Gemini API key non configuree" }, { status: 500 });
-    }
-
     const auth = await withAuth();
     if (auth.error) return auth.error;
     const { supabase, restaurantId } = auth.ctx;
@@ -31,10 +142,8 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json().catch(() => ({}));
-        const {
-            weekStartDate = new Date().toISOString().split("T")[0],
-            platforms = ["facebook", "instagram", "tiktok"],
-        } = body;
+        const weekStartDate = parseWeekStart(body.weekStartDate);
+        const platforms = normalizePlatforms(body.platforms);
 
         // Get restaurant info and products
         const [{ data: restaurant }, { data: products }] = await Promise.all([
@@ -51,6 +160,23 @@ export async function POST(request: NextRequest) {
                 .order("price", { ascending: false })
                 .limit(20),
         ]);
+
+        const fallbackCalendar = buildFallbackCalendar({
+            weekStartDate,
+            platforms,
+            restaurantName: restaurant?.name ?? "Votre restaurant",
+            products: products ?? [],
+        });
+
+        if (!GEMINI_API_KEY) {
+            return NextResponse.json({
+                calendar: fallbackCalendar,
+                weekStartDate,
+                total: fallbackCalendar.length,
+                fallback: true,
+                fallbackReason: "Gemini API key non configuree",
+            });
+        }
 
         const productList = (products ?? []).map((p: any) =>
             `- ${p.name} (${p.price} FCFA)${p.is_limited_edition ? " [EDITION LIMITEE]" : ""}${p.description ? `: ${p.description}` : ""}`
@@ -119,7 +245,13 @@ Regles:
         if (!res.ok) {
             const errText = await res.text();
             console.error("[ai/content-calendar] Gemini error:", res.status, errText);
-            return NextResponse.json({ error: "Erreur du service IA" }, { status: 502 });
+            return NextResponse.json({
+                calendar: fallbackCalendar,
+                weekStartDate,
+                total: fallbackCalendar.length,
+                fallback: true,
+                fallbackReason: `Gemini indisponible (${res.status})`,
+            });
         }
 
         const data = await res.json();
@@ -131,15 +263,29 @@ Regles:
             parsed = JSON.parse(cleaned);
         } catch {
             console.error("[ai/content-calendar] Parse error:", rawText);
-            return NextResponse.json({ error: "Impossible de generer le calendrier" }, { status: 422 });
+            return NextResponse.json({
+                calendar: fallbackCalendar,
+                weekStartDate,
+                total: fallbackCalendar.length,
+                fallback: true,
+                fallbackReason: "Reponse IA invalide",
+            });
         }
+
+        const normalizedCalendar = Array.isArray(parsed?.calendar)
+            ? parsed.calendar
+                .map((entry: unknown, idx: number) => sanitizeCalendarEntry(entry, idx, weekStartDate, platforms))
+                .filter((entry: CalendarEntry | null): entry is CalendarEntry => Boolean(entry))
+            : [];
+
+        const finalCalendar = normalizedCalendar.length > 0 ? normalizedCalendar : fallbackCalendar;
 
         await logAiUsage(supabase, restaurantId, "ai_calendar");
 
         return NextResponse.json({
-            calendar: parsed.calendar ?? [],
+            calendar: finalCalendar,
             weekStartDate,
-            total: (parsed.calendar ?? []).length,
+            total: finalCalendar.length,
         });
     } catch (error) {
         console.error("[ai/content-calendar] Unexpected:", error);
