@@ -1316,6 +1316,34 @@ export const en: TranslationKeys = {
             secure: "99.9% SECURE",
             verification: "Continuous journal verification",
         },
+
+        detail: {
+            title: "Audit Entry Detail",
+            id: "Entry ID",
+            adminId: "Admin ID",
+            rawDetails: "Raw Payload",
+            close: "Close",
+        },
+
+        analytics: {
+            title: "Activity Analytics",
+            actionDist: "Action Distribution",
+            dailyVolume: "Daily Volume (7d)",
+            toggle: "Toggle Analytics",
+        },
+
+        refresh: {
+            toggle: "Auto-Refresh",
+            active: "Live — refreshing every 30s",
+            lastSeen: "Last updated",
+        },
+
+        alerts: {
+            title: "Suspicious Activity Detected",
+            highIpActivity: "IP {ip} performed {n} actions on this page",
+            banDetected: "A ban_user action is present in this view",
+            bulkVerify: "Bulk restaurant verifications detected (>3 in 1 min)",
+        },
     },
 
     // Business Growth Admin Pages

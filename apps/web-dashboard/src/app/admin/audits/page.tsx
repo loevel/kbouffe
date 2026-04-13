@@ -18,10 +18,11 @@ import {
     Terminal,
     History,
 } from "lucide-react";
-import { Badge, Button, adminFetch, useLocale, toast } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch, useLocale, toast, Modal } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Download } from "lucide-react";
+import { PieChart, Pie, BarChart, Bar, Cell, Tooltip, Legend, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
 
 interface AuditLogRow {
     id: string;
@@ -55,6 +56,94 @@ function formatDetails(detailsStr: string | null) {
     }
 }
 
+function AuditDetailContent({ log, t }: { log: AuditLogRow; t: any }) {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">{t.auditLogs?.detail?.id ?? "Entry ID"}</p>
+                <p className="text-sm font-mono text-surface-900 dark:text-white mt-1">{log.id}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">{t.auditLogs?.detail?.adminId ?? "Admin ID"}</p>
+                <p className="text-sm font-mono text-surface-900 dark:text-white mt-1">{log.adminId}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">Admin Name</p>
+                <p className="text-sm text-surface-900 dark:text-white mt-1">{log.userName ?? "—"}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">Admin Email</p>
+                <p className="text-sm text-surface-900 dark:text-white mt-1">{log.userEmail ?? "—"}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">Action</p>
+                <p className="text-sm text-surface-900 dark:text-white mt-1">{log.action}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">Target Type</p>
+                <p className="text-sm text-surface-900 dark:text-white mt-1">{log.targetType}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">Target ID</p>
+                <p className="text-sm font-mono text-surface-900 dark:text-white mt-1">{log.targetId}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">IP Address</p>
+                <p className="text-sm text-surface-900 dark:text-white mt-1">{log.ipAddress ?? "local"}</p>
+            </div>
+            <div>
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide">Timestamp</p>
+                <p className="text-sm text-surface-900 dark:text-white mt-1">{new Date(log.createdAt).toLocaleString()}</p>
+            </div>
+            <div className="md:col-span-2">
+                <p className="text-xs font-bold text-surface-400 uppercase tracking-wide mb-2">{t.auditLogs?.detail?.rawDetails ?? "Raw Payload"}</p>
+                <pre className="bg-surface-100 dark:bg-surface-800 p-4 rounded-lg text-[10px] overflow-auto max-h-48 font-mono text-surface-900 dark:text-white border border-surface-200 dark:border-surface-700">
+                    {log.details ? JSON.stringify(JSON.parse(log.details), null, 2) : "{}"}
+                </pre>
+            </div>
+        </div>
+    );
+}
+
+function detectSuspiciousActivity(logs: AuditLogRow[], t: any): string[] {
+    const findings: string[] = [];
+
+    // Pattern 1: Same IP > 5 actions in current page
+    const ipCounts = new Map<string, number>();
+    logs.forEach(log => {
+        if (log.ipAddress) {
+            ipCounts.set(log.ipAddress, (ipCounts.get(log.ipAddress) ?? 0) + 1);
+        }
+    });
+    ipCounts.forEach((count, ip) => {
+        if (count > 5) {
+            findings.push(
+                (t.auditLogs?.alerts?.highIpActivity ?? "IP {ip} performed {n} actions on this page")
+                    .replace("{ip}", ip)
+                    .replace("{n}", String(count))
+            );
+        }
+    });
+
+    // Pattern 2: Any ban_user action present
+    if (logs.some(l => l.action === "ban_user")) {
+        findings.push(t.auditLogs?.alerts?.banDetected ?? "A ban_user action is present in this view");
+    }
+
+    // Pattern 3: Bulk verify_restaurant — more than 3 in the same minute
+    const verifyLogs = logs.filter(l => l.action === "verify_restaurant");
+    const byMinute = new Map<string, number>();
+    verifyLogs.forEach(log => {
+        const minuteKey = log.createdAt.slice(0, 16);
+        byMinute.set(minuteKey, (byMinute.get(minuteKey) ?? 0) + 1);
+    });
+    if (Array.from(byMinute.values()).some(count => count > 3)) {
+        findings.push(t.auditLogs?.alerts?.bulkVerify ?? "Bulk restaurant verifications detected (>3 in 1 min)");
+    }
+
+    return findings;
+}
+
 const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
@@ -73,13 +162,18 @@ export default function AdminAuditLogsPage() {
     const [actionFilter, setActionFilter] = useState("all");
     const [targetFilter, setTargetFilter] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
+    const [selectedLog, setSelectedLog] = useState<AuditLogRow | null>(null);
+    const [showAnalytics, setShowAnalytics] = useState(false);
+    const [isFullHistory, setIsFullHistory] = useState(false);
+    const [autoRefresh, setAutoRefresh] = useState(false);
+    const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+    const [alerts, setAlerts] = useState<string[]>([]);
 
-    const fetchLogs = useCallback(async (page = 1) => {
+    const fetchLogs = useCallback(async (page = 1, all = false) => {
         setLoading(true);
         try {
             const params = new URLSearchParams({
-                page: String(page),
-                limit: "20",
+                ...(all ? { limit: "9999" } : { page: String(page), limit: "20" }),
                 ...(actionFilter !== "all" && { action: actionFilter }),
                 ...(targetFilter !== "all" && { target: targetFilter }),
             });
@@ -87,6 +181,7 @@ export default function AdminAuditLogsPage() {
             const json = await res.json();
             setLogs(json.data ?? []);
             setPagination(json.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 });
+            if (all) setIsFullHistory(true);
         } catch {
             console.error("Failed to fetch audit logs");
         } finally {
@@ -169,6 +264,38 @@ export default function AdminAuditLogsPage() {
         fetchLogs(1);
     }, [fetchLogs]);
 
+    // Detect suspicious activity
+    useEffect(() => {
+        setAlerts(detectSuspiciousActivity(logs, t));
+    }, [logs, t]);
+
+    // Auto-refresh effect
+    useEffect(() => {
+        if (!autoRefresh) return;
+        const id = setInterval(async () => {
+            try {
+                const params = new URLSearchParams({
+                    page: "1",
+                    limit: "20",
+                    ...(actionFilter !== "all" && { action: actionFilter }),
+                    ...(targetFilter !== "all" && { target: targetFilter }),
+                });
+                const res = await adminFetch(`/api/admin/system/audit?${params}`);
+                const json = await res.json();
+                const fresh: AuditLogRow[] = json.data ?? [];
+                setLogs(prev => {
+                    const existingIds = new Set(prev.map(l => l.id));
+                    const newEntries = fresh.filter(l => !existingIds.has(l.id));
+                    return newEntries.length > 0 ? [...newEntries, ...prev] : prev;
+                });
+                setLastRefreshedAt(new Date());
+            } catch (error) {
+                console.error("Auto-refresh failed:", error);
+            }
+        }, 30_000);
+        return () => clearInterval(id);
+    }, [autoRefresh, actionFilter, targetFilter]);
+
     return (
         <motion.div 
             variants={containerVariants}
@@ -197,6 +324,30 @@ export default function AdminAuditLogsPage() {
                     </span>
                 </div>
             </div>
+
+            {/* Suspicious Activity Alerts */}
+            <AnimatePresence>
+                {alerts.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="flex items-start gap-3 px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl"
+                    >
+                        <ShieldAlert size={18} className="text-red-500 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="text-xs font-black uppercase tracking-widest text-red-600 dark:text-red-400">
+                                {t.auditLogs?.alerts?.title ?? "Suspicious Activity Detected"}
+                            </p>
+                            <ul className="mt-1 space-y-0.5">
+                                {alerts.map((msg, i) => (
+                                    <li key={i} className="text-xs text-red-500 dark:text-red-400">{msg}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Premium Controls */}
             <motion.div 
@@ -273,8 +424,111 @@ export default function AdminAuditLogsPage() {
                     >
                         <Download size={14} />
                     </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowAnalytics(v => !v)}
+                        className="h-10 px-3 rounded-xl text-surface-400 hover:text-brand-500 font-bold uppercase text-[10px] tracking-widest"
+                        title={t.auditLogs?.analytics?.toggle ?? "Toggle Analytics"}
+                    >
+                        <Activity size={14} />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => fetchLogs(1, true)}
+                        disabled={isFullHistory}
+                        className="h-10 px-3 rounded-xl text-surface-400 hover:text-brand-500 font-bold uppercase text-[10px] tracking-widest disabled:opacity-50"
+                        title={t.auditLogs?.export?.fullHistory ?? "Full History"}
+                    >
+                        <History size={14} />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAutoRefresh(v => !v)}
+                        className={cn(
+                            "h-10 px-3 rounded-xl font-bold uppercase text-[10px] tracking-widest",
+                            autoRefresh ? "text-green-500 hover:text-green-600" : "text-surface-400 hover:text-brand-500"
+                        )}
+                        title={t.auditLogs?.refresh?.toggle ?? "Auto-Refresh"}
+                    >
+                        <Clock size={14} />
+                    </Button>
                 </div>
             </motion.div>
+
+            {/* Analytics Panel */}
+            <AnimatePresence>
+                {showAnalytics && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="bg-white dark:bg-surface-900 rounded-[2rem] border border-surface-200 dark:border-surface-800 p-6"
+                    >
+                        <h3 className="text-lg font-bold text-surface-900 dark:text-white mb-6">
+                            {t.auditLogs?.analytics?.title ?? "Activity Analytics"}
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Action Distribution */}
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-xs font-bold text-surface-400 uppercase tracking-wide mb-4">
+                                    {t.auditLogs?.analytics?.actionDist ?? "Action Distribution"}
+                                </h4>
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <PieChart>
+                                        <Pie
+                                            data={Object.entries(
+                                                logs.reduce((acc, l) => ({ ...acc, [l.action]: (acc[l.action] ?? 0) + 1 }), {} as Record<string, number>)
+                                            ).map(([name, value]) => ({ name, value }))}
+                                            dataKey="value"
+                                            nameKey="name"
+                                            cx="50%"
+                                            cy="50%"
+                                            outerRadius={60}
+                                        >
+                                            {Object.entries(
+                                                logs.reduce((acc, l) => ({ ...acc, [l.action]: (acc[l.action] ?? 0) + 1 }), {} as Record<string, number>)
+                                            ).map(([_, idx], i) => (
+                                                <Cell key={`cell-${i}`} fill={["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b"][i % 4]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            {/* Daily Volume */}
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-xs font-bold text-surface-400 uppercase tracking-wide mb-4">
+                                    {t.auditLogs?.analytics?.dailyVolume ?? "Daily Volume (7d)"}
+                                </h4>
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <BarChart
+                                        data={Array.from({ length: 7 }, (_, i) => {
+                                            const d = new Date();
+                                            d.setDate(d.getDate() - (6 - i));
+                                            const key = d.toISOString().split("T")[0];
+                                            return {
+                                                date: key.slice(5),
+                                                count: logs.filter(l => l.createdAt.startsWith(key)).length
+                                            };
+                                        })}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="date" />
+                                        <YAxis />
+                                        <Tooltip />
+                                        <Bar dataKey="count" fill="#3b82f6" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Audit Data Table */}
             <motion.div 
@@ -327,13 +581,14 @@ export default function AdminAuditLogsPage() {
                                     </motion.tr>
                                 ) : (
                                     filteredLogs.map((log, idx) => (
-                                        <motion.tr 
-                                            key={log.id} 
+                                        <motion.tr
+                                            key={log.id}
                                             variants={itemVariants}
                                             initial="hidden"
                                             animate="visible"
                                             transition={{ delay: idx * 0.03 }}
                                             className="group hover:bg-surface-50 dark:hover:bg-surface-800/30 transition-all cursor-pointer"
+                                            onClick={() => setSelectedLog(log)}
                                         >
                                             <td className="px-8 py-6">
                                                 <div className="flex flex-col">
@@ -393,7 +648,7 @@ export default function AdminAuditLogsPage() {
                 </div>
 
                 {/* Audit Pagination */}
-                {pagination.totalPages > 1 && (
+                {pagination.totalPages > 1 && !isFullHistory && (
                     <div className="flex flex-col sm:flex-row items-center justify-between px-10 py-8 border-t border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/30 gap-6">
                         <div className="flex flex-col gap-1">
                             <p className="text-sm font-black text-surface-900 dark:text-white uppercase tracking-tight">
@@ -464,6 +719,16 @@ export default function AdminAuditLogsPage() {
                 </div>
                 <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/5 rounded-full -mr-48 -mt-48 blur-3xl opacity-50" />
             </motion.div>
+
+            {/* Audit Detail Modal */}
+            <Modal
+                isOpen={!!selectedLog}
+                onClose={() => setSelectedLog(null)}
+                title={t.auditLogs?.detail?.title ?? "Audit Entry Detail"}
+                size="lg"
+            >
+                {selectedLog && <AuditDetailContent log={selectedLog} t={t} />}
+            </Modal>
         </motion.div>
     );
 }

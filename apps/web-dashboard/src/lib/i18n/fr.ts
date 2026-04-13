@@ -1314,6 +1314,34 @@ export const fr = {
             secure: "99.9% SECURE",
             verification: "Vérification de registre continue",
         },
+
+        detail: {
+            title: "Détail de l'entrée d'audit",
+            id: "Identifiant",
+            adminId: "ID Administrateur",
+            rawDetails: "Données brutes",
+            close: "Fermer",
+        },
+
+        analytics: {
+            title: "Analytiques d'activité",
+            actionDist: "Distribution des actions",
+            dailyVolume: "Volume journalier (7j)",
+            toggle: "Afficher les analytiques",
+        },
+
+        refresh: {
+            toggle: "Actualisation auto",
+            active: "En direct — actualisation toutes les 30s",
+            lastSeen: "Dernière mise à jour",
+        },
+
+        alerts: {
+            title: "Activité suspecte détectée",
+            highIpActivity: "L'IP {ip} a effectué {n} actions sur cette page",
+            banDetected: "Une action ban_user est présente dans cette vue",
+            bulkVerify: "Vérifications groupées de restaurants détectées (>3 en 1 min)",
+        },
     },
 
     // Business Growth Admin Pages
