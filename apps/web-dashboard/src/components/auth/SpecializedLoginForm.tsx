@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, User } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, User, Shield, CheckCircle2 } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
     const router = useRouter();
     const { t } = useLocale();
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
@@ -200,9 +201,14 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5 ml-1">
-                                        Mot de passe
-                                    </label>
+                                    <div className="flex justify-between items-center mb-1.5 ml-1">
+                                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">
+                                            Mot de passe
+                                        </label>
+                                        <Link href="/forgot-password" title="Mot de passe oublié ?" className="text-xs text-brand-500 hover:text-brand-600 font-medium">
+                                            Oublié ?
+                                        </Link>
+                                    </div>
                                     <div className="relative group">
                                         <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400 group-focus-within:text-brand-500 transition-colors" />
                                         <input
@@ -217,15 +223,24 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                            title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                                         >
                                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
                                     </div>
-                                    <div className="flex justify-end mt-2">
-                                        <Link href="/forgot-password" title="Mot de passe oublié ?" className="text-xs text-brand-500 hover:text-brand-600 font-medium">
-                                            Mot de passe oublié ?
-                                        </Link>
-                                    </div>
+                                </div>
+
+                                <div className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        id="remember-me"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        className="w-4 h-4 rounded border-surface-300 text-brand-500 focus:ring-brand-500 cursor-pointer"
+                                    />
+                                    <label htmlFor="remember-me" className="ml-2 text-sm text-surface-600 dark:text-surface-400 cursor-pointer">
+                                        Se souvenir de moi
+                                    </label>
                                 </div>
                             </div>
 
@@ -244,6 +259,14 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                                 )}
                             </button>
                         </form>
+                    </div>
+
+                    {/* Trust Signals */}
+                    <div className="mt-6 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center gap-2">
+                        <Shield size={16} className="text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-xs text-emerald-700 dark:text-emerald-300">
+                            <strong>Sécurisé:</strong> Données encryptées • Authentification 2FA disponible
+                        </span>
                     </div>
 
                     <div className="mt-8 text-center space-y-4">

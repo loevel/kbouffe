@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Store, Smartphone, Banknote, ShieldCheck, BarChart3, Globe, ClipboardEdit, Share2, UtensilsCrossed } from "lucide-react";
+import { ArrowRight, Check, Store, Smartphone, Banknote, ShieldCheck, BarChart3, Globe, ClipboardEdit, Share2, UtensilsCrossed, Users, MessageSquare, TrendingUp, Shield, ChevronDown } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -68,6 +68,14 @@ export default function PartenairesPage() {
 
                             <p className="text-surface-500 text-sm mt-5">{t.partenaires.heroCtaSub}</p>
 
+                            {/* Trust Badge */}
+                            <div className="mt-8 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center gap-2 max-w-xl mx-auto">
+                                <ShieldCheck size={18} className="text-emerald-400" />
+                                <span className="text-sm text-emerald-300">
+                                    <strong>Zéro risque:</strong> 0% de commission • Pas d'engagement • Annulation gratuite
+                                </span>
+                            </div>
+
                             {/* Stats */}
                             <div className="grid grid-cols-3 gap-6 mt-16 p-6 rounded-2xl bg-white/5 border border-surface-800">
                                 <div>
@@ -120,6 +128,105 @@ export default function PartenairesPage() {
                     </div>
                 </section>
 
+                {/* Testimonials & Social Proof */}
+                <section className="py-24 md:py-32 bg-surface-950 relative overflow-hidden">
+                    <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-brand-500/5 blur-[100px]" />
+                    <div className="container mx-auto px-4 md:px-6 relative z-10">
+                        <div className="text-center max-w-3xl mx-auto mb-20">
+                            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 text-white">
+                                Ce que nos restaurateurs disent
+                            </h2>
+                            <p className="text-lg text-surface-400">
+                                Des centaines de restaurants camerounais font confiance à Kbouffe
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
+                            {/* Testimonial 1 */}
+                            <div className="bg-surface-900 border border-surface-800 rounded-2xl p-8 hover:border-brand-500/30 transition-all">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-lg font-bold text-amber-400">
+                                        R
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-white">Restaurant La Saveur</p>
+                                        <p className="text-xs text-surface-400">Douala, Cameroun</p>
+                                    </div>
+                                </div>
+                                <p className="text-surface-300 mb-4">
+                                    &ldquo;Avec Kbouffe, nos ventes en ligne ont augmenté de 45% en 3 mois. Zéro commission et un vrai support.&rdquo;
+                                </p>
+                                <div className="flex items-center gap-1 text-amber-400">
+                                    {[...Array(5)].map((_, i) => <Check key={i} size={16} className="fill-amber-400" />)}
+                                </div>
+                            </div>
+
+                            {/* Testimonial 2 */}
+                            <div className="bg-surface-900 border border-surface-800 rounded-2xl p-8 hover:border-brand-500/30 transition-all">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-lg font-bold text-green-400">
+                                        A
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-white">Chez Auntie Bea</p>
+                                        <p className="text-xs text-surface-400">Yaoundé, Cameroun</p>
+                                    </div>
+                                </div>
+                                <p className="text-surface-300 mb-4">
+                                    &ldquo;L'intégration était facile, vraiment 2 minutes. Les commandes arrivent instantanément en cuisine.&rdquo;
+                                </p>
+                                <div className="flex items-center gap-1 text-amber-400">
+                                    {[...Array(5)].map((_, i) => <Check key={i} size={16} className="fill-amber-400" />)}
+                                </div>
+                            </div>
+
+                            {/* Testimonial 3 */}
+                            <div className="bg-surface-900 border border-surface-800 rounded-2xl p-8 hover:border-brand-500/30 transition-all">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-lg font-bold text-blue-400">
+                                        P
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-white">Prestige Bistro</p>
+                                        <p className="text-xs text-surface-400">Buea, Cameroun</p>
+                                    </div>
+                                </div>
+                                <p className="text-surface-300 mb-4">
+                                    &ldquo;Pas d'engagement à long terme. On peut commencer dès aujourd'hui et arrêter quand on veut. Zéro risque.&rdquo;
+                                </p>
+                                <div className="flex items-center gap-1 text-amber-400">
+                                    {[...Array(5)].map((_, i) => <Check key={i} size={16} className="fill-amber-400" />)}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Trust Stats */}
+                        <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 p-8 rounded-2xl bg-white/5 border border-surface-800">
+                            <div className="text-center">
+                                <div className="flex items-center justify-center gap-2 mb-3">
+                                    <Store size={20} className="text-brand-400" />
+                                    <div className="text-3xl font-bold text-white">450+</div>
+                                </div>
+                                <p className="text-surface-400 text-sm">Restaurants partenaires</p>
+                            </div>
+                            <div className="text-center">
+                                <div className="flex items-center justify-center gap-2 mb-3">
+                                    <TrendingUp size={20} className="text-green-400" />
+                                    <div className="text-3xl font-bold text-white">+40%</div>
+                                </div>
+                                <p className="text-surface-400 text-sm">Augmentation moyenne des ventes</p>
+                            </div>
+                            <div className="text-center">
+                                <div className="flex items-center justify-center gap-2 mb-3">
+                                    <Shield size={20} className="text-emerald-400" />
+                                    <div className="text-3xl font-bold text-white">24/7</div>
+                                </div>
+                                <p className="text-surface-400 text-sm">Support WhatsApp garantis</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* How it works */}
                 <section className="py-24 md:py-32 bg-surface-950 relative overflow-hidden">
                     <div className="absolute top-[20%] left-[-5%] w-[300px] h-[300px] rounded-full bg-brand-500/5 blur-[100px]" />
@@ -151,6 +258,74 @@ export default function PartenairesPage() {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* FAQ - Objection Handling */}
+                <section className="py-24 md:py-32 bg-white dark:bg-surface-950 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-[400px] h-[400px] rounded-full bg-brand-500/5 blur-[100px]" />
+                    <div className="container mx-auto px-4 md:px-6 relative z-10">
+                        <div className="text-center max-w-3xl mx-auto mb-20">
+                            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 text-surface-900 dark:text-white">
+                                Questions fréquentes
+                            </h2>
+                            <p className="text-lg text-surface-600 dark:text-surface-400">
+                                Tout ce que vous devez savoir avant de commencer
+                            </p>
+                        </div>
+
+                        <div className="max-w-3xl mx-auto space-y-4">
+                            {[
+                                {
+                                    q: "Y a-t-il vraiment 0% de commission ?",
+                                    a: "Oui, 100% gratuit. Aucun frais sur les commandes. Nous gagnons uniquement quand vous gagnez via les services additionnels optionnels (boost, analytics premium, etc.)."
+                                },
+                                {
+                                    q: "Combien de temps pour être en ligne ?",
+                                    a: "2 minutes. Inscription → données restaurant → lien de partage. Vous pouvez commencer à recevoir des commandes immédiatement."
+                                },
+                                {
+                                    q: "Puis-je annuler à tout moment ?",
+                                    a: "Oui, sans engagement. Vous pouvez désactiver votre boutique n'importe quand, il n'y a aucun contrat à long terme."
+                                },
+                                {
+                                    q: "Comment les commandes me parviennent-elles ?",
+                                    a: "Instantanément via email, WhatsApp, et votre dashboard Kbouffe. Vous pouvez aussi configurer des notifications."
+                                },
+                                {
+                                    q: "Quel support offrez-vous ?",
+                                    a: "Support 24/7 via WhatsApp, email, et téléphone. Un agent dédié peut aussi vous aider à optimiser votre profil."
+                                },
+                            ].map((item, i) => (
+                                <details
+                                    key={i}
+                                    className="group border border-surface-200 dark:border-surface-800 rounded-xl overflow-hidden transition-all duration-300 hover:border-brand-500/30 hover:shadow-lg"
+                                >
+                                    <summary className="flex cursor-pointer items-center justify-between p-6 bg-surface-50 dark:bg-surface-900 select-none hover:bg-surface-100 dark:hover:bg-surface-800">
+                                        <h3 className="font-semibold text-surface-900 dark:text-white pr-4">{item.q}</h3>
+                                        <ChevronDown size={20} className="text-surface-600 dark:text-surface-400 group-open:rotate-180 transition-transform duration-300 shrink-0" />
+                                    </summary>
+                                    <div className="border-t border-surface-200 dark:border-surface-800 p-6 bg-white dark:bg-surface-950">
+                                        <p className="text-surface-600 dark:text-surface-400 leading-relaxed">
+                                            {item.a}
+                                        </p>
+                                    </div>
+                                </details>
+                            ))}
+                        </div>
+
+                        <div className="mt-16 p-8 rounded-2xl bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-500/20 text-center">
+                            <p className="text-surface-700 dark:text-surface-300 mb-4">
+                                Vous avez d'autres questions ?
+                            </p>
+                            <Link
+                                href="/contact"
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold transition-all"
+                            >
+                                Contacter notre équipe
+                                <ArrowRight size={18} />
+                            </Link>
                         </div>
                     </div>
                 </section>

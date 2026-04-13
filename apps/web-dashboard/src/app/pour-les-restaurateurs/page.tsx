@@ -32,6 +32,8 @@ import {
     TrendingUp,
     ShieldCheck,
     ChevronRight,
+    Shield,
+    Clock,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { KbouffeLogo } from "@/components/brand/Logo";
@@ -273,6 +275,14 @@ export default function PourLesRestaurateursPage() {
                                             Ouvrir mon restaurant gratuitement
                                             <ArrowRight size={18} />
                                         </Link>
+                                    </motion.div>
+
+                                    {/* Trust Badge */}
+                                    <motion.div variants={fadeIn} className="mt-6 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-500/20 inline-flex items-center gap-2">
+                                        <Shield size={16} className="text-green-600 dark:text-green-400" />
+                                        <span className="text-sm text-green-700 dark:text-green-300">
+                                            <strong>100% gratuit:</strong> Pas de frais cachés, commencez aujourd'hui
+                                        </span>
                                     </motion.div>
                                 </div>
 

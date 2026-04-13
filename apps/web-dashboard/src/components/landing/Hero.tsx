@@ -17,9 +17,10 @@ export function Hero() {
             description:
                 "Votre vitrine en ligne gratuite. Recevez des commandes, encaissez en Mobile Money et boostez votre visibilité avec nos packs. Seulement 5% par transaction — 6x moins que la concurrence.",
             placeholder: "Nom de votre établissement",
-            cta: "Créer mon espace",
+            cta: "Commencer gratuitement",
             ctaSub: "Gratuit pour toujours — Payez uniquement quand vous vendez",
             proofStrip: ["5% seulement", "En ligne en 2 min", "MoMo Intégré"],
+            trustSignals: ["✓ Aucune carte bancaire requise", "✓ 1 000+ restaurants actifs", "✓ Support WhatsApp 24/7"],
             stats: [
                 { value: "5%", label: "vs 30% ailleurs" },
                 { value: "2 min", label: "pour démarrer" },
@@ -36,9 +37,10 @@ export function Hero() {
             description:
                 "Your free online storefront. Receive orders, collect Mobile Money payments, and boost visibility with our packs. Only 5% per transaction — 6x less than the competition.",
             placeholder: "Your business name",
-            cta: "Create my space",
+            cta: "Start free",
             ctaSub: "Free forever — Only pay when you sell",
             proofStrip: ["Only 5%", "Online in 2 mins", "MoMo Integrated"],
+            trustSignals: ["✓ No credit card required", "✓ 1,000+ active restaurants", "✓ 24/7 WhatsApp support"],
             stats: [
                 { value: "5%", label: "vs 30% elsewhere" },
                 { value: "2 mins", label: "setup time" },
@@ -52,7 +54,6 @@ export function Hero() {
     const rotatingWords = copy.words;
     const [currentWord, setCurrentWord] = useState(0);
     const [isAnimating, setIsAnimating] = useState(false);
-    const [restaurantName, setRestaurantName] = useState("");
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -116,7 +117,7 @@ export function Hero() {
                         </motion.p>
 
                         {/* Proof Strip */}
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.3 }}
@@ -130,24 +131,28 @@ export function Hero() {
                             ))}
                         </motion.div>
 
-                        <motion.div 
+                        {/* Trust Signals */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.35 }}
+                            className="mb-10 flex flex-wrap justify-center gap-3 md:justify-start"
+                        >
+                            {copy.trustSignals.map((signal) => (
+                                <span key={signal} className="text-xs font-medium text-surface-400">
+                                    {signal}
+                                </span>
+                            ))}
+                        </motion.div>
+
+                        <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.4 }}
-                            className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto md:mx-0 mb-6"
+                            className="flex flex-col items-center md:items-start gap-4 max-w-xl mx-auto md:mx-0 mb-6"
                         >
-                            <div className="flex-1 relative">
-                                <Store size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-500" />
-                                <input
-                                    type="text"
-                                    placeholder={copy.placeholder}
-                                    value={restaurantName}
-                                    onChange={(e) => setRestaurantName(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-4 bg-white/5 border border-surface-700 rounded-2xl text-white placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all text-lg"
-                                />
-                            </div>
                             <Link
-                                href={`/register/restaurant${restaurantName ? `?restaurant=${encodeURIComponent(restaurantName)}` : ""}`}
+                                href="/register/restaurant"
                                 className="flex items-center justify-center gap-2 px-8 py-4 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white rounded-2xl text-lg font-semibold transition-all shadow-lg shadow-brand-500/25 whitespace-nowrap"
                             >
                                 {copy.cta}

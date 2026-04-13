@@ -1,73 +1,51 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import Link from "next/link";
-import { Check, Zap, Crown, Rocket } from "lucide-react";
+import { Check, Zap, Crown, Rocket, TrendingUp, Shield, Clock, ArrowRight, ChevronDown } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "Tarifs — Kbouffe",
-    description: "Des tarifs simples et transparents. 0% de commission sur vos ventes. Choisissez le plan adapté à votre restaurant.",
+    description: "Gratuit pour démarrer. Seulement 5% quand vous vendez. Pas d'abonnement, pas de frais cachés. Boostez votre visibilité avec les packs optionnels.",
 };
 
 const plans = [
     {
-        name: "Starter",
+        name: "Vitrine",
         price: "Gratuit",
-        period: "",
-        description: "Pour tester la plateforme et démarrer vos premières ventes.",
+        period: "pour toujours",
+        description: "Pour démarrer votre présence en ligne et recevoir vos premières commandes.",
         icon: <Zap className="h-6 w-6" />,
         features: [
-            "1 restaurant",
-            "Jusqu'à 15 produits",
+            "Menu digital complet",
             "Commandes illimitées",
-            "Paiement Mobile Money",
-            "0% commission",
+            "Paiements Mobile Money",
+            "Notifications push",
+            "QR code & lien unique",
+            "Seulement 5% par transaction",
             "Support par email",
         ],
         cta: "Commencer gratuitement",
-        href: "/register",
+        href: "/register/restaurant",
         highlighted: false,
     },
     {
-        name: "Pro",
-        price: "5 000",
-        period: "FCFA / mois",
-        description: "Pour les restaurants qui veulent se professionnaliser.",
+        name: "Packs Boost",
+        price: "À partir de",
+        period: "3 000 FCFA",
+        description: "Boostez votre visibilité et atteignez plus de clients quand vous êtes prêt.",
         icon: <Crown className="h-6 w-6" />,
         features: [
-            "1 restaurant",
-            "Produits illimités",
-            "Commandes illimitées",
-            "Paiement Mobile Money",
-            "0% commission",
-            "Tableau de bord avancé",
-            "Notifications en temps réel",
-            "Support prioritaire",
+            "Visibilité en tête des résultats",
+            "Bannière publicitaire sur la page d'accueil",
+            "SMS promotionnels à vos clients",
+            "Mise en avant de vos plats les plus populaires",
+            "Statistiques avancées",
+            "Aucun engagement — Achetez ce dont vous avez besoin",
         ],
-        cta: "Choisir Pro",
-        href: "/register",
+        cta: "Voir les packs",
+        href: "/register/restaurant",
         highlighted: true,
-    },
-    {
-        name: "Business",
-        price: "15 000",
-        period: "FCFA / mois",
-        description: "Pour les chaînes et groupes de restaurants.",
-        icon: <Rocket className="h-6 w-6" />,
-        features: [
-            "Jusqu'à 5 restaurants",
-            "Produits illimités",
-            "Commandes illimitées",
-            "Paiement Mobile Money",
-            "0% commission",
-            "Tableau de bord multi-sites",
-            "Analytics détaillés",
-            "Support dédié WhatsApp",
-            "Domaine personnalisé",
-        ],
-        cta: "Choisir Business",
-        href: "/register",
-        highlighted: false,
     },
 ];
 
@@ -79,15 +57,22 @@ export default function PricingPage() {
                 <div className="container mx-auto px-4 md:px-6">
                     <div className="text-center max-w-3xl mx-auto mb-16">
                         <h1 className="text-4xl md:text-5xl font-bold text-surface-900 dark:text-white mb-4">
-                            Des tarifs simples et transparents
+                            Gratuit pour démarrer. 5% quand vous vendez.
                         </h1>
                         <p className="text-lg text-surface-600 dark:text-surface-400">
-                            Pas de commission cachée, pas de frais surprises.
-                            Choisissez le plan adapté à votre activité.
+                            Pas d'abonnement. Pas de frais cachés. Vous ne payez que lorsque vos clients passent commande.
                         </p>
+
+                        {/* Trust Badge */}
+                        <div className="mt-8 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-500/20 inline-flex items-center gap-2 max-w-2xl mx-auto">
+                            <Shield size={18} className="text-green-600 dark:text-green-400" />
+                            <span className="text-sm text-green-700 dark:text-green-300">
+                                <strong>5% c'est moins cher:</strong> Jumia & Uber Eats demandent 15-30%. Nous, juste 5%.
+                            </span>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
                         {plans.map((plan) => (
                             <div
                                 key={plan.name}
@@ -167,10 +152,77 @@ export default function PricingPage() {
                         ))}
                     </div>
 
+                    {/* Earnings Example */}
+                    <div className="mt-20 p-8 rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100 dark:from-brand-900/20 dark:to-brand-900/10 border border-brand-200 dark:border-brand-500/20 max-w-3xl mx-auto">
+                        <h3 className="text-2xl font-bold text-surface-900 dark:text-white mb-8 text-center">
+                            Exemple: Combien vous gagneriez avec Kbouffe?
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-white dark:bg-surface-900 rounded-xl p-6">
+                                <p className="text-sm text-surface-600 dark:text-surface-400 mb-2">Scénario: Restaurant moyen</p>
+                                <p className="text-3xl font-bold text-surface-900 dark:text-white mb-1">20 commandes/jour</p>
+                                <p className="text-sm text-surface-500">À 5,000 FCFA/commande</p>
+                            </div>
+                            <div className="bg-white dark:bg-surface-900 rounded-xl p-6">
+                                <p className="text-sm text-surface-600 dark:text-surface-400 mb-2">Revenu brut mensuel</p>
+                                <p className="text-3xl font-bold text-green-600 dark:text-green-400 mb-1">3M FCFA</p>
+                                <p className="text-sm text-surface-500">Commandes en ligne</p>
+                            </div>
+                            <div className="bg-white dark:bg-surface-900 rounded-xl p-6">
+                                <p className="text-sm text-surface-600 dark:text-surface-400 mb-2">Coût Kbouffe (5%)</p>
+                                <p className="text-3xl font-bold text-surface-900 dark:text-white mb-1">150K FCFA</p>
+                                <p className="text-sm text-surface-500">Vs. 600K avec concurrents</p>
+                            </div>
+                        </div>
+                        <p className="text-center text-sm text-surface-600 dark:text-surface-400 mt-6">
+                            💰 <strong>Vous économisez 450K FCFA/mois</strong> comparé aux alternatives
+                        </p>
+                    </div>
+
+                    {/* FAQ Section */}
+                    <div className="mt-20 max-w-3xl mx-auto">
+                        <h3 className="text-2xl font-bold text-surface-900 dark:text-white mb-8 text-center">
+                            Questions sur les tarifs
+                        </h3>
+                        <div className="space-y-3">
+                            {[
+                                {
+                                    q: "Quand je commence à payer les 5% ?",
+                                    a: "Dès la première commande. Zéro frais avant cela. Pas d'abonnement caché."
+                                },
+                                {
+                                    q: "Puis-je augmenter mes prix pour couvrir les 5% ?",
+                                    a: "Bien sûr, c'est votre choix. Beaucoup de restaurants intègrent légèrement les frais ou les mettent en avant ('frais de livraison')."
+                                },
+                                {
+                                    q: "À quel moment la commission est prélevée ?",
+                                    a: "À chaque commande. Vous recevez l'argent moins les 5% directement sur votre compte MTN MoMo ou compte bancaire."
+                                },
+                                {
+                                    q: "Y a-t-il des frais supplémentaires ?",
+                                    a: "Non. Juste 5% par commande. Les Packs Boost sont optionnels pour augmenter votre visibilité."
+                                },
+                            ].map((item, i) => (
+                                <details
+                                    key={i}
+                                    className="group border border-surface-200 dark:border-surface-800 rounded-xl overflow-hidden transition-all hover:border-brand-500/30"
+                                >
+                                    <summary className="flex cursor-pointer items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 select-none hover:bg-surface-100 dark:hover:bg-surface-800">
+                                        <p className="font-semibold text-surface-900 dark:text-white">{item.q}</p>
+                                        <ChevronDown size={18} className="text-surface-600 dark:text-surface-400 group-open:rotate-180 transition-transform duration-300 shrink-0" />
+                                    </summary>
+                                    <div className="border-t border-surface-200 dark:border-surface-800 p-4 bg-white dark:bg-surface-950">
+                                        <p className="text-surface-600 dark:text-surface-400 text-sm">{item.a}</p>
+                                    </div>
+                                </details>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* FAQ teaser */}
                     <div className="text-center mt-16">
                         <p className="text-surface-600 dark:text-surface-400">
-                            Des questions ? {" "}
+                            Besoin de plus d'infos ? {" "}
                             <Link href="/contact" className="text-brand-500 hover:text-brand-600 font-semibold transition-colors">
                                 Contactez-nous
                             </Link>

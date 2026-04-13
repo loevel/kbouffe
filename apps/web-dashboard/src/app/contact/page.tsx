@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "Nous contacter — Kbouffe",
-    description: "Contactez l'équipe Kbouffe pour toute question, suggestion ou demande de partenariat.",
+    description: "Contactez l'équipe Kbouffe. Réponse moyenne : 2 heures. Support 24/7 via email et WhatsApp.",
 };
 
 export default function ContactPage() {
@@ -19,9 +19,23 @@ export default function ContactPage() {
                         <h1 className="text-4xl md:text-5xl font-bold text-surface-900 dark:text-white mb-4">
                             Nous contacter
                         </h1>
-                        <p className="text-lg text-surface-600 dark:text-surface-400">
-                            Une question, une suggestion ou besoin d&apos;aide ? Notre équipe est là pour vous.
+                        <p className="text-lg text-surface-600 dark:text-surface-400 mb-6">
+                            On répond à chaque message en moins de 2 heures. Qu&apos;est-ce qu&apos;on peut faire pour vous ?
                         </p>
+                        <div className="flex flex-wrap justify-center gap-4 text-sm">
+                            <span className="flex items-center gap-2 text-surface-500">
+                                <span className="text-green-500 font-bold">✓</span>
+                                Réponse moyenne: 2h
+                            </span>
+                            <span className="flex items-center gap-2 text-surface-500">
+                                <span className="text-green-500 font-bold">✓</span>
+                                Chaque message compte
+                            </span>
+                            <span className="flex items-center gap-2 text-surface-500">
+                                <span className="text-green-500 font-bold">✓</span>
+                                Support 24/7
+                            </span>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 max-w-5xl mx-auto">
@@ -42,8 +56,11 @@ export default function ContactPage() {
                                     <Phone className="h-5 w-5 text-brand-500" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-surface-900 dark:text-white mb-1">Téléphone</h3>
-                                    <p className="text-surface-600 dark:text-surface-400">+237 6XX XXX XXX</p>
+                                    <h3 className="font-semibold text-surface-900 dark:text-white mb-1">WhatsApp/Téléphone</h3>
+                                    <p className="text-surface-600 dark:text-surface-400">Réponse en ~5 min</p>
+                                    <a href="https://wa.me/237XXXXXXXXX" className="text-brand-500 hover:text-brand-600 font-medium mt-2 inline-block">
+                                        Ouvrir WhatsApp →
+                                    </a>
                                 </div>
                             </div>
 

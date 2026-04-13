@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, type Variants } from "framer-motion";
-import { Mail, Lock, User, Phone, Eye, EyeOff, Loader2, Store } from "lucide-react";
+import { Mail, Lock, User, Phone, Eye, EyeOff, Loader2, Store, Shield } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useLocale, Turnstile } from "@kbouffe/module-core/ui";
@@ -324,6 +324,19 @@ export function ClientRegistrationForm() {
                             <Link href="/privacy" className="text-brand-500 hover:underline font-medium">{t.auth.privacyLink}</Link>.
                         </motion.p>
                     </motion.form>
+
+                    {/* Security Badge */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.7 }}
+                        className="mt-6 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center gap-2"
+                    >
+                        <Shield size={16} className="text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-xs text-emerald-700 dark:text-emerald-300">
+                            <strong>Sécurisé:</strong> Données encryptées • Authentification 2FA disponible
+                        </span>
+                    </motion.div>
 
                     {/* Bottom Links */}
                     <motion.div 

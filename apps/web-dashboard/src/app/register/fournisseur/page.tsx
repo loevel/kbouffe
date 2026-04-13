@@ -32,6 +32,7 @@ import {
     Wheat,
     CheckCircle2,
     AlertCircle,
+    Shield,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { KbouffeLogo } from "@/components/brand/Logo";
@@ -676,6 +677,19 @@ export default function FournisseurRegisterPage() {
                                         .
                                     </motion.p>
                                 </motion.form>
+
+                                {/* Security Badge */}
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.6 }}
+                                    className="mt-6 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center gap-2"
+                                >
+                                    <Shield size={16} className="text-emerald-400" />
+                                    <span className="text-xs text-emerald-300/90">
+                                        <strong>Sécurisé:</strong> Données encryptées • Authentification 2FA disponible
+                                    </span>
+                                </motion.div>
                             </div>
                         </motion.div>
                     )}

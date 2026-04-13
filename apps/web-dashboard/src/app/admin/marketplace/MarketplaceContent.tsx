@@ -5,7 +5,7 @@ import {
     Package, Plus, Star, Megaphone, TrendingUp, Eye,
     BarChart3, Send, ShoppingBag, PenSquare, Trash2,
     ToggleLeft, ToggleRight, X, ChevronDown,
-    ArrowUpRight, Search, Filter,
+    ArrowUpRight, Search, Filter, Lightbulb, AlertCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button, adminFetch } from "@kbouffe/module-core/ui";
@@ -583,29 +583,68 @@ export default function AdminMarketplacePage() {
                     {[1, 2, 3].map(i => <div key={i} className="h-44 bg-surface-100 dark:bg-surface-800 rounded-[2rem]" />)}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <KpiCard
-                        label="Services actifs"
-                        value={String(stats?.activeServices ?? 0)}
-                        sub={`${stats?.totalServices ?? 0} au total`}
-                        icon={Package}
-                        iconColor="bg-brand-500 text-white shadow-xl shadow-brand-500/20"
-                    />
-                    <KpiCard
-                        label="Achats actifs"
-                        value={String(stats?.activePurchases ?? 0)}
-                        sub={`${stats?.totalPurchases ?? 0} au total`}
-                        icon={ShoppingBag}
-                        iconColor="bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"
-                    />
-                    <KpiCard
-                        label="Revenus générés"
-                        value={formatFCFA(stats?.totalRevenue ?? 0)}
-                        sub="Cumul total"
-                        icon={TrendingUp}
-                        iconColor="bg-blue-600 text-white shadow-xl shadow-blue-600/20"
-                    />
-                </div>
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <KpiCard
+                            label="Services actifs"
+                            value={String(stats?.activeServices ?? 0)}
+                            sub={`${stats?.totalServices ?? 0} au total`}
+                            icon={Package}
+                            iconColor="bg-brand-500 text-white shadow-xl shadow-brand-500/20"
+                        />
+                        <KpiCard
+                            label="Achats actifs"
+                            value={String(stats?.activePurchases ?? 0)}
+                            sub={`${stats?.totalPurchases ?? 0} au total`}
+                            icon={ShoppingBag}
+                            iconColor="bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"
+                        />
+                        <KpiCard
+                            label="Revenus générés"
+                            value={formatFCFA(stats?.totalRevenue ?? 0)}
+                            sub="Cumul total"
+                            icon={TrendingUp}
+                            iconColor="bg-blue-600 text-white shadow-xl shadow-blue-600/20"
+                        />
+                    </div>
+
+                    <motion.div
+                        variants={itemVariants}
+                        className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-[2rem] border border-blue-200 dark:border-blue-500/20 p-8"
+                    >
+                        <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center shrink-0">
+                                <Lightbulb size={24} className="text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-black text-blue-900 dark:text-blue-100 mb-3">Insights Opérationnels</h3>
+                                <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
+                                    <li className="flex items-center gap-2">
+                                        <span className="text-blue-600">→</span>
+                                        {stats && stats.activePurchases > 0
+                                            ? `${((stats.activePurchases / stats.totalPurchases) * 100).toFixed(0)}% des achats sont actuellement actifs`
+                                            : "Aucun achat actif détecté"
+                                        }
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="text-blue-600">→</span>
+                                        {stats && stats.activeServices > 0
+                                            ? `${((stats.activeServices / stats.totalServices) * 100).toFixed(0)}% des services sont actifs`
+                                            : "Aucun service actif"
+                                        }
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="text-blue-600">→</span>
+                                        {stats && stats.totalPurchases > 0
+                                            ? `Revenu moyen par achat: ${formatFCFA(stats.totalRevenue / stats.totalPurchases)}`
+                                            : "Pas de données de revenu"
+                                        }
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </motion.div>
+                </>
             )}
 
             {/* ── Tabs ── */}

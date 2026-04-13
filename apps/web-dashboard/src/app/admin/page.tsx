@@ -20,6 +20,9 @@ import {
     RefreshCw,
     Lightbulb,
     Truck,
+    Target,
+    FileText,
+    BarChart3,
 } from "lucide-react";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { useAdmin } from "@/components/providers/AdminProvider";
@@ -484,6 +487,48 @@ export default function AdminDashboardPage() {
                             </div>
 
                             <LayoutDashboard size={200} className="absolute -right-20 -bottom-20 text-white/5 rotate-12 group-hover:scale-125 transition-transform duration-1000" />
+                        </motion.div>
+
+                        {/* Business Growth Operations */}
+                        <motion.div
+                            variants={itemVariants}
+                            className="bg-gradient-to-br from-emerald-950 to-surface-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden group shadow-2xl flex flex-col justify-between"
+                        >
+                            <div className="relative z-10 space-y-6">
+                                <div className="space-y-1">
+                                    <h3 className="text-2xl font-black uppercase tracking-tight">Growth Ops</h3>
+                                    <p className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.2em]">Stratégie Expansion & Rétention</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    {[
+                                        { label: "Customer Success", href: "/admin/customer-success", icon: Activity, color: "bg-emerald-900/50 hover:bg-emerald-700" },
+                                        { label: "Revenue Ops", href: "/admin/revenue-operations", icon: BarChart3, color: "bg-emerald-900/50 hover:bg-emerald-700" },
+                                        { label: "Sales Eng", href: "/admin/sales-engineering", icon: Target, color: "bg-emerald-900/50 hover:bg-emerald-700" },
+                                        { label: "Contracts", href: "/admin/contracts-proposals", icon: FileText, color: "bg-emerald-900/50 hover:bg-emerald-700" },
+                                    ].map((action) => (
+                                        <a
+                                            key={action.href}
+                                            href={action.href}
+                                            className={cn(
+                                                "flex flex-col items-center gap-4 p-6 rounded-[2rem] transition-all duration-500 group/btn border border-emerald-500/20",
+                                                action.color
+                                            )}
+                                        >
+                                            <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover/btn:scale-110 group-hover/btn:rotate-6 transition-all duration-500">
+                                                <action.icon size={24} strokeWidth={1.5} />
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-center">{action.label}</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="relative z-10 mt-10 pt-8 border-t border-emerald-500/20 text-center">
+                                <p className="text-[10px] font-black text-emerald-400/40 uppercase tracking-[0.3em]">Strategic Growth Framework</p>
+                            </div>
+
+                            <TrendingUp size={200} className="absolute -right-20 -bottom-20 text-emerald-900/20 rotate-12 group-hover:scale-125 transition-transform duration-1000" />
                         </motion.div>
                     </div>
                 </>

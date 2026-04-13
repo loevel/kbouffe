@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { User, Store, Wheat, ArrowRight, ChevronLeft } from "lucide-react";
+import { User, Store, Wheat, ArrowRight, ChevronLeft, CheckCircle2, Users, Clock } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 
 export default function RegisterHubPage() {
@@ -245,14 +245,52 @@ export default function RegisterHubPage() {
                         </Link>
                     </motion.div>
 
-                    <motion.div 
+                    {/* Trust Signals */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="mt-12 pt-8 border-t border-surface-200 dark:border-surface-800"
+                    >
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center text-sm">
+                            <div>
+                                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 mb-2">
+                                    <CheckCircle2 size={18} />
+                                </div>
+                                <p className="text-surface-600 dark:text-surface-400">
+                                    <strong>100% Sécurisé</strong><br />
+                                    <span className="text-xs">Données encryptées SSL</span>
+                                </p>
+                            </div>
+                            <div>
+                                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-2">
+                                    <Users size={18} />
+                                </div>
+                                <p className="text-surface-600 dark:text-surface-400">
+                                    <strong>+1,000 utilisateurs</strong><br />
+                                    <span className="text-xs">Font confiance à Kbouffe</span>
+                                </p>
+                            </div>
+                            <div>
+                                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 mb-2">
+                                    <Clock size={18} />
+                                </div>
+                                <p className="text-surface-600 dark:text-surface-400">
+                                    <strong>Support 24/7</strong><br />
+                                    <span className="text-xs">Aide rapide via WhatsApp</span>
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.6 }}
                         className="mt-12 text-center"
                     >
-                        <Link 
-                            href="/" 
+                        <Link
+                            href="/"
                             className="inline-flex items-center gap-2 text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 transition-colors"
                         >
                             <ChevronLeft size={16} />
