@@ -27,8 +27,11 @@ export default function MarketplacePage() {
     const [loading, setLoading] = useState(true);
     const [restaurantId, setRestaurantId] = useState<string | null>(null);
     const [selectedPack, setSelectedPack] = useState<MarketplaceService | null>(null);
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [paymentProvider, setPaymentProvider] = useState<"mtn_momo" | "orange_money">("mtn_momo");
     const [purchasing, setPurchasing] = useState(false);
     const [purchaseStatus, setPurchaseStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+    const [paymentStep, setPaymentStep] = useState<"details" | "payment" | "pending">("details");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -57,9 +60,14 @@ export default function MarketplacePage() {
         fetchData();
     }, []);
 
-    const handlePurchase = async (pack: MarketplaceService) => {
+    const handleInitiatePayment = async (pack: MarketplaceService) => {
         if (!restaurantId) {
             setPurchaseStatus({ type: "error", message: "Restaurant non trouvé" });
+            return;
+        }
+
+        if (!phoneNumber || phoneNumber.trim().length < 9) {
+            setPurchaseStatus({ type: "error", message: "Numéro de téléphone invalide (min. 9 chiffres)" });
             return;
         }
 
@@ -67,28 +75,32 @@ export default function MarketplacePage() {
         setPurchaseStatus(null);
 
         try {
-            const response = await fetch("/api/marketplace/purchase", {
+            const response = await fetch("/api/marketplace/initiate-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     serviceId: pack.id,
                     restaurantId: restaurantId,
+                    amount: pack.price,
+                    phoneNumber: phoneNumber.trim(),
+                    provider: paymentProvider,
                 }),
             });
 
             if (response.ok) {
+                const data = await response.json();
                 setPurchaseStatus({
                     type: "success",
-                    message: `${pack.name} activé avec succès ! ✨`,
+                    message: `Paiement initié. Vérifiez votre téléphone pour confirmer.`,
                 });
-                setSelectedPack(null);
-                // Optionally refresh packs or show purchase confirmation
+                setPaymentStep("pending");
+                // Optionally poll for payment status
                 setTimeout(() => setPurchaseStatus(null), 5000);
             } else {
                 const error = await response.json();
                 setPurchaseStatus({
                     type: "error",
-                    message: error.error || "Erreur lors de l'achat",
+                    message: error.error || "Erreur lors de l'initiation du paiement",
                 });
             }
         } catch (error) {
@@ -538,13 +550,18 @@ export default function MarketplacePage() {
                             {/* Header */}
                             <div className="bg-gradient-to-r from-brand-500 to-brand-600 px-8 py-8 text-white relative">
                                 <button
-                                    onClick={() => setSelectedPack(null)}
+                                    onClick={() => {
+                                        setSelectedPack(null);
+                                        setPaymentStep("details");
+                                        setPhoneNumber("");
+                                        setPurchaseStatus(null);
+                                    }}
                                     className="absolute top-4 right-4 w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center"
                                 >
                                     <X size={18} />
                                 </button>
-                                <h2 className="text-2xl font-black">Confirmer l'achat</h2>
-                                <p className="text-white/80 text-sm mt-1">Activez ce pack pour votre restaurant</p>
+                                <h2 className="text-2xl font-black">{paymentStep === "pending" ? "Paiement en cours..." : "Confirmer l'achat"}</h2>
+                                <p className="text-white/80 text-sm mt-1">{paymentStep === "pending" ? "Veuillez confirmer sur votre téléphone" : "Activez ce pack pour votre restaurant"}</p>
                             </div>
 
                             {/* Content */}
@@ -612,24 +629,121 @@ export default function MarketplacePage() {
                                 )}
                             </div>
 
-                            {/* Footer */}
-                            <div className="border-t border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/50 p-6 flex gap-3">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setSelectedPack(null)}
-                                    className="flex-1 rounded-xl"
-                                    disabled={purchasing}
-                                >
-                                    Annuler
-                                </Button>
-                                <Button
-                                    onClick={() => handlePurchase(selectedPack)}
-                                    className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-black shadow-lg shadow-brand-500/20"
-                                    disabled={purchasing}
-                                >
-                                    {purchasing ? "Traitement..." : "Confirmer l'achat"}
-                                </Button>
-                            </div>
+                            {/* Payment Details Form */}
+                            {paymentStep === "details" && (
+                                <div className="border-t border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/50 p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-surface-700 dark:text-surface-300 mb-2">
+                                            Fournisseur de paiement
+                                        </label>
+                                        <div className="flex gap-3">
+                                            <label className="flex items-center gap-2 flex-1 p-3 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                   onClick={() => setPaymentProvider("mtn_momo")}>
+                                                <input
+                                                    type="radio"
+                                                    name="provider"
+                                                    value="mtn_momo"
+                                                    checked={paymentProvider === "mtn_momo"}
+                                                    onChange={() => setPaymentProvider("mtn_momo")}
+                                                    className="w-4 h-4"
+                                                />
+                                                <span className="font-bold">MTN MoMo</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 flex-1 p-3 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                   onClick={() => setPaymentProvider("orange_money")}>
+                                                <input
+                                                    type="radio"
+                                                    name="provider"
+                                                    value="orange_money"
+                                                    checked={paymentProvider === "orange_money"}
+                                                    onChange={() => setPaymentProvider("orange_money")}
+                                                    className="w-4 h-4"
+                                                />
+                                                <span className="font-bold">Orange Money</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-surface-700 dark:text-surface-300 mb-2">
+                                            Numéro de téléphone
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            value={phoneNumber}
+                                            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                                            placeholder="Ex: 237691234567"
+                                            className="w-full px-4 py-3 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                        />
+                                        <p className="text-xs text-surface-500 mt-2">Format: numéro avec indicatif pays (ex: 237691234567)</p>
+                                    </div>
+
+                                    {/* Status Messages */}
+                                    {purchaseStatus && (
+                                        <div
+                                            className={`rounded-lg p-4 flex items-start gap-3 ${
+                                                purchaseStatus.type === "success"
+                                                    ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
+                                                    : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+                                            }`}
+                                        >
+                                            {purchaseStatus.type === "success" ? (
+                                                <CheckCircle size={18} className="shrink-0 mt-0.5" />
+                                            ) : (
+                                                <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                            )}
+                                            <span className="text-sm font-medium">{purchaseStatus.message}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-3">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                setSelectedPack(null);
+                                                setPaymentStep("details");
+                                                setPhoneNumber("");
+                                            }}
+                                            className="flex-1 rounded-xl"
+                                            disabled={purchasing}
+                                        >
+                                            Annuler
+                                        </Button>
+                                        <Button
+                                            onClick={() => handleInitiatePayment(selectedPack)}
+                                            className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-black shadow-lg shadow-brand-500/20"
+                                            disabled={purchasing || !phoneNumber || phoneNumber.length < 9}
+                                        >
+                                            {purchasing ? "Traitement..." : "Procéder au paiement"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Payment Pending State */}
+                            {paymentStep === "pending" && (
+                                <div className="border-t border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/50 p-6 space-y-4">
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-blue-700 dark:text-blue-400">
+                                        <p className="font-bold mb-2">⏳ Paiement en cours...</p>
+                                        <p className="text-sm mb-3">Veuillez confirmer la transaction sur votre téléphone.</p>
+                                        <p className="text-xs">Un SMS ou une notification a été envoyé à <strong>{phoneNumber}</strong></p>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                setSelectedPack(null);
+                                                setPaymentStep("details");
+                                                setPhoneNumber("");
+                                            }}
+                                            className="flex-1 rounded-xl"
+                                        >
+                                            Fermer
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </motion.div>
                     </motion.div>
                 )}
