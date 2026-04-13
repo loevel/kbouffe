@@ -354,7 +354,7 @@ Kbouffe is a local-first food delivery platform designed to maximize restaurant 
                         onClick={() => {
                             navigator.clipboard.writeText(rfpTemplate);
                             handleCopyTemplate("rfp");
-                            toast({ title: "Copied to clipboard" });
+                            toast.success("Copied to clipboard");
                         }}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 text-sm font-medium"
                     >

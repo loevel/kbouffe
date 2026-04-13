@@ -114,11 +114,7 @@ export default function RevenueOperationsPage() {
             setMetrics(mockMetrics);
             setSegments(mockSegments);
         } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to load metrics",
-                variant: "destructive",
-            });
+            toast.error("Failed to load metrics");
         } finally {
             setLoading(false);
         }

@@ -184,11 +184,7 @@ export default function CustomerSuccessPage() {
         } catch (err) {
             const message = err instanceof Error ? err.message : "Failed to load health scores";
             setError(message);
-            toast({
-                title: "Error",
-                description: message,
-                variant: "destructive",
-            });
+            toast.error(message);
         } finally {
             setLoading(false);
         }
