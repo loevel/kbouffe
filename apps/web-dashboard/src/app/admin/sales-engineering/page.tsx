@@ -130,12 +130,12 @@ export default function SalesEngineeringPage() {
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Sales Engineering</h1>
-                    <p className="text-gray-600 mt-1">Competitive positioning and enterprise playbooks</p>
+                    <h1 className="text-3xl font-bold text-gray-900">{t.adminPages?.salesEngineering?.title ?? "Sales Engineering"}</h1>
+                    <p className="text-gray-600 mt-1">{t.adminPages?.salesEngineering?.subtitle ?? "Competitive positioning and enterprise playbooks"}</p>
                 </div>
                 <Button variant="outline" className="gap-2">
                     <Download className="w-4 h-4" />
-                    Export Battle Cards
+                    {t.adminPages?.salesEngineering?.exportBattleCards ?? "Export Battle Cards"}
                 </Button>
             </div>
 
@@ -146,15 +146,15 @@ export default function SalesEngineeringPage() {
                 animate="visible"
                 variants={itemVariants}
             >
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Competitive Positioning Matrix</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">{t.adminPages?.salesEngineering?.competitiveMatrix ?? "Competitive Positioning Matrix"}</h2>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-gray-200">
-                                <th className="text-left py-3 px-3 font-semibold text-gray-900">Platform</th>
-                                <th className="text-center py-3 px-3 font-semibold text-gray-900">Commission</th>
-                                <th className="text-left py-3 px-3 font-semibold text-gray-900">Strengths</th>
-                                <th className="text-left py-3 px-3 font-semibold text-gray-900">Weaknesses</th>
+                                <th className="text-left py-3 px-3 font-semibold text-gray-900">{t.adminPages?.salesEngineering?.platform ?? "Platform"}</th>
+                                <th className="text-center py-3 px-3 font-semibold text-gray-900">{t.adminPages?.salesEngineering?.commission ?? "Commission"}</th>
+                                <th className="text-left py-3 px-3 font-semibold text-gray-900">{t.adminPages?.salesEngineering?.strengths ?? "Strengths"}</th>
+                                <th className="text-left py-3 px-3 font-semibold text-gray-900">{t.adminPages?.salesEngineering?.weaknesses ?? "Weaknesses"}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -222,7 +222,7 @@ export default function SalesEngineeringPage() {
                 animate="visible"
                 variants={itemVariants}
             >
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Battle Cards: When Competitor Objections Arise</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">{t.adminPages?.salesEngineering?.battleCards ?? "Battle Cards: When Competitor Objections Arise"}</h2>
                 <div className="space-y-3">
                     {battleCards.map((card, idx) => (
                         <motion.div
@@ -256,15 +256,15 @@ export default function SalesEngineeringPage() {
                                     animate={{ opacity: 1, height: "auto" }}
                                 >
                                     <div>
-                                        <h4 className="text-xs font-semibold text-gray-900 uppercase mb-1">Our Advantage</h4>
+                                        <h4 className="text-xs font-semibold text-gray-900 uppercase mb-1">{t.adminPages?.salesEngineering?.ourAdvantage ?? "Our Advantage"}</h4>
                                         <p className="text-sm text-gray-700">{card.ourAdvantage}</p>
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-semibold text-gray-900 uppercase mb-1">Their Advantage</h4>
+                                        <h4 className="text-xs font-semibold text-gray-900 uppercase mb-1">{t.adminPages?.salesEngineering?.theirAdvantage ?? "Their Advantage"}</h4>
                                         <p className="text-sm text-gray-700">{card.competitorAdvantage}</p>
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-semibold text-emerald-900 uppercase mb-1">Our Rebuttal</h4>
+                                        <h4 className="text-xs font-semibold text-emerald-900 uppercase mb-1">{t.adminPages?.salesEngineering?.ourRebuttal ?? "Our Rebuttal"}</h4>
                                         <p className="text-sm text-emerald-700 font-medium">{card.ourRebuttal}</p>
                                     </div>
                                 </motion.div>
@@ -281,7 +281,7 @@ export default function SalesEngineeringPage() {
                 animate="visible"
                 variants={itemVariants}
             >
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Enterprise Sales Playbook (120-Day Cycle)</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">{t.adminPages?.salesEngineering?.enterprisePlaybook ?? "Enterprise Sales Playbook (120-Day Cycle)"}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {salesPlaybook.map((phase, idx) => (
                         <div key={idx} className="border border-blue-200 bg-blue-50 rounded-lg p-4">
@@ -312,7 +312,7 @@ export default function SalesEngineeringPage() {
                 animate="visible"
                 variants={itemVariants}
             >
-                <h2 className="text-lg font-bold text-emerald-900 mb-4">Key Selling Points (Always Mention)</h2>
+                <h2 className="text-lg font-bold text-emerald-900 mb-4">{t.adminPages?.salesEngineering?.keySellingPoints ?? "Key Selling Points (Always Mention)"}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-emerald-900">
                     <div className="flex gap-2">
                         <span className="font-bold">1. 75% Cost Savings</span>

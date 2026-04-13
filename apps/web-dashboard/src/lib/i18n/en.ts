@@ -1254,4 +1254,139 @@ export const en: TranslationKeys = {
         notificationChannels: "Notification channels",
         notificationChannelsDesc: "Choose how to inform your customers about order updates.",
     },
+
+    // Business Growth Admin Pages
+    adminPages: {
+        customerSuccess: {
+            title: "Customer Success",
+            subtitle: "Health scoring and retention analytics",
+            refreshData: "Refresh Data",
+            loadingMessage: "Loading health scores...",
+
+            stats: {
+                totalRestaurants: "Total Restaurants",
+                healthy: "Healthy",
+                atRisk: "At-Risk",
+                churning: "Churning",
+                avgScore: "Avg Score",
+            },
+
+            filter: "Filter",
+            filterAll: "All",
+            filterHealthy: "Healthy",
+            filterAtRisk: "At-Risk",
+            filterChurning: "Churning",
+
+            components: "Score Components",
+            recommendations: "Recommended Actions",
+            noResults: "No restaurants found for this tier",
+        },
+
+        revenueOperations: {
+            title: "Revenue Operations",
+            subtitle: "Pipeline forecasting and pricing optimization",
+            refreshData: "Refresh Data",
+            loadingMessage: "Loading revenue metrics...",
+
+            stats: {
+                mrr: "MRR",
+                mrrTarget: "Target: 15M by M12",
+                activeRestaurants: "Active Restaurants",
+                nrr: "NRR",
+                nrrBelowTarget: "Target: 95%+ (below target)",
+                totalGmv: "Total GMV",
+                commissionRate: "5% commission rate",
+            },
+
+            revenueComposition: "Revenue Composition",
+            transactionCommission: "Transaction Commission",
+            boostPacks: "Boost Packs",
+            total: "Total",
+
+            keyMetrics: "Key Metrics",
+            avgRestaurantValue: "Avg Restaurant Value",
+            churnRateBaseline: "Churn Rate Baseline",
+            boostAdoptionRate: "Boost Adoption Rate",
+
+            revenueOpportunities: "Revenue Opportunities",
+            reduceChurn: "Reduce churn 45%→30%: +2M FCFA/mo",
+            boostAdoption: "Boost adoption 5%→15%: +800K FCFA/mo",
+            tieredPricing: "Tiered pricing model: +1.2M FCFA/mo",
+
+            segments: "Customer Segments",
+            segmentCount: "Count",
+            segmentAvgGmv: "Avg GMV",
+            segmentChurn: "Churn",
+            segmentLtv: "LTV",
+            segmentGrowth: "Growth",
+            segmentBoostRate: "Boost Rate",
+
+            strategicRecommendations: "Strategic Recommendations",
+        },
+
+        salesEngineering: {
+            title: "Sales Engineering",
+            subtitle: "Competitive positioning and enterprise playbooks",
+            exportBattleCards: "Export Battle Cards",
+
+            competitiveMatrix: "Competitive Positioning Matrix",
+            platform: "Platform",
+            commission: "Commission",
+            strengths: "Strengths",
+            weaknesses: "Weaknesses",
+
+            battleCards: "Battle Cards: When Competitor Objections Arise",
+            situation: "Situation",
+            ourAdvantage: "Our Advantage",
+            theirAdvantage: "Their Advantage",
+            ourRebuttal: "Our Rebuttal",
+
+            enterprisePlaybook: "Enterprise Sales Playbook (120-Day Cycle)",
+            discovery: "Discovery",
+            proofOfValue: "Proof of Value",
+            pilotProgram: "Pilot Program",
+            enterpriseContract: "Enterprise Contract",
+
+            keySellingPoints: "Key Selling Points (Always Mention)",
+            costSavings: "75% Cost Savings",
+            dedicatedSupport: "Dedicated Support",
+            provenGrowth: "Proven Growth",
+            riskFreeTrial: "Risk-Free Trial",
+        },
+
+        contractsProposals: {
+            title: "Contracts & Proposals",
+            subtitle: "Agreement templates and sales proposals",
+            downloadAllTemplates: "Download All Templates",
+
+            rfpProposalStructure: "RFP/Proposal Structure",
+            executiveSummary: "Executive Summary",
+            currentState: "Current State",
+            solution: "Solution",
+            financialImpact: "Financial Impact",
+            riskMitigation: "Risk Mitigation",
+            successCriteria: "Success Criteria",
+
+            enterpriseRfpTemplate: "Enterprise RFP Template",
+            readyToCustomize: "Ready-to-customize proposal document",
+            copyToClipboard: "Copy",
+            copiedToClipboard: "Copied",
+
+            agreementTemplates: "Agreement Templates by Segment",
+            keyTerms: "Key Terms",
+            highlights: "Highlights",
+
+            standardAgreement: "Standard Restaurant Agreement",
+            growthTierAgreement: "Growth Tier Agreement",
+            enterprisePartnership: "Enterprise Partnership",
+            b2bSupplierAgreement: "B2B Supplier Agreement",
+            whiteLabelIntegration: "White-Label Integration",
+
+            legalReview: "Legal Review Required",
+            legalConsiderations: "Legal considerations to address",
+
+            copy: "Copy",
+            copied: "Copied",
+        },
+    },
 } as const;

@@ -311,12 +311,12 @@ Kbouffe is a local-first food delivery platform designed to maximize restaurant 
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Contracts & Proposals</h1>
-                    <p className="text-gray-600 mt-1">Agreement templates and sales proposals</p>
+                    <h1 className="text-3xl font-bold text-gray-900">{t.adminPages?.contractsProposals?.title ?? "Contracts & Proposals"}</h1>
+                    <p className="text-gray-600 mt-1">{t.adminPages?.contractsProposals?.subtitle ?? "Agreement templates and sales proposals"}</p>
                 </div>
                 <Button variant="outline" className="gap-2">
                     <Download className="w-4 h-4" />
-                    Download All Templates
+                    {t.adminPages?.contractsProposals?.downloadAllTemplates ?? "Download All Templates"}
                 </Button>
             </div>
 
@@ -327,7 +327,7 @@ Kbouffe is a local-first food delivery platform designed to maximize restaurant 
                 animate="visible"
                 variants={itemVariants}
             >
-                <h2 className="text-lg font-bold text-gray-900 mb-4">RFP/Proposal Structure</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">{t.adminPages?.contractsProposals?.rfpProposalStructure ?? "RFP/Proposal Structure"}</h2>
                 <div className="space-y-3">
                     {proposalSections.map((section, idx) => (
                         <div key={idx} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
@@ -347,8 +347,8 @@ Kbouffe is a local-first food delivery platform designed to maximize restaurant 
             >
                 <div className="flex items-start justify-between mb-4">
                     <div>
-                        <h2 className="text-lg font-bold text-blue-900">Enterprise RFP Template</h2>
-                        <p className="text-sm text-blue-700 mt-1">Ready-to-customize proposal document</p>
+                        <h2 className="text-lg font-bold text-blue-900">{t.adminPages?.contractsProposals?.enterpriseRfpTemplate ?? "Enterprise RFP Template"}</h2>
+                        <p className="text-sm text-blue-700 mt-1">{t.adminPages?.contractsProposals?.readyToCustomize ?? "Ready-to-customize proposal document"}</p>
                     </div>
                     <button
                         onClick={() => {
@@ -382,7 +382,7 @@ Kbouffe is a local-first food delivery platform designed to maximize restaurant 
                 initial="hidden"
                 animate="visible"
             >
-                <h2 className="text-lg font-bold text-gray-900">Agreement Templates by Segment</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t.adminPages?.contractsProposals?.agreementTemplates ?? "Agreement Templates by Segment"}</h2>
                 <div className="grid grid-cols-1 gap-4">
                     {templates.map((template) => (
                         <motion.div
@@ -456,7 +456,7 @@ Kbouffe is a local-first food delivery platform designed to maximize restaurant 
                 <div className="flex gap-3">
                     <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
-                        <h3 className="font-bold text-amber-900">Legal Review Required</h3>
+                        <h3 className="font-bold text-amber-900">{t.adminPages?.contractsProposals?.legalReview ?? "Legal Review Required"}</h3>
                         <ul className="space-y-2 mt-2 text-sm text-amber-900">
                             <li>• Have local legal counsel review all agreements before signing</li>
                             <li>• Ensure compliance with local food delivery regulations</li>

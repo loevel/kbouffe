@@ -156,11 +156,11 @@ export default function RevenueOperationsPage() {
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Revenue Operations</h1>
-                    <p className="text-gray-600 mt-1">Pipeline forecasting and pricing optimization</p>
+                    <h1 className="text-3xl font-bold text-gray-900">{t.adminPages?.revenueOperations?.title ?? "Revenue Operations"}</h1>
+                    <p className="text-gray-600 mt-1">{t.adminPages?.revenueOperations?.subtitle ?? "Pipeline forecasting and pricing optimization"}</p>
                 </div>
                 <Button onClick={loadMetrics} variant="outline">
-                    Refresh Data
+                    {t.adminPages?.revenueOperations?.refreshData ?? "Refresh Data"}
                 </Button>
             </div>
 
@@ -174,11 +174,11 @@ export default function RevenueOperationsPage() {
                 <motion.div className="bg-white rounded-lg border border-gray-200 p-4" variants={itemVariants}>
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">MRR</p>
+                            <p className="text-sm font-medium text-gray-600">{t.adminPages?.revenueOperations?.stats?.mrr ?? "MRR"}</p>
                             <p className="text-2xl font-bold text-gray-900 mt-1">
                                 {formatCurrency(metrics.monthlyRecurringRevenue)}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">Target: 15M by M12</p>
+                            <p className="text-xs text-gray-500 mt-1">{t.adminPages?.revenueOperations?.stats?.mrrTarget ?? "Target: 15M by M12"}</p>
                         </div>
                         <DollarSign className="w-8 h-8 text-blue-400" />
                     </div>
@@ -187,9 +187,9 @@ export default function RevenueOperationsPage() {
                 <motion.div className="bg-white rounded-lg border border-green-200 bg-green-50 p-4" variants={itemVariants}>
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-sm font-medium text-green-700">Active Restaurants</p>
+                            <p className="text-sm font-medium text-green-700">{t.adminPages?.revenueOperations?.stats?.activeRestaurants ?? "Active Restaurants"}</p>
                             <p className="text-2xl font-bold text-green-900 mt-1">{metrics.activeRestaurants}</p>
-                            <p className="text-xs text-green-600 mt-1">+{metrics.newRestaurantsThisMonth} this month</p>
+                            <p className="text-xs text-green-600 mt-1">+{metrics.newRestaurantsThisMonth} {t.adminPages?.revenueOperations?.stats?.mrrTarget?.split(" ")[1]}</p>
                         </div>
                         <Users className="w-8 h-8 text-green-600" />
                     </div>
@@ -198,9 +198,9 @@ export default function RevenueOperationsPage() {
                 <motion.div className="bg-white rounded-lg border border-purple-200 bg-purple-50 p-4" variants={itemVariants}>
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-sm font-medium text-purple-700">NRR</p>
+                            <p className="text-sm font-medium text-purple-700">{t.adminPages?.revenueOperations?.stats?.nrr ?? "NRR"}</p>
                             <p className="text-2xl font-bold text-purple-900 mt-1">{metrics.netRevenueRetention}%</p>
-                            <p className="text-xs text-purple-600 mt-1">Target: 95%+ (below target)</p>
+                            <p className="text-xs text-purple-600 mt-1">{t.adminPages?.revenueOperations?.stats?.nrrBelowTarget ?? "Target: 95%+ (below target)"}</p>
                         </div>
                         <TrendingUp className="w-8 h-8 text-purple-600" />
                     </div>
@@ -209,11 +209,11 @@ export default function RevenueOperationsPage() {
                 <motion.div className="bg-white rounded-lg border border-orange-200 bg-orange-50 p-4" variants={itemVariants}>
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-sm font-medium text-orange-700">Total GMV</p>
+                            <p className="text-sm font-medium text-orange-700">{t.adminPages?.revenueOperations?.stats?.totalGmv ?? "Total GMV"}</p>
                             <p className="text-2xl font-bold text-orange-900 mt-1">
                                 {formatCurrency(metrics.totalGmv)}
                             </p>
-                            <p className="text-xs text-orange-600 mt-1">5% commission rate</p>
+                            <p className="text-xs text-orange-600 mt-1">{t.adminPages?.revenueOperations?.stats?.commissionRate ?? "5% commission rate"}</p>
                         </div>
                         <BarChart3 className="w-8 h-8 text-orange-600" />
                     </div>
@@ -228,55 +228,55 @@ export default function RevenueOperationsPage() {
                 animate="visible"
             >
                 <motion.div className="bg-white rounded-lg border border-gray-200 p-4" variants={itemVariants}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Revenue Composition</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.revenueComposition ?? "Revenue Composition"}</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Transaction Commission</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.transactionCommission ?? "Transaction Commission"}</span>
                             <span className="font-semibold text-gray-900">{formatCurrency(metrics.totalCommissions)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Boost Packs</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.boostPacks ?? "Boost Packs"}</span>
                             <span className="font-semibold text-gray-900">{formatCurrency(metrics.boostPackRevenue)}</span>
                         </div>
                         <div className="border-t pt-2 flex justify-between items-center font-semibold">
-                            <span className="text-gray-900">Total</span>
+                            <span className="text-gray-900">{t.adminPages?.revenueOperations?.total ?? "Total"}</span>
                             <span className="text-gray-900">{formatCurrency(metrics.totalCommissions + metrics.boostPackRevenue)}</span>
                         </div>
                     </div>
                 </motion.div>
 
                 <motion.div className="bg-white rounded-lg border border-gray-200 p-4" variants={itemVariants}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Key Metrics</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.keyMetrics ?? "Key Metrics"}</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Avg Restaurant Value</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.avgRestaurantValue ?? "Avg Restaurant Value"}</span>
                             <span className="font-semibold text-gray-900">{formatCurrency(metrics.avgRestaurantValue)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Churn Rate Baseline</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.churnRateBaseline ?? "Churn Rate Baseline"}</span>
                             <span className="font-semibold text-red-600">45%</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Boost Adoption Rate</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.boostAdoptionRate ?? "Boost Adoption Rate"}</span>
                             <span className="font-semibold text-amber-600">5%</span>
                         </div>
                     </div>
                 </motion.div>
 
                 <motion.div className="bg-white rounded-lg border border-gray-200 p-4" variants={itemVariants}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Revenue Opportunities</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.revenueOpportunities ?? "Revenue Opportunities"}</h3>
                     <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                             <ArrowUp className="w-4 h-4 text-green-600" />
-                            <span>Reduce churn 45%→30%: +2M FCFA/mo</span>
+                            <span>{t.adminPages?.revenueOperations?.reduceChurn ?? "Reduce churn 45%→30%: +2M FCFA/mo"}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <ArrowUp className="w-4 h-4 text-green-600" />
-                            <span>Boost adoption 5%→15%: +800K FCFA/mo</span>
+                            <span>{t.adminPages?.revenueOperations?.boostAdoption ?? "Boost adoption 5%→15%: +800K FCFA/mo"}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <ArrowUp className="w-4 h-4 text-green-600" />
-                            <span>Tiered pricing model: +1.2M FCFA/mo</span>
+                            <span>{t.adminPages?.revenueOperations?.tieredPricing ?? "Tiered pricing model: +1.2M FCFA/mo"}</span>
                         </div>
                     </div>
                 </motion.div>
@@ -289,18 +289,18 @@ export default function RevenueOperationsPage() {
                 initial="hidden"
                 animate="visible"
             >
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Customer Segments</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">{t.adminPages?.revenueOperations?.segments ?? "Customer Segments"}</h2>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-gray-200">
-                                <th className="text-left py-2 px-2 font-semibold text-gray-900">Segment</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">Count</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">Avg GMV</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">Churn Rate</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">LTV</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">Growth</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">Boost Rate</th>
+                                <th className="text-left py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segments ?? "Segment"}</th>
+                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentCount ?? "Count"}</th>
+                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentAvgGmv ?? "Avg GMV"}</th>
+                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentChurn ?? "Churn Rate"}</th>
+                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentLtv ?? "LTV"}</th>
+                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentGrowth ?? "Growth"}</th>
+                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentBoostRate ?? "Boost Rate"}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -334,7 +334,7 @@ export default function RevenueOperationsPage() {
                 initial="hidden"
                 animate="visible"
             >
-                <h2 className="text-lg font-bold text-blue-900 mb-4">Strategic Recommendations</h2>
+                <h2 className="text-lg font-bold text-blue-900 mb-4">{t.adminPages?.revenueOperations?.strategicRecommendations ?? "Strategic Recommendations"}</h2>
                 <div className="space-y-3 text-sm text-blue-900">
                     <div className="flex gap-2">
                         <span className="font-semibold">1. Implement Tiered Pricing (Q1)</span>

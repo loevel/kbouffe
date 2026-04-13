@@ -224,8 +224,8 @@ export default function CustomerSuccessPage() {
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Customer Success</h1>
-                    <p className="text-gray-600 mt-1">Health scoring and retention analytics</p>
+                    <h1 className="text-3xl font-bold text-gray-900">{t.adminPages?.customerSuccess?.title ?? "Customer Success"}</h1>
+                    <p className="text-gray-600 mt-1">{t.adminPages?.customerSuccess?.subtitle ?? "Health scoring and retention analytics"}</p>
                 </div>
                 <Button
                     onClick={loadHealthScores}
@@ -233,7 +233,7 @@ export default function CustomerSuccessPage() {
                     className="gap-2"
                 >
                     <Download className="w-4 h-4" />
-                    Refresh Data
+                    {t.adminPages?.customerSuccess?.refreshData ?? "Refresh Data"}
                 </Button>
             </div>
 
@@ -250,7 +250,7 @@ export default function CustomerSuccessPage() {
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Total Restaurants</p>
+                            <p className="text-sm font-medium text-gray-600">{t.adminPages?.customerSuccess?.stats?.totalRestaurants ?? "Total Restaurants"}</p>
                             <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
                         </div>
                         <Activity className="w-8 h-8 text-gray-400" />
@@ -263,7 +263,7 @@ export default function CustomerSuccessPage() {
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-emerald-700">Healthy</p>
+                            <p className="text-sm font-medium text-emerald-700">{t.adminPages?.customerSuccess?.stats?.healthy ?? "Healthy"}</p>
                             <p className="text-2xl font-bold text-emerald-900 mt-1">{stats.healthy}</p>
                         </div>
                         <CheckCircle2 className="w-8 h-8 text-emerald-600" />
@@ -276,7 +276,7 @@ export default function CustomerSuccessPage() {
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-amber-700">At-Risk</p>
+                            <p className="text-sm font-medium text-amber-700">{t.adminPages?.customerSuccess?.stats?.atRisk ?? "At-Risk"}</p>
                             <p className="text-2xl font-bold text-amber-900 mt-1">{stats.atRisk}</p>
                         </div>
                         <AlertCircle className="w-8 h-8 text-amber-600" />
@@ -289,7 +289,7 @@ export default function CustomerSuccessPage() {
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-red-700">Churning</p>
+                            <p className="text-sm font-medium text-red-700">{t.adminPages?.customerSuccess?.stats?.churning ?? "Churning"}</p>
                             <p className="text-2xl font-bold text-red-900 mt-1">{stats.churning}</p>
                         </div>
                         <AlertCircle className="w-8 h-8 text-red-600" />
@@ -302,7 +302,7 @@ export default function CustomerSuccessPage() {
                 >
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-blue-700">Avg Score</p>
+                            <p className="text-sm font-medium text-blue-700">{t.adminPages?.customerSuccess?.stats?.avgScore ?? "Avg Score"}</p>
                             <p className="text-2xl font-bold text-blue-900 mt-1">{stats.avgScore}</p>
                         </div>
                         <BarChart3 className="w-8 h-8 text-blue-600" />
@@ -314,20 +314,25 @@ export default function CustomerSuccessPage() {
             <div className="flex gap-2">
                 <Filter className="w-4 h-4 text-gray-600 mt-2.5" />
                 <div className="flex gap-2 flex-wrap">
-                    {["all", "Healthy", "At-Risk", "Churning"].map((tier) => (
+                    {[
+                        { key: "all", label: t.adminPages?.customerSuccess?.filterAll ?? "All" },
+                        { key: "Healthy", label: t.adminPages?.customerSuccess?.filterHealthy ?? "Healthy" },
+                        { key: "At-Risk", label: t.adminPages?.customerSuccess?.filterAtRisk ?? "At-Risk" },
+                        { key: "Churning", label: t.adminPages?.customerSuccess?.filterChurning ?? "Churning" },
+                    ].map((tier) => (
                         <button
-                            key={tier}
-                            onClick={() => setTierFilter(tier)}
+                            key={tier.key}
+                            onClick={() => setTierFilter(tier.key)}
                             className={cn(
                                 "px-3 py-1 rounded-full text-sm font-medium border transition-colors",
-                                tierFilter === tier
-                                    ? tier === "all"
+                                tierFilter === tier.key
+                                    ? tier.key === "all"
                                         ? "bg-gray-900 text-white border-gray-900"
                                         : "border-current text-gray-900 bg-gray-100"
                                     : "border-gray-300 text-gray-600 hover:border-gray-400"
                             )}
                         >
-                            {tier === "all" ? "All" : tier}
+                            {tier.label}
                         </button>
                     ))}
                 </div>
@@ -390,7 +395,7 @@ export default function CustomerSuccessPage() {
                                         {/* Components */}
                                         <div>
                                             <h4 className="text-xs font-semibold uppercase opacity-75 mb-2">
-                                                Score Components
+                                                {t.adminPages?.customerSuccess?.components ?? "Score Components"}
                                             </h4>
                                             <div className="space-y-1">
                                                 {score.components.map((comp) => (
@@ -417,7 +422,7 @@ export default function CustomerSuccessPage() {
                                         {score.recommendations.length > 0 && (
                                             <div>
                                                 <h4 className="text-xs font-semibold uppercase opacity-75 mb-2">
-                                                    Recommended Actions
+                                                    {t.adminPages?.customerSuccess?.recommendations ?? "Recommended Actions"}
                                                 </h4>
                                                 <ul className="space-y-1">
                                                     {score.recommendations.map((rec, idx) => (
@@ -439,7 +444,7 @@ export default function CustomerSuccessPage() {
             {filteredScores.length === 0 && (
                 <div className="text-center py-12">
                     <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No restaurants found for this tier</p>
+                    <p className="text-gray-600">{t.adminPages?.customerSuccess?.noResults ?? "No restaurants found for this tier"}</p>
                 </div>
             )}
         </div>

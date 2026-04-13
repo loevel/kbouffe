@@ -1252,6 +1252,141 @@ export const fr = {
         notificationChannels: "Canaux de notification",
         notificationChannelsDesc: "Choisissez comment informer vos clients des mises a jour de commande.",
     },
+
+    // Business Growth Admin Pages
+    adminPages: {
+        customerSuccess: {
+            title: "Succès Client",
+            subtitle: "Modélisation de la santé et analyses de rétention",
+            refreshData: "Actualiser les données",
+            loadingMessage: "Chargement des scores de santé...",
+
+            stats: {
+                totalRestaurants: "Restaurants Total",
+                healthy: "Sain",
+                atRisk: "À Risque",
+                churning: "Churn",
+                avgScore: "Score Moyen",
+            },
+
+            filter: "Filtre",
+            filterAll: "Tous",
+            filterHealthy: "Sain",
+            filterAtRisk: "À Risque",
+            filterChurning: "Churn",
+
+            components: "Composants du Score",
+            recommendations: "Actions Recommandées",
+            noResults: "Aucun restaurant trouvé pour ce tier",
+        },
+
+        revenueOperations: {
+            title: "Opérations Revenus",
+            subtitle: "Prévision de pipeline et optimisation des prix",
+            refreshData: "Actualiser les données",
+            loadingMessage: "Chargement des métriques de revenus...",
+
+            stats: {
+                mrr: "MRR",
+                mrrTarget: "Cible : 15M par M12",
+                activeRestaurants: "Restaurants Actifs",
+                nrr: "NRR",
+                nrrBelowTarget: "Cible : 95%+ (sous la cible)",
+                totalGmv: "GMV Total",
+                commissionRate: "Taux de commission 5%",
+            },
+
+            revenueComposition: "Composition des Revenus",
+            transactionCommission: "Commission Transactions",
+            boostPacks: "Boost Packs",
+            total: "Total",
+
+            keyMetrics: "Métriques Clés",
+            avgRestaurantValue: "Valeur Moy. Restaurant",
+            churnRateBaseline: "Taux de Churn Baseline",
+            boostAdoptionRate: "Taux d'Adoption Boost",
+
+            revenueOpportunities: "Opportunités de Revenu",
+            reduceChurn: "Réduire churn 45%→30%: +2M FCFA/mo",
+            boostAdoption: "Adoption Boost 5%→15%: +800K FCFA/mo",
+            tieredPricing: "Modèle prix échelonné: +1.2M FCFA/mo",
+
+            segments: "Segments Clients",
+            segmentCount: "Nombre",
+            segmentAvgGmv: "GMV Moyen",
+            segmentChurn: "Churn",
+            segmentLtv: "LTV",
+            segmentGrowth: "Croissance",
+            segmentBoostRate: "Taux Boost",
+
+            strategicRecommendations: "Recommandations Stratégiques",
+        },
+
+        salesEngineering: {
+            title: "Ingénierie Ventes",
+            subtitle: "Positionnement compétitif et playbooks d'entreprise",
+            exportBattleCards: "Exporter les Battle Cards",
+
+            competitiveMatrix: "Matrice de Positionnement Compétitif",
+            platform: "Plateforme",
+            commission: "Commission",
+            strengths: "Forces",
+            weaknesses: "Faiblesses",
+
+            battleCards: "Battle Cards: Quand les Objections Surviennent",
+            situation: "Situation",
+            ourAdvantage: "Notre Avantage",
+            theirAdvantage: "Leur Avantage",
+            ourRebuttal: "Notre Contre-Argument",
+
+            enterprisePlaybook: "Playbook Ventes Entreprise (Cycle 120 Jours)",
+            discovery: "Découverte",
+            proofOfValue: "Preuve de Valeur",
+            pilotProgram: "Programme Pilote",
+            enterpriseContract: "Contrat Entreprise",
+
+            keySellingPoints: "Points de Vente Clés (À Toujours Mentionner)",
+            costSavings: "Économies de Coûts 75%",
+            dedicatedSupport: "Support Dédié",
+            provenGrowth: "Croissance Prouvée",
+            riskFreeTrial: "Essai Sans Risque",
+        },
+
+        contractsProposals: {
+            title: "Contrats & Propositions",
+            subtitle: "Modèles d'accord et réponses RFP",
+            downloadAllTemplates: "Télécharger Tous les Modèles",
+
+            rfpProposalStructure: "Structure RFP/Proposition",
+            executiveSummary: "Résumé Exécutif",
+            currentState: "État Actuel",
+            solution: "Solution",
+            financialImpact: "Impact Financier",
+            riskMitigation: "Atténuation des Risques",
+            successCriteria: "Critères de Succès",
+
+            enterpriseRfpTemplate: "Modèle RFP Entreprise",
+            readyToCustomize: "Document prêt à personnaliser",
+            copyToClipboard: "Copier",
+            copiedToClipboard: "Copié",
+
+            agreementTemplates: "Modèles d'Accord par Segment",
+            keyTerms: "Conditions Clés",
+            highlights: "Points Clés",
+
+            standardAgreement: "Accord Restaurant Standard",
+            growthTierAgreement: "Accord Tier Croissance",
+            enterprisePartnership: "Partenariat Entreprise",
+            b2bSupplierAgreement: "Accord Fournisseur B2B",
+            whiteLabelIntegration: "Intégration White-Label",
+
+            legalReview: "Examen Juridique Requis",
+            legalConsiderations: "Points de droit à considérer",
+
+            copy: "Copier",
+            copied: "Copié",
+        },
+    },
 } as const;
 
 // Recursive type that widens literal string types to string
