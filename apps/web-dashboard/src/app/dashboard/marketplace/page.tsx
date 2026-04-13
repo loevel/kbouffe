@@ -28,6 +28,8 @@ export default function MarketplacePage() {
     const [restaurantId, setRestaurantId] = useState<string | null>(null);
     const [selectedPack, setSelectedPack] = useState<MarketplaceService | null>(null);
     const [phoneNumber, setPhoneNumber] = useState("");
+    const [giftCardCode, setGiftCardCode] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<"mobile_money" | "gift_card">("mobile_money");
     const [paymentProvider, setPaymentProvider] = useState<"mtn_momo" | "orange_money">("mtn_momo");
     const [purchasing, setPurchasing] = useState(false);
     const [purchaseStatus, setPurchaseStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -66,9 +68,17 @@ export default function MarketplacePage() {
             return;
         }
 
-        if (!phoneNumber || phoneNumber.trim().length < 9) {
-            setPurchaseStatus({ type: "error", message: "Numéro de téléphone invalide (min. 9 chiffres)" });
-            return;
+        // Validate payment method inputs
+        if (paymentMethod === "mobile_money") {
+            if (!phoneNumber || phoneNumber.trim().length < 9) {
+                setPurchaseStatus({ type: "error", message: "Numéro de téléphone invalide (min. 9 chiffres)" });
+                return;
+            }
+        } else if (paymentMethod === "gift_card") {
+            if (!giftCardCode || giftCardCode.trim().length === 0) {
+                setPurchaseStatus({ type: "error", message: "Code carte cadeaux requis" });
+                return;
+            }
         }
 
         setPurchasing(true);
@@ -82,20 +92,38 @@ export default function MarketplacePage() {
                     serviceId: pack.id,
                     restaurantId: restaurantId,
                     amount: pack.price,
-                    phoneNumber: phoneNumber.trim(),
-                    provider: paymentProvider,
+                    paymentMethod,
+                    ...(paymentMethod === "mobile_money" && {
+                        phoneNumber: phoneNumber.trim(),
+                        provider: paymentProvider,
+                    }),
+                    ...(paymentMethod === "gift_card" && {
+                        giftCardCode: giftCardCode.trim(),
+                    }),
                 }),
             });
 
             if (response.ok) {
                 const data = await response.json();
-                setPurchaseStatus({
-                    type: "success",
-                    message: `Paiement initié. Vérifiez votre téléphone pour confirmer.`,
-                });
-                setPaymentStep("pending");
-                // Optionally poll for payment status
-                setTimeout(() => setPurchaseStatus(null), 5000);
+
+                if (paymentMethod === "gift_card") {
+                    setPurchaseStatus({
+                        type: "success",
+                        message: `✨ ${pack.name} activé immédiatement!`,
+                    });
+                    setTimeout(() => {
+                        setSelectedPack(null);
+                        setPaymentStep("details");
+                        setGiftCardCode("");
+                        setPurchaseStatus(null);
+                    }, 2000);
+                } else {
+                    setPurchaseStatus({
+                        type: "success",
+                        message: `Paiement initié. Vérifiez votre téléphone pour confirmer.`,
+                    });
+                    setPaymentStep("pending");
+                }
             } else {
                 const error = await response.json();
                 setPurchaseStatus({
@@ -634,49 +662,103 @@ export default function MarketplacePage() {
                                 <div className="border-t border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-800/50 p-6 space-y-4">
                                     <div>
                                         <label className="block text-sm font-bold text-surface-700 dark:text-surface-300 mb-2">
-                                            Fournisseur de paiement
+                                            Méthode de paiement
                                         </label>
                                         <div className="flex gap-3">
                                             <label className="flex items-center gap-2 flex-1 p-3 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
-                                                   onClick={() => setPaymentProvider("mtn_momo")}>
+                                                   onClick={() => setPaymentMethod("mobile_money")}>
                                                 <input
                                                     type="radio"
-                                                    name="provider"
-                                                    value="mtn_momo"
-                                                    checked={paymentProvider === "mtn_momo"}
-                                                    onChange={() => setPaymentProvider("mtn_momo")}
+                                                    name="method"
+                                                    value="mobile_money"
+                                                    checked={paymentMethod === "mobile_money"}
+                                                    onChange={() => setPaymentMethod("mobile_money")}
                                                     className="w-4 h-4"
                                                 />
-                                                <span className="font-bold">MTN MoMo</span>
+                                                <span className="font-bold">Mobile Money</span>
                                             </label>
                                             <label className="flex items-center gap-2 flex-1 p-3 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
-                                                   onClick={() => setPaymentProvider("orange_money")}>
+                                                   onClick={() => setPaymentMethod("gift_card")}>
                                                 <input
                                                     type="radio"
-                                                    name="provider"
-                                                    value="orange_money"
-                                                    checked={paymentProvider === "orange_money"}
-                                                    onChange={() => setPaymentProvider("orange_money")}
+                                                    name="method"
+                                                    value="gift_card"
+                                                    checked={paymentMethod === "gift_card"}
+                                                    onChange={() => setPaymentMethod("gift_card")}
                                                     className="w-4 h-4"
                                                 />
-                                                <span className="font-bold">Orange Money</span>
+                                                <span className="font-bold">Carte Cadeaux</span>
                                             </label>
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-bold text-surface-700 dark:text-surface-300 mb-2">
-                                            Numéro de téléphone
-                                        </label>
-                                        <input
-                                            type="tel"
-                                            value={phoneNumber}
-                                            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-                                            placeholder="Ex: 237691234567"
-                                            className="w-full px-4 py-3 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                        />
-                                        <p className="text-xs text-surface-500 mt-2">Format: numéro avec indicatif pays (ex: 237691234567)</p>
-                                    </div>
+                                    {/* Mobile Money Section */}
+                                    {paymentMethod === "mobile_money" && (
+                                        <>
+                                            <div>
+                                                <label className="block text-sm font-bold text-surface-700 dark:text-surface-300 mb-2">
+                                                    Fournisseur
+                                                </label>
+                                                <div className="flex gap-3">
+                                                    <label className="flex items-center gap-2 flex-1 p-3 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                           onClick={() => setPaymentProvider("mtn_momo")}>
+                                                        <input
+                                                            type="radio"
+                                                            name="provider"
+                                                            value="mtn_momo"
+                                                            checked={paymentProvider === "mtn_momo"}
+                                                            onChange={() => setPaymentProvider("mtn_momo")}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        <span className="font-bold">MTN MoMo</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 flex-1 p-3 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                           onClick={() => setPaymentProvider("orange_money")}>
+                                                        <input
+                                                            type="radio"
+                                                            name="provider"
+                                                            value="orange_money"
+                                                            checked={paymentProvider === "orange_money"}
+                                                            onChange={() => setPaymentProvider("orange_money")}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        <span className="font-bold">Orange Money</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-bold text-surface-700 dark:text-surface-300 mb-2">
+                                                    Numéro de téléphone
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    value={phoneNumber}
+                                                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                                                    placeholder="Ex: 237691234567"
+                                                    className="w-full px-4 py-3 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                                />
+                                                <p className="text-xs text-surface-500 mt-2">Format: numéro avec indicatif pays (ex: 237691234567)</p>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Gift Card Section */}
+                                    {paymentMethod === "gift_card" && (
+                                        <div>
+                                            <label className="block text-sm font-bold text-surface-700 dark:text-surface-300 mb-2">
+                                                Code carte cadeaux
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={giftCardCode}
+                                                onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                                                placeholder="Ex: GC-ABCD-EFGH"
+                                                className="w-full px-4 py-3 border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                            />
+                                            <p className="text-xs text-surface-500 mt-2">Entrez le code de votre carte cadeaux</p>
+                                        </div>
+                                    )}
 
                                     {/* Status Messages */}
                                     {purchaseStatus && (
@@ -703,6 +785,7 @@ export default function MarketplacePage() {
                                                 setSelectedPack(null);
                                                 setPaymentStep("details");
                                                 setPhoneNumber("");
+                                                setGiftCardCode("");
                                             }}
                                             className="flex-1 rounded-xl"
                                             disabled={purchasing}
@@ -712,9 +795,13 @@ export default function MarketplacePage() {
                                         <Button
                                             onClick={() => handleInitiatePayment(selectedPack)}
                                             className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-black shadow-lg shadow-brand-500/20"
-                                            disabled={purchasing || !phoneNumber || phoneNumber.length < 9}
+                                            disabled={
+                                                purchasing ||
+                                                (paymentMethod === "mobile_money" && (!phoneNumber || phoneNumber.length < 9)) ||
+                                                (paymentMethod === "gift_card" && !giftCardCode)
+                                            }
                                         >
-                                            {purchasing ? "Traitement..." : "Procéder au paiement"}
+                                            {purchasing ? "Traitement..." : (paymentMethod === "gift_card" ? "Payer avec carte cadeaux" : "Procéder au paiement")}
                                         </Button>
                                     </div>
                                 </div>
