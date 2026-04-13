@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { withAuth } from "@/lib/api/helpers";
 
 /**
  * POST /api/marketplace/purchase
@@ -7,47 +8,28 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function POST(request: NextRequest) {
     try {
-        const supabase = await createClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-            return NextResponse.json(
-                { error: "Non authentifié" },
-                { status: 401 }
-            );
-        }
+        const auth = await withAuth();
+        if (auth.error) return auth.error;
+        const { restaurantId, userId } = auth.ctx;
+        const supabase = await createAdminClient();
 
         const body = await request.json();
-        const { serviceId, restaurantId } = body;
+        const { serviceId } = body;
 
-        if (!serviceId || !restaurantId) {
+        if (!serviceId) {
             return NextResponse.json(
-                { error: "serviceId et restaurantId requis" },
+                { error: "serviceId requis" },
                 { status: 400 }
             );
         }
 
-        // Verify restaurant belongs to the user
-        const { data: restaurant, error: restaurantError } = await supabase
-            .from("restaurants")
-            .select("id, owner_id")
-            .eq("id", restaurantId)
-            .single();
-
-        if (restaurantError || !restaurant || restaurant.owner_id !== user.id) {
-            return NextResponse.json(
-                { error: "Accès refusé" },
-                { status: 403 }
-            );
-        }
-
         // Get pack details from marketplace_services
-        const { data: pack, error: packError } = await (supabase
-            .from("marketplace_services" as any)
-            .select("*")
+        const { data: pack, error: packError } = await supabase
+            .from("marketplace_services")
+            .select("id, name, price, duration_days")
             .eq("id", serviceId)
             .eq("is_active", true)
-            .single() as any);
+            .single();
 
         if (packError || !pack) {
             return NextResponse.json(
@@ -63,11 +45,12 @@ export async function POST(request: NextRequest) {
             : null;
 
         // Insert purchase record
-        const { data: purchase, error: purchaseError } = await (supabase
-            .from("marketplace_purchases" as any)
+        const { data: purchase, error: purchaseError } = await supabase
+            .from("marketplace_purchases")
             .insert({
                 restaurant_id: restaurantId,
                 service_id: serviceId,
+                admin_id: userId,
                 status: "active",
                 starts_at: startsAt.toISOString(),
                 expires_at: expiresAt?.toISOString() || null,
@@ -75,7 +58,7 @@ export async function POST(request: NextRequest) {
                 notes: `Achat de ${pack.name} via dashboard`,
             })
             .select("id")
-            .single() as any);
+            .single();
 
         if (purchaseError) {
             console.error("Purchase insert error:", purchaseError);
