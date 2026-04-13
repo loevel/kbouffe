@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { withAdmin, apiError } from "@/lib/api/helpers";
+import { logAuditAction, AUDIT_ACTIONS, extractClientIp } from "@/lib/api/audit";
 
 export async function GET(request: NextRequest) {
     const auth = await withAdmin();
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     const auth = await withAdmin();
     if (auth.error) return auth.error;
-    const { supabase } = auth.ctx;
+    const { supabase, userId } = auth.ctx;
     const db = supabase as any;
 
     try {
@@ -145,6 +146,20 @@ export async function PATCH(request: NextRequest) {
             console.error("[PATCH /api/admin/support]", error);
             return apiError("Erreur lors de la mise à jour");
         }
+
+        // Log audit action
+        const ipAddress = extractClientIp(
+            request.headers.get("x-forwarded-for"),
+            request.headers.get("x-real-ip")
+        );
+        await logAuditAction(userId, {
+            action: AUDIT_ACTIONS.UPDATE_SUPPORT_TICKET,
+            targetType: "support_ticket",
+            targetId: id,
+            details: updates,
+            ipAddress: ipAddress ?? undefined,
+            userAgent: request.headers.get("user-agent") ?? undefined,
+        });
 
         return NextResponse.json({ ticket: data });
     } catch (err) {

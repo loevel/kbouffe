@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { withAdmin, apiError } from "@/lib/api/helpers";
+import { logAuditAction, AUDIT_ACTIONS, extractClientIp } from "@/lib/api/audit";
 
 export async function GET(
     _request: NextRequest,
@@ -40,7 +41,7 @@ export async function PUT(
     const auth = await withAdmin();
     if (auth.error) return auth.error;
     const { ctx } = auth;
-    const { supabase, adminRole } = ctx;
+    const { supabase, adminRole, userId } = ctx;
     const db = supabase as any;
 
     if (adminRole !== "super_admin") {
@@ -101,17 +102,36 @@ export async function PUT(
         return apiError("Erreur lors de la mise à jour du modèle de courriel");
     }
 
+    // Log audit action
+    const ipAddress = extractClientIp(
+        request.headers.get("x-forwarded-for"),
+        request.headers.get("x-real-ip")
+    );
+    await logAuditAction(userId, {
+        action: AUDIT_ACTIONS.UPDATE_SETTING,
+        targetType: "email_template",
+        targetId: id,
+        details: {
+            name: updateData.name,
+            category: updateData.category,
+            version: updateData.version,
+            isActive: updateData.is_active,
+        },
+        ipAddress: ipAddress ?? undefined,
+        userAgent: request.headers.get("user-agent") ?? undefined,
+    });
+
     return NextResponse.json({ template: data });
 }
 
 export async function DELETE(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await withAdmin();
     if (auth.error) return auth.error;
     const { ctx } = auth;
-    const { supabase, adminRole } = ctx;
+    const { supabase, adminRole, userId } = ctx;
     const db = supabase as any;
 
     if (adminRole !== "super_admin") {
@@ -132,6 +152,19 @@ export async function DELETE(
         console.error("[DELETE /api/admin/email-templates/[id]]", error);
         return apiError("Erreur lors de la suppression du modèle de courriel");
     }
+
+    // Log audit action
+    const ipAddress = extractClientIp(
+        request.headers.get("x-forwarded-for"),
+        request.headers.get("x-real-ip")
+    );
+    await logAuditAction(userId, {
+        action: "delete_email_template",
+        targetType: "email_template",
+        targetId: id,
+        ipAddress: ipAddress ?? undefined,
+        userAgent: request.headers.get("user-agent") ?? undefined,
+    });
 
     return NextResponse.json({ success: true });
 }
