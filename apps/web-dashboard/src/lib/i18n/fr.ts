@@ -89,6 +89,10 @@ export const fr = {
         marketing: "Marketing",
         marketplace: "Boutique / Services",
         support: "Support",
+        customerSuccess: "Succès Client",
+        revenueOperations: "Opérations Revenus",
+        salesEngineering: "Ingénierie Ventes",
+        contractsProposals: "Contrats & Propositions",
         backToSite: "Retour au site",
     },
 

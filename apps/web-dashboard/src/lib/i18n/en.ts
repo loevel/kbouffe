@@ -91,6 +91,10 @@ export const en: TranslationKeys = {
         marketing: "Marketing",
         marketplace: "Marketplace",
         support: "Support",
+        customerSuccess: "Customer Success",
+        revenueOperations: "Revenue Operations",
+        salesEngineering: "Sales Engineering",
+        contractsProposals: "Contracts & Proposals",
         backToSite: "Back to site",
     },
 
