@@ -84,6 +84,130 @@ adminRestaurantsRoutes.get("/", async (c) => {
     });
 });
 
+adminRestaurantsRoutes.get("/health-scores", async (c) => {
+    const denied = requireDomain(c, "restaurants:read");
+    if (denied) return denied;
+
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: restaurants, error: restError } = await supabase
+        .from("restaurants")
+        .select("id, name")
+        .eq("is_published", true)
+        .order("created_at", { ascending: false })
+        .limit(60);
+
+    if (restError) {
+        return c.json({ error: "Erreur lors du chargement des restaurants" }, 500);
+    }
+
+    const ids = (restaurants || []).map((r: any) => r.id);
+    if (ids.length === 0) {
+        return c.json({ data: [] });
+    }
+
+    // Bulk parallel queries to avoid N+1
+    const [recentOrdersRes, prevOrdersRes, productUpdatesRes, openTicketsRes, packsRes] = await Promise.all([
+        supabase.from("orders").select("restaurant_id").in("restaurant_id", ids).gte("created_at", thirtyDaysAgo).limit(5000),
+        supabase.from("orders").select("restaurant_id").in("restaurant_id", ids).gte("created_at", sixtyDaysAgo).lt("created_at", thirtyDaysAgo).limit(5000),
+        supabase.from("products").select("restaurant_id").in("restaurant_id", ids).gte("updated_at", thirtyDaysAgo).limit(5000),
+        supabase.from("support_tickets").select("restaurant_id").eq("status", "open").in("restaurant_id", ids).limit(1000),
+        supabase.from("marketplace_purchases").select("restaurant_id, amount_paid").eq("status", "active").in("restaurant_id", ids).limit(1000),
+    ]);
+
+    // Aggregate counts per restaurant
+    const recentOrderCount: Record<string, number> = {};
+    for (const o of recentOrdersRes.data ?? []) {
+        recentOrderCount[(o as any).restaurant_id] = (recentOrderCount[(o as any).restaurant_id] ?? 0) + 1;
+    }
+    const prevOrderCount: Record<string, number> = {};
+    for (const o of prevOrdersRes.data ?? []) {
+        prevOrderCount[(o as any).restaurant_id] = (prevOrderCount[(o as any).restaurant_id] ?? 0) + 1;
+    }
+    const productUpdateCount: Record<string, number> = {};
+    for (const p of productUpdatesRes.data ?? []) {
+        productUpdateCount[(p as any).restaurant_id] = (productUpdateCount[(p as any).restaurant_id] ?? 0) + 1;
+    }
+    const openTicketCount: Record<string, number> = {};
+    for (const t of openTicketsRes.data ?? []) {
+        openTicketCount[(t as any).restaurant_id] = (openTicketCount[(t as any).restaurant_id] ?? 0) + 1;
+    }
+    const packRevenue: Record<string, number> = {};
+    for (const p of packsRes.data ?? []) {
+        packRevenue[(p as any).restaurant_id] = (packRevenue[(p as any).restaurant_id] ?? 0) + ((p as any).amount_paid ?? 0);
+    }
+
+    const data = (restaurants || []).map((restaurant: any) => {
+        const activityOrders = recentOrderCount[restaurant.id] ?? 0;
+        const prevOrders = prevOrderCount[restaurant.id] ?? 0;
+        const productUpdates = productUpdateCount[restaurant.id] ?? 0;
+        const openTickets = openTicketCount[restaurant.id] ?? 0;
+        const boost = packRevenue[restaurant.id] ?? 0;
+
+        // Activity score: 100 at >=15 orders, linear from 0
+        const activityScore = Math.min(100, Math.round((activityOrders / 15) * 100));
+
+        // Growth score: 50 baseline, ±5 per percentage point of growth
+        const growthRate = prevOrders > 0
+            ? Math.round(((activityOrders - prevOrders) / prevOrders) * 100)
+            : activityOrders > 0 ? 20 : 0;
+        const growthScore = Math.min(100, Math.max(0, 50 + growthRate * 5));
+
+        // Engagement score: 100 if >=3 product updates, min 20
+        const engagementScore = Math.min(100, Math.max(20, Math.round((productUpdates / 3) * 100)));
+
+        // Support score: 100 with no open tickets, -20 per open ticket
+        const supportScore = Math.max(0, 100 - openTickets * 20);
+
+        // Boost adoption score: 100 if has active pack, 20 if none
+        const boostScore = boost > 0 ? 100 : 20;
+
+        const totalScore = Math.round(
+            activityScore * 0.25 +
+            growthScore * 0.25 +
+            engagementScore * 0.20 +
+            supportScore * 0.15 +
+            boostScore * 0.15
+        );
+
+        const tier: "Healthy" | "At-Risk" | "Churning" =
+            totalScore >= 70 ? "Healthy" : totalScore >= 40 ? "At-Risk" : "Churning";
+
+        const recommendations: string[] = [];
+        if (tier === "Healthy") {
+            recommendations.push("🟢 Fidéliser : Proposer la mise à niveau Boost Pack ou des fonctionnalités premium");
+        } else if (tier === "At-Risk") {
+            recommendations.push("🟡 Intervention proactive requise : Planifier un appel de suivi cette semaine");
+            if (activityScore < 50) recommendations.push("Activité en baisse : Envoyer email de formation + offre d'incentive");
+            if (engagementScore < 50) recommendations.push("Peu de mises à jour du menu : Proposer un appel de formation menu");
+        } else {
+            recommendations.push("🔴 Campagne de reconquête urgente nécessaire");
+            recommendations.push("Contacter le dirigeant + affecter un support dédié");
+        }
+
+        return {
+            restaurant_id: restaurant.id,
+            restaurant_name: restaurant.name,
+            total_score: totalScore,
+            tier,
+            components: [
+                { component: "Activity", weight: "25%", metric_value: activityOrders, score: activityScore, weighted_score: (activityScore * 0.25).toFixed(1) },
+                { component: "Growth", weight: "25%", metric_value: growthRate, score: growthScore, weighted_score: (growthScore * 0.25).toFixed(1) },
+                { component: "Engagement", weight: "20%", metric_value: productUpdates, score: engagementScore, weighted_score: (engagementScore * 0.20).toFixed(1) },
+                { component: "Support", weight: "15%", metric_value: openTickets, score: supportScore, weighted_score: (supportScore * 0.15).toFixed(1) },
+                { component: "Boost Adoption", weight: "15%", metric_value: boost, score: boostScore, weighted_score: (boostScore * 0.15).toFixed(1) },
+            ],
+            recommendations,
+        };
+    });
+
+    return c.json({ data });
+});
+
 adminRestaurantsRoutes.get("/:id", async (c) => {
     const denied = requireDomain(c, "restaurants:read");
     if (denied) return denied;

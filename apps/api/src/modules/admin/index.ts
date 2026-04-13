@@ -49,6 +49,7 @@ adminRoutes.get("/stats", async (c) => {
         { data: activeSubscriptions },
         { count: aiCallsToday },
         { count: aiCallsMonth },
+        { count: newRestaurantsThisMonth },
     ] = await Promise.all([
         supabase.from("platform_global_metrics").select("*").single(),
         supabase.from("users").select("*", { count: "exact", head: true }),
@@ -68,6 +69,8 @@ adminRoutes.get("/stats", async (c) => {
         supabase.from("ai_usage_logs").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
         // AI calls this month
         supabase.from("ai_usage_logs").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
+        // New restaurants this month
+        supabase.from("restaurants").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
     ]);
 
     const newRestaurants = (newSupabaseRestaurants || []).map((r: any) => ({
@@ -97,6 +100,7 @@ adminRoutes.get("/stats", async (c) => {
             total: metrics.total_restaurants,
             active: metrics.active_restaurants,
             pending: metrics.total_restaurants - metrics.active_restaurants,
+            newThisMonth: newRestaurantsThisMonth ?? 0,
         },
         users: {
             total: totalUsers || 0,
@@ -122,6 +126,89 @@ adminRoutes.get("/stats", async (c) => {
         },
         recentActivity: { newRestaurants },
     });
+});
+
+adminRoutes.get("/stats/segments", async (c) => {
+    const denied = requireDomain(c, "stats");
+    if (denied) return denied;
+
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const prevMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString();
+
+    const [currentOrdersRes, prevOrdersRes, packsRes] = await Promise.all([
+        supabase.from("orders").select("restaurant_id, total").not("status", "eq", "cancelled").gte("created_at", monthStart).limit(10000),
+        supabase.from("orders").select("restaurant_id, total").not("status", "eq", "cancelled").gte("created_at", prevMonthStart).lt("created_at", monthStart).limit(10000),
+        supabase.from("marketplace_purchases").select("restaurant_id, amount_paid").eq("status", "active").limit(5000),
+    ]);
+
+    // Aggregate GMV per restaurant for current month
+    const currentGmv: Record<string, number> = {};
+    for (const o of currentOrdersRes.data ?? []) {
+        currentGmv[(o as any).restaurant_id] = (currentGmv[(o as any).restaurant_id] ?? 0) + ((o as any).total ?? 0);
+    }
+    // Aggregate GMV per restaurant for previous month
+    const prevGmv: Record<string, number> = {};
+    for (const o of prevOrdersRes.data ?? []) {
+        prevGmv[(o as any).restaurant_id] = (prevGmv[(o as any).restaurant_id] ?? 0) + ((o as any).total ?? 0);
+    }
+    // Active pack revenue per restaurant
+    const packRevenue: Record<string, number> = {};
+    for (const p of packsRes.data ?? []) {
+        packRevenue[(p as any).restaurant_id] = (packRevenue[(p as any).restaurant_id] ?? 0) + ((p as any).amount_paid ?? 0);
+    }
+
+    // Classify restaurants into segments by current-month GMV
+    type SegmentKey = "Casual (Segment A)" | "Croissance (Segment B)" | "Établis (Segment C)" | "Débutants (Segment D)";
+    const classifySegment = (gmv: number): SegmentKey => {
+        if (gmv >= 20_000_000) return "Établis (Segment C)";
+        if (gmv >= 5_000_000) return "Croissance (Segment B)";
+        if (gmv >= 100_000) return "Casual (Segment A)";
+        return "Débutants (Segment D)";
+    };
+
+    type SegmentAccumulator = { gmvValues: number[]; prevGmvValues: number[]; packRevenues: number[] };
+    const segmentData: Record<SegmentKey, SegmentAccumulator> = {
+        "Établis (Segment C)": { gmvValues: [], prevGmvValues: [], packRevenues: [] },
+        "Croissance (Segment B)": { gmvValues: [], prevGmvValues: [], packRevenues: [] },
+        "Casual (Segment A)": { gmvValues: [], prevGmvValues: [], packRevenues: [] },
+        "Débutants (Segment D)": { gmvValues: [], prevGmvValues: [], packRevenues: [] },
+    };
+
+    for (const [restaurantId, gmv] of Object.entries(currentGmv)) {
+        const seg = classifySegment(gmv);
+        segmentData[seg].gmvValues.push(gmv);
+        segmentData[seg].prevGmvValues.push(prevGmv[restaurantId] ?? 0);
+        segmentData[seg].packRevenues.push(packRevenue[restaurantId] ?? 0);
+    }
+
+    const segments = (Object.entries(segmentData) as [SegmentKey, SegmentAccumulator][])
+        .map(([name, data]) => {
+            const count = data.gmvValues.length;
+            if (count === 0) return null;
+            const avgGmv = Math.round(data.gmvValues.reduce((s, v) => s + v, 0) / count);
+            const avgPrevGmv = Math.round(data.prevGmvValues.reduce((s, v) => s + v, 0) / count);
+            const avgCommission = Math.round(avgGmv * 0.05);
+            const ltv = avgGmv * 12;
+            const growthRate = avgPrevGmv > 0
+                ? Math.round(((avgGmv - avgPrevGmv) / avgPrevGmv) * 100)
+                : 0;
+            const boostingCount = data.packRevenues.filter(r => r > 0).length;
+            const boostAdoptionRate = Math.round((boostingCount / count) * 100);
+            // Churn proxy: restaurants whose GMV dropped >80% vs previous month
+            const churningCount = data.gmvValues.filter((gmv, i) => {
+                const prev = data.prevGmvValues[i];
+                return prev > 0 && gmv < prev * 0.2;
+            }).length;
+            const churnRate = Math.round((churningCount / count) * 100);
+            return { name, count, avgGmv, avgCommission, churnRate, ltv, growthRate, boostAdoptionRate };
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => b.avgGmv - a.avgGmv);
+
+    return c.json({ data: segments });
 });
 
 // Mount the sub-routes

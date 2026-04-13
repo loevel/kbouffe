@@ -44,17 +44,6 @@ const statusConfig: Record<string, { label: string; variant: "default" | "succes
     cancelled: { label: "Annulée", variant: "danger", icon: XCircle, color: "text-red-500 bg-red-500/10" },
 };
 
-// Placeholder data (matches the existing mock but extended for better feel)
-const mockOrders: OrderRow[] = [
-    { id: "ORD-001", restaurantName: "Le Tchop Gourmet", customerName: "Jean Kamga", total: 8500, status: "completed", createdAt: "2026-03-04T14:30:00Z" },
-    { id: "ORD-002", restaurantName: "Chez Mama", customerName: "Marie Ngo", total: 12000, status: "preparing", createdAt: "2026-03-04T15:12:00Z" },
-    { id: "ORD-003", restaurantName: "Pizza Express", customerName: "Paul Mbarga", total: 6500, status: "pending", createdAt: "2026-03-04T15:45:00Z" },
-    { id: "ORD-004", restaurantName: "Le Tchop Gourmet", customerName: "Aline Fotso", total: 15200, status: "accepted", createdAt: "2026-03-04T16:00:00Z" },
-    { id: "ORD-005", restaurantName: "Saveurs du Cameroun", customerName: "Eric Njoh", total: 9800, status: "cancelled", createdAt: "2026-03-04T12:20:00Z" },
-    { id: "ORD-006", restaurantName: "Burger Lab", customerName: "Sandra Etoudi", total: 7400, status: "preparing", createdAt: "2026-03-04T10:15:00Z" },
-    { id: "ORD-007", restaurantName: "Pasta House", customerName: "Kevin Talla", total: 11000, status: "ready", createdAt: "2026-03-04T11:45:00Z" },
-];
-
 function formatFCFA(value: number) {
     return new Intl.NumberFormat("fr-FR").format(value) + " FCFA";
 }

@@ -3,15 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import {
     TrendingUp,
-    TrendingDown,
     DollarSign,
     Users,
-    Target,
     BarChart3,
-    PieChart,
     ArrowUp,
 } from "lucide-react";
-import { Badge, Button, useLocale, toast } from "@kbouffe/module-core/ui";
+import { Badge, Button, useLocale, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -50,71 +47,55 @@ const itemVariants = {
 export default function RevenueOperationsPage() {
     const { t } = useLocale();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [metrics, setMetrics] = useState<RevenueMetrics | null>(null);
     const [segments, setSegments] = useState<SegmentMetrics[]>([]);
 
     const loadMetrics = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
-            // Mock data based on strategy document
-            const mockMetrics: RevenueMetrics = {
-                monthlyRecurringRevenue: 8_000_000, // 8M FCFA
-                totalGmv: 150_000_000, // 150M FCFA
-                totalCommissions: 7_500_000, // 7.5M FCFA (5%)
-                boostPackRevenue: 500_000, // 500K FCFA
-                activeRestaurants: 450,
-                newRestaurantsThisMonth: 20,
-                netRevenueRetention: 92, // 92% - below 95% target
-                avgRestaurantValue: 18_000, // ~18K FCFA avg commission per restaurant
-            };
+            const [statsRes, segmentsRes] = await Promise.all([
+                adminFetch("/api/admin/stats"),
+                adminFetch("/api/admin/stats/segments"),
+            ]);
 
-            const mockSegments: SegmentMetrics[] = [
-                {
-                    name: "Casual Restaurants (Segment A)",
-                    count: 180, // 40% of 450
-                    avgGmv: 3_500_000,
-                    avgCommission: 175_000,
-                    churnRate: 45,
-                    ltv: 2_500_000,
-                    growthRate: 10,
-                    boostAdoptionRate: 3,
-                },
-                {
-                    name: "Growth Restaurants (Segment B)",
-                    count: 158, // 35% of 450
-                    avgGmv: 15_000_000,
-                    avgCommission: 750_000,
-                    churnRate: 25,
-                    ltv: 12_500_000,
-                    growthRate: 5,
-                    boostAdoptionRate: 8,
-                },
-                {
-                    name: "Established Players (Segment C)",
-                    count: 90, // 20% of 450
-                    avgGmv: 40_000_000,
-                    avgCommission: 2_000_000,
-                    churnRate: 10,
-                    ltv: 50_000_000,
-                    growthRate: 2,
-                    boostAdoptionRate: 30,
-                },
-                {
-                    name: "B2B Suppliers (Segment D)",
-                    count: 22, // 5% of 450
-                    avgGmv: 1_250_000,
-                    avgCommission: 312_500,
-                    churnRate: 40,
-                    ltv: 7_500_000,
-                    growthRate: 15,
-                    boostAdoptionRate: 5,
-                },
-            ];
+            if (!statsRes.ok) {
+                const json = await statsRes.json();
+                throw new Error(json.error || `Erreur ${statsRes.status}`);
+            }
+            if (!segmentsRes.ok) {
+                const json = await segmentsRes.json();
+                throw new Error(json.error || `Erreur ${segmentsRes.status}`);
+            }
 
-            setMetrics(mockMetrics);
-            setSegments(mockSegments);
-        } catch (error) {
-            toast.error("Failed to load metrics");
+            const statsJson = await statsRes.json();
+            const segmentsJson = await segmentsRes.json();
+
+            const mrr: number = statsJson.saas?.mrr ?? 0;
+            const gmv: number = statsJson.metrics?.gmv ?? 0;
+            const activeRestaurants: number = statsJson.restaurants?.active ?? 0;
+
+            setMetrics({
+                monthlyRecurringRevenue: mrr,
+                totalGmv: gmv,
+                totalCommissions: Math.round(gmv * 0.05),
+                boostPackRevenue: mrr,
+                activeRestaurants,
+                newRestaurantsThisMonth: statsJson.restaurants?.newThisMonth ?? 0,
+                netRevenueRetention: statsJson.saas?.packAdoptionRate
+                    ? Math.min(100, Math.round(95 - (100 - statsJson.saas.packAdoptionRate) * 0.3))
+                    : 0,
+                avgRestaurantValue: activeRestaurants > 0
+                    ? Math.round((Math.round(gmv * 0.05) + mrr) / activeRestaurants)
+                    : 0,
+            });
+
+            setSegments(segmentsJson.data ?? []);
+        } catch (err: any) {
+            const message = err.message || "Échec du chargement des métriques";
+            setError(message);
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -141,7 +122,19 @@ export default function RevenueOperationsPage() {
                     <div className="animate-spin mb-4">
                         <BarChart3 className="w-8 h-8 text-blue-600 mx-auto" />
                     </div>
-                    <p className="text-gray-600">Loading revenue metrics...</p>
+                    <p className="text-gray-600">Chargement des métriques...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center space-y-4">
+                    <BarChart3 className="w-12 h-12 text-red-400 mx-auto" />
+                    <p className="text-red-600">{error}</p>
+                    <Button onClick={loadMetrics} variant="outline">Réessayer</Button>
                 </div>
             </div>
         );
@@ -156,7 +149,7 @@ export default function RevenueOperationsPage() {
                     <p className="text-gray-600 mt-1">{t.adminPages?.revenueOperations?.subtitle ?? "Pipeline forecasting and pricing optimization"}</p>
                 </div>
                 <Button onClick={loadMetrics} variant="outline">
-                    {t.adminPages?.revenueOperations?.refreshData ?? "Refresh Data"}
+                    {t.adminPages?.revenueOperations?.refreshData ?? "Actualiser"}
                 </Button>
             </div>
 
@@ -174,7 +167,7 @@ export default function RevenueOperationsPage() {
                             <p className="text-2xl font-bold text-gray-900 mt-1">
                                 {formatCurrency(metrics.monthlyRecurringRevenue)}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">{t.adminPages?.revenueOperations?.stats?.mrrTarget ?? "Target: 15M by M12"}</p>
+                            <p className="text-xs text-gray-500 mt-1">{t.adminPages?.revenueOperations?.stats?.mrrTarget ?? "Objectif : 15M à M12"}</p>
                         </div>
                         <DollarSign className="w-8 h-8 text-blue-400" />
                     </div>
@@ -183,9 +176,9 @@ export default function RevenueOperationsPage() {
                 <motion.div className="bg-white rounded-lg border border-green-200 bg-green-50 p-4" variants={itemVariants}>
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-sm font-medium text-green-700">{t.adminPages?.revenueOperations?.stats?.activeRestaurants ?? "Active Restaurants"}</p>
+                            <p className="text-sm font-medium text-green-700">{t.adminPages?.revenueOperations?.stats?.activeRestaurants ?? "Restaurants actifs"}</p>
                             <p className="text-2xl font-bold text-green-900 mt-1">{metrics.activeRestaurants}</p>
-                            <p className="text-xs text-green-600 mt-1">+{metrics.newRestaurantsThisMonth} {t.adminPages?.revenueOperations?.stats?.mrrTarget?.split(" ")[1]}</p>
+                            <p className="text-xs text-green-600 mt-1">+{metrics.newRestaurantsThisMonth} ce mois</p>
                         </div>
                         <Users className="w-8 h-8 text-green-600" />
                     </div>
@@ -196,7 +189,7 @@ export default function RevenueOperationsPage() {
                         <div>
                             <p className="text-sm font-medium text-purple-700">{t.adminPages?.revenueOperations?.stats?.nrr ?? "NRR"}</p>
                             <p className="text-2xl font-bold text-purple-900 mt-1">{metrics.netRevenueRetention}%</p>
-                            <p className="text-xs text-purple-600 mt-1">{t.adminPages?.revenueOperations?.stats?.nrrBelowTarget ?? "Target: 95%+ (below target)"}</p>
+                            <p className="text-xs text-purple-600 mt-1">{t.adminPages?.revenueOperations?.stats?.nrrBelowTarget ?? "Objectif : 95%+"}</p>
                         </div>
                         <TrendingUp className="w-8 h-8 text-purple-600" />
                     </div>
@@ -205,11 +198,11 @@ export default function RevenueOperationsPage() {
                 <motion.div className="bg-white rounded-lg border border-orange-200 bg-orange-50 p-4" variants={itemVariants}>
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-sm font-medium text-orange-700">{t.adminPages?.revenueOperations?.stats?.totalGmv ?? "Total GMV"}</p>
+                            <p className="text-sm font-medium text-orange-700">{t.adminPages?.revenueOperations?.stats?.totalGmv ?? "GMV Total"}</p>
                             <p className="text-2xl font-bold text-orange-900 mt-1">
                                 {formatCurrency(metrics.totalGmv)}
                             </p>
-                            <p className="text-xs text-orange-600 mt-1">{t.adminPages?.revenueOperations?.stats?.commissionRate ?? "5% commission rate"}</p>
+                            <p className="text-xs text-orange-600 mt-1">{t.adminPages?.revenueOperations?.stats?.commissionRate ?? "Taux de commission 5%"}</p>
                         </div>
                         <BarChart3 className="w-8 h-8 text-orange-600" />
                     </div>
@@ -224,10 +217,10 @@ export default function RevenueOperationsPage() {
                 animate="visible"
             >
                 <motion.div className="bg-white rounded-lg border border-gray-200 p-4" variants={itemVariants}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.revenueComposition ?? "Revenue Composition"}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.revenueComposition ?? "Composition du revenu"}</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.transactionCommission ?? "Transaction Commission"}</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.transactionCommission ?? "Commission transactions"}</span>
                             <span className="font-semibold text-gray-900">{formatCurrency(metrics.totalCommissions)}</span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -242,37 +235,45 @@ export default function RevenueOperationsPage() {
                 </motion.div>
 
                 <motion.div className="bg-white rounded-lg border border-gray-200 p-4" variants={itemVariants}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.keyMetrics ?? "Key Metrics"}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.keyMetrics ?? "Indicateurs clés"}</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.avgRestaurantValue ?? "Avg Restaurant Value"}</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.avgRestaurantValue ?? "Valeur moy. restaurant"}</span>
                             <span className="font-semibold text-gray-900">{formatCurrency(metrics.avgRestaurantValue)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.churnRateBaseline ?? "Churn Rate Baseline"}</span>
-                            <span className="font-semibold text-red-600">45%</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.churnRateBaseline ?? "Taux de churn de base"}</span>
+                            <span className="font-semibold text-red-600">
+                                {segments.length > 0
+                                    ? `${Math.round(segments.reduce((s, seg) => s + seg.churnRate * seg.count, 0) / segments.reduce((s, seg) => s + seg.count, 0))}%`
+                                    : "—"}
+                            </span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.boostAdoptionRate ?? "Boost Adoption Rate"}</span>
-                            <span className="font-semibold text-amber-600">5%</span>
+                            <span className="text-sm text-gray-600">{t.adminPages?.revenueOperations?.boostAdoptionRate ?? "Taux d'adoption Boost"}</span>
+                            <span className="font-semibold text-amber-600">
+                                {segments.length > 0
+                                    ? `${Math.round(segments.reduce((s, seg) => s + seg.boostAdoptionRate * seg.count, 0) / segments.reduce((s, seg) => s + seg.count, 0))}%`
+                                    : "—"}
+                            </span>
                         </div>
                     </div>
                 </motion.div>
 
                 <motion.div className="bg-white rounded-lg border border-gray-200 p-4" variants={itemVariants}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.revenueOpportunities ?? "Revenue Opportunities"}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.adminPages?.revenueOperations?.revenueOpportunities ?? "Opportunités de revenu"}</h3>
                     <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                             <ArrowUp className="w-4 h-4 text-green-600" />
-                            <span>{t.adminPages?.revenueOperations?.reduceChurn ?? "Reduce churn 45%→30%: +2M FCFA/mo"}</span>
+                            <span>{t.adminPages?.revenueOperations?.reduceChurn ?? "Réduire le churn 45%→30% : +2M FCFA/mois"}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <ArrowUp className="w-4 h-4 text-green-600" />
-                            <span>{t.adminPages?.revenueOperations?.boostAdoption ?? "Boost adoption 5%→15%: +800K FCFA/mo"}</span>
+                            <span>{t.adminPages?.revenueOperations?.boostAdoption ?? "Adoption Boost 5%→15% : +800K FCFA/mois"}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <ArrowUp className="w-4 h-4 text-green-600" />
-                            <span>{t.adminPages?.revenueOperations?.tieredPricing ?? "Tiered pricing model: +1.2M FCFA/mo"}</span>
+                            <span>{t.adminPages?.revenueOperations?.tieredPricing ?? "Tarification par palier : +1.2M FCFA/mois"}</span>
                         </div>
                     </div>
                 </motion.div>
@@ -285,42 +286,46 @@ export default function RevenueOperationsPage() {
                 initial="hidden"
                 animate="visible"
             >
-                <h2 className="text-lg font-bold text-gray-900 mb-4">{t.adminPages?.revenueOperations?.segments ?? "Customer Segments"}</h2>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-gray-200">
-                                <th className="text-left py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segments ?? "Segment"}</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentCount ?? "Count"}</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentAvgGmv ?? "Avg GMV"}</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentChurn ?? "Churn Rate"}</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentLtv ?? "LTV"}</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentGrowth ?? "Growth"}</th>
-                                <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentBoostRate ?? "Boost Rate"}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {segments.map((segment, idx) => (
-                                <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="py-3 px-2 text-gray-900 font-medium">{segment.name}</td>
-                                    <td className="text-right py-3 px-2 text-gray-600">{segment.count}</td>
-                                    <td className="text-right py-3 px-2 text-gray-600">{formatCurrency(segment.avgGmv)}</td>
-                                    <td className="text-right py-3 px-2">
-                                        <Badge className={cn(
-                                            "border",
-                                            segment.churnRate > 30 ? "bg-red-100 text-red-800 border-red-300" : "bg-amber-100 text-amber-800 border-amber-300"
-                                        )}>
-                                            {segment.churnRate}%
-                                        </Badge>
-                                    </td>
-                                    <td className="text-right py-3 px-2 font-semibold text-gray-900">{formatCurrency(segment.ltv)}</td>
-                                    <td className="text-right py-3 px-2 text-gray-600">{segment.growthRate}%</td>
-                                    <td className="text-right py-3 px-2 text-gray-600">{segment.boostAdoptionRate}%</td>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">{t.adminPages?.revenueOperations?.segments ?? "Segments clients"}</h2>
+                {segments.length === 0 ? (
+                    <p className="text-gray-500 text-sm py-6 text-center">Aucune donnée de segment disponible pour ce mois.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-200">
+                                    <th className="text-left py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segments ?? "Segment"}</th>
+                                    <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentCount ?? "Nb"}</th>
+                                    <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentAvgGmv ?? "GMV moy."}</th>
+                                    <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentChurn ?? "Churn"}</th>
+                                    <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentLtv ?? "LTV"}</th>
+                                    <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentGrowth ?? "Croissance"}</th>
+                                    <th className="text-right py-2 px-2 font-semibold text-gray-900">{t.adminPages?.revenueOperations?.segmentBoostRate ?? "Taux Boost"}</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {segments.map((segment, idx) => (
+                                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="py-3 px-2 text-gray-900 font-medium">{segment.name}</td>
+                                        <td className="text-right py-3 px-2 text-gray-600">{segment.count}</td>
+                                        <td className="text-right py-3 px-2 text-gray-600">{formatCurrency(segment.avgGmv)}</td>
+                                        <td className="text-right py-3 px-2">
+                                            <Badge className={cn(
+                                                "border",
+                                                segment.churnRate > 30 ? "bg-red-100 text-red-800 border-red-300" : "bg-amber-100 text-amber-800 border-amber-300"
+                                            )}>
+                                                {segment.churnRate}%
+                                            </Badge>
+                                        </td>
+                                        <td className="text-right py-3 px-2 font-semibold text-gray-900">{formatCurrency(segment.ltv)}</td>
+                                        <td className="text-right py-3 px-2 text-gray-600">{segment.growthRate}%</td>
+                                        <td className="text-right py-3 px-2 text-gray-600">{segment.boostAdoptionRate}%</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </motion.div>
 
             {/* Strategic Recommendations */}
@@ -330,23 +335,23 @@ export default function RevenueOperationsPage() {
                 initial="hidden"
                 animate="visible"
             >
-                <h2 className="text-lg font-bold text-blue-900 mb-4">{t.adminPages?.revenueOperations?.strategicRecommendations ?? "Strategic Recommendations"}</h2>
+                <h2 className="text-lg font-bold text-blue-900 mb-4">{t.adminPages?.revenueOperations?.strategicRecommendations ?? "Recommandations stratégiques"}</h2>
                 <div className="space-y-3 text-sm text-blue-900">
                     <div className="flex gap-2">
-                        <span className="font-semibold">1. Implement Tiered Pricing (Q1)</span>
-                        <span>- Keep 5% default, offer 3.5% at 200K GMV, 2.5% at 500K GMV → +1.2M FCFA/mo</span>
+                        <span className="font-semibold">1. Tarification par palier (T1)</span>
+                        <span>- Maintenir 5% par défaut, offrir 3,5% à 200K GMV, 2,5% à 500K GMV → +1.2M FCFA/mois</span>
                     </div>
                     <div className="flex gap-2">
-                        <span className="font-semibold">2. Launch Health Scoring (Q1)</span>
-                        <span>- Enable proactive retention, predict churn 2-3 months in advance → reduce to 35%</span>
+                        <span className="font-semibold">2. Score de santé (T1)</span>
+                        <span>- Activer la rétention proactive, prédire le churn 2-3 mois à l'avance → réduire à 35%</span>
                     </div>
                     <div className="flex gap-2">
-                        <span className="font-semibold">3. Boost Pack Marketing (Q2)</span>
-                        <span>- Case studies + performance dashboards → increase adoption from 5% to 15% → +800K FCFA/mo</span>
+                        <span className="font-semibold">3. Marketing Boost Pack (T2)</span>
+                        <span>- Études de cas + tableaux de bord de performance → augmenter l'adoption de 5% à 15% → +800K FCFA/mois</span>
                     </div>
                     <div className="flex gap-2">
-                        <span className="font-semibold">4. B2B Supplier Focus (Q2-Q3)</span>
-                        <span>- New revenue stream with lower churn, competitive moat → +2M FCFA/mo potential</span>
+                        <span className="font-semibold">4. Fournisseurs B2B (T2-T3)</span>
+                        <span>- Nouveau flux de revenus avec un churn plus faible → +2M FCFA/mois potentiel</span>
                     </div>
                 </div>
             </motion.div>

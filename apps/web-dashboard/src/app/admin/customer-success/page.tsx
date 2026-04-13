@@ -10,7 +10,7 @@ import {
     Filter,
     Download,
 } from "lucide-react";
-import { Badge, Button, useLocale, toast } from "@kbouffe/module-core/ui";
+import { Badge, Button, useLocale, toast, adminFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -102,87 +102,14 @@ export default function CustomerSuccessPage() {
         setLoading(true);
         setError(null);
         try {
-            // TODO: Replace with actual API call to fetch health scores
-            // For now, using demo data - will be replaced with real restaurant data
-            const response = await fetch("/api/admin/restaurants/health-scores");
-            if (!response.ok && response.status !== 404) {
-                throw new Error(`Failed to load health scores: ${response.status}`);
+            const res = await adminFetch("/api/admin/restaurants/health-scores");
+            const json = await res.json();
+            if (!res.ok) {
+                throw new Error(json.error || `Erreur ${res.status}`);
             }
-
-            // Use demo data for now
-            const demoData: HealthScoreData[] = [
-                {
-                    restaurant_id: "rest_001",
-                    restaurant_name: "Restaurant La Saveur",
-                    total_score: 100,
-                    tier: "Healthy",
-                    components: [
-                        { component: "Activity", weight: "25%", metric_value: 15, score: 100, weighted_score: "25.0" },
-                        { component: "Growth", weight: "25%", metric_value: 8, score: 100, weighted_score: "25.0" },
-                        { component: "Engagement", weight: "20%", metric_value: 2, score: 100, weighted_score: "20.0" },
-                        { component: "Support", weight: "15%", metric_value: 12, score: 100, weighted_score: "15.0" },
-                        { component: "Boost Adoption", weight: "15%", metric_value: 250000, score: 100, weighted_score: "15.0" },
-                    ],
-                    recommendations: [
-                        "🟢 Nurture for expansion: Offer Boost Pack upgrade or premium features"
-                    ],
-                },
-                {
-                    restaurant_id: "rest_002",
-                    restaurant_name: "Chez Auntie Bea",
-                    total_score: 46,
-                    tier: "At-Risk",
-                    components: [
-                        { component: "Activity", weight: "25%", metric_value: 4, score: 40, weighted_score: "10.0" },
-                        { component: "Growth", weight: "25%", metric_value: -2, score: 80, weighted_score: "20.0" },
-                        { component: "Engagement", weight: "20%", metric_value: 0, score: 20, weighted_score: "4.0" },
-                        { component: "Support", weight: "15%", metric_value: 36, score: 60, weighted_score: "9.0" },
-                        { component: "Boost Adoption", weight: "15%", metric_value: 0, score: 20, weighted_score: "3.0" },
-                    ],
-                    recommendations: [
-                        "🟡 Proactive outreach required: Schedule CSM check-in this week",
-                        "Activity declining: Send training email + incentive offer",
-                        "No menu updates: Offer menu update training call",
-                    ],
-                },
-                {
-                    restaurant_id: "rest_003",
-                    restaurant_name: "Prestige Bistro",
-                    total_score: 88,
-                    tier: "Healthy",
-                    components: [
-                        { component: "Activity", weight: "25%", metric_value: 35, score: 100, weighted_score: "25.0" },
-                        { component: "Growth", weight: "25%", metric_value: 3, score: 55, weighted_score: "13.8" },
-                        { component: "Engagement", weight: "20%", metric_value: 3, score: 100, weighted_score: "20.0" },
-                        { component: "Support", weight: "15%", metric_value: 8, score: 100, weighted_score: "15.0" },
-                        { component: "Boost Adoption", weight: "15%", metric_value: 500000, score: 100, weighted_score: "15.0" },
-                    ],
-                    recommendations: [
-                        "🟢 Nurture for expansion: Offer Boost Pack upgrade or premium features"
-                    ],
-                },
-                {
-                    restaurant_id: "rest_004",
-                    restaurant_name: "Street Shack",
-                    total_score: 26,
-                    tier: "Churning",
-                    components: [
-                        { component: "Activity", weight: "25%", metric_value: 2, score: 30, weighted_score: "7.5" },
-                        { component: "Growth", weight: "25%", metric_value: -8, score: 30, weighted_score: "7.5" },
-                        { component: "Engagement", weight: "20%", metric_value: 0, score: 20, weighted_score: "4.0" },
-                        { component: "Support", weight: "15%", metric_value: 72, score: 30, weighted_score: "4.5" },
-                        { component: "Boost Adoption", weight: "15%", metric_value: 0, score: 20, weighted_score: "3.0" },
-                    ],
-                    recommendations: [
-                        "🔴 Win-back campaign urgently needed",
-                        "CEO/Manager outreach + dedicated support assignment",
-                    ],
-                },
-            ];
-
-            setHealthScores(demoData);
+            setHealthScores(json.data ?? []);
         } catch (err) {
-            const message = err instanceof Error ? err.message : "Failed to load health scores";
+            const message = err instanceof Error ? err.message : "Échec du chargement des scores de santé";
             setError(message);
             toast.error(message);
         } finally {
@@ -209,7 +136,21 @@ export default function CustomerSuccessPage() {
                     <div className="animate-spin mb-4">
                         <Activity className="w-8 h-8 text-emerald-600 mx-auto" />
                     </div>
-                    <p className="text-gray-600">Loading health scores...</p>
+                    <p className="text-gray-600">Chargement des scores de santé...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center space-y-4">
+                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
+                    <p className="text-red-600">{error}</p>
+                    <Button onClick={loadHealthScores} variant="outline">
+                        Réessayer
+                    </Button>
                 </div>
             </div>
         );
