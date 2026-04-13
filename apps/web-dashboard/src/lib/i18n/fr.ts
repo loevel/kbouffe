@@ -1253,6 +1253,69 @@ export const fr = {
         notificationChannelsDesc: "Choisissez comment informer vos clients des mises a jour de commande.",
     },
 
+    // Audit Logs Page
+    auditLogs: {
+        title: "Audits Immuables",
+        subtitle: "Registre complet et infalsifiable de toutes les actions administratives. Indispensable pour la conformité et la sécurité opérationnelle.",
+        badge: "Secured Journal",
+
+        filters: {
+            label: "Filtres",
+            action: "Toutes les actions",
+            target: "Toutes les cibles",
+            actionOptions: {
+                verify_restaurant: "Vérifier Restaurant",
+                update_payout: "Mise à jour Payout",
+                ban_user: "Bannir Utilisateur",
+                update_setting: "Modifier Paramètre",
+            },
+            targetOptions: {
+                restaurant: "Restaurant",
+                user: "Utilisateur",
+                payout: "Payout",
+                platform_setting: "Paramètre",
+            },
+        },
+
+        search: {
+            placeholder: "Chercher admin, IP, ou détails...",
+            noResults: "Aucun résultat trouvé",
+        },
+
+        table: {
+            timestamp: "Horodatage",
+            actor: "Acteur Admin",
+            action: "Action Système",
+            target: "Cible d'Action",
+            ip: "Origine IP",
+            noData: "Aucune donnée d'audit",
+            details: "Détails",
+        },
+
+        pagination: {
+            segment: "Segment Audit",
+            integrity: "Contrôle d'intégrité séquentiel actif",
+            previous: "Précédent",
+            next: "Suivant",
+        },
+
+        export: {
+            csv: "📥 Télécharger CSV",
+            json: "📥 Télécharger JSON",
+            pdf: "📥 Télécharger PDF",
+            fullHistory: "📋 Historique complet",
+        },
+
+        compliance: {
+            badge: "Compliance Protocol",
+            title: "Intégrité des Données Audit",
+            description: "Ce journal est généré cryptographiquement et ne peut être modifié par aucun administrateur, y compris les Super-Admins. Toute action de suppression ou de modification est techniquement impossible pour garantir la traçabilité légale.",
+            health: "Platform Health",
+            secure: "99.9% SECURE",
+            verification: "Vérification de registre continue",
+        },
+    },
+
     // Business Growth Admin Pages
     adminPages: {
         customerSuccess: {

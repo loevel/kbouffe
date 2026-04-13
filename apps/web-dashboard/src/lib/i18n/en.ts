@@ -1255,6 +1255,69 @@ export const en: TranslationKeys = {
         notificationChannelsDesc: "Choose how to inform your customers about order updates.",
     },
 
+    // Audit Logs Page
+    auditLogs: {
+        title: "Immutable Audits",
+        subtitle: "Complete and tamper-proof record of all administrative actions. Essential for compliance and operational security.",
+        badge: "Secured Journal",
+
+        filters: {
+            label: "Filters",
+            action: "All actions",
+            target: "All targets",
+            actionOptions: {
+                verify_restaurant: "Verify Restaurant",
+                update_payout: "Payout Update",
+                ban_user: "Ban User",
+                update_setting: "Update Setting",
+            },
+            targetOptions: {
+                restaurant: "Restaurant",
+                user: "User",
+                payout: "Payout",
+                platform_setting: "Setting",
+            },
+        },
+
+        search: {
+            placeholder: "Search admin, IP, or details...",
+            noResults: "No results found",
+        },
+
+        table: {
+            timestamp: "Timestamp",
+            actor: "Admin Actor",
+            action: "System Action",
+            target: "Action Target",
+            ip: "IP Origin",
+            noData: "No audit data",
+            details: "Details",
+        },
+
+        pagination: {
+            segment: "Audit Segment",
+            integrity: "Sequential integrity check active",
+            previous: "Previous",
+            next: "Next",
+        },
+
+        export: {
+            csv: "📥 Download CSV",
+            json: "📥 Download JSON",
+            pdf: "📥 Download PDF",
+            fullHistory: "📋 Full History",
+        },
+
+        compliance: {
+            badge: "Compliance Protocol",
+            title: "Audit Data Integrity",
+            description: "This journal is cryptographically generated and cannot be modified by any administrator, including Super-Admins. Any deletion or modification action is technically impossible to ensure legal traceability.",
+            health: "Platform Health",
+            secure: "99.9% SECURE",
+            verification: "Continuous journal verification",
+        },
+    },
+
     // Business Growth Admin Pages
     adminPages: {
         customerSuccess: {
