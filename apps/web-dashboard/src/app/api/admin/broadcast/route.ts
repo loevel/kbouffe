@@ -3,11 +3,52 @@
  * GET  /api/admin/broadcast — retourne l'historique des broadcasts
  *
  * Cibles : all | pack (by service_id) | city (by address keyword) | active (published=true)
+ *
+ * Protections:
+ * - Rate limiting: max 1 broadcast par heure par admin
+ * - Chunking FCM: max 500 tokens par batch (FCM limit)
+ * - Deduplication: tokens uniques uniquement
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { withAdmin, apiError } from "@/lib/api/helpers";
 import { sendFcmBatch } from "@/lib/firebase/admin";
+
+// ── Utilitaires ─────────────────────────────────────────────────────────────
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+}
+
+async function checkRateLimit(db: any, userId: string): Promise<{ allowed: boolean; message?: string }> {
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+
+    const { data, error } = await db
+        .from("admin_broadcasts")
+        .select("id", { count: "exact" })
+        .eq("sent_by", userId)
+        .gte("sent_at", oneHourAgo);
+
+    if (error) {
+        console.error("[broadcast rate limit check error]", error);
+        // En cas d'erreur, on laisse passer (fail-open)
+        return { allowed: true };
+    }
+
+    const count = data?.length ?? 0;
+    if (count >= 5) {
+        return {
+            allowed: false,
+            message: `Limite atteinte: 5 broadcasts par heure. Réessayez plus tard.`
+        };
+    }
+
+    return { allowed: true };
+}
 
 function serviceDb() {
     return createClient(
@@ -24,6 +65,12 @@ export async function POST(request: NextRequest) {
     const { userId } = auth.ctx;
 
     const db = serviceDb() as any;
+
+    // ── Rate limiting ─────────────────────────────────────────────────────────
+    const rateLimitCheck = await checkRateLimit(db, userId);
+    if (!rateLimitCheck.allowed) {
+        return apiError(rateLimitCheck.message ?? "Rate limited", 429);
+    }
 
     let body: any;
     try {
@@ -114,29 +161,55 @@ export async function POST(request: NextRequest) {
         .select("token")
         .in("user_id", uniqueOwnerIds);
 
-    const tokens: string[] = (tokenRows ?? [])
-        .map((r: any) => r.token as string)
-        .filter((t: string) => Boolean(t));
+    // Déduplication + filtre des tokens vides
+    const tokensSet = new Set(
+        (tokenRows ?? [])
+            .map((r: any) => r.token as string)
+            .filter((t: string) => Boolean(t))
+    );
+    const tokens = Array.from(tokensSet);
 
     let tokensSent = 0;
 
     if (tokens.length > 0) {
         try {
-            await sendFcmBatch(
-                tokens,
-                title.trim(),
-                bodyText.trim(),
-                { type: "broadcast", template: template ?? "custom" },
-                link ?? "/dashboard"
-            );
-            tokensSent = tokens.length;
+            // Chunking FCM: max 500 tokens par batch
+            const chunks = chunkArray(tokens, 500);
+            console.log(`[broadcast] Envoi de ${tokens.length} tokens en ${chunks.length} chunk(s)`);
 
-            await db
-                .from("push_tokens")
-                .update({ last_used_at: new Date().toISOString() })
-                .in("token", tokens);
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                console.log(`[broadcast] Chunk ${i + 1}/${chunks.length}: ${chunk.length} tokens`);
+
+                try {
+                    await sendFcmBatch(
+                        chunk,
+                        title.trim(),
+                        bodyText.trim(),
+                        { type: "broadcast", template: template ?? "custom" },
+                        link ?? "/dashboard"
+                    );
+                    tokensSent += chunk.length;
+                } catch (err: any) {
+                    console.error(`[broadcast] FCM error chunk ${i + 1}:`, err?.message);
+                    // Continue avec les chunks suivants même si un échoue
+                }
+
+                // Petit délai entre les chunks pour éviter le rate limiting
+                if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+
+            // Marquer les tokens comme utilisés
+            if (tokens.length > 0) {
+                await db
+                    .from("push_tokens")
+                    .update({ last_used_at: new Date().toISOString() })
+                    .in("token", tokens);
+            }
         } catch (err: any) {
-            console.error("[broadcast] FCM error:", err?.message);
+            console.error("[broadcast] Unexpected FCM error:", err?.message);
         }
     }
 
