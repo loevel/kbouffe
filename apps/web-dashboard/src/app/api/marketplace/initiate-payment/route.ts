@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         if (paymentMethod === "gift_card") {
             const { data: giftCard, error: gcError } = await admin
                 .from("gift_cards")
-                .select("id, code, current_balance, expires_at, is_active")
+                .select("id, code, current_balance, expires_at, is_active, issued_by_type, usable_context")
                 .eq("restaurant_id", restaurantId)
                 .eq("code", giftCardCode.trim().toUpperCase())
                 .eq("is_active", true)
@@ -75,6 +75,15 @@ export async function POST(request: NextRequest) {
 
             if (gcError || !giftCard) {
                 return apiError("Code carte cadeaux invalide ou inactif", 400);
+            }
+
+            // ❌ Reject restaurant-issued cards or cards restricted to menu_only
+            if ((giftCard as any).issued_by_type === "restaurant") {
+                return apiError("Les cartes cadeaux du restaurant ne peuvent pas être utilisées pour les services marketplace", 400);
+            }
+
+            if ((giftCard as any).usable_context === "menu_only") {
+                return apiError("Cette carte cadeaux ne peut être utilisée que pour les menus des restaurants", 400);
             }
 
             if (giftCard.expires_at && new Date(giftCard.expires_at) < new Date()) {
