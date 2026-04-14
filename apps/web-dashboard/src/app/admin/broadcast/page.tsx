@@ -170,6 +170,9 @@ export default function AdminBroadcastPage() {
     const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
     const [savingDraft, setSavingDraft] = useState(false);
 
+    // Scheduling state
+    const [scheduledAt, setScheduledAt] = useState<string>("");
+
     const fetchHistory = useCallback(async () => {
         setLoadingHistory(true);
         try {
@@ -373,12 +376,20 @@ export default function AdminBroadcastPage() {
                     template: selectedTemplate,
                     targetType,
                     targetValue: targetType === "pack" || targetType === "city" ? targetValue : undefined,
+                    scheduledAt: scheduledAt || undefined,
                 }),
             });
             const data = await res.json();
             setSendResult(data);
             if (data.success) {
                 fetchHistory();
+                // Reset form
+                setTitle("");
+                setBody("");
+                setTargetType("all");
+                setTargetValue("");
+                setScheduledAt("");
+                setCurrentDraftId(null);
             }
         } catch (e) {
             setSendResult({ success: false, message: "Erreur réseau" });
@@ -628,6 +639,19 @@ export default function AdminBroadcastPage() {
                             </motion.div>
                         )}
                     </AnimatePresence>
+
+                    {/* Scheduling */}
+                    <div className="bg-surface-900 border border-surface-800 rounded-xl p-5">
+                        <h3 className="text-sm font-semibold text-surface-300 mb-3">4. Programmer l'envoi (optionnel)</h3>
+                        <label className="text-xs text-surface-400 mb-1.5 block">Envoyer le</label>
+                        <input
+                            type="datetime-local"
+                            value={scheduledAt}
+                            onChange={e => setScheduledAt(e.target.value)}
+                            className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 transition-colors"
+                        />
+                        <p className="text-xs text-surface-500 mt-2">Laisser vide pour envoyer immédiatement</p>
+                    </div>
 
                     {/* Draft + Send buttons */}
                     <div className="flex gap-2">

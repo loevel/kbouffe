@@ -79,10 +79,18 @@ export async function POST(request: NextRequest) {
         return apiError("Body JSON invalide", 400);
     }
 
-    const { title, bodyText, template, targetType, targetValue, link } = body;
+    const { title, bodyText, template, targetType, targetValue, link, scheduledAt } = body;
 
     if (!title?.trim() || !bodyText?.trim()) {
         return apiError("Titre et message requis", 400);
+    }
+
+    // Si programmé, retourner immédiatement (sera traité par cron job)
+    if (scheduledAt) {
+        const scheduledDate = new Date(scheduledAt);
+        if (scheduledDate <= new Date()) {
+            return apiError("La date programmée doit être dans le futur", 400);
+        }
     }
     const validTargets = ["all", "pack", "city", "active", "inactive_30d", "no_products"];
     if (!validTargets.includes(targetType)) {
@@ -170,6 +178,28 @@ export async function POST(request: NextRequest) {
 
     if (targetedRestaurants.length === 0) {
         return NextResponse.json({ success: true, tokensSent: 0, message: "Aucun destinataire trouvé pour cette cible." });
+    }
+
+    // Si programmé, juste enregistrer dans la DB
+    if (scheduledAt) {
+        await db.from("admin_broadcasts").insert({
+            sent_by: userId,
+            title: title.trim(),
+            body: bodyText.trim(),
+            template: template ?? "custom",
+            target_type: targetType,
+            target_value: targetValue ?? null,
+            tokens_sent: 0,
+            scheduled_at: scheduledAt,
+            status: "scheduled",
+        });
+
+        return NextResponse.json({
+            success: true,
+            tokensSent: 0,
+            message: `Broadcast programmé pour ${new Date(scheduledAt).toLocaleString("fr-FR")}`,
+            scheduled: true,
+        });
     }
 
     const uniqueOwnerIds = [...new Set(targetedRestaurants.map((r) => r.owner_id))];
