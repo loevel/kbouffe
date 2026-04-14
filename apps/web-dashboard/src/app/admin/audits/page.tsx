@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
     ShieldAlert,
     Search,
@@ -15,14 +15,18 @@ import {
     X,
     RefreshCw,
     Terminal,
+    History,
 } from "lucide-react";
-import { Badge, Button, adminFetch, useLocale } from "@kbouffe/module-core/ui";
+import { Badge, Button, adminFetch, Modal } from "@kbouffe/module-core/ui";
 import { useAdminQuery } from "@/hooks/use-admin-query";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 import { cn } from "@/lib/utils";
 import { AdminTableSkeleton } from "@/components/admin/AdminTableSkeleton";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminStatsCardsSkeleton } from "@/components/admin/AdminStatsCardsSkeleton";
 import { ExportCSVButton } from "@/components/admin/ExportCSVButton";
+import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -163,10 +167,24 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: s
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminAuditLogsPage() {
-    const { t } = useLocale();
+    const { t } = useDashboardLocale();
 
     // Stats
     const { data: stats, loading: statsLoading } = useAdminQuery<AuditStats>("/api/admin/system/audit/stats");
+
+    // Detail modal
+    const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
+    // Full history
+    const [isFullHistory, setIsFullHistory] = useState(false);
+
+    // Analytics panel
+    const [showAnalytics, setShowAnalytics] = useState(false);
+
+    // Auto-refresh
+    const [autoRefresh, setAutoRefresh] = useState(false);
+    const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+
 
     // Filters
     const [search,     setSearch]     = useState("");
@@ -176,7 +194,7 @@ export default function AdminAuditLogsPage() {
     const [dateFrom,      setDateFrom]      = useState("");
     const [dateTo,        setDateTo]        = useState("");
     const [page,          setPage]          = useState(1);
-    const LIMIT = 50;
+    const LIMIT = isFullHistory ? 9999 : 50;
 
     // Debounce search
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -214,6 +232,86 @@ export default function AdminAuditLogsPage() {
     };
 
     const hasFilters = search || adminFilter || actionFilter || dateFrom || dateTo;
+
+    // Analytics data
+    const actionDistData = useMemo(() => {
+        const dist: Record<string, number> = {};
+        logs.forEach(log => {
+            const label = ACTION_LABELS[log.action] ?? log.action;
+            dist[label] = (dist[label] ?? 0) + 1;
+        });
+        return Object.entries(dist).map(([name, value]) => ({ name, value }));
+    }, [logs]);
+
+    const dailyVolumeData = useMemo(() => {
+        const data: Record<string, number> = {};
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+            const key = date.toLocaleDateString("fr-FR");
+            data[key] = 0;
+        }
+        logs.forEach(log => {
+            const key = new Date(log.createdAt).toLocaleDateString("fr-FR");
+            if (data.hasOwnProperty(key)) data[key]++;
+        });
+        return Object.entries(data).map(([date, count]) => ({ date, count }));
+    }, [logs]);
+
+    const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#06b6d4", "#6366f1"];
+
+    // Suspicious activity detection - memoized to avoid recalculation
+    const detectedAlerts = useMemo(() => {
+        const newAlerts: string[] = [];
+
+        // Pattern 1: Same IP > 5 actions in loaded page
+        const ipCounts: Record<string, number> = {};
+        logs.forEach(log => {
+            if (log.ipAddress) {
+                ipCounts[log.ipAddress] = (ipCounts[log.ipAddress] ?? 0) + 1;
+            }
+        });
+        Object.entries(ipCounts).forEach(([ip, count]) => {
+            if (count > 5) {
+                newAlerts.push(`highIpActivity:${ip}:${count}`);
+            }
+        });
+
+        // Pattern 2: Any ban_user action present
+        if (logs.some(log => log.action === "ban_user")) {
+            newAlerts.push("banDetected");
+        }
+
+        // Pattern 3: verify_restaurant > 3 in the same minute
+        const verifyMinutes: Record<string, number> = {};
+        logs.forEach(log => {
+            if (log.action === "verify_restaurant") {
+                const key = log.createdAt.slice(0, 16);
+                verifyMinutes[key] = (verifyMinutes[key] ?? 0) + 1;
+            }
+        });
+        Object.entries(verifyMinutes).forEach(([minute, count]) => {
+            if (count > 3) {
+                newAlerts.push("bulkVerify");
+            }
+        });
+
+        return newAlerts;
+    }, [logs]);
+
+
+    // Auto-refresh effect
+    useEffect(() => {
+        if (!autoRefresh) return;
+
+        const interval = setInterval(async () => {
+            await refetch();
+            setLastRefreshedAt(new Date());
+        }, 30_000);
+
+        return () => clearInterval(interval);
+    }, [autoRefresh]);
 
     // CSV export
     const exportCSV = () => {
@@ -253,6 +351,26 @@ export default function AdminAuditLogsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Button
+                        variant={isFullHistory ? "primary" : "ghost"}
+                        size="sm"
+                        onClick={() => { setIsFullHistory(!isFullHistory); setPage(1); }}
+                        disabled={isFullHistory}
+                        className="flex items-center gap-2 rounded-xl"
+                    >
+                        <History size={15} />
+                        {t.auditLogs.export.fullHistory}
+                    </Button>
+                    <Button
+                        variant={autoRefresh ? "primary" : "ghost"}
+                        size="sm"
+                        onClick={() => setAutoRefresh(!autoRefresh)}
+                        className="flex items-center gap-2 rounded-xl relative"
+                    >
+                        <Clock size={15} />
+                        {autoRefresh && <span className="absolute w-2 h-2 bg-emerald-500 rounded-full -top-1 -right-1 animate-pulse"></span>}
+                        {t.auditLogs.refresh.toggle}
+                    </Button>
+                    <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => refetch()}
@@ -275,6 +393,50 @@ export default function AdminAuditLogsPage() {
                 </div>
             </div>
 
+            {/* ── Suspicious Activity Alerts ── */}
+            <AnimatePresence>
+                {detectedAlerts.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-800 p-4 space-y-3"
+                    >
+                        <div className="flex items-start gap-3">
+                            <ShieldAlert size={20} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="font-bold text-red-900 dark:text-red-200 mb-2">{t.auditLogs.alerts.title}</p>
+                                <ul className="space-y-1">
+                                    {detectedAlerts.map((alert, idx) => {
+                                        if (alert.startsWith("highIpActivity:")) {
+                                            const [, ip, count] = alert.split(":");
+                                            return (
+                                                <li key={idx} className="text-sm text-red-800 dark:text-red-300">
+                                                    • {t.auditLogs.alerts.highIpActivity.replace("{ip}", ip).replace("{n}", count)}
+                                                </li>
+                                            );
+                                        } else if (alert === "banDetected") {
+                                            return (
+                                                <li key={idx} className="text-sm text-red-800 dark:text-red-300">
+                                                    • {t.auditLogs.alerts.banDetected}
+                                                </li>
+                                            );
+                                        } else if (alert === "bulkVerify") {
+                                            return (
+                                                <li key={idx} className="text-sm text-red-800 dark:text-red-300">
+                                                    • {t.auditLogs.alerts.bulkVerify}
+                                                </li>
+                                            );
+                                        }
+                                        return null;
+                                    })}
+                                </ul>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* ── Stats row ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {statsLoading ? (
@@ -296,7 +458,8 @@ export default function AdminAuditLogsPage() {
 
             {/* ── Filters ── */}
             <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5 space-y-4">
-                <div className="flex flex-wrap gap-3 items-end">
+                <div className="flex flex-wrap gap-3 items-end justify-between">
+                    <div className="flex flex-wrap gap-3 items-end">
                     {/* Search */}
                     <div className="relative flex-1 min-w-[200px]">
                         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
@@ -359,14 +522,93 @@ export default function AdminAuditLogsPage() {
                             Réinitialiser les filtres
                         </button>
                     )}
+                    </div>
+
+                    <Button
+                        variant={showAnalytics ? "primary" : "ghost"}
+                        size="sm"
+                        onClick={() => setShowAnalytics(!showAnalytics)}
+                        className="flex items-center gap-2 rounded-xl"
+                    >
+                        <Activity size={15} />
+                        {t.auditLogs.analytics.toggle}
+                    </Button>
                 </div>
 
-                {total > 0 && (
-                    <p className="text-xs text-surface-400 font-medium">
-                        {total.toLocaleString("fr-FR")} entrée{total > 1 ? "s" : ""} trouvée{total > 1 ? "s" : ""}
-                    </p>
-                )}
+                <div className="flex items-center justify-between w-full">
+                    <div>
+                        {total > 0 && (
+                            <p className="text-xs text-surface-400 font-medium">
+                                {total.toLocaleString("fr-FR")} entrée{total > 1 ? "s" : ""} trouvée{total > 1 ? "s" : ""}
+                            </p>
+                        )}
+                    </div>
+                    {autoRefresh && lastRefreshedAt && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                            {t.auditLogs.refresh.active} — {t.auditLogs.refresh.lastSeen}: {lastRefreshedAt.toLocaleTimeString("fr-FR")}
+                        </p>
+                    )}
+                </div>
             </div>
+
+            {/* ── Analytics Panel ── */}
+            {showAnalytics && (
+                <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6 space-y-8">
+                    <h3 className="text-lg font-black text-surface-900 dark:text-white flex items-center gap-2">
+                        <Activity size={20} className="text-brand-500" />
+                        {t.auditLogs.analytics.title}
+                    </h3>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Action Distribution */}
+                        <div>
+                            <h4 className="text-sm font-bold text-surface-700 dark:text-surface-300 mb-4">{t.auditLogs.analytics.actionDist}</h4>
+                            {actionDistData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <PieChart>
+                                        <Pie
+                                            data={actionDistData}
+                                            cx="50%"
+                                            cy="50%"
+                                            labelLine={false}
+                                            label={({ name, value }) => `${name}: ${value}`}
+                                            outerRadius={60}
+                                            fill="#8884d8"
+                                            dataKey="value"
+                                        >
+                                            {actionDistData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <p className="text-surface-400 text-center py-8">{t.common.noResults}</p>
+                            )}
+                        </div>
+
+                        {/* Daily Volume */}
+                        <div>
+                            <h4 className="text-sm font-bold text-surface-700 dark:text-surface-300 mb-4">{t.auditLogs.analytics.dailyVolume}</h4>
+                            {dailyVolumeData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <BarChart data={dailyVolumeData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                        <YAxis tick={{ fontSize: 12 }} />
+                                        <Tooltip />
+                                        <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <p className="text-surface-400 text-center py-8">{t.common.noResults}</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Table ── */}
             <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 overflow-hidden">
@@ -398,7 +640,7 @@ export default function AdminAuditLogsPage() {
                                 logs.map(log => {
                                     const severity = getSeverity(log.action);
                                     return (
-                                        <tr key={log.id} className="border-b border-surface-100 dark:border-surface-800 hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors">
+                                        <tr key={log.id} className="border-b border-surface-100 dark:border-surface-800 hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors cursor-pointer" onClick={() => setSelectedLog(log)}>
                                             {/* Timestamp */}
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <div className="flex flex-col">
@@ -467,7 +709,7 @@ export default function AdminAuditLogsPage() {
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && (
+                {totalPages > 1 && !isFullHistory && (
                     <div className="flex items-center justify-between px-6 py-4 border-t border-surface-100 dark:border-surface-800">
                         <p className="text-sm text-surface-500">
                             Page {page} sur {totalPages} — {total.toLocaleString("fr-FR")} entrées
@@ -497,6 +739,60 @@ export default function AdminAuditLogsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Detail Modal */}
+            <Modal
+                isOpen={!!selectedLog}
+                onClose={() => setSelectedLog(null)}
+                title={t.auditLogs.detail.title}
+                size="lg"
+            >
+                {selectedLog && (
+                    <div className="space-y-6">
+                        {/* 2-column grid for basic info */}
+                        <div className="grid grid-cols-2 gap-6">
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">{t.auditLogs.detail.id}</p>
+                                <p className="font-mono text-sm text-surface-700 dark:text-surface-300 break-all">{selectedLog.id}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">Action</p>
+                                <p className="text-sm font-semibold text-surface-900 dark:text-white">{ACTION_LABELS[selectedLog.action] ?? selectedLog.action}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">Admin</p>
+                                <p className="text-sm text-surface-700 dark:text-surface-300">{selectedLog.adminName ?? selectedLog.adminEmail ?? selectedLog.adminId ?? "—"}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">Timestamp</p>
+                                <p className="text-sm text-surface-700 dark:text-surface-300">{new Date(selectedLog.createdAt).toLocaleString("fr-FR")}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">Target Type</p>
+                                <p className="text-sm text-surface-700 dark:text-surface-300">{selectedLog.targetType}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">Target ID</p>
+                                <p className="font-mono text-sm text-surface-700 dark:text-surface-300 break-all">{selectedLog.targetId}</p>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">IP Address</p>
+                                <p className="font-mono text-sm text-surface-700 dark:text-surface-300">{selectedLog.ipAddress ?? "—"}</p>
+                            </div>
+                        </div>
+
+                        {/* Raw details JSON block */}
+                        {selectedLog.details && Object.keys(selectedLog.details).length > 0 && (
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-surface-400 mb-2">{t.auditLogs.detail.rawDetails}</p>
+                                <pre className="bg-surface-50 dark:bg-surface-900 p-4 rounded-xl border border-surface-200 dark:border-surface-700 overflow-auto max-h-64 text-surface-700 dark:text-surface-300 text-[11px] font-mono whitespace-pre-wrap">
+                                    {JSON.stringify(selectedLog.details, null, 2)}
+                                </pre>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 }
