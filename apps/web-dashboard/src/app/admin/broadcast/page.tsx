@@ -45,6 +45,19 @@ interface BroadcastHistory {
     sentAt: string;
 }
 
+interface BroadcastAnalytics {
+    broadcast: { id: string; title: string; tokens_sent: number; sent_at: string };
+    summary: {
+        sent: number;
+        opens: number;
+        clicks: number;
+        openRate: number;
+        openedRestaurants: number;
+        clickedRestaurants: number;
+    };
+    timeline: Array<{ date: string; opens: number; clicks: number }>;
+}
+
 interface Pack { id: string; name: string; category: string }
 
 // ── Templates ─────────────────────────────────────────────────────────────────
@@ -172,6 +185,11 @@ export default function AdminBroadcastPage() {
 
     // Scheduling state
     const [scheduledAt, setScheduledAt] = useState<string>("");
+
+    // Analytics state
+    const [analyticsOpen, setAnalyticsOpen] = useState<string | null>(null);
+    const [analyticsData, setAnalyticsData] = useState<BroadcastAnalytics | null>(null);
+    const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
     const fetchHistory = useCallback(async () => {
         setLoadingHistory(true);
@@ -321,6 +339,20 @@ export default function AdminBroadcastPage() {
             console.error("Load draft error:", e);
         } finally {
             setLoadingDrafts(false);
+        }
+    }
+
+    async function handleViewAnalytics(broadcastId: string) {
+        setAnalyticsLoading(true);
+        setAnalyticsOpen(broadcastId);
+        try {
+            const res = await fetch(`/api/admin/broadcasts/${broadcastId}/analytics`);
+            const data = await res.json();
+            setAnalyticsData(data);
+        } catch (e) {
+            console.error("Analytics fetch error:", e);
+        } finally {
+            setAnalyticsLoading(false);
         }
     }
 
@@ -872,6 +904,15 @@ export default function AdminBroadcastPage() {
                                         <Smartphone size={11} />
                                         {b.tokensSent} appareils
                                     </div>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleViewAnalytics(b.id)}
+                                        className="text-brand-400 hover:text-brand-300 gap-1 h-auto px-1.5 py-0"
+                                    >
+                                        <Activity size={12} />
+                                        <span className="text-xs">Analytics</span>
+                                    </Button>
                                     <span className="text-xs text-surface-600">
                                         {new Date(b.sentAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                                     </span>
@@ -881,6 +922,112 @@ export default function AdminBroadcastPage() {
                     </div>
                 )}
             </motion.div>
+
+            {/* Analytics Modal */}
+            <AnimatePresence>
+                {analyticsOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setAnalyticsOpen(null)}
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-surface-900 border border-surface-800 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+                        >
+                            {analyticsLoading ? (
+                                <div className="flex items-center justify-center h-96">
+                                    <Loader2 size={32} className="animate-spin text-brand-400" />
+                                </div>
+                            ) : analyticsData ? (
+                                <>
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between p-6 border-b border-surface-800">
+                                        <div>
+                                            <h2 className="text-lg font-bold text-white">{analyticsData.broadcast.title}</h2>
+                                            <p className="text-xs text-surface-500 mt-1">
+                                                Envoyé le {new Date(analyticsData.broadcast.sent_at).toLocaleString("fr-FR")}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setAnalyticsOpen(null)}
+                                            className="text-surface-400 hover:text-white transition-colors"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-6 border-b border-surface-800">
+                                        <div className="bg-surface-800/50 rounded-lg p-4">
+                                            <p className="text-xs text-surface-500">Envoyés</p>
+                                            <p className="text-2xl font-bold text-white mt-1">{analyticsData.summary.sent}</p>
+                                        </div>
+                                        <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">
+                                            <p className="text-xs text-blue-300">Ouvertures</p>
+                                            <p className="text-2xl font-bold text-blue-400 mt-1">{analyticsData.summary.opens}</p>
+                                            <p className="text-xs text-blue-400/60 mt-1">{analyticsData.summary.openRate}%</p>
+                                        </div>
+                                        <div className="bg-emerald-500/10 rounded-lg p-4 border border-emerald-500/20">
+                                            <p className="text-xs text-emerald-300">Clics</p>
+                                            <p className="text-2xl font-bold text-emerald-400 mt-1">{analyticsData.summary.clicks}</p>
+                                        </div>
+                                        <div className="bg-violet-500/10 rounded-lg p-4 border border-violet-500/20">
+                                            <p className="text-xs text-violet-300">Restaurants</p>
+                                            <p className="text-2xl font-bold text-violet-400 mt-1">{analyticsData.summary.openedRestaurants}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Timeline Chart */}
+                                    {analyticsData.timeline.length > 0 && (
+                                        <div className="p-6 border-b border-surface-800">
+                                            <h3 className="text-sm font-semibold text-white mb-4">Tendance (7 derniers jours)</h3>
+                                            <ResponsiveContainer width="100%" height={250}>
+                                                <BarChart data={analyticsData.timeline}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                    <XAxis dataKey="date" stroke="rgba(255,255,255,0.5)" />
+                                                    <YAxis stroke="rgba(255,255,255,0.5)" />
+                                                    <Tooltip
+                                                        contentStyle={{
+                                                            backgroundColor: "rgba(30,30,30,0.9)",
+                                                            border: "1px solid rgba(255,255,255,0.1)",
+                                                            borderRadius: "8px",
+                                                        }}
+                                                        cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                                                    />
+                                                    <Legend />
+                                                    <Bar dataKey="opens" fill="#3b82f6" name="Ouvertures" />
+                                                    <Bar dataKey="clicks" fill="#10b981" name="Clics" />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    )}
+
+                                    {/* Footer */}
+                                    <div className="p-6">
+                                        <Button
+                                            onClick={() => setAnalyticsOpen(null)}
+                                            variant="ghost"
+                                            className="w-full text-surface-400"
+                                        >
+                                            Fermer
+                                        </Button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex items-center justify-center h-96 text-surface-500">
+                                    Erreur lors du chargement des analytics
+                                </div>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
