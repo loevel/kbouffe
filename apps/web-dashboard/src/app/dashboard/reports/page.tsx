@@ -5,6 +5,20 @@ import { useLocale, formatCFA, Card, Button, ReportStatCard, Badge } from "@kbou
 import { useOrders, useDashboardStats } from "@kbouffe/module-orders/ui";
 import { useProducts, useCategories } from "@/hooks/use-data";
 import {
+    ResponsiveContainer,
+    AreaChart,
+    Area,
+    BarChart,
+    Bar,
+    Cell,
+    PieChart,
+    Pie,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+} from "recharts";
+import {
     Download,
     TrendingUp,
     Zap,
@@ -108,6 +122,30 @@ function TrendCard({ label, value, description, delta }: TrendCardProps) {
     );
 }
 
+// ── Custom chart tooltip ─────────────────────────────────────────────────────
+function ChartTooltip({
+    active,
+    payload,
+    label,
+    valueFormatter,
+}: {
+    active?: boolean;
+    payload?: any[];
+    label?: string;
+    valueFormatter?: (value: number) => string;
+}) {
+    if (!active || !payload || !payload[0]) return null;
+    const value = payload[0].value as number;
+    const formattedValue = valueFormatter ? valueFormatter(value) : String(value);
+
+    return (
+        <div className="bg-surface-800 dark:bg-surface-900 border border-surface-700 dark:border-surface-600 rounded-lg px-3 py-2 shadow-xl">
+            {label && <p className="text-xs text-surface-400 mb-0.5">{label}</p>}
+            <p className="text-sm font-bold text-white">{formattedValue}</p>
+        </div>
+    );
+}
+
 // ── Utilitaires ──────────────────────────────────────────────────────────────
 
 function getDayLabel(date: Date) {
@@ -176,6 +214,18 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }>
     delivered: { label: "Livree", icon: CheckCircle2, color: "text-green-500" },
     completed: { label: "Completee", icon: CheckCircle2, color: "text-emerald-500" },
     cancelled: { label: "Annulee", icon: XCircle, color: "text-red-500" },
+};
+
+// Status colors for PieChart
+const STATUS_COLORS: Record<string, string> = {
+    pending: "#f59e0b",
+    confirmed: "#3b82f6",
+    preparing: "#6366f1",
+    ready: "#06b6d4",
+    delivering: "#f97316",
+    delivered: "#22c55e",
+    completed: "#10b981",
+    cancelled: "#ef4444",
 };
 
 export default function ReportsPage() {
@@ -561,115 +611,262 @@ export default function ReportsPage() {
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Revenue Chart */}
+                {/* Revenue Chart — AreaChart */}
                 <Card className="lg:col-span-2">
                     <h3 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
                         <TrendingUp size={18} className="text-brand-500" />
                         {t.dashboard.revenueChart}
                     </h3>
-                    <div className="h-64 p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl border border-surface-200 dark:border-surface-700">
-                        <div className="h-full flex items-end gap-1.5">
-                            {chartSeries.map((point) => (
-                                <div key={point.key} className="flex-1 h-full flex flex-col justify-end items-center gap-2 min-w-0">
-                                    <div className="text-[10px] text-surface-400 dark:text-surface-500 leading-none hidden sm:block">
-                                        {point.value > 0 ? `${Math.round(point.value / 1000)}k` : "0"}
-                                    </div>
-                                    <div className="w-full flex justify-center" style={{ height: "180px" }}>
-                                        <div
-                                            className="w-full max-w-[28px] rounded-t-md bg-brand-500/80 hover:bg-brand-500 transition-colors"
-                                            style={{ height: `${point.heightPercent}%` }}
-                                            title={`${point.label} : ${formatCFA(point.value)}`}
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                                data={chartSeries}
+                                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                            >
+                                <defs>
+                                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="var(--color-brand-500, #f97316)" stopOpacity={0.25} />
+                                        <stop offset="100%" stopColor="var(--color-brand-500, #f97316)" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    stroke="rgba(0,0,0,0.05)"
+                                    vertical={false}
+                                />
+                                <XAxis
+                                    dataKey="label"
+                                    tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    interval="preserveStartEnd"
+                                />
+                                <YAxis
+                                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(v: number) =>
+                                        v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+                                    }
+                                    width={45}
+                                    className="hidden sm:block"
+                                />
+                                <Tooltip
+                                    content={
+                                        <ChartTooltip
+                                            valueFormatter={(v) => formatCFA(v)}
                                         />
-                                    </div>
-                                    <div className="text-[10px] text-surface-500 dark:text-surface-400 whitespace-nowrap">{point.label}</div>
-                                </div>
-                            ))}
-                        </div>
+                                    }
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke="var(--color-brand-500, #f97316)"
+                                    strokeWidth={2}
+                                    fill="url(#revenueGradient)"
+                                    dot={false}
+                                    animationDuration={800}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
                 </Card>
 
-                {/* Orders by Status */}
+                {/* Orders by Status — PieChart */}
                 <Card>
                     <h3 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
                         <ShoppingBag size={18} className="text-brand-500" />
                         Par statut
                     </h3>
-                    <div className="space-y-3">
-                        {ordersByStatus.map(([status, count]) => {
-                            const conf = STATUS_CONFIG[status] ?? { label: status, icon: Package, color: "text-surface-400" };
-                            const Icon = conf.icon;
-                            const pct = totalOrdersCount > 0 ? Math.round((count / totalOrdersCount) * 100) : 0;
-                            return (
-                                <div key={status} className="flex items-center gap-3">
-                                    <Icon size={14} className={`${conf.color} flex-shrink-0`} />
-                                    <span className="text-sm text-surface-600 dark:text-surface-400 flex-1 truncate">{conf.label}</span>
-                                    <span className="text-sm font-bold text-surface-900 dark:text-white">{count}</span>
-                                    <div className="w-16 h-1.5 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} />
-                                    </div>
-                                    <span className="text-xs text-surface-400 w-8 text-right">{pct}%</span>
-                                </div>
-                            );
-                        })}
-                        {ordersByStatus.length === 0 && (
-                            <p className="text-sm text-surface-400 italic text-center py-6">Aucune commande</p>
-                        )}
-                    </div>
+                    {ordersByStatus.length === 0 ? (
+                        <p className="text-sm text-surface-400 italic text-center py-8">Aucune commande</p>
+                    ) : (
+                        <div className="flex flex-col items-center">
+                            <div className="h-56 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={ordersByStatus.map(([status, count]) => ({
+                                                name: STATUS_CONFIG[status]?.label ?? status,
+                                                value: count,
+                                                status,
+                                            }))}
+                                            cx="50%"
+                                            cy="45%"
+                                            innerRadius={55}
+                                            outerRadius={85}
+                                            paddingAngle={2}
+                                            dataKey="value"
+                                            animationDuration={800}
+                                        >
+                                            {ordersByStatus.map(([status]) => (
+                                                <Cell
+                                                    key={status}
+                                                    fill={STATUS_COLORS[status] ?? "#94a3b8"}
+                                                />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            content={
+                                                <ChartTooltip
+                                                    valueFormatter={(v) => `${v} commande${v > 1 ? "s" : ""}`}
+                                                />
+                                            }
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            {/* Custom Legend */}
+                            <div className="grid grid-cols-2 gap-2 w-full mt-2 text-[11px]">
+                                {ordersByStatus.map(([status, count]) => {
+                                    const conf = STATUS_CONFIG[status];
+                                    const Icon = conf?.icon ?? Package;
+                                    const pct = totalOrdersCount > 0 ? Math.round((count / totalOrdersCount) * 100) : 0;
+                                    return (
+                                        <div key={status} className="flex items-center gap-1.5 px-2 py-1.5 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
+                                            <div
+                                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: STATUS_COLORS[status] }}
+                                            />
+                                            <span className="text-surface-600 dark:text-surface-400 truncate flex-1">{conf?.label ?? status}</span>
+                                            <span className="font-semibold text-surface-900 dark:text-white">{count}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </Card>
             </div>
 
-            {/* Peak Hours */}
+            {/* Peak Hours — BarChart */}
             {peakHours.length > 0 && (
                 <Card>
                     <h3 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
                         <Clock size={18} className="text-brand-500" />
                         Heures de pointe
                     </h3>
-                    <div className="flex items-end gap-1 px-2">
-                        {Array.from({ length: 16 }, (_, i) => {
-                            const hour = 7 + i;
-                            const slot = peakHours.find((s) => s.hour === hour);
+                    <div className="h-48">
+                        {(() => {
                             const maxCount = Math.max(...peakHours.map((s) => s.count), 1);
-                            const count = slot?.count ?? 0;
-                            const isPeak = count === maxCount && count > 0;
                             return (
-                                <div key={hour} className="flex-1 flex flex-col items-center gap-1">
-                                    <div
-                                        className={`w-full rounded-t-sm transition-colors ${
-                                            isPeak ? "bg-brand-500 shadow-lg" : "bg-surface-200 dark:bg-surface-700"
-                                        }`}
-                                        style={{ height: `${Math.max(4, (count / maxCount) * 100)}px` }}
-                                        title={`${hour}h: ${count} commandes`}
-                                    />
-                                    <span className="text-[9px] text-surface-400 whitespace-nowrap">{hour}h</span>
-                                    {isPeak && <span className="text-[8px] font-bold text-brand-500 leading-none">pic</span>}
-                                </div>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={peakHours}
+                                        margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                                    >
+                                        <CartesianGrid
+                                            strokeDasharray="3 3"
+                                            stroke="rgba(0,0,0,0.05)"
+                                            vertical={false}
+                                        />
+                                        <XAxis
+                                            dataKey="hour"
+                                            tickFormatter={(h: number) => `${h}h`}
+                                            tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <Tooltip
+                                            content={
+                                                <ChartTooltip
+                                                    valueFormatter={(v) => `${v} commande${v > 1 ? "s" : ""}`}
+                                                />
+                                            }
+                                        />
+                                        <Bar
+                                            dataKey="count"
+                                            radius={[4, 4, 0, 0]}
+                                            animationDuration={600}
+                                        >
+                                            {peakHours.map((entry, index) => (
+                                                <Cell
+                                                    key={`cell-${index}`}
+                                                    fill={
+                                                        entry.count === maxCount && entry.count > 0
+                                                            ? "var(--color-brand-500, #f97316)"
+                                                            : "#cbd5e1"
+                                                    }
+                                                />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
                             );
-                        })}
+                        })()}
                     </div>
                 </Card>
             )}
 
-            {/* Revenue by Category */}
+            {/* Revenue by Category — Horizontal BarChart */}
             {revenueByCategory.length > 0 && (
                 <Card>
                     <h3 className="font-bold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
                         <BarChart3 size={18} className="text-brand-500" />
                         Revenus par catégorie
                     </h3>
-                    <div className="space-y-3">
-                        {revenueByCategory.map(({ name, revenue }) => {
-                            const pct = totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0;
+                    <div className="h-64">
+                        {(() => {
+                            const CATEGORY_COLORS = ["#f97316", "#3b82f6", "#10b981", "#a855f7", "#f59e0b"];
                             return (
-                                <div key={name} className="flex items-center gap-3">
-                                    <span className="text-sm text-surface-600 dark:text-surface-400 flex-1 truncate">{name}</span>
-                                    <div className="w-24 h-1.5 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} />
-                                    </div>
-                                    <span className="text-xs font-semibold text-surface-900 dark:text-white w-8 text-right">{pct}%</span>
-                                </div>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={revenueByCategory.map(({ name, revenue }, idx) => ({
+                                            name,
+                                            revenue,
+                                            pct: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0,
+                                            color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
+                                        }))}
+                                        layout="vertical"
+                                        margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+                                    >
+                                        <CartesianGrid
+                                            strokeDasharray="3 3"
+                                            stroke="rgba(0,0,0,0.05)"
+                                            horizontal={false}
+                                        />
+                                        <XAxis
+                                            type="number"
+                                            tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+                                        />
+                                        <YAxis
+                                            type="category"
+                                            dataKey="name"
+                                            tick={{ fontSize: 11, fill: "#64748b" }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            width={115}
+                                        />
+                                        <Tooltip
+                                            content={
+                                                <ChartTooltip
+                                                    valueFormatter={(v) => formatCFA(v)}
+                                                />
+                                            }
+                                        />
+                                        <Bar
+                                            dataKey="revenue"
+                                            radius={[0, 4, 4, 0]}
+                                            animationDuration={700}
+                                        >
+                                            {revenueByCategory.map((_, idx) => (
+                                                <Cell
+                                                    key={`cell-${idx}`}
+                                                    fill={
+                                                        ["#f97316", "#3b82f6", "#10b981", "#a855f7", "#f59e0b"][
+                                                            idx % 5
+                                                        ]
+                                                    }
+                                                />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
                             );
-                        })}
+                        })()}
                     </div>
                 </Card>
             )}
