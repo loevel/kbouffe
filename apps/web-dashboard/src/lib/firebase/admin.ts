@@ -138,15 +138,39 @@ export async function sendFcmMessage(msg: FcmMessage): Promise<void> {
     }
 }
 
-/** Envoie en batch (max 500 tokens) */
+/** Envoie en batch (max 500 tokens) et retourne les tokens invalides */
 export async function sendFcmBatch(
     tokens: string[],
     title: string,
     body: string,
     data?: Record<string, string>,
     link?: string
-): Promise<void> {
-    await Promise.allSettled(
-        tokens.map((token) => sendFcmMessage({ token, title, body, data, link }))
+): Promise<{ invalidTokens: string[] }> {
+    const invalidTokens: string[] = [];
+
+    const results = await Promise.allSettled(
+        tokens.map(async (token) => {
+            try {
+                await sendFcmMessage({ token, title, body, data, link });
+            } catch (err: any) {
+                // Tokens invalides/expirés
+                if (err.message?.includes("404") || err.message?.includes("400")) {
+                    invalidTokens.push(token);
+                }
+                throw err;
+            }
+        })
     );
+
+    // Tracker les tokens qui ont échoué
+    results.forEach((result, idx) => {
+        if (result.status === "rejected") {
+            const token = tokens[idx];
+            if (!invalidTokens.includes(token)) {
+                invalidTokens.push(token);
+            }
+        }
+    });
+
+    return { invalidTokens };
 }

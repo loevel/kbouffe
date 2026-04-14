@@ -175,6 +175,7 @@ export async function POST(request: NextRequest) {
         try {
             // Chunking FCM: max 500 tokens par batch
             const chunks = chunkArray(tokens, 500);
+            const invalidTokensCollected: Set<string> = new Set();
             console.log(`[broadcast] Envoi de ${tokens.length} tokens en ${chunks.length} chunk(s)`);
 
             for (let i = 0; i < chunks.length; i++) {
@@ -182,14 +183,21 @@ export async function POST(request: NextRequest) {
                 console.log(`[broadcast] Chunk ${i + 1}/${chunks.length}: ${chunk.length} tokens`);
 
                 try {
-                    await sendFcmBatch(
+                    const { invalidTokens } = await sendFcmBatch(
                         chunk,
                         title.trim(),
                         bodyText.trim(),
                         { type: "broadcast", template: template ?? "custom" },
                         link ?? "/dashboard"
                     );
+
                     tokensSent += chunk.length;
+
+                    // Tracker les tokens invalides pour suppression
+                    invalidTokens.forEach(t => invalidTokensCollected.add(t));
+                    if (invalidTokens.length > 0) {
+                        console.warn(`[broadcast] ${invalidTokens.length} invalid tokens in chunk ${i + 1}`);
+                    }
                 } catch (err: any) {
                     console.error(`[broadcast] FCM error chunk ${i + 1}:`, err?.message);
                     // Continue avec les chunks suivants même si un échoue
@@ -207,6 +215,19 @@ export async function POST(request: NextRequest) {
                     .from("push_tokens")
                     .update({ last_used_at: new Date().toISOString() })
                     .in("token", tokens);
+            }
+
+            // Nettoyer les tokens invalides
+            if (invalidTokensCollected.size > 0) {
+                const invalidTokensArray = Array.from(invalidTokensCollected);
+                console.log(`[broadcast] Cleaning up ${invalidTokensArray.length} invalid tokens...`);
+
+                await db
+                    .from("push_tokens")
+                    .delete()
+                    .in("token", invalidTokensArray);
+
+                console.log(`[broadcast] Cleaned up ${invalidTokensArray.length} invalid tokens`);
             }
         } catch (err: any) {
             console.error("[broadcast] Unexpected FCM error:", err?.message);

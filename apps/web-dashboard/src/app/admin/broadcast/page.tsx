@@ -23,6 +23,9 @@ import {
     Brain,
     Copy,
     Check,
+    Save,
+    Trash2,
+    FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "@kbouffe/module-core/ui";
@@ -152,6 +155,12 @@ export default function AdminBroadcastPage() {
     const [previewCount, setPreviewCount] = useState<number | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
+    // Draft state
+    const [drafts, setDrafts] = useState<Array<{ id: string; title: string; updated_at: string }>>([]);
+    const [loadingDrafts, setLoadingDrafts] = useState(false);
+    const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+    const [savingDraft, setSavingDraft] = useState(false);
+
     const fetchHistory = useCallback(async () => {
         setLoadingHistory(true);
         try {
@@ -167,6 +176,21 @@ export default function AdminBroadcastPage() {
     }, []);
 
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+    const fetchDrafts = useCallback(async () => {
+        setLoadingDrafts(true);
+        try {
+            const res = await fetch("/api/admin/broadcast/drafts");
+            const data = await res.json();
+            setDrafts(data.drafts ?? []);
+        } catch (e) {
+            console.error("Drafts fetch error:", e);
+        } finally {
+            setLoadingDrafts(false);
+        }
+    }, []);
+
+    useEffect(() => { fetchDrafts(); }, [fetchDrafts]);
 
     // Fetch preview count when targeting changes
     useEffect(() => {
@@ -228,6 +252,79 @@ export default function AdminBroadcastPage() {
         if (tpl) {
             setTitle(tpl.title);
             setBody(tpl.body);
+        }
+    }
+
+    async function handleSaveDraft() {
+        if (!title.trim() || !body.trim()) return;
+        setSavingDraft(true);
+        try {
+            const res = await fetch("/api/admin/broadcast/drafts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: currentDraftId,
+                    title,
+                    bodyText: body,
+                    template: selectedTemplate,
+                    targetType,
+                    targetValue: targetType === "pack" || targetType === "city" ? targetValue : undefined,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setCurrentDraftId(data.id);
+                fetchDrafts();
+                setSendResult({ success: true, message: "Brouillon sauvegardé ✓" });
+                setTimeout(() => setSendResult(null), 3000);
+            }
+        } catch (e) {
+            setSendResult({ success: false, message: "Erreur réseau" });
+        } finally {
+            setSavingDraft(false);
+        }
+    }
+
+    async function handleLoadDraft(draftId: string) {
+        const draft = drafts.find(d => d.id === draftId);
+        if (!draft) return;
+
+        setLoadingDrafts(true);
+        try {
+            const res = await fetch("/api/admin/broadcast/drafts");
+            const data = await res.json();
+            const fullDraft = data.drafts?.find((d: any) => d.id === draftId);
+
+            if (fullDraft) {
+                setCurrentDraftId(draftId);
+                setTitle(fullDraft.title);
+                setBody(fullDraft.body);
+                setSelectedTemplate(fullDraft.template);
+                setTargetType(fullDraft.target_type);
+                setTargetValue(fullDraft.target_value ?? "");
+                setSendResult({ success: true, message: "Brouillon chargé ✓" });
+                setTimeout(() => setSendResult(null), 2000);
+            }
+        } catch (e) {
+            console.error("Load draft error:", e);
+        } finally {
+            setLoadingDrafts(false);
+        }
+    }
+
+    async function handleDeleteDraft(draftId: string) {
+        if (!confirm("Supprimer ce brouillon ?")) return;
+
+        try {
+            await fetch(`/api/admin/broadcast/drafts/${draftId}`, {
+                method: "DELETE",
+            });
+            fetchDrafts();
+            if (currentDraftId === draftId) {
+                setCurrentDraftId(null);
+            }
+        } catch (e) {
+            console.error("Delete draft error:", e);
         }
     }
 
@@ -523,6 +620,19 @@ export default function AdminBroadcastPage() {
                         )}
                     </AnimatePresence>
 
+                    {/* Draft + Send buttons */}
+                    <div className="flex gap-2">
+                        <Button
+                            onClick={handleSaveDraft}
+                            disabled={!title.trim() || !body.trim() || savingDraft}
+                            variant="ghost"
+                            className="gap-2 text-surface-400 hover:text-white"
+                        >
+                            {savingDraft ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                            Sauvegarder
+                        </Button>
+                    </div>
+
                     {/* Send button */}
                     <div className="flex justify-end gap-3">
                         <Button
@@ -626,13 +736,44 @@ export default function AdminBroadcastPage() {
                         </div>
                     </div>
 
+                    {/* Drafts */}
+                    {drafts.length > 0 && (
+                        <div className="bg-surface-900 border border-surface-800 rounded-xl p-4">
+                            <h4 className="text-xs font-semibold text-surface-400 mb-3 flex items-center gap-2">
+                                <FileText size={12} />
+                                Brouillons ({drafts.length})
+                            </h4>
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {drafts.map(draft => (
+                                    <div key={draft.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-surface-800/50 hover:bg-surface-800 transition-colors group">
+                                        <button
+                                            onClick={() => handleLoadDraft(draft.id)}
+                                            className="flex-1 text-left min-w-0"
+                                        >
+                                            <p className="text-xs font-medium text-white truncate group-hover:text-brand-400">{draft.title || "Sans titre"}</p>
+                                            <p className="text-[10px] text-surface-600">
+                                                {new Date(draft.updated_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                            </p>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteDraft(draft.id)}
+                                            className="p-1 text-surface-600 hover:text-red-400 transition-colors shrink-0"
+                                        >
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Tips */}
                     <div className="bg-surface-900 border border-surface-800 rounded-xl p-4">
                         <h4 className="text-xs font-semibold text-surface-400 mb-2">💡 Bonnes pratiques</h4>
                         <ul className="space-y-1.5 text-xs text-surface-500">
                             <li>• Titre court (&lt;65 car.) pour un meilleur affichage</li>
                             <li>• Évitez les envois après 22h</li>
-                            <li>• Max 1 broadcast par semaine</li>
+                            <li>• Max 5 broadcasts par heure</li>
                             <li>• Les restaurants sans push token ne recevront pas la notif</li>
                         </ul>
                     </div>
