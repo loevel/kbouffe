@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const { targetType, targetValue } = body;
 
-    const validTargets = ["all", "pack", "city", "active"];
+    const validTargets = ["all", "pack", "city", "active", "inactive_30d", "no_products"];
     if (!validTargets.includes(targetType)) {
         return apiError("Cible invalide", 400);
     }
@@ -82,6 +82,26 @@ export async function POST(request: NextRequest) {
                 .select("id, owner_id", { count: "exact" })
                 .ilike("address", `%${targetValue.trim()}%`)
                 .not("owner_id", "is", null);
+            targetedRestaurants = (rests ?? []).map((r: any) => ({ id: r.id, owner_id: r.owner_id }));
+
+        } else if (targetType === "inactive_30d") {
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            const { data: rests } = await db
+                .from("restaurants")
+                .select("id, owner_id")
+                .or(`last_order_at.is.null,last_order_at.lt.${thirtyDaysAgo}`)
+                .not("owner_id", "is", null);
+            targetedRestaurants = (rests ?? []).map((r: any) => ({ id: r.id, owner_id: r.owner_id }));
+
+        } else if (targetType === "no_products") {
+            // Restaurants without any products
+            const { data: rests } = await db
+                .from("restaurants")
+                .select("id, owner_id")
+                .not("owner_id", "is", null)
+                .not("id", "in",
+                    `(SELECT DISTINCT restaurant_id FROM products WHERE is_active=true)`
+                );
             targetedRestaurants = (rests ?? []).map((r: any) => ({ id: r.id, owner_id: r.owner_id }));
         }
 

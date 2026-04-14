@@ -95,6 +95,8 @@ const TEMPLATES = [
 const TARGET_OPTIONS = [
     { key: "all", label: "Tous les restaurants", icon: Globe, description: "Tous les marchands inscrits" },
     { key: "active", label: "Restaurants actifs", icon: Store, description: "Uniquement les boutiques publiées" },
+    { key: "inactive_30d", label: "Inactifs >30 jours", icon: Users, description: "Restaurants sans commande depuis 30j" },
+    { key: "no_products", label: "Sans produits", icon: Package, description: "Boutiques avec menu vide" },
     { key: "pack", label: "Par abonnement", icon: Package, description: "Restaurants abonnés à un pack spécifique" },
     { key: "city", label: "Par ville", icon: MapPin, description: "Restaurants dans une ville donnée" },
 ] as const;
@@ -107,15 +109,22 @@ const TEMPLATE_BADGE_COLORS: Record<string, string> = {
 };
 
 const TARGET_BADGE_COLORS: Record<string, string> = {
-    all:    "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    active: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    pack:   "bg-violet-500/10 text-violet-400 border-violet-500/20",
-    city:   "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    all:            "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    active:         "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    inactive_30d:   "bg-orange-500/10 text-orange-400 border-orange-500/20",
+    no_products:    "bg-red-500/10 text-red-400 border-red-500/20",
+    pack:           "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    city:           "bg-amber-500/10 text-amber-400 border-amber-500/20",
 };
 
 function targetLabel(b: BroadcastHistory) {
     const base: Record<string, string> = {
-        all: "Tous", active: "Actifs", pack: "Pack", city: "Ville"
+        all: "Tous",
+        active: "Actifs",
+        inactive_30d: "Inactifs >30j",
+        no_products: "Sans produits",
+        pack: "Pack",
+        city: "Ville"
     };
     const lbl = base[b.targetType] ?? b.targetType;
     return b.targetLabel ? `${lbl}: ${b.targetLabel}` : b.targetValue ? `${lbl}: ${b.targetValue}` : lbl;
