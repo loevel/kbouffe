@@ -28,6 +28,7 @@ import {
     BarChart3,
     Target,
     FileText,
+    Gift,
 } from "lucide-react";
 import { KbouffeLogoWhite } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,7 @@ import { useAdmin } from "@/components/providers/AdminProvider";
 import { motion } from "framer-motion";
 import { type AdminPermission } from "@/lib/admin-permissions";
 
-export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories" | "aiUsage" | "subscriptions" | "onboarding" | "broadcast" | "socialMonitor" | "backup" | "suppliers" | "homepage" | "emailTemplates" | "customerSuccess" | "revenueOperations" | "salesEngineering" | "contractsProposals";
+export type AdminNavKey = "dashboard" | "users" | "restaurants" | "billing" | "settings" | "audits" | "marketing" | "marketplace" | "support" | "orders" | "moderation" | "cuisineCategories" | "aiUsage" | "subscriptions" | "onboarding" | "broadcast" | "socialMonitor" | "backup" | "suppliers" | "homepage" | "emailTemplates" | "customerSuccess" | "revenueOperations" | "salesEngineering" | "contractsProposals" | "giftCards";
 
 export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any; permission?: AdminPermission }[] = [
     { href: "/admin", labelKey: "dashboard", icon: LayoutDashboard },
@@ -50,6 +51,7 @@ export const adminNavItemsDef: { href: string; labelKey: AdminNavKey; icon: any;
     { href: "/admin/marketing", labelKey: "marketing", icon: Megaphone, permission: "admin:marketing:read" },
     { href: "/admin/suppliers", labelKey: "suppliers", icon: Leaf, permission: "admin:marketplace:manage" },
     { href: "/admin/marketplace", labelKey: "marketplace", icon: StoreIcon, permission: "admin:marketplace:manage" },
+    { href: "/admin/gift-cards", labelKey: "giftCards", icon: Gift, permission: "admin:marketplace:manage" },
 
     // Business Growth Operations
     { href: "/admin/customer-success", labelKey: "customerSuccess", icon: Activity, permission: "admin:settings:manage" },
