@@ -120,6 +120,10 @@ giftCardRoutes.post("/", async (c) => {
             expires_at: body.expires_at ?? null,
             is_active: true,
             created_by: c.var.userId ?? null,
+            issued_by_type: "restaurant",
+            issued_by_id: c.var.restaurantId,
+            usable_context: "menu_only",
+            restricted_to_restaurant_id: c.var.restaurantId,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         } as any)
@@ -131,19 +135,22 @@ giftCardRoutes.post("/", async (c) => {
         return c.json({ error: "Erreur lors de la création de la carte cadeau" }, 500);
     }
 
-    // Enregistrer le mouvement initial (issue)
-    await c.var.supabase
+    // Enregistrer le mouvement initial (issue) - don't pass created_at, it has a default
+    const { error: movementError } = await c.var.supabase
         .from("gift_card_movements")
         .insert({
-            id: crypto.randomUUID(),
             gift_card_id: (data as GiftCard).id,
             order_id: null,
             amount: balance,
             balance_after: balance,
             type: "issue",
             note: body.note?.trim() ?? "Émission initiale",
-            created_at: new Date().toISOString(),
         } as any);
+
+    if (movementError) {
+        console.error("[POST /gift-cards] Movement error:", movementError);
+        // Don't fail - card was created successfully
+    }
 
     return c.json({ gift_card: data }, 201);
 });
