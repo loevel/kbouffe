@@ -188,19 +188,6 @@ export default function ReportsPage() {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
-    // Show skeleton during loading
-    if (isLoading && orders.length === 0) {
-        return (
-            <div className="space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{t.reports.title}</h1>
-                    <p className="text-surface-500 dark:text-surface-400 mt-1">{t.reports.subtitle}</p>
-                </div>
-                <ReportsSkeleton />
-            </div>
-        );
-    }
-
     const periodDays = period === "7d" ? 7 : period === "30d" ? 30 : 90;
     const periodLabel = period === "7d" ? "7 jours" : period === "30d" ? "30 jours" : "90 jours";
 
@@ -440,6 +427,19 @@ export default function ReportsPage() {
         setShowExportMenu(false);
         setExportFeedback("✓ Résumé téléchargé");
     }, [periodLabel, totalOrdersCount, completedOrders, cancelledOrders, cancelRate, totalRevenue, avgOrderValue, stats, products, categories, topProducts, period]);
+
+    // Show skeleton during loading
+    if (isLoading && orders.length === 0) {
+        return (
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{t.reports.title}</h1>
+                    <p className="text-surface-500 dark:text-surface-400 mt-1">{t.reports.subtitle}</p>
+                </div>
+                <ReportsSkeleton />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

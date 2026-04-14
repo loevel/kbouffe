@@ -109,7 +109,7 @@ export function NotificationBell() {
         try {
             const res = await authFetch("/api/notifications");
             if (res.ok) {
-                const data = await res.json();
+                const data = await res.json() as { notifications: KdsNotification[]; unreadCount: number };
                 setNotifications(data.notifications);
                 setUnreadCount(data.unreadCount);
             }
