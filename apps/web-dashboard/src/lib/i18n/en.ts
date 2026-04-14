@@ -90,6 +90,7 @@ export const en: TranslationKeys = {
         audits: "Audit Logs",
         marketing: "Marketing",
         marketplace: "Marketplace",
+        giftCards: "Gift Cards",
         support: "Support",
         customerSuccess: "Customer Success",
         revenueOperations: "Revenue Operations",

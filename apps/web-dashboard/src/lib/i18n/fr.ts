@@ -88,6 +88,7 @@ export const fr = {
         audits: "Logs d'audit",
         marketing: "Marketing",
         marketplace: "Boutique / Services",
+        giftCards: "Cartes Cadeaux",
         support: "Support",
         customerSuccess: "Succès Client",
         revenueOperations: "Opérations Revenus",
