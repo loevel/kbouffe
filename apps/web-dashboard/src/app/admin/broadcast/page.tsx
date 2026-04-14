@@ -140,12 +140,17 @@ export default function AdminBroadcastPage() {
 
     // Send state
     const [sending, setSending] = useState(false);
-    const [sendResult, setSendResult] = useState<{ success: boolean; message: string; tokensSent: number } | null>(null);
+    const [sendResult, setSendResult] = useState<{ success: boolean; message: string; tokensSent?: number } | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [testLoading, setTestLoading] = useState(false);
 
     // History state
     const [history, setHistory] = useState<BroadcastHistory[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
+
+    // Preview state
+    const [previewCount, setPreviewCount] = useState<number | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
 
     const fetchHistory = useCallback(async () => {
         setLoadingHistory(true);
@@ -162,6 +167,34 @@ export default function AdminBroadcastPage() {
     }, []);
 
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+    // Fetch preview count when targeting changes
+    useEffect(() => {
+        const fetchPreview = async () => {
+            if (!targetType) return;
+            if ((targetType === "pack" || targetType === "city") && !targetValue.trim()) return;
+
+            setPreviewLoading(true);
+            try {
+                const res = await fetch("/api/admin/broadcast/preview", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ targetType, targetValue: targetValue || undefined }),
+                });
+                const data = await res.json();
+                if (data.restaurantCount !== undefined) {
+                    setPreviewCount(data.deviceCount);
+                }
+            } catch (e) {
+                console.error("Preview fetch error:", e);
+            } finally {
+                setPreviewLoading(false);
+            }
+        };
+
+        const timer = setTimeout(fetchPreview, 300); // Debounce
+        return () => clearTimeout(timer);
+    }, [targetType, targetValue]);
 
     async function draftWithAI() {
         if (!aiIntent.trim()) return;
@@ -198,6 +231,28 @@ export default function AdminBroadcastPage() {
         }
     }
 
+    async function handleTest() {
+        if (!title.trim() || !body.trim()) return;
+        setTestLoading(true);
+        setSendResult(null);
+        try {
+            const res = await fetch("/api/admin/broadcast/test", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title,
+                    bodyText: body,
+                }),
+            });
+            const data = await res.json();
+            setSendResult(data);
+        } catch (e) {
+            setSendResult({ success: false, message: "Erreur réseau" });
+        } finally {
+            setTestLoading(false);
+        }
+    }
+
     async function handleSend() {
         if (!title.trim() || !body.trim()) return;
         setSending(true);
@@ -220,7 +275,7 @@ export default function AdminBroadcastPage() {
                 fetchHistory();
             }
         } catch (e) {
-            setSendResult({ success: false, message: "Erreur réseau", tokensSent: 0 });
+            setSendResult({ success: false, message: "Erreur réseau" });
         } finally {
             setSending(false);
             setConfirmOpen(false);
@@ -469,7 +524,17 @@ export default function AdminBroadcastPage() {
                     </AnimatePresence>
 
                     {/* Send button */}
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            onClick={handleTest}
+                            disabled={!canSend || testLoading || sending}
+                            variant="ghost"
+                            className="gap-2 text-surface-400 hover:text-white"
+                        >
+                            {testLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                            Tester d'abord
+                        </Button>
+
                         {!confirmOpen ? (
                             <Button
                                 onClick={() => setConfirmOpen(true)}
@@ -547,6 +612,17 @@ export default function AdminBroadcastPage() {
                                     {targetValue && ` — ${targetValue}`}
                                 </span>
                             </div>
+                            {previewLoading ? (
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-surface-500">Destinataires</span>
+                                    <Loader2 size={12} className="animate-spin text-brand-400" />
+                                </div>
+                            ) : previewCount !== null ? (
+                                <div className="flex items-center justify-between text-xs px-2 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                                    <span className="text-emerald-300 font-medium">Appareils à cibler:</span>
+                                    <span className="text-emerald-400 font-bold">{previewCount}</span>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
 
