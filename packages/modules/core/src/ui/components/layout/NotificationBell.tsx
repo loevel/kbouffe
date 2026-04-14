@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, ShoppingBag, AlertCircle, Clock, X, BarChart3, Trophy, UserMinus, Megaphone } from "lucide-react";
+import { Bell, ShoppingBag, AlertCircle, Clock, X, BarChart3, Trophy, UserMinus, Megaphone, Trash2 } from "lucide-react";
 import { authFetch } from "../../lib/auth-fetch";
 import { createClient } from "../../lib/supabase-client";
 import { useDashboard } from "../../contexts/DashboardContext";
@@ -14,6 +14,7 @@ interface KdsNotification {
     payload: Record<string, any>;
     processed: boolean;
     created_at: string;
+    _source?: "kds" | "engagement";
 }
 
 function timeAgo(dateStr: string): string {
@@ -101,6 +102,7 @@ export function NotificationBell() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [deleting, setDeleting] = useState<Set<string>>(new Set());
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const fetchNotifications = useCallback(async () => {
@@ -222,6 +224,52 @@ export function NotificationBell() {
         }
     };
 
+    const deleteNotification = async (id: string, source: string) => {
+        // Optimistic update
+        const wasUnread = notifications.find((n) => n.id === id)?.processed === false;
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        if (wasUnread) {
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+        }
+
+        // API call
+        setDeleting((prev) => new Set([...prev, id]));
+        try {
+            await authFetch("/api/notifications", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ids: [id],
+                    source: source === "kds" ? "kds" : "engagement",
+                }),
+            });
+        } catch {
+            // If fails, refetch to sync
+            fetchNotifications();
+        } finally {
+            setDeleting((prev) => {
+                const s = new Set(prev);
+                s.delete(id);
+                return s;
+            });
+        }
+    };
+
+    const deleteAll = async () => {
+        setNotifications([]);
+        setUnreadCount(0);
+        try {
+            await authFetch("/api/notifications", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ source: "all" }),
+            });
+        } catch {
+            // If fails, refetch
+            fetchNotifications();
+        }
+    };
+
     return (
         <div className="relative" ref={dropdownRef}>
             <button
@@ -245,6 +293,15 @@ export function NotificationBell() {
                             Notifications
                         </h3>
                         <div className="flex items-center gap-2">
+                            {notifications.length > 0 && (
+                                <button
+                                    onClick={deleteAll}
+                                    className="text-xs text-red-500 hover:text-red-600 font-medium transition-colors"
+                                    title="Supprimer toutes les notifications"
+                                >
+                                    Tout supprimer
+                                </button>
+                            )}
                             {unreadCount > 0 && (
                                 <button
                                     onClick={markAllRead}
@@ -273,7 +330,7 @@ export function NotificationBell() {
                             notifications.map((notif) => (
                                 <div
                                     key={notif.id}
-                                    className={`flex items-start gap-3 px-4 py-3 border-b border-surface-100 dark:border-surface-800 last:border-b-0 transition-colors ${getNotificationBg(notif.event_type, notif.processed)}`}
+                                    className={`group flex items-start gap-3 px-4 py-3 border-b border-surface-100 dark:border-surface-800 last:border-b-0 transition-colors ${getNotificationBg(notif.event_type, notif.processed)}`}
                                 >
                                     <div className="mt-0.5 shrink-0 w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
                                         {getNotificationIcon(notif.event_type)}
@@ -298,6 +355,15 @@ export function NotificationBell() {
                                     {!notif.processed && (
                                         <div className="mt-2 w-2 h-2 rounded-full bg-brand-500 shrink-0" />
                                     )}
+                                    <button
+                                        onClick={() => deleteNotification(notif.id, notif._source ?? "engagement")}
+                                        disabled={deleting.has(notif.id)}
+                                        className="mt-0.5 shrink-0 p-1.5 text-surface-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                                        aria-label="Supprimer"
+                                        title="Supprimer cette notification"
+                                    >
+                                        <Trash2 size={13} />
+                                    </button>
                                 </div>
                             ))
                         )}

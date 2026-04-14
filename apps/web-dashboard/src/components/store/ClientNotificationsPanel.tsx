@@ -9,6 +9,7 @@ import {
     Package,
     Truck,
     X,
+    Trash2,
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -84,6 +85,7 @@ export function ClientNotificationsPanel() {
     const [isLoading, setIsLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const [markingRead, setMarkingRead] = useState(false);
+    const [deleting, setDeleting] = useState<Set<string>>(new Set());
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -164,6 +166,49 @@ export function ClientNotificationsPanel() {
         }
     };
 
+    const deleteNotification = async (id: string) => {
+        // Optimistic update
+        const wasUnread = notifications.find((n) => n.id === id)?.is_read === false;
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        if (wasUnread) {
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+        }
+
+        // API call
+        setDeleting((prev) => new Set([...prev, id]));
+        try {
+            await authFetch("/api/auth/notifications", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: [id] }),
+            });
+        } catch {
+            // If fails, refetch to sync
+            fetchNotifications();
+        } finally {
+            setDeleting((prev) => {
+                const s = new Set(prev);
+                s.delete(id);
+                return s;
+            });
+        }
+    };
+
+    const deleteAll = async () => {
+        setNotifications([]);
+        setUnreadCount(0);
+        try {
+            await authFetch("/api/auth/notifications", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+        } catch {
+            // If fails, refetch
+            fetchNotifications();
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
@@ -210,15 +255,25 @@ export function ClientNotificationsPanel() {
                         Suivez vos commandes en temps reel.
                     </p>
                 </div>
-                {unreadCount > 0 && (
-                    <button
-                        onClick={markAllRead}
-                        disabled={markingRead}
-                        className="text-sm font-semibold text-brand-500 hover:text-brand-600 disabled:opacity-50"
-                    >
-                        {markingRead ? "..." : "Marquer tout comme lu"}
-                    </button>
-                )}
+                <div className="flex items-center gap-3">
+                    {notifications.length > 0 && (
+                        <button
+                            onClick={deleteAll}
+                            className="text-sm font-semibold text-red-500 hover:text-red-600 transition-colors"
+                        >
+                            Tout supprimer
+                        </button>
+                    )}
+                    {unreadCount > 0 && (
+                        <button
+                            onClick={markAllRead}
+                            disabled={markingRead}
+                            className="text-sm font-semibold text-brand-500 hover:text-brand-600 disabled:opacity-50"
+                        >
+                            {markingRead ? "..." : "Marquer tout comme lu"}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {notifications.length === 0 ? (
@@ -233,7 +288,7 @@ export function ClientNotificationsPanel() {
                     {notifications.map((notif) => (
                         <div
                             key={notif.id}
-                            className={`flex items-start gap-3 p-4 rounded-xl border border-surface-200 dark:border-surface-700 transition-colors ${getNotificationBg(notif.type, notif.is_read)}`}
+                            className={`group flex items-start gap-3 p-4 rounded-xl border border-surface-200 dark:border-surface-700 transition-colors ${getNotificationBg(notif.type, notif.is_read)}`}
                         >
                             <div className="mt-0.5 shrink-0 w-9 h-9 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
                                 {getNotificationIcon(notif.type)}
@@ -264,6 +319,15 @@ export function ClientNotificationsPanel() {
                                     )}
                                 </div>
                             </div>
+                            <button
+                                onClick={() => deleteNotification(notif.id)}
+                                disabled={deleting.has(notif.id)}
+                                className="mt-0.5 shrink-0 p-1.5 text-surface-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                                aria-label="Supprimer"
+                                title="Supprimer cette notification"
+                            >
+                                <Trash2 size={14} />
+                            </button>
                         </div>
                     ))}
                 </div>
