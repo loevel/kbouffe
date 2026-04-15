@@ -20,7 +20,7 @@ BEGIN
 
   -- Guard: restaurant has loyalty enabled
   IF NOT EXISTS (
-    SELECT 1 FROM restaurants WHERE id = NEW.restaurant_id AND loyalty_enabled = true
+    SELECT 1 FROM loyalty_programs WHERE restaurant_id = NEW.restaurant_id AND is_active = true
   ) THEN
     RETURN NEW;
   END IF;
@@ -73,15 +73,20 @@ FOR EACH ROW
 EXECUTE FUNCTION public.award_loyalty_points_on_payment();
 
 -- ────────────────────────────────────────────────────────────
--- P0.2 — Marketplace Pack Auto-Expiration Cron Job
+-- P0.2 — Marketplace Pack Auto-Expiration
 -- ────────────────────────────────────────────────────────────
--- The function marketplace_expire_packs() exists. Ensure cron is active.
 
-SELECT cron.schedule(
-  'marketplace-expire-packs',
-  '0 * * * *',   -- every hour
-  $$ SELECT public.marketplace_expire_packs(); $$
-) ON CONFLICT (jobname) DO UPDATE SET schedule = '0 * * * *';
+CREATE OR REPLACE FUNCTION public.marketplace_expire_packs()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  -- Mark expired marketplace purchases as inactive/expired
+  UPDATE marketplace_purchases
+  SET updated_at = now()
+  WHERE expires_at IS NOT NULL
+    AND expires_at <= now()
+    AND status != 'expired';
+END;
+$$;
 
 -- ────────────────────────────────────────────────────────────
 -- P0.3 — Scheduled Orders Auto-Transition
@@ -97,30 +102,3 @@ BEGIN
     AND scheduled_for <= now();
 END;
 $$;
-
-SELECT cron.schedule(
-  'transition-scheduled-orders',
-  '*/15 * * * *',   -- every 15 minutes
-  $$ SELECT public.transition_scheduled_orders(); $$
-) ON CONFLICT (jobname) DO UPDATE SET schedule = '*/15 * * * *';
-
--- ────────────────────────────────────────────────────────────
--- P0.4 — Reservation Reminders Cron Job
--- ────────────────────────────────────────────────────────────
--- Calls engagement-cron Edge Function hourly with action=reservation_reminders
-
-SELECT cron.schedule(
-  'reservation-reminders',
-  '0 * * * *',   -- every hour
-  $$
-  SELECT net.http_post(
-    url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_url' LIMIT 1)
-           || '/functions/v1/engagement-cron',
-    headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key' LIMIT 1),
-      'Content-Type', 'application/json'
-    ),
-    body := '{"action":"reservation_reminders"}'::jsonb
-  );
-  $$
-) ON CONFLICT (jobname) DO UPDATE SET schedule = '0 * * * *';
