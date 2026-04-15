@@ -19,6 +19,8 @@ Deno.serve(async (req) => {
       await handleDailySummary(db);
     } else if (action === "inactive_customers") {
       await handleInactiveCustomers(db);
+    } else if (action === "reservation_reminders") {
+      await handleReservationReminders(db);
     } else {
       return new Response(JSON.stringify({ error: "Unknown action" }), {
         status: 400,
@@ -261,6 +263,170 @@ async function findInactiveRegularsManual(
       last_order: customerOrders.get(cid)!.lastOrder,
     };
   });
+}
+
+// ============================================================
+// RESERVATION REMINDERS
+// ============================================================
+async function handleReservationReminders(db: ReturnType<typeof createSupabaseClient>) {
+  // Cameroon is UTC+1 (WAT)
+  const now = new Date();
+  const cameroonOffset = 1 * 60 * 60 * 1000;
+  const cameroonNow = new Date(now.getTime() + cameroonOffset);
+
+  // Calculate time windows
+  const todayStr = cameroonNow.toISOString().slice(0, 10);
+  const tomorrowStr = new Date(cameroonNow.getTime() + 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const currentTimeHHMM = cameroonNow.toISOString().slice(11, 16);
+
+  // Window 1: Reservations TODAY, time in [now+45min, now+75min]
+  const in45Min = new Date(cameroonNow.getTime() + 45 * 60 * 1000);
+  const in75Min = new Date(cameroonNow.getTime() + 75 * 60 * 1000);
+  const window1Start = in45Min.toISOString().slice(11, 16);
+  const window1End = in75Min.toISOString().slice(11, 16);
+
+  // Window 2: Reservations TOMORROW, time in [X, X+60min] where X is current time
+  // (simplified: just check if reservation is tomorrow)
+  const tomorrowWindowStart = cameroonNow.toISOString().slice(11, 16);
+  const tomorrowWindowEnd = new Date(cameroonNow.getTime() + 60 * 60 * 1000)
+    .toISOString()
+    .slice(11, 16);
+
+  // Get all published restaurants
+  const { data: restaurants } = await db
+    .from("restaurants")
+    .select("id, name, owner_id")
+    .eq("is_published", true);
+
+  if (!restaurants?.length) return;
+
+  for (const rest of restaurants) {
+    try {
+      // Find reservations in Window 1 (TODAY, next 45-75 min)
+      const { data: window1Reservations } = await db
+        .from("reservations")
+        .select("id, reservation_date, reservation_time, customer_id, party_size, guest_name")
+        .eq("restaurant_id", rest.id)
+        .in("status", ["pending", "confirmed"])
+        .eq("reservation_date", todayStr)
+        .gte("reservation_time", window1Start)
+        .lte("reservation_time", window1End);
+
+      // Find reservations in Window 2 (TOMORROW, next 1h from now)
+      const { data: window2Reservations } = await db
+        .from("reservations")
+        .select("id, reservation_date, reservation_time, customer_id, party_size, guest_name")
+        .eq("restaurant_id", rest.id)
+        .in("status", ["pending", "confirmed"])
+        .eq("reservation_date", tomorrowStr)
+        .gte("reservation_time", tomorrowWindowStart)
+        .lte("reservation_time", tomorrowWindowEnd);
+
+      const allReservations = [...(window1Reservations ?? []), ...(window2Reservations ?? [])];
+
+      for (const reservation of allReservations) {
+        try {
+          const isWindow1 = window1Reservations?.some((r) => r.id === reservation.id);
+          const windowLabel = isWindow1 ? "1h" : "24h";
+
+          // Check if we already sent a reminder in last 2 hours
+          const { data: existing } = await db
+            .from("restaurant_notifications")
+            .select("id")
+            .eq("restaurant_id", rest.id)
+            .eq("type", "reservation_reminder")
+            .gte("created_at", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+            .contains("payload", { reservation_id: reservation.id })
+            .limit(1);
+
+          if (existing?.length) continue;
+
+          const timeStr = reservation.reservation_time;
+          const partyInfo =
+            reservation.party_size > 0
+              ? `${reservation.party_size} personne${reservation.party_size > 1 ? "s" : ""}`
+              : "invité(s)";
+
+          // Build messages
+          let restaurantTitle: string;
+          let restaurantBody: string;
+          let customerTitle: string;
+          let customerBody: string;
+
+          if (isWindow1) {
+            restaurantTitle = "Réservation dans 1h";
+            restaurantBody = `${reservation.guest_name} à ${timeStr} (${partyInfo})`;
+            customerTitle = "Votre réservation arrive !";
+            customerBody = `Vous êtes attendu à ${timeStr}. À bientôt !`;
+          } else {
+            restaurantTitle = "Réservation demain";
+            restaurantBody = `${reservation.guest_name} à ${timeStr} (${partyInfo})`;
+            customerTitle = "Rappel de réservation";
+            customerBody = `Demain à ${timeStr}. On vous attend !`;
+          }
+
+          // Insert restaurant notification
+          await db.from("restaurant_notifications").insert({
+            restaurant_id: rest.id,
+            type: "reservation_reminder",
+            title: restaurantTitle,
+            body: restaurantBody,
+            payload: {
+              reservation_id: reservation.id,
+              guest_name: reservation.guest_name,
+              party_size: reservation.party_size,
+              time: timeStr,
+              window: windowLabel,
+            },
+          });
+
+          // Send push to restaurant members
+          await sendPushToRestaurantTokens(rest.id, rest.owner_id, restaurantTitle, restaurantBody, {
+            type: "reservation_reminder",
+            restaurant_id: rest.id,
+          });
+
+          // Send push to customer if exists
+          if (reservation.customer_id) {
+            const { data: customerTokens } = await db
+              .from("push_tokens")
+              .select("token")
+              .eq("user_id", reservation.customer_id);
+
+            const tokens = (customerTokens ?? [])
+              .map((r: { token: string }) => r.token)
+              .filter(Boolean);
+
+            if (tokens.length) {
+              await sendFcmBatch(tokens, customerTitle, customerBody, {
+                type: "reservation_reminder",
+                reservation_id: reservation.id,
+              }, "/stores/orders");
+            }
+
+            // Insert client notification
+            await db.from("client_notifications").insert({
+              user_id: reservation.customer_id,
+              type: "reservation_reminder",
+              title: customerTitle,
+              body: customerBody,
+              payload: {
+                reservation_id: reservation.id,
+                restaurant_name: rest.name,
+                time: timeStr,
+              },
+            });
+          }
+        } catch (err) {
+          console.error(`[reservation_reminders] Reservation ${reservation.id}:`, err);
+        }
+      }
+    } catch (err) {
+      console.error(`[reservation_reminders] Restaurant ${rest.id}:`, err);
+    }
+  }
 }
 
 // ============================================================
