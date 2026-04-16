@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { unregisterPushToken } from '@/lib/notifications';
 import type { Session, User } from '@supabase/supabase-js';
 
 interface MerchantProfile {
@@ -138,6 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
+        // Unregister push token before signing out
+        await unregisterPushToken();
         await supabase.auth.signOut();
         setProfile(null);
     };

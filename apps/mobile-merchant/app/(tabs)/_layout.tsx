@@ -79,10 +79,10 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="notifications"
+                name="messages"
                 options={{
-                    title: 'Alertes',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'notifications' : 'notifications-outline'} color={color} />,
+                    title: 'Messages',
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} color={color} />,
                 }}
             />
             <Tabs.Screen
