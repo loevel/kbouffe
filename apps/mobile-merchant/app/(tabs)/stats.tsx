@@ -174,6 +174,78 @@ function DeliveryBreakdown({
     );
 }
 
+function PeakHoursChart({
+    hours,
+}: {
+    hours: Array<{ hour: string; count: number; percentage: number }>;
+}) {
+    const theme = useTheme();
+    const s = styles(theme);
+    const maxCount = Math.max(...hours.map((h) => h.count), 1);
+
+    return (
+        <View style={s.sectionCard}>
+            <Text style={s.sectionTitle}>Heures de pointe</Text>
+            {hours.length === 0 ? (
+                <Text style={[s.emptyText, { marginTop: 10 }]}>Aucune donnée sur la période.</Text>
+            ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chartRow}>
+                    {hours.map((hour, index) => {
+                        const height = Math.max(4, Math.round((hour.count / maxCount) * 100));
+                        return (
+                            <View key={`${hour.hour}-${index}`} style={s.chartItem}>
+                                <Text style={s.chartValue}>{hour.count}</Text>
+                                <View style={s.chartTrack}>
+                                    <View style={[s.chartBar, { height: `${height}%` }, { backgroundColor: theme.primary }]} />
+                                </View>
+                                <Text style={s.chartLabel}>{hour.hour}</Text>
+                            </View>
+                        );
+                    })}
+                </ScrollView>
+            )}
+        </View>
+    );
+}
+
+function TopProductsList({
+    products,
+}: {
+    products: Array<{ name: string; quantity: number; revenue: number }>;
+}) {
+    const theme = useTheme();
+    const s = styles(theme);
+    const maxRevenue = Math.max(...products.map((p) => p.revenue), 1);
+
+    return (
+        <View style={s.sectionCard}>
+            <Text style={s.sectionTitle}>Meilleurs produits</Text>
+            {products.length === 0 ? (
+                <Text style={[s.emptyText, { marginTop: 10 }]}>Aucun produit vendu.</Text>
+            ) : (
+                <View style={s.productsList}>
+                    {products.slice(0, 5).map((product, index) => (
+                        <View key={`${product.name}-${index}`} style={s.productRow}>
+                            <View style={s.productInfo}>
+                                <Text style={s.productName}>{product.name}</Text>
+                                <Text style={s.productMeta}>{product.quantity} vendus · {formatFcfa(product.revenue)}</Text>
+                            </View>
+                            <View style={s.progressTrack}>
+                                <View
+                                    style={[
+                                        s.progressBar,
+                                        { width: `${Math.max((product.revenue / maxRevenue) * 100, 4)}%` },
+                                    ]}
+                                />
+                            </View>
+                        </View>
+                    ))}
+                </View>
+            )}
+        </View>
+    );
+}
+
 export default function StatsScreen() {
     const { session, profile } = useAuth();
     const theme = useTheme();
@@ -291,6 +363,14 @@ export default function StatsScreen() {
                         <RevenueChart points={revenueChart} />
                         <StatusBreakdown rows={statusBreakdown} />
                         <DeliveryBreakdown rows={deliveryBreakdown} />
+
+                        {payload?.peakHours && payload.peakHours.length > 0 && (
+                            <PeakHoursChart hours={payload.peakHours} />
+                        )}
+
+                        {payload?.topProducts && payload.topProducts.length > 0 && (
+                            <TopProductsList products={payload.topProducts} />
+                        )}
 
                         <TouchableOpacity
                             style={s.reportCta}
@@ -430,4 +510,9 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         },
         reportCtaLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
         reportCtaText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+        productsList: { marginTop: 12, gap: 10 },
+        productRow: { gap: 8 },
+        productInfo: { gap: 2 },
+        productName: { fontSize: 12, fontWeight: '600', color: theme.text },
+        productMeta: { fontSize: 11, color: theme.textSecondary },
     });

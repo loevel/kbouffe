@@ -44,6 +44,8 @@ export default function RootLayout() {
                     <Stack.Screen name="loyalty" options={{ headerShown: false }} />
                     <Stack.Screen name="reports" options={{ headerShown: false }} />
                     <Stack.Screen name="team" options={{ headerShown: false }} />
+                    <Stack.Screen name="caisse" options={{ headerShown: false }} />
+                    <Stack.Screen name="tables" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar style="auto" />
             </ThemeProvider>
