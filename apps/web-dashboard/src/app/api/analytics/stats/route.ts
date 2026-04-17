@@ -1,21 +1,34 @@
 /**
  * GET /api/analytics/stats
  * Returns enriched analytics stats for the restaurant dashboard.
+ *
+ * Query params:
+ * - from: ISO date string (default: 30 days ago)
+ * - to: ISO date string (default: now)
  */
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api/helpers";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
     const auth = await withAuth();
     if (auth.error) return auth.error;
     const { supabase, restaurantId } = auth.ctx;
 
     try {
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        // Parse date range from query params
+        const searchParams = new URL(request.url).searchParams;
+        const fromParam = searchParams.get("from");
+        const toParam = searchParams.get("to");
+        const dateFrom = fromParam ? new Date(fromParam).toISOString() : thirtyDaysAgo.toISOString();
+        const dateTo = toParam ? new Date(toParam).toISOString() : now.toISOString();
+
         const [
             { data: products },
             { data: orders },
             { data: categories },
-            { data: orderItems },
         ] = await Promise.all([
             supabase
                 .from("products")
@@ -23,21 +36,28 @@ export async function GET(_request: NextRequest) {
                 .eq("restaurant_id", restaurantId),
             supabase
                 .from("orders")
-                .select("id, total_amount, status, delivery_method, created_at")
+                .select("id, total, status, delivery_type, created_at")
                 .eq("restaurant_id", restaurantId)
+                .gte("created_at", dateFrom)
+                .lte("created_at", dateTo)
                 .order("created_at", { ascending: false })
                 .limit(500),
             supabase
                 .from("categories")
                 .select("id, name, is_active")
                 .eq("restaurant_id", restaurantId),
-            supabase
-                .from("order_items")
-                .select("product_id, quantity, unit_price, product_name")
-                .eq("restaurant_id", restaurantId)
-                .order("created_at", { ascending: false })
-                .limit(1000),
         ]);
+
+        // Fetch order items by order IDs (no restaurant_id column exists)
+        const orderIds = (orders ?? []).map((o: any) => o.id);
+        let orderItems: any[] = [];
+        if (orderIds.length > 0) {
+            const { data: items } = await supabase
+                .from("order_items")
+                .select("product_id, quantity, price, name")
+                .in("order_id", orderIds);
+            orderItems = items ?? [];
+        }
 
         // --- Products ---
         const totalProducts = products?.length ?? 0;
@@ -62,7 +82,7 @@ export async function GET(_request: NextRequest) {
 
         // --- Revenue ---
         const totalRevenue = completedOrders.reduce(
-            (sum: number, o: any) => sum + (o.total_amount || 0),
+            (sum: number, o: any) => sum + (o.total || 0),
             0
         );
         const avgOrderValue =
@@ -71,7 +91,6 @@ export async function GET(_request: NextRequest) {
                 : 0;
 
         // --- Time-based filters ---
-        const now = new Date();
         const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
         const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -89,10 +108,10 @@ export async function GET(_request: NextRequest) {
         // --- Week-over-week revenue ---
         const thisWeekRevenue = recentOrders
             .filter((o: any) => o.status === "delivered" || o.status === "completed")
-            .reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+            .reduce((s: number, o: any) => s + (o.total || 0), 0);
         const prevWeekRevenue = prevWeekOrders
             .filter((o: any) => o.status === "delivered" || o.status === "completed")
-            .reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+            .reduce((s: number, o: any) => s + (o.total || 0), 0);
         const revenueGrowth =
             prevWeekRevenue > 0
                 ? Math.round(((thisWeekRevenue - prevWeekRevenue) / prevWeekRevenue) * 100)
@@ -131,7 +150,7 @@ export async function GET(_request: NextRequest) {
         // --- Delivery breakdown ---
         const deliveryBreakdown: Record<string, number> = {};
         for (const o of orders ?? []) {
-            const m = (o as any).delivery_method || "unknown";
+            const m = (o as any).delivery_type || "unknown";
             deliveryBreakdown[m] = (deliveryBreakdown[m] || 0) + 1;
         }
 
@@ -148,14 +167,14 @@ export async function GET(_request: NextRequest) {
             const id = (item as any).product_id || "unknown";
             if (!productSales[id]) {
                 productSales[id] = {
-                    name: (item as any).product_name || "Produit inconnu",
+                    name: (item as any).name || "Produit inconnu",
                     qty: 0,
                     revenue: 0,
                 };
             }
             productSales[id].qty += (item as any).quantity || 1;
             productSales[id].revenue +=
-                ((item as any).unit_price || 0) * ((item as any).quantity || 1);
+                ((item as any).price || 0) * ((item as any).quantity || 1);
         }
         const bestSellers = Object.values(productSales)
             .sort((a, b) => b.qty - a.qty)
@@ -172,7 +191,7 @@ export async function GET(_request: NextRequest) {
             if ((o as any).status === "delivered" || (o as any).status === "completed") {
                 const key = new Date(o.created_at).toISOString().slice(0, 10);
                 if (key in dailyRevenueMap) {
-                    dailyRevenueMap[key] += (o as any).total_amount || 0;
+                    dailyRevenueMap[key] += (o as any).total || 0;
                 }
             }
         }
@@ -186,7 +205,7 @@ export async function GET(_request: NextRequest) {
         const activeCategories =
             categories?.filter((c: any) => c.is_active)?.length ?? 0;
 
-        return NextResponse.json({
+        const response = NextResponse.json({
             totalProducts,
             activeProducts,
             productsWithoutImages,
@@ -211,6 +230,14 @@ export async function GET(_request: NextRequest) {
             totalCategories,
             activeCategories,
         });
+
+        // Cache for 60 seconds, revalidate stale responses for up to 5 minutes
+        response.headers.set(
+            "Cache-Control",
+            "private, s-maxage=60, stale-while-revalidate=300"
+        );
+
+        return response;
     } catch (error) {
         console.error("[analytics/stats] Unexpected:", error);
         return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

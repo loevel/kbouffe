@@ -1,0 +1,31 @@
+{
+  "cli": {
+    "version": ">= 18.7.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wkuyuiypkbgsftgtstra.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdXl1aXlwa2Jnc2Z0Z3RzdHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDE3MTMsImV4cCI6MjA4NzkxNzcxM30.KSRYboSZP_JsD6I5G3xVB8Hi_AiiVBEOmS1WlrdJdP4",
+        "EXPO_PUBLIC_API_URL": "https://kbouffe-api.davechendjou.workers.dev"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wkuyuiypkbgsftgtstra.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdXl1aXlwa2Jnc2Z0Z3RzdHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDE3MTMsImV4cCI6MjA4NzkxNzcxM30.KSRYboSZP_JsD6I5G3xVB8Hi_AiiVBEOmS1WlrdJdP4",
+        "EXPO_PUBLIC_API_URL": "https://kbouffe-api.davechendjou.workers.dev"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

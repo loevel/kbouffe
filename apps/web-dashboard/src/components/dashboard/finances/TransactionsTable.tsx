@@ -2,14 +2,25 @@
 
 import { Download } from "lucide-react";
 import { Card, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, toast } from "@kbouffe/module-core/ui";
-import { useOrders } from "@kbouffe/module-orders/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
-import { formatCFA, formatDateTime, formatOrderId, getPaymentLabel, getPaymentStatusLabel, formatDate } from "@kbouffe/module-core/ui";
+import { formatCFA, formatDateTime, formatOrderId, getPaymentLabel, getPaymentStatusLabel } from "@kbouffe/module-core/ui";
 
-export function TransactionsTable() {
+interface TransactionRow {
+    id: string;
+    customer_name: string;
+    total: number;
+    payment_method: string;
+    payment_status: string;
+    status: string;
+    created_at: string;
+}
+
+interface TransactionsTableProps {
+    transactions: TransactionRow[];
+}
+
+export function TransactionsTable({ transactions }: TransactionsTableProps) {
     const { t } = useLocale();
-    const { orders } = useOrders({ limit: 200 });
-    const paidOrders = orders.filter(o => o.payment_status === "paid" && o.status !== "cancelled");
 
     function exportCsv() {
         const headers = [
@@ -20,7 +31,7 @@ export function TransactionsTable() {
             t.finances.status,
             t.finances.date,
         ];
-        const rows = paidOrders.map((order) => [
+        const rows = transactions.map((order) => [
             formatOrderId(order.id),
             order.customer_name,
             String(order.total),
@@ -65,18 +76,26 @@ export function TransactionsTable() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {paidOrders.map((order) => (
-                        <TableRow key={order.id}>
-                            <TableCell className="font-medium text-surface-900 dark:text-white">{formatOrderId(order.id)}</TableCell>
-                            <TableCell>{order.customer_name}</TableCell>
-                            <TableCell className="font-medium">{formatCFA(order.total)}</TableCell>
-                            <TableCell>{getPaymentLabel(order.payment_method)}</TableCell>
-                            <TableCell>
-                                <Badge variant="success">{getPaymentStatusLabel(order.payment_status)}</Badge>
+                    {transactions.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-surface-400">
+                                Aucune transaction trouvée pour cette période
                             </TableCell>
-                            <TableCell className="text-surface-500">{formatDateTime(order.created_at)}</TableCell>
                         </TableRow>
-                    ))}
+                    ) : (
+                        transactions.map((order) => (
+                            <TableRow key={order.id}>
+                                <TableCell className="font-medium text-surface-900 dark:text-white">{formatOrderId(order.id)}</TableCell>
+                                <TableCell>{order.customer_name}</TableCell>
+                                <TableCell className="font-medium">{formatCFA(order.total)}</TableCell>
+                                <TableCell>{getPaymentLabel(order.payment_method)}</TableCell>
+                                <TableCell>
+                                    <Badge variant="success">{getPaymentStatusLabel(order.payment_status)}</Badge>
+                                </TableCell>
+                                <TableCell className="text-surface-500">{formatDateTime(order.created_at)}</TableCell>
+                            </TableRow>
+                        ))
+                    )}
                 </TableBody>
             </Table>
         </Card>

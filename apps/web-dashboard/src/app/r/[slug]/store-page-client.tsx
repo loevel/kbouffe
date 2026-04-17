@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -135,6 +135,10 @@ interface StoreData {
     announcements?: Announcement[];
 }
 
+const EMPTY_CATEGORIES: Category[] = [];
+const EMPTY_PRODUCTS: Product[] = [];
+const EMPTY_REVIEWS: Review[] = [];
+
 const cuisineLabels: Record<string, string> = {
     african: "Cuisine Africaine",
     camerounaise: "Cuisine Camerounaise",
@@ -153,7 +157,7 @@ const cancellationPolicyLabels: Record<Restaurant["reservationCancelPolicy"], st
     strict: "Stricte",
 };
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 // ── Product Card (horizontal: text left, image right) ──────────────────
 function ProductCard({
@@ -275,12 +279,14 @@ function ProductDetailModal({
     onClose,
     onAdd,
     relatedProducts = [],
+    reduceMotion = false,
 }: {
     product: Product;
     restaurant: { id: string; name: string; slug: string };
     onClose: () => void;
     onAdd: (selectedOptions: Record<string, string>, notes: string, finalPrice: number) => void;
     relatedProducts?: Product[];
+    reduceMotion?: boolean;
 }) {
     const [quantity, setQuantity] = useState(1);
     const [note, setNote] = useState("");
@@ -322,7 +328,7 @@ function ProductDetailModal({
         const ctrl = new AbortController();
         fetch(`/api/store/products/${product.id}/reviews`, { signal: ctrl.signal })
             .then((r) => r.json())
-            .then((data: any) => {
+            .then((data: { reviews?: ProductReview[]; stats?: ProductReviewStats }) => {
                 const rv: ProductReview[] = data.reviews ?? [];
                 const st: ProductReviewStats = data.stats ?? { count: 0, average: 0 };
                 _reviewsCache.set(product.id, { reviews: rv, stats: st });
@@ -394,7 +400,7 @@ function ProductDetailModal({
                 setStats(updatedStats);
                 _reviewsCache.set(product.id, { reviews: updatedReviews, stats: updatedStats });
             } else {
-                const json = await res.json().catch(() => ({})) as any;
+                const json = await res.json().catch((): { error?: string } => ({}));
                 setSubmitError(json.error ?? "Erreur lors de l'envoi de l'avis.");
             }
         } catch {
@@ -423,17 +429,17 @@ function ProductDetailModal({
         <AnimatePresence>
             <motion.div
                 key="modal"
-                initial={{ opacity: 0 }}
+                initial={reduceMotion ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                exit={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
                 className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             >
                 <motion.div
-                    initial={{ opacity: 0, y: 60 }}
+                    initial={reduceMotion ? false : { opacity: 0, y: 60 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 60 }}
-                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                    exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 60 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                     onClick={(e) => e.stopPropagation()}
                     className="bg-white dark:bg-surface-900 rounded-t-3xl sm:rounded-2xl border border-surface-200 dark:border-surface-800 shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col"
                 >
@@ -449,10 +455,10 @@ function ProductDetailModal({
                                 <AnimatePresence mode="wait">
                                     <motion.img
                                         key={activeImg}
-                                        initial={{ opacity: 0, scale: 1.02 }}
+                                        initial={reduceMotion ? false : { opacity: 0, scale: 1.02 }}
                                         animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.25 }}
+                                        exit={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+                                        transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                                         src={allImages[activeImg]}
                                         alt={`${product.name} — photo ${activeImg + 1}`}
                                         className="max-w-full max-h-full object-contain cursor-zoom-in"
@@ -807,9 +813,9 @@ function ProductDetailModal({
             {fullscreen && allImages.length > 0 && (
                 <motion.div
                     key="lightbox"
-                    initial={{ opacity: 0 }}
+                    initial={reduceMotion ? false : { opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                    exit={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
                     className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
                     onClick={() => setFullscreen(false)}
                 >
@@ -832,10 +838,10 @@ function ProductDetailModal({
                     <AnimatePresence mode="wait">
                         <motion.img
                             key={activeImg}
-                            initial={{ opacity: 0, scale: 0.95 }}
+                            initial={reduceMotion ? false : { opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
+                            exit={reduceMotion ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
+                            transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                             src={allImages[activeImg]}
                             alt={`${product.name} — photo ${activeImg + 1}`}
                             className="max-w-[90vw] max-h-[80vh] object-contain select-none"
@@ -1082,6 +1088,7 @@ export function StorePageClient({ slug }: { slug: string }) {
     const [availLoading, setAvailLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const { addItem, itemCount, subtotal } = useCart();
+    const shouldReduceMotion = useReducedMotion();
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
     const isScrollingRef = useRef(false);
 
@@ -1303,6 +1310,106 @@ export function StorePageClient({ slug }: { slug: string }) {
         }
     }, [resName, resPhone, resEmail, resPartySize, resDate, resTime, resSpecial, resSelectedZone, resOccasion, resByob, resCorkageAcknowledged]);
 
+    const restaurant = data?.restaurant ?? null;
+    const categories = data?.categories ?? EMPTY_CATEGORIES;
+    const products = data?.products ?? EMPTY_PRODUCTS;
+    const reviews = data?.reviews ?? EMPTY_REVIEWS;
+    const announcements = data?.announcements;
+    const featuredProducts = data?.featuredProducts ?? EMPTY_PRODUCTS;
+    const avgRating = restaurant?.rating?.toFixed(1) ?? "—";
+
+    const categoriesWithProducts = useMemo(
+        () =>
+            categories
+                .map((cat) => ({ cat, items: products.filter((p) => p.category_id === cat.id) }))
+                .filter((g) => g.items.length > 0),
+        [categories, products],
+    );
+
+    // ── i18n : check if English translations are available ──
+    const hasEnglish = useMemo(
+        () => products.some((p) => p.name_i18n?.en) || categories.some((c) => c.name_i18n?.en),
+        [products, categories],
+    );
+
+    // Localized data — map translated text before passing to theme components
+    const localizedProducts = useMemo(
+        () =>
+            products.map((p) => ({
+                ...p,
+                name: t18n(p.name_i18n, p.name, storeLang),
+                description: t18n(p.description_i18n, p.description ?? "", storeLang) || null,
+            })),
+        [products, storeLang],
+    );
+
+    const localizedCategories = useMemo(
+        () =>
+            categories.map((c) => ({
+                ...c,
+                name: t18n(c.name_i18n, c.name, storeLang),
+                description: t18n(c.description_i18n, c.description ?? "", storeLang) || null,
+            })),
+        [categories, storeLang],
+    );
+
+    const localizedFeaturedProducts = useMemo(
+        () =>
+            featuredProducts.map((p) => ({
+                ...p,
+                name: t18n(p.name_i18n, p.name, storeLang),
+                description: t18n(p.description_i18n, p.description ?? "", storeLang) || null,
+            })),
+        [featuredProducts, storeLang],
+    );
+
+    const themeLayout = restaurant?.themeLayout ?? "grid";
+
+    // ── Theme engine ──
+    const ThemeComponent = useMemo(
+        () =>
+            ({
+                grid: GridTheme,
+                luxury: LuxuryTheme,
+                story: StoryTheme,
+            }[themeLayout] ?? GridTheme),
+        [themeLayout],
+    );
+
+    // ── Search filter ──
+    const normalizedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
+    const filteredProducts = useMemo(
+        () =>
+            normalizedQuery
+                ? localizedProducts.filter(
+                      (p) =>
+                          p.name.toLowerCase().includes(normalizedQuery) ||
+                          p.description?.toLowerCase().includes(normalizedQuery),
+                  )
+                : localizedProducts,
+        [normalizedQuery, localizedProducts],
+    );
+
+    const filteredFeaturedProducts = useMemo(
+        () =>
+            normalizedQuery
+                ? localizedFeaturedProducts.filter(
+                      (p) =>
+                          p.name.toLowerCase().includes(normalizedQuery) ||
+                          (p.description?.toLowerCase().includes(normalizedQuery) ?? false),
+                  )
+                : localizedFeaturedProducts,
+        [normalizedQuery, localizedFeaturedProducts],
+    );
+
+    const themeTransition = shouldReduceMotion
+        ? { duration: 0 }
+        : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+
+    const springTransition = shouldReduceMotion
+        ? { duration: 0 }
+        : { type: "spring" as const, stiffness: 520, damping: 30 };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-white dark:bg-surface-950 flex items-center justify-center">
@@ -1311,7 +1418,7 @@ export function StorePageClient({ slug }: { slug: string }) {
         );
     }
 
-    if (error || !data) {
+    if (error || !data || !restaurant) {
         return (
             <div className="min-h-screen bg-white dark:bg-surface-950 flex flex-col items-center justify-center gap-4 px-4">
                 <ChefHat size={48} className="text-surface-300" />
@@ -1330,57 +1437,6 @@ export function StorePageClient({ slug }: { slug: string }) {
             </div>
         );
     }
-
-    const { restaurant, categories, products, reviews, announcements } = data;
-    const featuredProducts = data.featuredProducts ?? [];
-    const avgRating = restaurant.rating?.toFixed(1) ?? "—";
-
-    const categoriesWithProducts = categories
-        .map((cat) => ({ cat, items: products.filter((p) => p.category_id === cat.id) }))
-        .filter((g) => g.items.length > 0);
-
-    const uncategorised = products.filter(
-        (p) => !p.category_id || !categories.find((c) => c.id === p.category_id),
-    );
-
-    // ── i18n : check if English translations are available ──
-    const hasEnglish = products.some(p => p.name_i18n?.en) || categories.some(c => c.name_i18n?.en);
-
-    // Localized data — map translated text before passing to theme components
-    const localizedProducts = products.map(p => ({
-        ...p,
-        name: t18n(p.name_i18n, p.name, storeLang),
-        description: t18n(p.description_i18n, p.description ?? "", storeLang) || null,
-    }));
-    const localizedCategories = categories.map(c => ({
-        ...c,
-        name: t18n(c.name_i18n, c.name, storeLang),
-        description: t18n(c.description_i18n, c.description ?? "", storeLang) || null,
-    }));
-
-    // ── Theme engine ──
-    const ThemeComponent = {
-        grid: GridTheme,
-        luxury: LuxuryTheme,
-        story: StoryTheme,
-    }[restaurant.themeLayout ?? "grid"] ?? GridTheme;
-
-    // ── Search filter ──
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    const filteredProducts = normalizedQuery
-        ? localizedProducts.filter(
-              (p) =>
-                  p.name.toLowerCase().includes(normalizedQuery) ||
-                  p.description?.toLowerCase().includes(normalizedQuery),
-          )
-        : localizedProducts;
-    const filteredFeaturedProducts = normalizedQuery
-        ? featuredProducts.filter(
-              (p) =>
-                  p.name.toLowerCase().includes(normalizedQuery) ||
-                  (p.description?.toLowerCase().includes(normalizedQuery) ?? false),
-          )
-        : featuredProducts;
 
     const handleAddToCart = (
         product: { id: string; name: string; price: number; image_url: string | null; options?: Array<{ name: string; choices: Array<{ label: string; extra_price: number }>; required?: boolean }> | null },
@@ -1492,7 +1548,8 @@ export function StorePageClient({ slug }: { slug: string }) {
                     
                     <Link href="/" className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 group">
                         <motion.div 
-                            whileHover={{ rotate: 10 }}
+                            whileHover={shouldReduceMotion ? undefined : { rotate: 8 }}
+                            transition={themeTransition}
                             className="bg-brand-500 text-white p-2 rounded-xl shadow-lg shadow-brand-500/20"
                         >
                             <ChefHat size={18} />
@@ -1509,9 +1566,10 @@ export function StorePageClient({ slug }: { slug: string }) {
                         <AnimatePresence>
                             {itemCount > 0 && (
                                 <motion.span 
-                                    initial={{ scale: 0 }}
+                                    initial={shouldReduceMotion ? false : { scale: 0 }}
                                     animate={{ scale: 1 }}
-                                    exit={{ scale: 0 }}
+                                    exit={shouldReduceMotion ? { scale: 1 } : { scale: 0 }}
+                                    transition={springTransition}
                                     className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-brand-500 text-white text-[10px] font-black rounded-lg flex items-center justify-center shadow-lg shadow-brand-500/40 ring-2 ring-white dark:ring-surface-950"
                                 >
                                     {itemCount > 9 ? "9+" : itemCount}
@@ -1530,9 +1588,9 @@ export function StorePageClient({ slug }: { slug: string }) {
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white dark:to-surface-950" />
                 {restaurant.coverUrl && (
                     <motion.img 
-                        initial={{ scale: 1.1, opacity: 0 }}
+                        initial={shouldReduceMotion ? false : { scale: 1.08, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        transition={{ duration: 1 }}
+                        transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                         src={restaurant.coverUrl} 
                         alt="" 
                         className="w-full h-full object-cover relative z-0" 
@@ -1550,8 +1608,9 @@ export function StorePageClient({ slug }: { slug: string }) {
                 <div className="relative flex flex-col md:flex-row items-start gap-6 md:gap-8">
                     {/* Logo */}
                     <motion.div 
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.94 }}
                         animate={{ opacity: 1, scale: 1 }}
+                        transition={themeTransition}
                         className="relative z-10 w-20 h-20 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 shadow-2xl shrink-0 overflow-hidden -mt-10 sm:-mt-16 md:-mt-20 ring-4 sm:ring-8 ring-white dark:ring-surface-950"
                     >
                         {restaurant.logoUrl ? (
@@ -1565,8 +1624,9 @@ export function StorePageClient({ slug }: { slug: string }) {
 
                     <div className="flex-1 min-w-0">
                         <motion.div 
-                            initial={{ opacity: 0, x: -10 }}
+                            initial={shouldReduceMotion ? false : { opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
+                            transition={themeTransition}
                             className="flex flex-wrap items-center gap-3"
                         >
                             <h1 className="text-3xl sm:text-4xl font-black text-surface-900 dark:text-white tracking-tight">
@@ -1664,9 +1724,10 @@ export function StorePageClient({ slug }: { slug: string }) {
                                 <AnimatePresence>
                                     {reservationOpen && restaurant.hasReservations && (
                                         <motion.div 
-                                            initial={{ height: 0, opacity: 0 }}
+                                            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
                                             animate={{ height: "auto", opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
+                                            exit={shouldReduceMotion ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
+                                            transition={themeTransition}
                                             className="border-t border-surface-200 dark:border-surface-800 overflow-hidden"
                                         >
                                             <div className="p-5 sm:p-6 space-y-4">
@@ -2399,12 +2460,12 @@ export function StorePageClient({ slug }: { slug: string }) {
                  Full-width fixed bottom bar, only on < lg, only when cart has items.
                  Animates in/out with framer-motion. pb respects iPhone notch. ── */}
             <AnimatePresence>
-                {itemCount > 0 && (
+                {itemCount > 0 && !cartOpen && (
                     <motion.div
-                        initial={{ y: 80, opacity: 0 }}
+                        initial={shouldReduceMotion ? false : { y: 80, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 80, opacity: 0 }}
-                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                        exit={shouldReduceMotion ? { y: 0, opacity: 1 } : { y: 80, opacity: 0 }}
+                        transition={themeTransition}
                         className="fixed bottom-0 left-0 right-0 z-40 lg:hidden"
                         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
                     >
@@ -2439,6 +2500,7 @@ export function StorePageClient({ slug }: { slug: string }) {
                 <ProductDetailModal
                     product={selectedProduct}
                     restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
+                    reduceMotion={shouldReduceMotion}
                     onClose={() => setSelectedProduct(null)}
                     onAdd={(selectedOpts, notes, finalPrice) => {
                         handleAddToCart(selectedProduct, selectedOpts, notes, finalPrice);

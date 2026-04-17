@@ -1,27 +1,56 @@
 "use client";
 
-import { TrendingUp, Truck, Wallet } from "lucide-react";
+import { TrendingUp, Truck, Wallet, DollarSign } from "lucide-react";
 import { Card } from "@kbouffe/module-core/ui";
 import { formatCFA } from "@kbouffe/module-core/ui";
-import { useOrders } from "@kbouffe/module-orders/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 
-export function FinanceSummaryCards() {
+interface FinanceSummaryProps {
+    summary: {
+        grossRevenue: number;
+        deliveryRevenue: number;
+        feesRevenue: number;
+        tipsRevenue: number;
+        totalRevenue: number;
+        transactionCount: number;
+        avgOrderValue: number;
+        totalPaidOut: number;
+        pendingPayouts: number;
+    };
+}
+
+export function FinanceSummaryCards({ summary }: FinanceSummaryProps) {
     const { t } = useLocale();
-    const { orders, isLoading } = useOrders({ limit: 200 });
-    const completedOrders = orders.filter(o => o.status === "completed" || o.status === "ready" || o.status === "preparing" || o.status === "accepted");
-    const totalRevenue = completedOrders.reduce((sum, o) => sum + o.subtotal, 0);
-    const totalDelivery = completedOrders.reduce((sum, o) => sum + o.delivery_fee, 0);
-    const netRevenue = totalRevenue;
 
     const cards = [
-        { label: t.finances.totalRevenue, value: formatCFA(totalRevenue), icon: <TrendingUp size={20} />, color: "text-green-500 bg-green-100 dark:bg-green-900/30" },
-        { label: t.finances.deliveryFees, value: formatCFA(totalDelivery), icon: <Truck size={20} />, color: "text-blue-500 bg-blue-100 dark:bg-blue-900/30" },
-        { label: t.finances.netRevenue, value: formatCFA(netRevenue), icon: <Wallet size={20} />, color: "text-brand-500 bg-brand-100 dark:bg-brand-900/30" },
+        {
+            label: "Revenu brut",
+            value: formatCFA(summary.grossRevenue),
+            icon: <TrendingUp size={20} />,
+            color: "text-green-500 bg-green-100 dark:bg-green-900/30"
+        },
+        {
+            label: "Livraisons",
+            value: formatCFA(summary.deliveryRevenue),
+            icon: <Truck size={20} />,
+            color: "text-blue-500 bg-blue-100 dark:bg-blue-900/30"
+        },
+        {
+            label: "Frais & Services",
+            value: formatCFA(summary.feesRevenue),
+            icon: <DollarSign size={20} />,
+            color: "text-amber-500 bg-amber-100 dark:bg-amber-900/30"
+        },
+        {
+            label: "Revenu total",
+            value: formatCFA(summary.totalRevenue),
+            icon: <Wallet size={20} />,
+            color: "text-brand-500 bg-brand-100 dark:bg-brand-900/30"
+        },
     ];
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {cards.map((card) => (
                 <Card key={card.label}>
                     <div className="flex items-center gap-4">

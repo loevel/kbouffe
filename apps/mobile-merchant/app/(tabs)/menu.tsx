@@ -36,20 +36,34 @@ export default function MenuScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchMenu = useCallback(async () => {
-        if (!profile?.restaurantId) return;
-        const [catsRes, prodsRes] = await Promise.all([
-            supabase.from('categories').select('id, name, sort_order').eq('restaurant_id', profile.restaurantId).order('sort_order'),
-            supabase.from('products').select('id, name, description, price, is_available, image_url, category_id').eq('restaurant_id', profile.restaurantId).order('name'),
-        ]);
-        const cats = catsRes.data ?? [];
-        const prods = prodsRes.data ?? [];
-        const uncategorized = prods.filter((p: Product) => !p.category_id);
-        const result: Category[] = cats.map((c: any) => ({
-            ...c,
-            products: prods.filter((p: Product) => p.category_id === c.id),
-        }));
-        if (uncategorized.length > 0) result.push({ id: '_uncategorized', name: 'Sans catégorie', products: uncategorized });
-        setSections(result.filter((s) => s.products.length > 0));
+        if (!profile?.restaurantId) {
+            console.log('No restaurantId:', profile);
+            return;
+        }
+        try {
+            const [catsRes, prodsRes] = await Promise.all([
+                supabase.from('categories').select('id, name, sort_order').eq('restaurant_id', profile.restaurantId).order('sort_order'),
+                supabase.from('products').select('id, name, description, price, is_available, image_url, category_id').eq('restaurant_id', profile.restaurantId).order('name'),
+            ]);
+            if (catsRes.error) {
+                console.error('Categories error:', catsRes.error);
+            }
+            if (prodsRes.error) {
+                console.error('Products error:', prodsRes.error);
+            }
+            console.log('Loaded categories:', catsRes.data?.length, 'products:', prodsRes.data?.length);
+            const cats = catsRes.data ?? [];
+            const prods = prodsRes.data ?? [];
+            const uncategorized = prods.filter((p: Product) => !p.category_id);
+            const result: Category[] = cats.map((c: any) => ({
+                ...c,
+                products: prods.filter((p: Product) => p.category_id === c.id),
+            }));
+            if (uncategorized.length > 0) result.push({ id: '_uncategorized', name: 'Sans catégorie', products: uncategorized });
+            setSections(result.filter((s) => s.products.length > 0));
+        } catch (error) {
+            console.error('Error fetching menu:', error);
+        }
     }, [profile?.restaurantId]);
 
     useEffect(() => { fetchMenu().finally(() => setLoading(false)); }, [fetchMenu]);

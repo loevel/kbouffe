@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import useSWR from "swr";
 import {
     Activity,
     Brain,
@@ -21,8 +22,19 @@ import {
     CheckCircle2,
     Sparkles,
 } from "lucide-react";
-import { Card, Button } from "@kbouffe/module-core/ui";
+import { Card, Button, authFetch } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";
+import { DateRangePicker, type DateRange } from "@/components/admin/DateRangePicker";
+
+// Fetcher for SWR
+async function fetcher<T>(url: string): Promise<T> {
+    const res = await authFetch(url);
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `API error ${res.status}`);
+    }
+    return res.json();
+}
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -183,20 +195,25 @@ const DELIVERY_LABELS: Record<string, string> = {
 // ── Main page ────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-    const [stats, setStats] = useState<AnalyticsStats | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
 
-    useEffect(() => {
-        fetch("/api/analytics/stats")
-            .then(async (res) => {
-                if (!res.ok) throw new Error("Erreur de chargement");
-                const data = await res.json();
-                setStats(data);
-            })
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
-    }, []);
+    // Build API URL with date range params
+    const apiUrl = useMemo(() => {
+        const params = new URLSearchParams();
+        if (dateRange.from) params.set("from", dateRange.from);
+        if (dateRange.to) params.set("to", dateRange.to);
+        const query = params.toString();
+        return `/api/analytics/stats${query ? `?${query}` : ""}`;
+    }, [dateRange]);
+
+    const { data: stats, error, isLoading, mutate } = useSWR<AnalyticsStats>(
+        apiUrl,
+        fetcher,
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 60000, // 1 minute dedup
+        }
+    );
 
     // Derived data for charts
     const ordersByDayData = useMemo(() => {
@@ -222,7 +239,7 @@ export default function AnalyticsPage() {
         }));
     }, [stats]);
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="space-y-6">
                 <AnalyticsNav />
@@ -239,8 +256,8 @@ export default function AnalyticsPage() {
                 <AnalyticsNav />
                 <div className="text-center py-20">
                     <XCircle size={40} className="mx-auto text-red-400 mb-4" />
-                    <p className="text-surface-500">{error ?? "Impossible de charger les donnees"}</p>
-                    <Button variant="outline" onClick={() => window.location.reload()} className="mt-4">
+                    <p className="text-surface-500">{error?.message ?? "Impossible de charger les donnees"}</p>
+                    <Button variant="outline" onClick={() => mutate()} className="mt-4">
                         Reessayer
                     </Button>
                 </div>
@@ -266,6 +283,16 @@ export default function AnalyticsPage() {
             </div>
 
             <AnalyticsNav />
+
+            {/* Date Range Filter */}
+            <Card className="p-4">
+                <DateRangePicker
+                    from={dateRange.from}
+                    to={dateRange.to}
+                    onChange={setDateRange}
+                    label="Période d'analyse"
+                />
+            </Card>
 
             {/* KPI Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

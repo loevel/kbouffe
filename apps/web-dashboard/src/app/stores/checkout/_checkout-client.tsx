@@ -75,11 +75,35 @@ interface GiftCardValidation {
     remaining_to_pay: number;
 }
 
+interface CheckoutDraft {
+    customerName?: string;
+    customerPhone?: string;
+    deliveryAddress?: string;
+    tableNumber?: string;
+}
+
+interface AddressRow {
+    address: string | null;
+    city: string | null;
+    instructions: string | null;
+    is_default: boolean | null;
+}
+
+const CHECKOUT_DRAFT_KEY = "kbouffe-store-checkout-draft-v1";
+
 const DELIVERY_LABELS: Record<DeliveryType, string> = {
     delivery: "Livraison",
     pickup:   "À emporter",
     dine_in:  "Sur place",
 };
+
+function formatAddressRow(address: AddressRow): string {
+    const parts: string[] = [];
+    if (address.address?.trim()) parts.push(address.address.trim());
+    if (address.city?.trim()) parts.push(address.city.trim());
+    if (address.instructions?.trim()) parts.push(`Repère: ${address.instructions.trim()}`);
+    return parts.join(", ");
+}
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: "info" | "payment" | "review" }) {
@@ -154,6 +178,37 @@ export function CheckoutPageClient() {
     const [giftCardCode, setGiftCardCode] = useState("");
     const [giftCardValidation, setGiftCardValidation] = useState<GiftCardValidation | null>(null);
     const [validatingGiftCard, setValidatingGiftCard] = useState(false);
+    const [draftHydrated, setDraftHydrated] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            const rawDraft = window.localStorage.getItem(CHECKOUT_DRAFT_KEY);
+            if (!rawDraft) return;
+            const draft = JSON.parse(rawDraft) as CheckoutDraft;
+
+            if (draft.customerName?.trim()) {
+                const name = draft.customerName.trim();
+                setCustomerName((prev) => prev.trim() || name);
+            }
+            if (draft.customerPhone?.trim()) {
+                const phone = draft.customerPhone.trim();
+                setCustomerPhone((prev) => prev.trim() || phone);
+            }
+            if (deliveryType === "delivery" && draft.deliveryAddress?.trim()) {
+                const address = draft.deliveryAddress.trim();
+                setDeliveryAddress((prev) => prev.trim() || address);
+            }
+            if (deliveryType === "dine_in" && draft.tableNumber?.trim()) {
+                const table = draft.tableNumber.trim();
+                setTableNumber((prev) => prev.trim() || table);
+            }
+        } catch (err) {
+            console.error("[Checkout] Failed to load draft:", err);
+        } finally {
+            setDraftHydrated(true);
+        }
+    }, [deliveryType]);
 
     // ── Load user data on mount ────────────────────────────────────────────
     useEffect(() => {
@@ -175,8 +230,31 @@ export function CheckoutPageClient() {
                     .maybeSingle();
 
                 if (userProfile) {
-                    if (userProfile.full_name) setCustomerName(userProfile.full_name);
-                    if (userProfile.phone) setCustomerPhone(userProfile.phone);
+                    if (userProfile.full_name) {
+                        setCustomerName((prev) => prev.trim() || userProfile.full_name);
+                    }
+                    if (userProfile.phone) {
+                        setCustomerPhone((prev) => prev.trim() || userProfile.phone);
+                    }
+                }
+
+                if (deliveryType === "delivery") {
+                    const { data: addressRows, error: addressesError } = await supabase
+                        .from("addresses")
+                        .select("address, city, instructions, is_default")
+                        .eq("user_id", session.user.id)
+                        .order("is_default", { ascending: false })
+                        .limit(5);
+
+                    if (addressesError) {
+                        console.error("[Checkout] Failed to load addresses:", addressesError);
+                    } else if (addressRows && addressRows.length > 0) {
+                        const preferredAddress = addressRows.find((addr) => addr.is_default) ?? addressRows[0];
+                        const formattedAddress = formatAddressRow(preferredAddress);
+                        if (formattedAddress) {
+                            setDeliveryAddress((prev) => prev.trim() || formattedAddress);
+                        }
+                    }
                 }
             } catch (err) {
                 console.error("[Checkout] Failed to load user data:", err);
@@ -184,7 +262,23 @@ export function CheckoutPageClient() {
         };
 
         loadUserData();
-    }, []);
+    }, [deliveryType]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (!draftHydrated) return;
+        const draft: CheckoutDraft = {
+            customerName: customerName.trim() || undefined,
+            customerPhone: customerPhone.trim() || undefined,
+            deliveryAddress: deliveryAddress.trim() || undefined,
+            tableNumber: tableNumber.trim() || undefined,
+        };
+        if (!draft.customerName && !draft.customerPhone && !draft.deliveryAddress && !draft.tableNumber) {
+            window.localStorage.removeItem(CHECKOUT_DRAFT_KEY);
+            return;
+        }
+        window.localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(draft));
+    }, [customerName, customerPhone, deliveryAddress, tableNumber, draftHydrated]);
 
     useEffect(() => {
         if (paymentMethod !== "gift_card") {

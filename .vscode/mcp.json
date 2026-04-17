@@ -34,6 +34,14 @@
       "env": {
         "FIREBASE_PROJECT_ID": "kbouffe-app"
       }
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
     }
   }
 }

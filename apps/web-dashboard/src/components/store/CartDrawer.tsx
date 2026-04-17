@@ -22,7 +22,6 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
-import { motion } from "framer-motion";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,26 +78,23 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
     const [giftCardApplied, setGiftCardApplied] = useState(false);
     const [giftCardBalance, setGiftCardBalance] = useState(0);
     const [giftCardAmount, setGiftCardAmount] = useState(0);
-    const [giftCardId, setGiftCardId] = useState<string | null>(null);
     const [giftCardError, setGiftCardError] = useState<string | null>(null);
     const [giftCardLoading, setGiftCardLoading] = useState(false);
-
-    // ── Responsive: detect desktop to switch between bottom-sheet (mobile) and
-    //    side-drawer (lg+) animations without duplicating JSX. ──────────────────
-    const [isDesktop, setIsDesktop] = useState(false);
-    useEffect(() => {
-        const mq = window.matchMedia("(min-width: 1024px)");
-        setIsDesktop(mq.matches);
-        const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-        mq.addEventListener("change", handler);
-        return () => mq.removeEventListener("change", handler);
-    }, []);
 
     useEffect(() => {
         const supabase = createClient();
         if (!supabase) return;
         supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
     }, []);
+
+    useEffect(() => {
+        if (!open) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [open, onClose]);
 
     // Reset step when drawer closes
     const prevOpen = useRef(open);
@@ -132,13 +128,11 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                 setGiftCardError(json.error ?? "Code invalide");
                 setGiftCardApplied(false);
                 setGiftCardAmount(0);
-                setGiftCardId(null);
                 return;
             }
             setGiftCardApplied(true);
             setGiftCardBalance(json.current_balance);
             setGiftCardAmount(json.amount_applicable);
-            setGiftCardId(json.gift_card_id);
         } catch {
             setGiftCardError("Erreur lors de la validation. Réessayez.");
         } finally {
@@ -151,7 +145,6 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
         setGiftCardApplied(false);
         setGiftCardBalance(0);
         setGiftCardAmount(0);
-        setGiftCardId(null);
         setGiftCardError(null);
     };
 
@@ -266,22 +259,20 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
             />
 
             {/* Drawer — right-side panel on lg+, bottom sheet that slides up on < lg */}
-            <motion.aside
-                initial={false}
-                animate={
-                    open
-                        ? { y: 0, x: 0 }
-                        : isDesktop
-                        ? { y: 0, x: "100%" }
-                        : { y: "100%", x: 0 }
-                }
-                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            <aside
                 className="fixed z-50 flex flex-col bg-white dark:bg-surface-900 shadow-2xl
                     inset-x-0 bottom-0 rounded-t-3xl max-h-[90vh]
-                    lg:inset-x-auto lg:inset-y-0 lg:right-0 lg:rounded-none lg:w-full lg:max-w-md lg:max-h-full"
+                    lg:inset-x-auto lg:inset-y-0 lg:right-0 lg:rounded-none lg:w-full lg:max-w-md lg:max-h-full
+                    transform transition-transform duration-300 ease-out
+                    data-[open=true]:translate-y-0 data-[open=false]:translate-y-full
+                    lg:data-[open=true]:translate-x-0 lg:data-[open=false]:translate-x-full
+                    lg:data-[open=false]:translate-y-0
+                    data-[open=true]:pointer-events-auto data-[open=false]:pointer-events-none"
+                data-open={open}
                 aria-label="Panier"
                 aria-modal="true"
                 role="dialog"
+                aria-hidden={!open}
             >
                 {/* Drag handle pill — bottom sheet affordance, hidden on desktop */}
                 <div className="flex justify-center pt-3 pb-1 shrink-0 lg:hidden" aria-hidden="true">
@@ -721,7 +712,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                         </button>
                     </div>
                 )}
-            </motion.aside>
+            </aside>
         </>
     );
 }
