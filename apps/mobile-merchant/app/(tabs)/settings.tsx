@@ -21,6 +21,32 @@ export default function SettingsScreen() {
 
     const s = styles(theme);
 
+    const menuSections = [
+        {
+            title: 'Opérations',
+            items: [
+                { label: 'Statistiques', icon: 'bar-chart-outline', href: '/stats' },
+                { label: 'Messages', icon: 'chatbubble-ellipses-outline', href: '/messages' },
+                { label: 'Finances', icon: 'cash-outline', href: '/finances' },
+                { label: 'Réservations', icon: 'calendar-outline', href: '/reservations' },
+                { label: 'Équipe', icon: 'people-outline', href: '/team' },
+                { label: 'Avis clients', icon: 'star-outline', href: '/reviews' },
+                { label: 'Caisse', icon: 'wallet-outline', href: '/caisse' },
+                { label: 'Tables', icon: 'square-outline', href: '/tables' },
+            ],
+        },
+        {
+            title: 'Configuration',
+            items: [
+                { label: 'Horaires d\'ouverture', icon: 'time-outline', href: '/settings/hours' },
+                { label: 'Informations du restaurant', icon: 'business-outline', href: '/settings/restaurant' },
+                { label: 'Zones de livraison', icon: 'map-outline', href: '/settings/zones' },
+                { label: 'Modes de paiement', icon: 'card-outline', href: '/settings/payments' },
+                { label: 'Notifications push', icon: 'notifications-outline', href: '/settings/notifications' },
+            ],
+        },
+    ];
+
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
@@ -42,19 +68,18 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* Menu items */}
-                {[
-                    { label: 'Horaires d\'ouverture', icon: 'time-outline', href: '/settings/hours' },
-                    { label: 'Informations du restaurant', icon: 'business-outline', href: '/settings/restaurant' },
-                    { label: 'Zones de livraison', icon: 'map-outline', href: '/settings/zones' },
-                    { label: 'Modes de paiement', icon: 'card-outline', href: '/settings/payments' },
-                    { label: 'Notifications push', icon: 'notifications-outline', href: '/settings/notifications' },
-                ].map((item) => (
-                    <TouchableOpacity key={item.label} style={s.menuItem} onPress={() => router.push(item.href as never)}>
-                        <Ionicons name={item.icon as any} size={20} color={theme.primary} />
-                        <Text style={[s.menuLabel, { color: theme.text }]}>{item.label}</Text>
-                        <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-                    </TouchableOpacity>
+                {/* Menu sections */}
+                {menuSections.map((section) => (
+                    <View key={section.title} style={s.section}>
+                        <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>{section.title}</Text>
+                        {section.items.map((item) => (
+                            <TouchableOpacity key={item.label} style={s.menuItem} onPress={() => router.push(item.href as never)}>
+                                <Ionicons name={item.icon as any} size={20} color={theme.primary} />
+                                <Text style={[s.menuLabel, { color: theme.text }]}>{item.label}</Text>
+                                <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 ))}
 
                 <TouchableOpacity style={[s.menuItem, s.signOutItem]} onPress={handleSignOut}>
@@ -79,6 +104,8 @@ const styles = (theme: any) => StyleSheet.create({
     restaurantInfo: { flex: 1 },
     restaurantName: { fontSize: 16, fontWeight: '700' },
     restaurantRole: { fontSize: 12, marginTop: 2 },
+    section: { marginBottom: 20 },
+    sectionTitle: { fontSize: 12, fontWeight: '700', paddingHorizontal: 4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
     menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.surface, borderRadius: 12, padding: 14, marginBottom: 8 },
     menuLabel: { flex: 1, fontSize: 14, fontWeight: '500' },
     signOutItem: { marginTop: 12 },
