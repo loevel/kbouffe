@@ -277,7 +277,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             width: 280,
             backgroundColor: theme.surface,
             borderRadius: 12,
-            overflow: 'hidden,
+            overflow: 'hidden',
             borderWidth: 1,
             borderColor: theme.border,
         },

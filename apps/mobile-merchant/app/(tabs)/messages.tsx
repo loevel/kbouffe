@@ -33,7 +33,7 @@ interface Conversation {
 function formatRelativeDate(timestamp: string) {
     const deltaMs = Date.now() - new Date(timestamp).getTime();
     const minutes = Math.max(0, Math.floor(deltaMs / 60_000));
-    if (minutes < 1) return 'À l'instant';
+    if (minutes < 1) return "À l'instant";
     if (minutes < 60) return `${minutes}min`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h`;
