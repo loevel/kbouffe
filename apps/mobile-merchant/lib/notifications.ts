@@ -35,8 +35,8 @@ export async function registerForPushNotifications() {
       return;
     }
 
-    // Enregistrer le token dans Supabase
-    const { error } = await supabase.from('push_tokens').insert(
+    // Enregistrer le token dans Supabase (upsert si existe déjà)
+    const { error } = await supabase.from('push_tokens').upsert(
       {
         user_id: user.id,
         token: token.data,
@@ -49,11 +49,12 @@ export async function registerForPushNotifications() {
 
     if (error) {
       console.error('Erreur lors de l\'enregistrement du token:', error);
-    } else {
-      console.log('Token enregistré:', token.data);
-      // Sauvegarder le token dans SecureStore pour la récupération plus tard
-      await SecureStore.setItemAsync('expo_push_token', token.data);
+      return;
     }
+
+    console.log('Token enregistré:', token.data);
+    // Sauvegarder le token dans SecureStore pour la récupération plus tard
+    await SecureStore.setItemAsync('expo_push_token', token.data);
   } catch (error) {
     console.error('Erreur lors de registerForPushNotifications:', error);
   }
