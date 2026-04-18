@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface Reservation {
     id: string;
@@ -241,6 +242,7 @@ export default function ReservationsScreen() {
     };
 
     return (
+        <PermissionGate permission="reservations:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
@@ -283,6 +285,7 @@ export default function ReservationsScreen() {
                 }
             />
         </SafeAreaView>
+        </PermissionGate>
     );
 }
 

@@ -6,7 +6,7 @@
  */
 
 // ── Types ──────────────────────────────────────────────────────────────
-export type TeamRole = "owner" | "manager" | "cashier" | "cook" | "viewer";
+export type TeamRole = "owner" | "manager" | "cashier" | "cook" | "viewer" | "driver";
 
 export type Permission =
     // Dashboard
@@ -88,6 +88,9 @@ const ROLE_PERMISSIONS: Record<TeamRole, readonly Permission[]> = {
         "finances:read",
         "reservations:read",
     ],
+    driver: [
+        "orders:read",
+    ],
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -109,6 +112,7 @@ const ROLE_HIERARCHY: Record<TeamRole, number> = {
     cashier: 30,
     cook: 20,
     viewer: 10,
+    driver: 5,
 };
 
 export function canManageRole(actorRole: TeamRole, targetRole: TeamRole): boolean {
@@ -116,10 +120,10 @@ export function canManageRole(actorRole: TeamRole, targetRole: TeamRole): boolea
 }
 
 /** All available roles (for dropdowns) */
-export const TEAM_ROLES: TeamRole[] = ["owner", "manager", "cashier", "cook", "viewer"];
+export const TEAM_ROLES: TeamRole[] = ["owner", "manager", "cashier", "cook", "viewer", "driver"];
 
 /** Assignable roles (owner cannot be assigned, it's automatic) */
-export const ASSIGNABLE_ROLES: TeamRole[] = ["manager", "cashier", "cook", "viewer"];
+export const ASSIGNABLE_ROLES: TeamRole[] = ["manager", "cashier", "cook", "viewer", "driver"];
 
 /** Human-readable role labels (used in UI) */
 export const ROLE_LABELS: Record<TeamRole, { fr: string; en: string }> = {
@@ -128,6 +132,7 @@ export const ROLE_LABELS: Record<TeamRole, { fr: string; en: string }> = {
     cashier: { fr: "Caissier",    en: "Cashier" },
     cook:    { fr: "Cuisinier",   en: "Cook" },
     viewer:  { fr: "Observateur", en: "Viewer" },
+    driver:  { fr: "Livreur",     en: "Driver" },
 };
 
 /** Role badge colour variants (for the UI Badge component) */
@@ -137,6 +142,7 @@ export const ROLE_BADGE_VARIANT: Record<TeamRole, "brand" | "info" | "success" |
     cashier: "success",
     cook:    "warning",
     viewer:  "default",
+    driver:  "default",
 };
 
 // ── Sidebar nav → permission mapping ────────────────────────────────────

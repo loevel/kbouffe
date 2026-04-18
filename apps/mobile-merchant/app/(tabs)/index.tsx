@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { usePermission } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
 
 type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
@@ -78,6 +79,7 @@ export default function OverviewScreen() {
     const { profile } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const canSeeFinances = usePermission('finances:read');
     const [overview, setOverview] = useState<OverviewData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -250,12 +252,14 @@ export default function OverviewScreen() {
                 </View>
 
                 <View style={styles.metricsGrid}>
-                    <MetricCard
-                        label="CA du jour"
-                        value={`${(overview?.todayRevenue ?? 0).toLocaleString()} F`}
-                        subtitle={`${overview?.todayOrdersCount ?? 0} commande${overview?.todayOrdersCount && overview.todayOrdersCount > 1 ? 's' : ''} aujourd'hui`}
-                        accent={theme.success}
-                    />
+                    {canSeeFinances && (
+                        <MetricCard
+                            label="CA du jour"
+                            value={`${(overview?.todayRevenue ?? 0).toLocaleString()} F`}
+                            subtitle={`${overview?.todayOrdersCount ?? 0} commande${overview?.todayOrdersCount && overview.todayOrdersCount > 1 ? 's' : ''} aujourd'hui`}
+                            accent={theme.success}
+                        />
+                    )}
                     <MetricCard
                         label="Commandes en cours"
                         value={String(overview?.activeOrdersCount ?? 0)}
@@ -283,6 +287,7 @@ export default function OverviewScreen() {
                     <View style={styles.quickActions}>
                         {[
                             { label: 'Voir les commandes', icon: 'receipt-outline', href: '/(tabs)/orders' },
+                            { label: 'Écran cuisine', icon: 'layers-outline', href: '/kitchen' },
                             { label: 'Gérer le menu', icon: 'restaurant-outline', href: '/(tabs)/menu' },
                             { label: 'Consulter les stats', icon: 'bar-chart-outline', href: '/(tabs)/stats' },
                         ].map((action) => (

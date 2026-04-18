@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface FinanceSummary {
     grossRevenue: number;
@@ -189,6 +190,7 @@ export default function FinancesScreen() {
     const netRevenue = finances.summary.totalRevenue - finances.summary.feesRevenue;
 
     return (
+        <PermissionGate permission="finances:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
@@ -293,6 +295,7 @@ export default function FinancesScreen() {
                 )}
             </ScrollView>
         </SafeAreaView>
+        </PermissionGate>
     );
 }
 

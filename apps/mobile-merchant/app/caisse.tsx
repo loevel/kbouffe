@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface CashSession {
     id: string;
@@ -121,7 +122,7 @@ export default function CaisseScreen() {
             const amount = parseFloat(startingCash);
             await supabase.from('pos_cash_sessions').insert({
                 restaurant_id: profile.restaurantId,
-                opening_user_id: profile.userId,
+                opening_user_id: profile.id,
                 opened_at: new Date().toISOString(),
                 starting_cash: amount,
                 expected_cash: amount,
@@ -193,6 +194,7 @@ export default function CaisseScreen() {
     const formatFcfa = (amount: number) => amount.toLocaleString('fr-FR') + ' FCFA';
 
     return (
+        <PermissionGate permission="orders:manage">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
@@ -420,6 +422,7 @@ export default function CaisseScreen() {
                 </View>
             </Modal>
         </SafeAreaView>
+        </PermissionGate>
     );
 }
 

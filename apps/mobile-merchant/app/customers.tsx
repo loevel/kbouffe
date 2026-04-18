@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface Customer {
     id: string;
@@ -199,6 +200,7 @@ export default function CustomersScreen() {
     };
 
     return (
+        <PermissionGate permission="customers:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
@@ -240,6 +242,7 @@ export default function CustomersScreen() {
                 }
             />
         </SafeAreaView>
+        </PermissionGate>
     );
 }
 

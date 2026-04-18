@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface Table {
     id: string;
@@ -217,6 +218,7 @@ export default function TablesScreen() {
     };
 
     return (
+        <PermissionGate permission="tables:manage">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
@@ -388,6 +390,7 @@ export default function TablesScreen() {
                 </View>
             </Modal>
         </SafeAreaView>
+        </PermissionGate>
     );
 }
 

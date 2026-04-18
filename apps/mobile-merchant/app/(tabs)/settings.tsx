@@ -5,12 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { usePermissions } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
+import type { Permission } from '@/lib/permissions';
 
 export default function SettingsScreen() {
     const { profile, signOut } = useAuth();
     const theme = useTheme();
     const router = useRouter();
+    const can = usePermissions();
 
     const handleSignOut = () => {
         Alert.alert('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
@@ -21,31 +24,66 @@ export default function SettingsScreen() {
 
     const s = styles(theme);
 
-    const menuSections = [
+    type MenuItem = { label: string; icon: string; href: string; permission?: Permission };
+    type MenuSection = { title: string; items: MenuItem[] };
+
+    const allSections: MenuSection[] = [
         {
             title: 'Opérations',
             items: [
-                { label: 'Statistiques', icon: 'bar-chart-outline', href: '/stats' },
+                { label: 'Statistiques', icon: 'bar-chart-outline', href: '/stats', permission: 'dashboard:read' },
+                { label: 'Rapports', icon: 'document-text-outline', href: '/reports', permission: 'finances:read' },
                 { label: 'Messages', icon: 'chatbubble-ellipses-outline', href: '/messages' },
-                { label: 'Finances', icon: 'cash-outline', href: '/finances' },
-                { label: 'Réservations', icon: 'calendar-outline', href: '/reservations' },
-                { label: 'Équipe', icon: 'people-outline', href: '/team' },
-                { label: 'Avis clients', icon: 'star-outline', href: '/reviews' },
-                { label: 'Caisse', icon: 'wallet-outline', href: '/caisse' },
-                { label: 'Tables', icon: 'square-outline', href: '/tables' },
+                { label: 'Finances', icon: 'cash-outline', href: '/finances', permission: 'finances:read' },
+                { label: 'Réservations', icon: 'calendar-outline', href: '/reservations', permission: 'reservations:read' },
+                { label: 'Équipe', icon: 'people-outline', href: '/team', permission: 'team:read' },
+                { label: 'Avis clients', icon: 'star-outline', href: '/reviews', permission: 'customers:read' },
+                { label: 'Clients', icon: 'people-circle-outline', href: '/customers', permission: 'customers:read' },
+                { label: 'Caisse', icon: 'wallet-outline', href: '/caisse', permission: 'orders:manage' },
+                { label: 'Tables', icon: 'square-outline', href: '/tables', permission: 'tables:manage' },
+                { label: 'Cuisine', icon: 'restaurant-outline', href: '/kitchen', permission: 'orders:read' },
+            ],
+        },
+        {
+            title: 'Offres & Promotions',
+            items: [
+                { label: 'Promotions', icon: 'pricetag-outline', href: '/promotions', permission: 'marketing:read' },
+                { label: 'Fidélité', icon: 'heart-outline', href: '/loyalty', permission: 'marketing:read' },
+                { label: 'Cartes cadeaux', icon: 'gift-outline', href: '/gift-cards', permission: 'marketing:read' },
+            ],
+        },
+        {
+            title: 'Outils',
+            items: [
+                { label: 'Analytique', icon: 'bar-chart-outline', href: '/analytics', permission: 'finances:read' },
+                { label: 'Vitrine', icon: 'storefront-outline', href: '/showcase', permission: 'store:manage' },
+                { label: 'Marketplace', icon: 'bag-outline', href: '/marketplace', permission: 'store:manage' },
+                { label: 'Support', icon: 'help-circle-outline', href: '/support' },
             ],
         },
         {
             title: 'Configuration',
             items: [
-                { label: 'Horaires d\'ouverture', icon: 'time-outline', href: '/settings/hours' },
-                { label: 'Informations du restaurant', icon: 'business-outline', href: '/settings/restaurant' },
-                { label: 'Zones de livraison', icon: 'map-outline', href: '/settings/zones' },
-                { label: 'Modes de paiement', icon: 'card-outline', href: '/settings/payments' },
+                { label: 'Informations du restaurant', icon: 'business-outline', href: '/settings/restaurant', permission: 'settings:manage' },
+                { label: "Horaires d'ouverture", icon: 'time-outline', href: '/settings/hours', permission: 'settings:manage' },
+                { label: 'Zones de livraison', icon: 'map-outline', href: '/settings/zones', permission: 'settings:manage' },
+                { label: 'Modes de paiement', icon: 'card-outline', href: '/settings/payments', permission: 'settings:manage' },
                 { label: 'Notifications push', icon: 'notifications-outline', href: '/settings/notifications' },
+                { label: 'Identité visuelle', icon: 'palette-outline', href: '/settings/branding', permission: 'settings:manage' },
+                { label: 'Service sur place', icon: 'restaurant-outline', href: '/settings/dine-in', permission: 'settings:manage' },
+                { label: 'Galerie photos', icon: 'images-outline', href: '/settings/gallery', permission: 'settings:manage' },
+                { label: 'Sécurité', icon: 'shield-checkmark-outline', href: '/settings/security' },
+                { label: 'Données & Export', icon: 'download-outline', href: '/settings/data', permission: 'finances:read' },
             ],
         },
     ];
+
+    const menuSections = allSections
+        .map((section) => ({
+            ...section,
+            items: section.items.filter((item) => !item.permission || can(item.permission)),
+        }))
+        .filter((section) => section.items.length > 0);
 
     return (
         <SafeAreaView style={s.container} edges={['top']}>

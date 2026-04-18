@@ -17,6 +17,8 @@ import { authMiddleware } from "./middleware/auth";
 import { userAuthMiddleware } from "./middleware/user-auth";
 import { adminMiddleware } from "./middleware/admin";
 import { requireModule } from "./middleware/module";
+import { requirePermission } from "./middleware/permission";
+import type { Permission } from "./lib/permissions";
 
 // ── Public routes ────────────────────────────────────────────────────
 import { coreApi } from "@kbouffe/module-core";
@@ -29,6 +31,8 @@ const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute:
 import { storePublicRoutes } from "./modules/store/store-public";
 import { dashboardRoutes } from "./modules/store/dashboard";
 import { restaurantRoutes } from "./modules/store/restaurant";
+import { merchantExtrasRoutes } from "./modules/store/merchant-extras";
+import { marketplacePublicServicesRoutes } from "./modules/marketplace/public-services";
 import { cuisineCategoriesPublicRoutes } from "./modules/cuisine-categories";
 import { homepageSectionsPublicRoutes } from "./modules/homepage-sections";
 
@@ -164,8 +168,9 @@ api.route("/auth", authRoutes);
 api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
 api.route("/sync-user", authRoutes);       // Combined in authRoutes
 
-// ── Marketplace — routes publiques (annuaire fournisseurs, inscription) ─
+// ── Marketplace — routes publiques (annuaire fournisseurs, inscription, services) ─
 api.route("/marketplace", marketplacePublicRoutes);        // packs visibles
+api.route("/marketplace", marketplacePublicServicesRoutes); // services catalogue (public)
 
 // Supplier self-service routes require auth (register + /me/*)
 // IMPORTANT: middleware MUST be registered BEFORE api.route() in Hono,
@@ -226,7 +231,7 @@ const merchantPaths = [
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
     "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
-    "/caisse", "/supplier",
+    "/caisse", "/supplier", "/analytics", "/finances",
 ] as const;
 
 // Marketplace merchant routes (trace + product management) require auth
@@ -257,6 +262,36 @@ api.use("/security", userAuthMiddleware);
 for (const path of merchantPaths) {
     api.use(`${path}/*`, authMiddleware);
     api.use(path, authMiddleware);
+}
+
+// ── Permission requirements (RBAC) ───────────────────────────────────
+// Maps route prefix → minimum permission required to access that route.
+// Owners bypass nothing — they have all permissions in ROLE_PERMISSIONS.
+// Write operations on sensitive routes should add their own requirePermission()
+// call inside the route handler for finer-grained control.
+const permissionRequirements: Record<string, Permission> = {
+    "/dashboard":   "dashboard:read",
+    "/orders":      "orders:read",
+    "/caisse":      "orders:manage",
+    "/categories":  "menu:read",
+    "/products":    "menu:read",
+    "/customers":   "customers:read",
+    "/analytics":   "finances:read",
+    "/finances":    "finances:read",
+    "/marketing":   "marketing:read",
+    "/coupons":     "marketing:read",
+    "/gift-cards":  "marketing:read",
+    "/sms":         "marketing:manage",
+    "/ads":         "marketing:read",
+    "/team":        "team:read",
+    "/tables":      "tables:manage",
+    "/payouts":     "finances:read",
+    "/reservations": "reservations:read",
+};
+
+for (const [path, permission] of Object.entries(permissionRequirements)) {
+    api.use(`${path}/*`, requirePermission(permission));
+    api.use(path, requirePermission(permission));
 }
 
 // ── Module requirements ──────────────────────────────────────────────
@@ -293,6 +328,10 @@ api.route("/zones", tableZonesRoutes);            // zones de salle
 api.route("/orders/zones", deliveryZonesRoutes);  // zones de livraison
 api.route("/dashboard", dashboardRoutes);
 api.route("/restaurant", restaurantRoutes);
+api.route("/restaurant", merchantExtrasRoutes);  // Additional merchant routes (support, export)
+api.route("/analytics", merchantExtrasRoutes);    // Analytics stats
+api.route("/finances", merchantExtrasRoutes);     // Finances summary
+api.route("/marketplace", merchantExtrasRoutes);  // Marketplace services
 api.route("/account", usersRoutes);
 api.route("/security", securityRoutes);
 api.route("/register-restaurant", authRoutes);

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TeamRole } from "./lib/permissions";
 
 /**
  * Cloudflare Worker environment bindings.
@@ -67,4 +68,6 @@ export interface Variables {
     supabase: SupabaseClient;
     /** Admin sub-role (only set for admin users) */
     adminRole: AdminRole | null;
+    /** Restaurant member role (set by authMiddleware — null for non-member routes) */
+    memberRole: TeamRole | null;
 }

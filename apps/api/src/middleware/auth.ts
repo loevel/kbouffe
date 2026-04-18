@@ -9,6 +9,7 @@
 import { createMiddleware } from "hono/factory";
 import { createClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "../types";
+import type { TeamRole } from "../lib/permissions";
 
 /**
  * Merchant auth middleware.
@@ -40,26 +41,28 @@ export const authMiddleware = createMiddleware<{
         return c.json({ error: "Token invalide ou expiré" }, 401);
     }
 
-    // Resolve the merchant's restaurant from Supabase public.users
-    const { data: dbUser, error: userError } = await supabase
+    // Resolve the merchant's restaurant + role from Supabase public.users
+    const { data: dbUser } = await supabase
         .from("users")
         .select("restaurant_id")
         .eq("id", user.id)
         .maybeSingle();
 
     let restaurantId = dbUser?.restaurant_id;
+    let memberRole: TeamRole | null = restaurantId ? "owner" : null;
 
-    // Fallback to restaurant_members if not in user profile
+    // Fallback to restaurant_members (team members invited by an owner)
     if (!restaurantId) {
         const { data: memberData } = await supabase
             .from("restaurant_members")
-            .select("restaurant_id")
+            .select("restaurant_id, role")
             .eq("user_id", user.id)
             .eq("status", "active")
             .limit(1)
             .maybeSingle();
-        
+
         restaurantId = (memberData as any)?.restaurant_id;
+        memberRole = ((memberData as any)?.role as TeamRole) ?? null;
     }
 
     if (!restaurantId) {
@@ -69,6 +72,7 @@ export const authMiddleware = createMiddleware<{
     // Set context variables
     c.set("userId", user.id);
     c.set("restaurantId", restaurantId);
+    c.set("memberRole", memberRole);
     c.set("supabase", supabase);
 
     await next();
