@@ -3,12 +3,13 @@
 import { MoreVertical, ShieldCheck, UserX } from "lucide-react";
 import { Badge, Dropdown, useLocale } from "@kbouffe/module-core/ui";
 import { type TeamRole } from "../api/permissions";
-import { ROLE_LABELS } from "./constants";
+import { ROLE_LABELS, ROLE_BADGE_VARIANT } from "./constants";
 
 export interface TeamMember {
     id: string;
     userId: string;
     role: string;
+    roles?: string[];
     status: string;
     createdAt: string | number | null;
     acceptedAt: string | number | null;
@@ -23,29 +24,28 @@ export interface TeamMember {
 interface MemberRowProps {
     member: TeamMember;
     callerRole: TeamRole;
-    badgeVariant: "brand" | "info" | "success" | "warning" | "default";
-    assignableRoles: TeamRole[];
     canManageRoles: boolean;
     canRevoke: boolean;
-    onRoleChange: (memberId: string, role: TeamRole) => void;
+    onManageRoles: (member: TeamMember) => void;
     onRevoke: (memberId: string) => void;
     isPending?: boolean;
 }
 
 export function MemberRow({
     member,
-    badgeVariant,
-    assignableRoles,
     canManageRoles,
     canRevoke,
-    onRoleChange,
+    onManageRoles,
     onRevoke,
     isPending,
 }: MemberRowProps) {
     const { locale, t } = useLocale();
     const lang = locale === "fr" ? "fr" : "en";
 
-    const roleLabel = ROLE_LABELS[member.role as TeamRole]?.[lang] ?? member.role;
+    const roles: TeamRole[] = (member.roles && member.roles.length > 0
+        ? member.roles
+        : [member.role]) as TeamRole[];
+
     const initials = (member.fullName ?? member.email)
         .split(" ")
         .map((s) => s[0])
@@ -53,17 +53,17 @@ export function MemberRow({
         .toUpperCase()
         .slice(0, 2);
 
-    const hasActions = (canManageRoles && assignableRoles.length > 0) || canRevoke;
+    const hasActions = canManageRoles || canRevoke;
 
     const dropdownItems = [
         ...(canManageRoles
-            ? assignableRoles
-                .filter((r) => r !== member.role)
-                .map((r) => ({
-                    label: `${t.team.changeRoleTo} ${ROLE_LABELS[r][lang]}`,
+            ? [
+                {
+                    label: lang === "fr" ? "Gérer les rôles" : "Manage roles",
                     icon: ShieldCheck,
-                    onClick: () => onRoleChange(member.id, r),
-                }))
+                    onClick: () => onManageRoles(member),
+                },
+            ]
             : []),
         ...(canRevoke
             ? [
@@ -101,10 +101,18 @@ export function MemberRow({
                 <p className="text-xs text-surface-500 truncate">{member.email}</p>
             </div>
 
-            {/* Role badge */}
-            <Badge variant={badgeVariant}>
-                {isPending ? t.team.pending : roleLabel}
-            </Badge>
+            {/* Role badges (multi) */}
+            <div className="flex flex-wrap items-center gap-1 justify-end max-w-[45%]">
+                {isPending ? (
+                    <Badge variant="warning">{t.team.pending}</Badge>
+                ) : (
+                    roles.map((r) => (
+                        <Badge key={r} variant={ROLE_BADGE_VARIANT[r] ?? "default"}>
+                            {ROLE_LABELS[r]?.[lang] ?? r}
+                        </Badge>
+                    ))
+                )}
+            </div>
 
             {/* Actions */}
             {hasActions && (

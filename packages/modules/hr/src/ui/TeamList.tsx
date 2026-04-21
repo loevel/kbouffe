@@ -3,25 +3,32 @@
 import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Loader2, KeyRound } from "lucide-react";
 import { Card, Button, Badge, toast, useDashboard, useLocale, authFetch } from "@kbouffe/module-core/ui";
-import { type TeamRole, ASSIGNABLE_ROLES, canManageRole } from "../api/permissions";
-import { ROLE_BADGE_VARIANT } from "./constants";
+import { type TeamRole, canManageRole, ASSIGNABLE_ROLES } from "../api/permissions";
 import { InviteModal } from "./InviteModal";
 import { MemberRow, type TeamMember } from "./MemberRow";
 import { PinSetupModal } from "./PinSetupModal";
+import { ManageRolesModal } from "./ManageRolesModal";
 
 interface TeamListProps {
     filterRole?: TeamRole;
 }
 
+function getMemberRoles(m: TeamMember): TeamRole[] {
+    return (m.roles && m.roles.length > 0 ? m.roles : [m.role]) as TeamRole[];
+}
+
 export function TeamList({ filterRole }: TeamListProps = {}) {
     const { can, teamRole } = useDashboard();
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
+    const lang = locale === "fr" ? "fr" : "en";
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [showInvite, setShowInvite] = useState(false);
 
     // PIN setup modal state
     const [pinModalMember, setPinModalMember] = useState<TeamMember | null>(null);
+    // Manage-roles modal state
+    const [rolesModalMember, setRolesModalMember] = useState<TeamMember | null>(null);
 
     const fetchMembers = useCallback(async () => {
         try {
@@ -30,7 +37,7 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
             const data = await res.json();
             const fetchedMembers: TeamMember[] = (data as any).members ?? [];
             if (filterRole) {
-                setMembers(fetchedMembers.filter(m => m.role === filterRole));
+                setMembers(fetchedMembers.filter(m => getMemberRoles(m).includes(filterRole)));
             } else {
                 setMembers(fetchedMembers);
             }
@@ -39,17 +46,24 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [filterRole]);
 
     useEffect(() => {
         fetchMembers();
     }, [fetchMembers]);
 
-    const handleRoleChange = async (memberId: string, newRole: TeamRole) => {
+    const handleSaveRoles = async (memberId: string, newRoles: TeamRole[]) => {
+        // Backend (single-role) attend un role ∈ ASSIGNABLE_ROLES.
+        // On filtre les rôles non assignables (ex: "owner") pour la compat.
+        const assignable = newRoles.filter((r) => (ASSIGNABLE_ROLES as TeamRole[]).includes(r));
+        if (assignable.length === 0) {
+            toast.error(lang === "fr" ? "Aucun rôle assignable sélectionné." : "No assignable role selected.");
+            return;
+        }
         const res = await authFetch(`/api/team/${memberId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ role: newRole }),
+            body: JSON.stringify({ roles: assignable, role: assignable[0] }),
         });
         if (!res.ok) {
             const data = await res.json();
@@ -73,9 +87,24 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
 
     // Caller can set any member's PIN if they have team:manage_roles
     const canManagePins = can("team:manage_roles");
+    const callerRole = teamRole as TeamRole;
 
     const activeMembers = members.filter((m) => m.status === "active");
     const pendingMembers = members.filter((m) => m.status === "pending");
+
+    const canManageMemberRoles = (m: TeamMember) => {
+        if (!can("team:manage_roles")) return false;
+        // Caller must strictly outrank every one of the member's current roles.
+        // (Un owner ne peut pas éditer un autre owner, un manager ne peut pas éditer un manager, etc.)
+        return getMemberRoles(m).every((r) => canManageRole(callerRole, r));
+    };
+
+    const canRevokeMember = (m: TeamMember) => {
+        if (!can("team:invite")) return false;
+        const roles = getMemberRoles(m);
+        if (roles.includes("owner")) return false;
+        return roles.every((r) => canManageRole(callerRole, r));
+    };
 
     if (loading) {
         return (
@@ -106,6 +135,13 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
                     )}
                 </div>
 
+                {/* Hint: multi-role supported */}
+                <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
+                    {lang === "fr"
+                        ? "Un membre peut cumuler plusieurs rôles (ex : Gérant + Propriétaire)."
+                        : "A member can hold multiple roles at once (e.g. Manager + Owner)."}
+                </p>
+
                 {/* Active members */}
                 <div className="space-y-2">
                     {activeMembers.map((member) => (
@@ -113,12 +149,10 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
                             <div className="flex-1 min-w-0">
                                 <MemberRow
                                     member={member}
-                                    callerRole={teamRole as TeamRole}
-                                    badgeVariant={ROLE_BADGE_VARIANT[member.role as TeamRole] ?? "default"}
-                                    assignableRoles={ASSIGNABLE_ROLES.filter((r) => canManageRole(teamRole as TeamRole, r))}
-                                    canManageRoles={can("team:manage_roles")}
-                                    canRevoke={can("team:invite") && canManageRole(teamRole as TeamRole, member.role as TeamRole) && member.role !== "owner"}
-                                    onRoleChange={handleRoleChange}
+                                    callerRole={callerRole}
+                                    canManageRoles={canManageMemberRoles(member)}
+                                    canRevoke={canRevokeMember(member)}
+                                    onManageRoles={setRolesModalMember}
                                     onRevoke={handleRevoke}
                                 />
                             </div>
@@ -166,12 +200,10 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
                                 <MemberRow
                                     key={member.id}
                                     member={member}
-                                    callerRole={teamRole as TeamRole}
-                                    badgeVariant="warning"
-                                    assignableRoles={[]}
+                                    callerRole={callerRole}
                                     canManageRoles={false}
                                     canRevoke={can("team:invite")}
-                                    onRoleChange={handleRoleChange}
+                                    onManageRoles={setRolesModalMember}
                                     onRevoke={handleRevoke}
                                     isPending
                                 />
@@ -185,7 +217,7 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
                 isOpen={showInvite}
                 onClose={() => setShowInvite(false)}
                 onInvited={fetchMembers}
-                callerRole={teamRole as TeamRole}
+                callerRole={callerRole}
                 allowedRoles={filterRole ? [filterRole] : undefined}
             />
 
@@ -198,6 +230,18 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
                     memberName={pinModalMember.fullName ?? pinModalMember.email}
                     hasPin={pinModalMember.hasPin ?? false}
                     onSuccess={fetchMembers}
+                />
+            )}
+
+            {/* Manage-roles modal */}
+            {rolesModalMember && (
+                <ManageRolesModal
+                    isOpen={rolesModalMember !== null}
+                    onClose={() => setRolesModalMember(null)}
+                    memberName={rolesModalMember.fullName ?? rolesModalMember.email}
+                    initialRoles={getMemberRoles(rolesModalMember)}
+                    callerRole={callerRole}
+                    onSave={(roles) => handleSaveRoles(rolesModalMember.id, roles)}
                 />
             )}
         </>

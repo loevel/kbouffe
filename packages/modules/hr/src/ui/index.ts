@@ -1,6 +1,7 @@
 export * from "./TeamList";
 export * from "./MemberRow";
 export * from "./InviteModal";
+export * from "./ManageRolesModal";
 export * from "./PayoutsList";
 export * from "./PayrollReport";
 export * from "./PinSetupModal";
