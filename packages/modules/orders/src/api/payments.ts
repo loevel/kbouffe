@@ -133,7 +133,7 @@ paymentRoutes.get("/status/:referenceId", async (c) => {
     const admin = getAdminClient(c.env);
 
     const { data: tx, error: txError } = await admin.from("payment_transactions")
-        .select("id, order_id, restaurant_id, reference_id, status, provider")
+        .select("id, order_id, restaurant_id, reference_id, status, provider, amount")
         .eq("reference_id", referenceId).eq("restaurant_id", c.var.restaurantId).single();
 
     if (txError || !tx) return c.json({ error: "Transaction introuvable" }, 404);
@@ -150,18 +150,55 @@ paymentRoutes.get("/status/:referenceId", async (c) => {
     const providerPayload = await provider.getRequestToPayStatus(c.env, referenceId);
     const providerStatus = String(providerPayload.status ?? "PENDING");
     const mappedStatus = mapMtnStatusToPaymentStatus(providerStatus);
+    const nowIso = new Date().toISOString();
 
     await admin.from("payment_transactions").update({
         status: mappedStatus, provider_status: providerStatus, provider_response: providerPayload,
-        completed_at: mappedStatus === "paid" ? new Date().toISOString() : null,
+        completed_at: mappedStatus === "paid" ? nowIso : null,
         failed_reason: mappedStatus === "failed" ? String(providerPayload.reason ?? "FAILED") : null,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
     } as never).eq("id", (tx as any).id);
 
     if ((tx as any).order_id) {
         const orderPaymentStatus = mappedStatus === "paid" ? "paid" : mappedStatus === "failed" ? "failed" : "pending";
-        await admin.from("orders").update({ payment_status: orderPaymentStatus, updated_at: new Date().toISOString() } as never)
+        await admin.from("orders").update({ payment_status: orderPaymentStatus, updated_at: nowIso } as never)
             .eq("id", (tx as any).order_id).eq("restaurant_id", c.var.restaurantId);
+    } else {
+        const { data: purchase } = await admin
+            .from("marketplace_purchases")
+            .select("id, service_id, status")
+            .eq("payment_transaction_id", (tx as any).id)
+            .maybeSingle();
+
+        if (purchase && (purchase as any).status === "pending") {
+            if (mappedStatus === "paid") {
+                const { data: svc } = await admin
+                    .from("marketplace_services")
+                    .select("duration_days")
+                    .eq("id", (purchase as any).service_id)
+                    .maybeSingle();
+                const durationDays = (svc as any)?.duration_days as number | null;
+                let expiresAt: string | null = null;
+                if (durationDays && durationDays > 0) {
+                    const d = new Date();
+                    d.setUTCDate(d.getUTCDate() + durationDays);
+                    expiresAt = d.toISOString();
+                }
+                await admin.from("marketplace_purchases").update({
+                    status: "active",
+                    activated_at: nowIso,
+                    starts_at: nowIso,
+                    expires_at: expiresAt,
+                    amount_paid: (tx as any).amount ?? 0,
+                    updated_at: nowIso,
+                } as never).eq("id", (purchase as any).id);
+            } else if (mappedStatus === "failed") {
+                await admin.from("marketplace_purchases").update({
+                    status: "failed",
+                    updated_at: nowIso,
+                } as never).eq("id", (purchase as any).id);
+            }
+        }
     }
 
     return c.json({ success: true, payment: { referenceId, status: mappedStatus, providerStatus }, providerPayload });
@@ -264,7 +301,7 @@ paymentWebhookRoutes.post("/webhook", async (c) => {
     const admin = getAdminClient(c.env);
     const { data: tx } = await admin
         .from("payment_transactions")
-        .select("id, order_id, restaurant_id, provider")
+        .select("id, order_id, restaurant_id, provider, amount")
         .eq("reference_id", referenceId)
         .single();
     if (!tx) return c.json({ success: true, ignored: true });
@@ -278,18 +315,57 @@ paymentWebhookRoutes.post("/webhook", async (c) => {
     const providerPayload = await provider.getRequestToPayStatus(c.env, referenceId);
     const providerStatus = String(providerPayload.status ?? "PENDING");
     const mappedStatus = mapMtnStatusToPaymentStatus(providerStatus);
+    const nowIso = new Date().toISOString();
 
     await admin.from("payment_transactions").update({
         status: mappedStatus, provider_status: providerStatus, provider_response: providerPayload,
-        completed_at: mappedStatus === "paid" ? new Date().toISOString() : null,
+        completed_at: mappedStatus === "paid" ? nowIso : null,
         failed_reason: mappedStatus === "failed" ? String(providerPayload.reason ?? "FAILED") : null,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
     } as never).eq("id", (tx as any).id);
 
     if ((tx as any).order_id) {
         const orderPaymentStatus = mappedStatus === "paid" ? "paid" : mappedStatus === "failed" ? "failed" : "pending";
-        await admin.from("orders").update({ payment_status: orderPaymentStatus, updated_at: new Date().toISOString() } as never)
+        await admin.from("orders").update({ payment_status: orderPaymentStatus, updated_at: nowIso } as never)
             .eq("id", (tx as any).order_id).eq("restaurant_id", (tx as any).restaurant_id);
+    } else {
+        // Marketplace purchase flow: payment_transactions.order_id is NULL.
+        // Locate the linked purchase and transition it based on mapped status.
+        const { data: purchase } = await admin
+            .from("marketplace_purchases")
+            .select("id, service_id, status")
+            .eq("payment_transaction_id", (tx as any).id)
+            .maybeSingle();
+
+        if (purchase && (purchase as any).status === "pending") {
+            if (mappedStatus === "paid") {
+                const { data: svc } = await admin
+                    .from("marketplace_services")
+                    .select("duration_days")
+                    .eq("id", (purchase as any).service_id)
+                    .maybeSingle();
+                const durationDays = (svc as any)?.duration_days as number | null;
+                let expiresAt: string | null = null;
+                if (durationDays && durationDays > 0) {
+                    const d = new Date();
+                    d.setUTCDate(d.getUTCDate() + durationDays);
+                    expiresAt = d.toISOString();
+                }
+                await admin.from("marketplace_purchases").update({
+                    status: "active",
+                    activated_at: nowIso,
+                    starts_at: nowIso,
+                    expires_at: expiresAt,
+                    amount_paid: (tx as any).amount ?? 0,
+                    updated_at: nowIso,
+                } as never).eq("id", (purchase as any).id);
+            } else if (mappedStatus === "failed") {
+                await admin.from("marketplace_purchases").update({
+                    status: "failed",
+                    updated_at: nowIso,
+                } as never).eq("id", (purchase as any).id);
+            }
+        }
     }
 
     return c.json({ success: true });

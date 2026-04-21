@@ -4,6 +4,12 @@ import { zonesRoutes } from './zones';
 import { caisseRoutes } from './caisse';
 
 export { ordersRoutes, paymentRoutes, paymentWebhookRoutes, zonesRoutes, caisseRoutes };
+export {
+    getMobileMoneyProvider,
+    listMobileMoneyProviders,
+    type MobileMoneyProviderCode,
+    type MobileMoneyProvider,
+} from './mobile-money-providers';
 
 export const ordersApi = {
     ordersRoutes,

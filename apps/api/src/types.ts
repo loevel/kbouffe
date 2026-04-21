@@ -40,6 +40,8 @@ export interface Env {
     // ── Marketplace ─────────────────────────────────────────
     /** Bearer secret for marketplace MTN webhook callbacks. */
     MARKETPLACE_WEBHOOK_SECRET?: string;
+    /** MTN/Orange MoMo number credited for platform (marketplace) purchases. */
+    PLATFORM_PAYEE_MSISDN?: string;
 
     // ── Queues ─────────────────────────────────────────────
     SMS_QUEUE: Queue;
