@@ -46,6 +46,11 @@ dead_letter_queue = "kbouffe-sms-dlq"
 # MTN_ADS_SUBSCRIPTION_KEY
 # MTN_KYC_SUBSCRIPTION_KEY
 
+# ── Marketplace (platform purchases) ───────────────────────────────
+# Set via `wrangler secret put <KEY_NAME>`:
+# PLATFORM_PAYEE_MSISDN       — numéro MoMo crédité pour les achats marketplace
+# MARKETPLACE_WEBHOOK_SECRET  — bearer secret pour les webhooks marketplace
+
 
 # ── Durable Objects — Rate Limiter ────────────────────────────────
 [[durable_objects.bindings]]
