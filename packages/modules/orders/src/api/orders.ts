@@ -42,7 +42,14 @@ ordersRoutes.get("/", async (c) => {
         .select("*", { count: "exact" })
         .eq("restaurant_id", restaurantId);
 
-    if (status) query = query.eq("status", status);
+    if (status) {
+        const statuses = status.split(",").map((s: string) => s.trim()).filter(Boolean);
+        if (statuses.length === 1) {
+            query = query.eq("status", statuses[0]);
+        } else {
+            query = query.in("status", statuses);
+        }
+    }
     if (payment) query = query.eq("payment_status", payment);
     if (delivery) query = query.eq("delivery_type", delivery);
     if (search) {

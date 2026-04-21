@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
+import { CoreEnv as Env, CoreVariables as Variables } from '@kbouffe/module-core';
 import type {
   MarketplaceInitiatePurchaseRequest,
-  RestaurantPackSubscription
+  RestaurantPackSubscription,
 } from '../lib/types.js';
 import { validateInitiatePurchase } from '../lib/validation.js';
 
-export const merchantRoutes = new Hono();
+export const merchantRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
  * GET /api/marketplace/my-packs
@@ -13,8 +14,8 @@ export const merchantRoutes = new Hono();
  */
 merchantRoutes.get('/my-packs', async (c) => {
   try {
-    const supabase = c.get('supabase');
-    const restaurantId = c.get('restaurantId');
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
 
     if (!supabase || !restaurantId) {
       return c.json({ error: 'Non autorisé' }, 401);
@@ -41,8 +42,8 @@ merchantRoutes.get('/my-packs', async (c) => {
  */
 merchantRoutes.get('/subscriptions', async (c) => {
   try {
-    const supabase = c.get('supabase');
-    const restaurantId = c.get('restaurantId');
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
 
     if (!supabase || !restaurantId) {
       return c.json({ error: 'Non autorisé' }, 401);
@@ -74,9 +75,9 @@ merchantRoutes.get('/subscriptions', async (c) => {
  */
 merchantRoutes.post('/purchase', async (c) => {
   try {
-    const supabase = c.get('supabase');
-    const restaurantId = c.get('restaurantId');
-    const userId = c.get('userId');
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
+    const userId = c.var.userId;
 
     if (!supabase || !restaurantId || !userId) {
       return c.json({ error: 'Non autorisé' }, 401);
@@ -140,8 +141,8 @@ merchantRoutes.post('/purchase', async (c) => {
  */
 merchantRoutes.post('/cancel/:subscriptionId', async (c) => {
   try {
-    const supabase = c.get('supabase');
-    const restaurantId = c.get('restaurantId');
+    const supabase = c.var.supabase;
+    const restaurantId = c.var.restaurantId;
     const subscriptionId = c.req.param('subscriptionId');
 
     if (!supabase || !restaurantId) {

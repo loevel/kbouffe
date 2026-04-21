@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { authFetch } from "@kbouffe/module-core/ui";
 
 export interface MerchantReview {
     id: string;
@@ -38,7 +39,7 @@ export function useMerchantReviews(page = 1) {
     const load = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/restaurant/reviews?page=${page}`, { cache: "no-store" });
+            const res = await authFetch(`/api/restaurant/reviews?page=${page}`);
             if (!res.ok) throw new Error("Erreur");
             const data = await res.json() as any;
             setReviews(data.reviews ?? []);
@@ -65,7 +66,7 @@ export function useMerchantProductReviews(page = 1) {
     const load = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/restaurant/product-reviews?page=${page}`, { cache: "no-store" });
+            const res = await authFetch(`/api/restaurant/product-reviews?page=${page}`);
             if (!res.ok) throw new Error("Erreur");
             const data = await res.json() as any;
             setReviews(data.reviews ?? []);

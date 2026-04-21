@@ -105,6 +105,7 @@ export default function ShowcaseEditorPage() {
     useEffect(() => {
         if (!restaurant?.id) return;
         authFetch(`/api/products`)
+            .then(r => r.json())
             .then((data: any) => setProducts(Array.isArray(data) ? data : data.products ?? []))
             .catch(() => {});
     }, [restaurant?.id]);

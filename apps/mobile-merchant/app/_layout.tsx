@@ -46,6 +46,11 @@ export default function RootLayout() {
                     <Stack.Screen name="team" options={{ headerShown: false }} />
                     <Stack.Screen name="caisse" options={{ headerShown: false }} />
                     <Stack.Screen name="tables" options={{ headerShown: false }} />
+                    <Stack.Screen name="gift-cards" options={{ headerShown: false }} />
+                    <Stack.Screen name="analytics" options={{ headerShown: false }} />
+                    <Stack.Screen name="showcase" options={{ headerShown: false }} />
+                    <Stack.Screen name="marketplace" options={{ headerShown: false }} />
+                    <Stack.Screen name="support" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar style="auto" />
             </ThemeProvider>

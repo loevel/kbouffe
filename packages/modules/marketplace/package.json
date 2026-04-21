@@ -19,16 +19,17 @@
     "@kbouffe/module-core": "*",
     "@kbouffe/shared-types": "*",
     "hono": "^4.7.0",
+    "lucide-react": "^0.575.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "lucide-react": "^0.575.0",
-    "swr": "^2.3.3"
+    "swr": "^2.3.3",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250621.0",
+    "@types/node": "^20.10.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/node": "^20.10.0",
     "typescript": "^5"
   }
 }

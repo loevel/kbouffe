@@ -69,14 +69,16 @@ securityRoutes.post("/password", async (c) => {
 
 /** GET /security/sessions */
 securityRoutes.get("/sessions", async (c) => {
+    const now = new Date().toISOString();
     return c.json({
         sessions: [
             {
                 id: "current",
                 device: "Session actuelle",
-                location: "Inconnue",
-                lastActive: "Maintenant",
-                current: true,
+                ip_address: c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "Inconnue",
+                login_at: now,
+                last_activity: now,
+                is_current: true,
             },
         ],
     });

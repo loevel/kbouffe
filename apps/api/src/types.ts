@@ -37,6 +37,10 @@ export interface Env {
     MTN_KYC_SUBSCRIPTION_KEY?: string;
     MTN_KYC_BASE_URL?: string;
 
+    // ── Marketplace ─────────────────────────────────────────
+    /** Bearer secret for marketplace MTN webhook callbacks. */
+    MARKETPLACE_WEBHOOK_SECRET?: string;
+
     // ── Queues ─────────────────────────────────────────────
     SMS_QUEUE: Queue;
 
@@ -49,6 +53,8 @@ export interface Env {
     RESEND_API_KEY?: string;
     /** Public dashboard URL used in admin-generated links */
     DASHBOARD_URL?: string;
+    /** Durable Object namespace for distributed rate limiting */
+    RATE_LIMITER: DurableObjectNamespace;
 }
 
 /**

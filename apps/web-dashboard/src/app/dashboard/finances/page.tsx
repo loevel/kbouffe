@@ -122,7 +122,7 @@ export default function FinancesPage() {
                     <div className="xl:col-span-2">
                         <TransactionsTable transactions={data.transactions} />
                     </div>
-                    <PayoutsList payouts={data.payouts} />
+                    <PayoutsList />
                 </div>
             </div>
         </>

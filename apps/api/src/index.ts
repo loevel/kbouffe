@@ -31,7 +31,10 @@ const { menuRoute: menuRoutes, categoriesRoute: categoriesRoutes, productsRoute:
 import { storePublicRoutes } from "./modules/store/store-public";
 import { dashboardRoutes } from "./modules/store/dashboard";
 import { restaurantRoutes } from "./modules/store/restaurant";
-import { merchantExtrasRoutes } from "./modules/store/merchant-extras";
+import { analyticsRoutes } from "./modules/store/merchant-analytics";
+import { financesRoutes } from "./modules/store/merchant-finances";
+import { restaurantSupportRoutes } from "./modules/store/restaurant-support";
+import { merchantMarketplaceServicesRoutes } from "./modules/store/merchant-marketplace-services";
 import { marketplacePublicServicesRoutes } from "./modules/marketplace/public-services";
 import { cuisineCategoriesPublicRoutes } from "./modules/cuisine-categories";
 import { homepageSectionsPublicRoutes } from "./modules/homepage-sections";
@@ -60,6 +63,9 @@ const { teamRoutes, payoutsRoutes } = hrApi;
 import { chatApi } from "@kbouffe/module-chat";
 const { chatRoutes } = chatApi;
 import { notificationsRoutes } from "./modules/core/notifications";
+import { loyaltyRoutes } from "./modules/store/loyalty";
+import { upsellRoutes } from "./modules/store/upsell";
+import { galleryRoutes } from "./modules/store/gallery";
 import {
     customerReviewRoutes,
     merchantReviewRoutes,
@@ -83,6 +89,10 @@ import {
     traceRoutes,
     supplierAdminRoutes,
 } from "@kbouffe/module-marketplace";
+
+// ── Durable Objects ──────────────────────────────────────────────────
+export { RateLimiterDO } from "./lib/rate-limiter-do";
+import { checkRateLimit } from "./lib/rate-limiter-do";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Root app — health check lives at / (outside the /api scope)
@@ -145,21 +155,13 @@ api.route("/store", publicRestaurantReviewRoutes);          // public restaurant
 api.route("/coupons/validate", couponValidateRoutes);
 
 // SEC-011: Rate limiting on public coupon validation (5 req/min/IP — prevents brute-force)
-const couponRateLimiter = (() => {
-    const attempts = new Map<string, { count: number; resetAt: number }>();
-    return async (c: any, next: any) => {
-        const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
-        const now = Date.now();
-        const rec = attempts.get(ip);
-        if (!rec || now > rec.resetAt) {
-            attempts.set(ip, { count: 1, resetAt: now + 60_000 });
-        } else {
-            rec.count++;
-            if (rec.count > 5) return c.json({ valid: false, error: "Trop de tentatives. Réessayez dans 1 minute." }, 429);
-        }
-        await next();
-    };
-})();
+// Backed by Durable Object — shared across all isolates for correctness.
+const couponRateLimiter = async (c: any, next: any) => {
+    const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
+    const { allowed, retryAfter } = await checkRateLimit(c.env.RATE_LIMITER, `coupon:${ip}`, { windowMs: 60_000, maxRequests: 5 });
+    if (!allowed) return c.json({ valid: false, error: `Trop de tentatives. Réessayez dans ${retryAfter}s.` }, 429);
+    await next();
+};
 api.use("/coupons/validate/*", couponRateLimiter);
 api.route("/cuisine-categories", cuisineCategoriesPublicRoutes);
 api.route("/homepage-sections", homepageSectionsPublicRoutes);
@@ -184,40 +186,14 @@ api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
 api.route("/marketplace/suppliers", suppliersRoutes);      // annuaire + inscription
 
 // ── Rate limiting on authentication endpoints (CRIT-004) ────────────
-// In-process limiter: 10 attempts / minute per IP.
+// DO-backed sliding window: 10 attempts / minute per IP — correct across all isolates.
 // Complement with Cloudflare Rate Limiting Rules on /api/auth/* in production.
-const authRateLimiter = (() => {
-    const attempts = new Map<string, { count: number; resetAt: number }>();
-    return async (c: any, next: any) => {
-        const ip =
-            c.req.header("CF-Connecting-IP") ??
-            c.req.header("X-Forwarded-For") ??
-            "unknown";
-        const now = Date.now();
-        const WINDOW = 60_000;
-        const MAX = 10;
-        const rec = attempts.get(ip);
-        if (!rec || now > rec.resetAt) {
-            attempts.set(ip, { count: 1, resetAt: now + WINDOW });
-        } else {
-            rec.count++;
-            if (rec.count > MAX) {
-                return c.json(
-                    { error: "Trop de tentatives. Réessayez dans 1 minute." },
-                    429,
-                );
-            }
-        }
-        // Cleanup old entries periodically
-        if (attempts.size > 5000) {
-            const nowTs = Date.now();
-            for (const [k, v] of attempts) {
-                if (nowTs > v.resetAt) attempts.delete(k);
-            }
-        }
-        await next();
-    };
-})();
+const authRateLimiter = async (c: any, next: any) => {
+    const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
+    const { allowed, retryAfter } = await checkRateLimit(c.env.RATE_LIMITER, `auth:${ip}`, { windowMs: 60_000, maxRequests: 10 });
+    if (!allowed) return c.json({ error: `Trop de tentatives. Réessayez dans ${retryAfter}s.` }, 429);
+    await next();
+};
 
 api.use("/auth/*", authRateLimiter);
 api.use("/auth", authRateLimiter);
@@ -232,6 +208,7 @@ const merchantPaths = [
     "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
     "/caisse", "/supplier", "/analytics", "/finances",
+    "/loyalty", "/upsell-rules", "/gallery",
 ] as const;
 
 // Marketplace merchant routes (trace + product management) require auth
@@ -328,24 +305,27 @@ api.route("/zones", tableZonesRoutes);            // zones de salle
 api.route("/orders/zones", deliveryZonesRoutes);  // zones de livraison
 api.route("/dashboard", dashboardRoutes);
 api.route("/restaurant", restaurantRoutes);
-api.route("/restaurant", merchantExtrasRoutes);  // Additional merchant routes (support, export)
-api.route("/analytics", merchantExtrasRoutes);    // Analytics stats
-api.route("/finances", merchantExtrasRoutes);     // Finances summary
-api.route("/marketplace", merchantExtrasRoutes);  // Marketplace services
+api.route("/restaurant", restaurantSupportRoutes);  // support/tickets + export
+api.route("/analytics", analyticsRoutes);            // /stats
+api.route("/finances", financesRoutes);              // /summary
+api.route("/marketplace", merchantMarketplaceServicesRoutes);  // /services
 api.route("/account", usersRoutes);
 api.route("/security", securityRoutes);
 api.route("/register-restaurant", authRoutes);
 api.route("/kyc", authRoutes);
 api.route("/upload", uploadRoutes);
 api.route("/marketing", marketingRoutes);
+api.route("/coupons", couponsRoutes);
 api.route("/admin/email-templates", emailTemplatesRoutes);
 api.route("/notifications", notificationsRoutes);
 api.route("/payouts", payoutsRoutes);
 api.route("/payments/mtn", paymentRoutes);
 api.route("/ads", adsRoutes);
 api.route("/team", teamRoutes);
-api.route("/upload", uploadRoutes);
 api.route("/sms", smsRoutes);
+api.route("/loyalty", loyaltyRoutes);
+api.route("/upsell-rules", upsellRoutes);
+api.route("/gallery", galleryRoutes);
 api.route("/gift-cards", giftCardRoutes);
 api.route("/chat", chatRoutes);
 api.route("/reviews", customerReviewRoutes);

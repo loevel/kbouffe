@@ -265,7 +265,8 @@ export default function AnalyticsPage() {
         );
     }
 
-    const formatCFA = (n: number) => `${n.toLocaleString("fr-FR")} FCFA`;
+    const formatCFA = (n: number | null | undefined) =>
+        `${(n ?? 0).toLocaleString("fr-FR")} FCFA`;
 
     return (
         <div className="space-y-6">
@@ -395,9 +396,9 @@ export default function AnalyticsPage() {
                         <Sparkles size={16} className="text-purple-500" />
                         <h3 className="font-semibold text-surface-900 dark:text-white">Best-sellers</h3>
                     </div>
-                    {stats.bestSellers.length > 0 ? (
+                    {(stats.bestSellers ?? []).length > 0 ? (
                         <HorizontalBar
-                            items={stats.bestSellers.map(b => ({
+                            items={(stats.bestSellers ?? []).map(b => ({
                                 label: b.name,
                                 value: b.qty,
                                 sub: `(${formatCFA(b.revenue)})`,
@@ -426,7 +427,7 @@ export default function AnalyticsPage() {
                         <h3 className="font-semibold text-surface-900 dark:text-white">Par statut</h3>
                     </div>
                     <div className="space-y-2.5">
-                        {Object.entries(stats.ordersByStatus).map(([status, count]) => {
+                        {Object.entries(stats.ordersByStatus ?? {}).map(([status, count]) => {
                             const conf = STATUS_LABELS[status] ?? { label: status, color: "bg-surface-400" };
                             const pct = stats.totalOrders > 0 ? Math.round((count / stats.totalOrders) * 100) : 0;
                             return (
@@ -447,7 +448,7 @@ export default function AnalyticsPage() {
                         <h3 className="font-semibold text-surface-900 dark:text-white">Mode de commande</h3>
                     </div>
                     <div className="space-y-2.5">
-                        {Object.entries(stats.deliveryBreakdown).map(([method, count]) => {
+                        {Object.entries(stats.deliveryBreakdown ?? {}).map(([method, count]) => {
                             const pct = stats.totalOrders > 0 ? Math.round((count / stats.totalOrders) * 100) : 0;
                             return (
                                 <div key={method} className="flex items-center gap-3">
@@ -459,7 +460,7 @@ export default function AnalyticsPage() {
                                 </div>
                             );
                         })}
-                        {Object.keys(stats.deliveryBreakdown).length === 0 && (
+                        {Object.keys(stats.deliveryBreakdown ?? {}).length === 0 && (
                             <p className="text-sm text-surface-400 italic text-center py-4">Aucune donnee</p>
                         )}
                     </div>

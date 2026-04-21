@@ -9,6 +9,8 @@ export interface CollectionRequestInput {
     currency: string;
     externalId: string;
     payerMsisdn: string;
+    /** Optional — recipient MSISDN for direct-to-merchant payment flows. */
+    payeeMsisdn?: string | null;
     payerMessage: string;
     payeeNote: string;
 }

@@ -8,21 +8,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
-
-type OrderStatus = string;
-
-interface Order {
-    id: string;
-    order_number: string;
-    status: OrderStatus;
-    total_amount: number;
-    delivery_type: 'delivery' | 'pickup' | 'dine_in' | string;
-    created_at: string;
-    customer_name?: string;
-    customer_phone?: string;
-    items_count?: number;
-    table_number?: string;
-}
+import type { OrderRow } from '@/lib/types';
 
 interface StatusConfig {
     label: string;
@@ -47,7 +33,7 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
 
 const DEFAULT_STATUS_CONFIG: StatusConfig = { label: 'Statut inconnu', color: '#64748b', bg: '#f1f5f9' };
 
-const TERMINAL_STATUSES = new Set<OrderStatus>(['delivered', 'completed', 'cancelled', 'refunded']);
+const TERMINAL_STATUSES = new Set<string>(['delivered', 'completed', 'cancelled', 'refunded']);
 
 const STATUS_FALLBACKS: Record<string, string[]> = {
     out_for_delivery: ['delivering'],
@@ -68,7 +54,7 @@ function asAmount(value: unknown) {
     return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function mapOrderRow(row: Record<string, unknown>): Order {
+function mapOrderRow(row: Record<string, unknown>): OrderRow {
     return {
         id: typeof row.id === 'string' ? row.id : asOrderNumber(row),
         order_number: asOrderNumber(row),
@@ -86,11 +72,11 @@ function mapOrderRow(row: Record<string, unknown>): Order {
     };
 }
 
-function getStatusConfig(status: OrderStatus) {
+function getStatusConfig(status: string) {
     return STATUS_CONFIG[status] ?? DEFAULT_STATUS_CONFIG;
 }
 
-function getNextStatus(order: Order): OrderStatus | null {
+function getNextStatus(order: OrderRow): string | null {
     switch (order.status) {
         case 'pending':
             return 'accepted';
@@ -108,7 +94,7 @@ function getNextStatus(order: Order): OrderStatus | null {
     }
 }
 
-function getNextLabel(order: Order): string | null {
+function getNextLabel(order: OrderRow): string | null {
     switch (order.status) {
         case 'pending':
             return 'Accepter';
@@ -130,7 +116,7 @@ export default function OrdersScreen() {
     const { profile } = useAuth();
     const theme = useTheme();
     const router = useRouter();
-    const [orders, setOrders] = useState<Order[]>([]);
+    const [orders, setOrders] = useState<OrderRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -193,7 +179,7 @@ export default function OrdersScreen() {
         return () => { supabase.removeChannel(channel); };
     }, [profile?.restaurantId, fetchOrders]);
 
-    const advanceStatus = async (order: Order) => {
+    const advanceStatus = async (order: OrderRow) => {
         if (!profile?.restaurantId) return;
         const nextStatus = getNextStatus(order);
         const nextLabel = getNextLabel(order);
@@ -256,7 +242,7 @@ export default function OrdersScreen() {
 
     const s = styles(theme);
 
-    const renderOrder = ({ item }: { item: Order }) => {
+    const renderOrder = ({ item }: { item: OrderRow }) => {
         const cfg = getStatusConfig(item.status);
         const nextLabel = getNextLabel(item);
         const time = new Date(item.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -300,7 +286,14 @@ export default function OrdersScreen() {
         <SafeAreaView style={[s.container]} edges={['top']}>
             {/* Header */}
             <View style={s.header}>
-                <Text style={s.title}>Commandes</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <Text style={s.title}>Commandes</Text>
+                    <TouchableOpacity onPress={() => router.push('/kitchen')}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: theme.primary + '20', borderRadius: 8 }}>
+                            <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600' }}>👨‍🍳 Cuisine</Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
                 <View style={s.filterRow}>
                     {(['active', 'all'] as const).map((f) => (
                         <TouchableOpacity

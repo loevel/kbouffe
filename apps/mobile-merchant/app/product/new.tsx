@@ -18,18 +18,13 @@ import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
+import type { CategoryRow } from '@/lib/types';
 
 interface ProductCreateResponse {
     success: boolean;
     product: {
         id: string;
     };
-}
-
-interface Category {
-    id: string;
-    name: string;
-    sort_order?: number;
 }
 
 export default function NewProductScreen() {
@@ -43,7 +38,7 @@ export default function NewProductScreen() {
     const [price, setPrice] = useState('');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<CategoryRow[]>([]);
     const [showCategorySelector, setShowCategorySelector] = useState(false);
 
     const parsedPrice = Number.parseInt(price, 10);

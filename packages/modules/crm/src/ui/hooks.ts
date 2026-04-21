@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { authFetch } from "@kbouffe/module-core/ui";
 import { DashboardCustomer } from "./types";
 
 export function useCustomers() {
@@ -14,7 +15,7 @@ export function useCustomers() {
         async function loadCustomers() {
             setIsLoading(true);
             try {
-                const response = await fetch("/api/customers?limit=200", { cache: "no-store" });
+                const response = await authFetch("/api/customers?limit=200");
                 if (!response.ok) throw new Error("API customers indisponible");
 
                 const data = await response.json() as any;

@@ -5,6 +5,7 @@
  */
 import type { Context, Next } from "hono";
 import type { Env, Variables } from "../types";
+import { checkRateLimit } from "../lib/rate-limiter-do";
 
 type AdminCtx = Context<{ Bindings: Env; Variables: Variables }>;
 
@@ -12,8 +13,6 @@ type AdminCtx = Context<{ Bindings: Env; Variables: Variables }>;
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_MUTATIONS = 60;
-
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 export async function adminMutationRateLimiter(
     c: AdminCtx,
@@ -25,24 +24,14 @@ export async function adminMutationRateLimiter(
     }
 
     const userId = c.get("userId");
-    const now = Date.now();
-    const rec = rateLimitStore.get(userId);
+    const { allowed, retryAfter } = await checkRateLimit(
+        c.env.RATE_LIMITER,
+        `admin-mut:${userId}`,
+        { windowMs: RATE_WINDOW_MS, maxRequests: RATE_MAX_MUTATIONS },
+    );
 
-    if (!rec || now > rec.resetAt) {
-        rateLimitStore.set(userId, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    } else {
-        rec.count++;
-        if (rec.count > RATE_MAX_MUTATIONS) {
-            return c.json({ error: "Trop de requêtes. Veuillez patienter." }, 429);
-        }
-    }
-
-    // Periodic cleanup to prevent unbounded memory growth
-    if (rateLimitStore.size > 1000) {
-        const nowTs = Date.now();
-        for (const [k, v] of rateLimitStore) {
-            if (nowTs > v.resetAt) rateLimitStore.delete(k);
-        }
+    if (!allowed) {
+        return c.json({ error: `Trop de requêtes. Réessayez dans ${retryAfter}s.` }, 429);
     }
 
     await next();

@@ -10,28 +10,19 @@ import { Image } from 'expo-image';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import type { ProductRow } from '@/lib/types';
 
-interface Product {
+interface MenuSection {
     id: string;
     name: string;
-    description: string | null;
-    price: number;
-    is_available: boolean;
-    image_url: string | null;
-    category_id: string | null;
-}
-
-interface Category {
-    id: string;
-    name: string;
-    products: Product[];
+    products: ProductRow[];
 }
 
 export default function MenuScreen() {
     const { profile } = useAuth();
     const theme = useTheme();
     const router = useRouter();
-    const [sections, setSections] = useState<Category[]>([]);
+    const [sections, setSections] = useState<MenuSection[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -54,10 +45,10 @@ export default function MenuScreen() {
             console.log('Loaded categories:', catsRes.data?.length, 'products:', prodsRes.data?.length);
             const cats = catsRes.data ?? [];
             const prods = prodsRes.data ?? [];
-            const uncategorized = prods.filter((p: Product) => !p.category_id);
-            const result: Category[] = cats.map((c: any) => ({
+            const uncategorized = prods.filter((p: ProductRow) => !p.category_id);
+            const result: MenuSection[] = cats.map((c: any) => ({
                 ...c,
-                products: prods.filter((p: Product) => p.category_id === c.id),
+                products: prods.filter((p: ProductRow) => p.category_id === c.id),
             }));
             if (uncategorized.length > 0) result.push({ id: '_uncategorized', name: 'Sans catégorie', products: uncategorized });
             setSections(result.filter((s) => s.products.length > 0));
@@ -68,7 +59,7 @@ export default function MenuScreen() {
 
     useEffect(() => { fetchMenu().finally(() => setLoading(false)); }, [fetchMenu]);
 
-    const toggleAvailability = async (product: Product) => {
+    const toggleAvailability = async (product: ProductRow) => {
         const newVal = !product.is_available;
         setSections((prev) =>
             prev.map((s) => ({

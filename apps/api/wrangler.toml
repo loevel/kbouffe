@@ -16,6 +16,9 @@ bucket_name = "kbouffe-images"
 #   SUPABASE_ANON_KEY   — Your Supabase anon/public key
 #   SUPABASE_SERVICE_ROLE_KEY — For admin bypass
 
+[vars]
+ENVIRONMENT = "production"
+
 # ── SMS Queue ──────────────────────────────────────────────────────
 [[queues.producers]]
 binding = "SMS_QUEUE"
@@ -43,6 +46,15 @@ dead_letter_queue = "kbouffe-sms-dlq"
 # MTN_ADS_SUBSCRIPTION_KEY
 # MTN_KYC_SUBSCRIPTION_KEY
 
+
+# ── Durable Objects — Rate Limiter ────────────────────────────────
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiterDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiterDO"]
 
 # ── Workers AI ────────────────────────────────────────────────────
 [ai]

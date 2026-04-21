@@ -1,17 +1,23 @@
-export function formatCFA(amount: number): string {
-    return new Intl.NumberFormat("fr-FR").format(amount) + " FCFA";
+export function formatCFA(amount: number | null | undefined): string {
+    const value = typeof amount === "number" && Number.isFinite(amount) ? amount : 0;
+    return new Intl.NumberFormat("fr-FR").format(value) + " FCFA";
 }
 
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date | null | undefined): string {
+    if (date === null || date === undefined || date === "") return "—";
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return "—";
     return new Intl.DateTimeFormat("fr-FR", {
         day: "numeric",
         month: "short",
         year: "numeric",
-    }).format(new Date(date));
+    }).format(d);
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | null | undefined): string {
+    if (date === null || date === undefined || date === "") return "—";
     const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return "—";
     const dateStr = new Intl.DateTimeFormat("fr-FR", {
         day: "numeric",
         month: "short",

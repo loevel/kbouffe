@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
+import { CoreEnv as Env, CoreVariables as Variables } from '@kbouffe/module-core';
 import type { MarketplacePack } from '../lib/types.js';
 
-export const publicRoutes = new Hono();
+export const publicRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
  * GET /api/marketplace/packs
@@ -9,7 +10,7 @@ export const publicRoutes = new Hono();
  */
 publicRoutes.get('/packs', async (c) => {
   try {
-    const supabase = c.get('supabase');
+    const supabase = c.var.supabase;
     if (!supabase) {
       return c.json({ error: 'Service indisponible' }, 503);
     }
@@ -40,7 +41,7 @@ publicRoutes.get('/packs', async (c) => {
 publicRoutes.get('/packs/:id', async (c) => {
   try {
     const packId = c.req.param('id');
-    const supabase = c.get('supabase');
+    const supabase = c.var.supabase;
     if (!supabase) {
       return c.json({ error: 'Service indisponible' }, 503);
     }

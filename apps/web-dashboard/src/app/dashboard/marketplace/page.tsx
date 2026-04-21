@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Star, Megaphone, TrendingUp, CheckCircle2, Crown, Calendar, Image, Heart, Share2, Package, X, AlertCircle, CheckCircle, MapPin, Sparkles, Brain, Zap } from "lucide-react";
-import { Button, Card } from "@kbouffe/module-core/ui";
+import { Button, Card, authFetch } from "@kbouffe/module-core/ui";
 import { AnimatePresence, motion } from "framer-motion";
 
 const ICON_MAP: Record<string, any> = {
@@ -39,7 +39,7 @@ export default function MarketplacePage() {
         const fetchData = async () => {
             try {
                 // Fetch restaurant info for current user
-                const restaurantRes = await fetch("/api/restaurant");
+                const restaurantRes = await authFetch("/api/restaurant");
                 if (restaurantRes.ok) {
                     const restaurantData = await restaurantRes.json();
                     const resolvedRestaurantId = restaurantData?.restaurant?.id ?? restaurantData?.id ?? null;
@@ -47,7 +47,7 @@ export default function MarketplacePage() {
                 }
 
                 // Fetch packs
-                const response = await fetch("/api/marketplace/services");
+                const response = await authFetch("/api/marketplace/services");
                 if (response.ok) {
                     const data = await response.json();
                     setPacks(data.data || []);
@@ -85,7 +85,7 @@ export default function MarketplacePage() {
         setPurchaseStatus(null);
 
         try {
-            const response = await fetch("/api/marketplace/initiate-payment", {
+            const response = await authFetch("/api/marketplace/initiate-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

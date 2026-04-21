@@ -18,29 +18,14 @@ import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-
-interface Product {
-    id: string;
-    name: string;
-    description: string | null;
-    price: number;
-    category_id: string | null;
-    is_available: boolean;
-    image_url: string | null;
-}
-
-interface Category {
-    id: string;
-    name: string;
-    sort_order?: number;
-}
+import type { ProductRow, CategoryRow } from '@/lib/types';
 
 export default function ProductDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { session, profile } = useAuth();
     const router = useRouter();
     const theme = useTheme();
-    const [product, setProduct] = useState<Product | null>(null);
+    const [product, setProduct] = useState<ProductRow | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [name, setName] = useState('');
@@ -48,7 +33,7 @@ export default function ProductDetailScreen() {
     const [price, setPrice] = useState('');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<CategoryRow[]>([]);
     const [showCategorySelector, setShowCategorySelector] = useState(false);
     const [loadingCategories, setLoadingCategories] = useState(false);
 
@@ -61,7 +46,7 @@ export default function ProductDetailScreen() {
             return;
         }
 
-        apiFetch<{ product: Product }>(`/api/products/${id}`, session.access_token)
+        apiFetch<{ product: ProductRow }>(`/api/products/${id}`, session.access_token)
             .then((data) => {
                 setProduct(data.product);
                 setName(data.product.name);
@@ -160,7 +145,7 @@ export default function ProductDetailScreen() {
                 imageUrl = await uploadImage(selectedImage);
             }
 
-            await apiFetch<{ success: boolean; product: Product }>(`/api/products/${id}`, session.access_token, {
+            await apiFetch<{ success: boolean; product: ProductRow }>(`/api/products/${id}`, session.access_token, {
                 method: 'PATCH',
                 body: JSON.stringify({
                     name: name.trim(),

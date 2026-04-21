@@ -1,0 +1,483 @@
+/**
+ * Public order routes — guest order creation and tracking.
+ *
+ * POST /order       — create a guest order
+ * GET  /orders/:id  — track order by ID
+ */
+import { Hono } from "hono";
+import type { Env } from "../../types";
+import { getAdminClient, isMtnCollectionConfigured, requestMtnToPay } from "./store-helpers";
+
+export const storeOrdersRoutes = new Hono<{ Bindings: Env }>();
+
+const ALLOWED_DELIVERY_TYPES = ["delivery", "pickup", "dine_in"] as const;
+const ALLOWED_PAYMENT_METHODS = ["cash", "mobile_money_mtn", "mobile_money_orange", "gift_card"] as const;
+
+type DeliveryType = (typeof ALLOWED_DELIVERY_TYPES)[number];
+type PaymentMethod = (typeof ALLOWED_PAYMENT_METHODS)[number];
+
+// ── POST /order — create a guest order ────────────────────────────
+storeOrdersRoutes.post("/order", async (c) => {
+    try {
+        const body = await c.req.json<{
+            restaurantId: string;
+            customerId?: string;
+            items: Array<{
+                productId: string;
+                name: string;
+                price: number;
+                quantity: number;
+                options?: Array<{
+                    optionId?: string;
+                    valueId?: string;
+                    name: string;
+                    value: string;
+                    priceAdjustment: number;
+                }>;
+            }>;
+            deliveryType: DeliveryType;
+            deliveryAddress?: string;
+            tableNumber?: string;
+            customerName: string;
+            customerPhone: string;
+            paymentMethod: PaymentMethod;
+            subtotal: number;
+            deliveryFee: number;
+            total: number;
+            notes?: string;
+            externalDrinksCount?: number;
+            giftCardCode?: string;
+        }>();
+
+        // ── Validation ────────────────────────────────────────────
+        if (!body.restaurantId) return c.json({ error: "restaurantId requis" }, 400);
+        if (!body.items?.length) return c.json({ error: "La commande doit contenir au moins un article" }, 400);
+        if (!body.customerName?.trim()) return c.json({ error: "customerName requis" }, 400);
+        if (!body.customerPhone?.trim()) return c.json({ error: "customerPhone requis" }, 400);
+        if (!ALLOWED_DELIVERY_TYPES.includes(body.deliveryType)) return c.json({ error: "deliveryType invalide" }, 400);
+        if (!ALLOWED_PAYMENT_METHODS.includes(body.paymentMethod)) return c.json({ error: "paymentMethod invalide" }, 400);
+        if (body.paymentMethod === "gift_card" && !body.giftCardCode?.trim()) {
+            return c.json({ error: "Code carte cadeau requis" }, 400);
+        }
+
+        const supabase = getAdminClient(c.env);
+
+        // Fetch restaurant settings to compute server-side fees + loyalty
+        const { data: restSettings } = await supabase
+            .from("restaurants")
+            .select("dine_in_service_fee, corkage_fee_amount, min_order_amount, loyalty_enabled, loyalty_points_per_order, loyalty_point_value, delivery_fee, delivery_base_fee")
+            .eq("id", body.restaurantId)
+            .single();
+
+        const dineInServiceFee = restSettings?.dine_in_service_fee ?? 0;
+        const corkageFeeAmount = restSettings?.corkage_fee_amount ?? 0;
+
+        // SEC-002: Validate product prices from DB — never trust client-sent prices
+        const productIds = body.items.map(i => i.productId);
+        const { data: dbProducts } = await supabase
+            .from("products")
+            .select("id, price, dine_in_price, is_available, options")
+            .in("id", productIds)
+            .eq("restaurant_id", body.restaurantId);
+
+        if (!dbProducts || dbProducts.length !== productIds.length) {
+            return c.json({ error: "Un ou plusieurs produits sont invalides ou n'appartiennent pas à ce restaurant" }, 400);
+        }
+
+        const productMap = new Map(dbProducts.map(p => [p.id, p as { id: string; price: number; dine_in_price: number | null; is_available: boolean; options: any[] | null }]));
+
+        // Fetch option values prices from DB for price_adjustment validation (legacy valueId-based)
+        const allValueIds = body.items.flatMap(i => (i.options ?? []).map(o => o.valueId).filter(Boolean)) as string[];
+        const valueAdjustMap = new Map<string, number>();
+        if (allValueIds.length > 0) {
+            const { data: dbValues } = await supabase
+                .from("menu_item_option_values")
+                .select("id, price_adjustment")
+                .in("id", allValueIds);
+            for (const v of dbValues ?? []) {
+                valueAdjustMap.set(v.id, (v as any).price_adjustment ?? 0);
+            }
+        }
+
+        /** Compute extra price for a single option choice.
+         *  Prefers the DB-sourced valueId map (legacy), falls back to the
+         *  product's JSONB options to validate client-sent priceAdjustment. */
+        function resolveOptionPrice(
+            opt: { valueId?: string; name: string; value: string; priceAdjustment: number },
+            dbProduct: { options: any[] | null }
+        ): number {
+            if (opt.valueId) return valueAdjustMap.get(opt.valueId) ?? 0;
+            // Look up extra_price in the product's JSONB options (source of truth)
+            const optGroup = (dbProduct.options ?? []).find((o: any) => o.name === opt.name);
+            if (optGroup) {
+                const choice = (optGroup.choices ?? []).find((c: any) => c.label === opt.value);
+                if (choice) return (choice.extra_price ?? 0);
+            }
+            return 0;
+        }
+
+        // Compute subtotal server-side from DB prices
+        let computedSubtotal = 0;
+        for (const item of body.items) {
+            const dbProduct = productMap.get(item.productId);
+            if (!dbProduct) return c.json({ error: `Produit ${item.productId} introuvable` }, 400);
+            if (!dbProduct.is_available) return c.json({ error: `Le produit "${item.name}" n'est plus disponible` }, 400);
+
+            const basePrice = body.deliveryType === "dine_in" && dbProduct.dine_in_price
+                ? dbProduct.dine_in_price
+                : dbProduct.price;
+
+            let optionsTotal = 0;
+            for (const opt of item.options ?? []) {
+                optionsTotal += resolveOptionPrice(opt, dbProduct);
+            }
+            computedSubtotal += (basePrice + optionsTotal) * item.quantity;
+        }
+
+        if (restSettings?.min_order_amount && computedSubtotal < restSettings.min_order_amount) {
+            return c.json({ error: `Montant minimum de commande : ${restSettings.min_order_amount} FCFA` }, 400);
+        }
+
+        // SEC-008: Compute server-side fees using validated subtotal + server-side delivery fee
+        const serviceFee = body.deliveryType === "dine_in"
+            ? Math.round(computedSubtotal * dineInServiceFee / 100)
+            : 0;
+        const externalDrinksCount = Math.max(0, Number(body.externalDrinksCount ?? 0));
+        const corkageFee = externalDrinksCount > 0
+            ? corkageFeeAmount * externalDrinksCount
+            : 0;
+        // Delivery fee: free for dine_in/pickup, otherwise from restaurant config
+        const serverDeliveryFee = (body.deliveryType === "dine_in" || body.deliveryType === "pickup")
+            ? 0
+            : (restSettings?.delivery_fee ?? restSettings?.delivery_base_fee ?? 0);
+        const computedTotal = computedSubtotal + serverDeliveryFee + serviceFee + corkageFee;
+
+        // ── Validation carte cadeau (si fournie) ──────────────────────────
+        let giftCardId: string | null = null;
+        let giftCardAmount = 0;
+        let finalTotal = computedTotal;
+        let finalPaymentMethod: PaymentMethod | "mixed" = body.paymentMethod;
+        let finalPaymentStatus: "pending" | "paid" = "pending";
+
+        if (body.giftCardCode?.trim()) {
+            const giftCardCode = body.giftCardCode.trim().toUpperCase();
+
+            const { data: giftCard, error: gcError } = await supabase
+                .from("gift_cards")
+                .select("id, current_balance, expires_at, is_active")
+                .eq("restaurant_id", body.restaurantId)
+                .eq("code", giftCardCode)
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (gcError) {
+                console.error("[POST /store/order] Gift card query error:", gcError);
+                return c.json({ error: "Erreur lors de la validation de la carte cadeau" }, 500);
+            }
+
+            if (!giftCard) {
+                return c.json({ error: "Code carte cadeau invalide ou inactif" }, 400);
+            }
+
+            if (giftCard.expires_at && new Date(giftCard.expires_at) < new Date()) {
+                return c.json({ error: "Cette carte cadeau a expiré" }, 400);
+            }
+
+            if (giftCard.current_balance <= 0) {
+                return c.json({ error: "Le solde de cette carte cadeau est épuisé" }, 400);
+            }
+
+            giftCardId = giftCard.id as string;
+            giftCardAmount = Math.min(giftCard.current_balance as number, computedTotal);
+            finalTotal = computedTotal - giftCardAmount;
+            if (body.paymentMethod === "gift_card") {
+                finalPaymentMethod = finalTotal > 0 ? "mixed" : "gift_card";
+                finalPaymentStatus = finalTotal > 0 ? "pending" : "paid";
+            }
+        }
+
+        // 1. Create the Order
+        const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .insert({
+                restaurant_id: body.restaurantId,
+                customer_id: body.customerId ?? null,
+                customer_name: body.customerName.trim(),
+                customer_phone: body.customerPhone.trim(),
+                items: body.items, // Keep JSON for backward compatibility / quick view
+                subtotal: computedSubtotal,
+                delivery_fee: serverDeliveryFee,
+                service_fee: serviceFee,
+                corkage_fee: corkageFee,
+                external_drinks_count: externalDrinksCount,
+                total: finalTotal,
+                gift_card_id: giftCardId,
+                gift_card_amount: giftCardAmount,
+                loyalty_points_earned: 0,
+                status: "pending",
+                delivery_type: body.deliveryType,
+                delivery_address: body.deliveryAddress ?? null,
+                payment_method: finalPaymentMethod,
+                payment_status: finalPaymentStatus,
+                notes: body.notes ?? null,
+                table_number: body.tableNumber ?? null,
+            } as any)
+            .select("id")
+            .single();
+
+        if (orderError || !order) {
+            console.error("[POST /store/order] Supabase order error:", orderError);
+            return c.json({ error: "Erreur lors de la création de la commande" }, 500);
+        }
+
+        const orderId = (order as { id: string }).id;
+
+        // 2. Create Order Items and Options
+        for (const item of body.items) {
+            const dbProduct = productMap.get(item.productId)!;
+            const basePrice = body.deliveryType === "dine_in" && dbProduct.dine_in_price
+                ? dbProduct.dine_in_price
+                : dbProduct.price;
+            let optionsTotal = 0;
+            for (const opt of item.options ?? []) {
+                optionsTotal += resolveOptionPrice(opt, dbProduct);
+            }
+            const validatedItemPrice = basePrice + optionsTotal;
+
+            const { data: orderItem, error: itemError } = await supabase
+                .from("order_items")
+                .insert({
+                    order_id: orderId,
+                    product_id: item.productId,
+                    name: item.name,
+                    price: validatedItemPrice,
+                    quantity: item.quantity,
+                    subtotal: validatedItemPrice * item.quantity,
+                } as any)
+                .select("id")
+                .single();
+
+            if (itemError || !orderItem) {
+                console.error("[POST /store/order] Supabase item error:", itemError);
+                // We don't fail the whole request since order is created, but we should log
+                continue;
+            }
+
+            if (item.options?.length) {
+                const optionsToInsert = item.options.map(opt => ({
+                    order_item_id: orderItem.id,
+                    option_id: opt.optionId ?? null,
+                    value_id: opt.valueId ?? null,
+                    name: opt.name,
+                    value: opt.value,
+                    price_adjustment: opt.priceAdjustment
+                }));
+
+                const { error: optionsError } = await supabase
+                    .from("order_item_options")
+                    .insert(optionsToInsert as any);
+
+                if (optionsError) {
+                    console.error("[POST /store/order] Supabase options error:", optionsError);
+                }
+            }
+        }
+
+        // 3. Déduire le solde de la carte cadeau et enregistrer le mouvement
+        if (giftCardId && giftCardAmount > 0) {
+            // Récupérer le solde actuel pour calculer le solde restant
+            const { data: gcCurrent } = await supabase
+                .from("gift_cards")
+                .select("current_balance")
+                .eq("id", giftCardId)
+                .single();
+
+            const balanceBefore = (gcCurrent?.current_balance as number) ?? giftCardAmount;
+            const balanceAfter = balanceBefore - giftCardAmount;
+
+            // Décrémenter le solde
+            await supabase
+                .from("gift_cards")
+                .update({
+                    current_balance: balanceAfter,
+                    is_active: balanceAfter > 0, // désactiver si épuisée
+                    updated_at: new Date().toISOString(),
+                } as any)
+                .eq("id", giftCardId);
+
+            // Enregistrer le mouvement
+            await supabase
+                .from("gift_card_movements")
+                .insert({
+                    id: crypto.randomUUID(),
+                    gift_card_id: giftCardId,
+                    order_id: orderId,
+                    amount: -giftCardAmount,
+                    balance_after: balanceAfter,
+                    type: "redeem",
+                    note: `Commande ${orderId}`,
+                    created_at: new Date().toISOString(),
+                } as any);
+        }
+
+        // 4. Award loyalty points if program is enabled and customer is identified
+        let loyaltyPointsEarned = 0;
+        if (
+            restSettings?.loyalty_enabled &&
+            body.customerId &&
+            (restSettings?.loyalty_points_per_order ?? 0) > 0
+        ) {
+            const pointsPerOrder = restSettings.loyalty_points_per_order ?? 10;
+            const pointValue = restSettings.loyalty_point_value ?? 1;
+            loyaltyPointsEarned = pointsPerOrder;
+            const creditAmount = pointsPerOrder * pointValue;
+
+            // Record wallet movement
+            const { error: walletErr } = await supabase
+                .from("wallet_movements")
+                .insert({
+                    user_id: body.customerId,
+                    type: "credit",
+                    amount: creditAmount,
+                    reason: "loyalty",
+                    description: `${pointsPerOrder} points de fidélité`,
+                    order_id: orderId,
+                } as any);
+
+            if (!walletErr) {
+                // Increment user wallet balance
+                await supabase.rpc("increment_wallet_balance", {
+                    input_user_id: body.customerId,
+                    amount: creditAmount,
+                });
+
+                // Update order with earned points
+                await supabase
+                    .from("orders")
+                    .update({ loyalty_points_earned: loyaltyPointsEarned } as any)
+                    .eq("id", orderId);
+            } else {
+                console.error("[POST /store/order] Loyalty wallet error:", walletErr);
+            }
+        }
+
+        let payment: {
+            provider: "mtn_momo";
+            referenceId: string;
+            status: "pending" | "failed";
+            error?: string;
+        } | null = null;
+
+        if (body.paymentMethod === "mobile_money_mtn") {
+            if (!isMtnCollectionConfigured(c.env)) {
+                payment = {
+                    provider: "mtn_momo",
+                    referenceId: "",
+                    status: "failed",
+                    error: "Configuration MTN manquante",
+                };
+            } else {
+                const referenceId = crypto.randomUUID();
+                const externalId = `order-${orderId}`;
+                const payerMsisdn = body.customerPhone.trim();
+
+                const { data: tx, error: txError } = await supabase
+                    .from("payment_transactions")
+                    .insert({
+                        restaurant_id: body.restaurantId,
+                        order_id: orderId,
+                        provider: "mtn_momo",
+                        reference_id: referenceId,
+                        external_id: externalId,
+                        payer_msisdn: payerMsisdn,
+                        amount: computedTotal,
+                        currency: "XAF",
+                        status: "pending",
+                        provider_status: "PENDING",
+                    } as any)
+                    .select("id")
+                    .single();
+
+                if (txError || !tx) {
+                    payment = {
+                        provider: "mtn_momo",
+                        referenceId,
+                        status: "failed",
+                        error: "Impossible de créer la transaction MTN",
+                    };
+                } else {
+                    try {
+                        await requestMtnToPay(c.env, {
+                            referenceId,
+                            amount: computedTotal,
+                            externalId,
+                            payerMsisdn,
+                            payerMessage: "Paiement commande Kbouffe",
+                            payeeNote: `Commande ${orderId}`,
+                        });
+
+                        payment = {
+                            provider: "mtn_momo",
+                            referenceId,
+                            status: "pending",
+                        };
+                    } catch (paymentError) {
+                        const errorMessage = paymentError instanceof Error ? paymentError.message : "Erreur paiement MTN";
+                        await supabase
+                            .from("payment_transactions")
+                            .update({
+                                status: "failed",
+                                provider_status: "FAILED",
+                                failed_reason: errorMessage,
+                                provider_response: { error: errorMessage },
+                                updated_at: new Date().toISOString(),
+                            } as any)
+                            .eq("id", tx.id);
+
+                        await supabase
+                            .from("orders")
+                            .update({ payment_status: "failed", updated_at: new Date().toISOString() } as any)
+                            .eq("id", orderId);
+
+                        payment = {
+                            provider: "mtn_momo",
+                            referenceId,
+                            status: "failed",
+                            error: errorMessage,
+                        };
+                    }
+                }
+            }
+        }
+
+        return c.json({ success: true, orderId, serviceFee, corkageFee, total: finalTotal, giftCardAmount, loyaltyPointsEarned, payment }, 201);
+    } catch (error) {
+        console.error("[POST /store/order] Unexpected error:", error);
+        return c.json({ error: "Erreur serveur" }, 500);
+    }
+});
+
+// ── GET /orders/:id — track order by UUID ─────────────────────────
+storeOrdersRoutes.get("/orders/:id", async (c) => {
+    try {
+        const id = c.req.param("id");
+        if (!id || id.length < 10) return c.json({ error: "ID de commande invalide" }, 400);
+
+        const supabase = getAdminClient(c.env);
+
+        const { data: order, error } = await supabase
+            .from("orders")
+            .select(
+                "id, status, payment_status, delivery_type, delivery_address, customer_name, customer_phone, items, subtotal, delivery_fee, service_fee, total, created_at, updated_at, notes, table_number, restaurant_id, preparation_time_minutes, scheduled_for, delivered_at, delivery_note",
+            )
+            .eq("id", id)
+            .single();
+
+        if (error || !order) return c.json({ error: "Commande introuvable" }, 404);
+
+        return c.json({ order });
+    } catch (error) {
+        console.error("[GET /store/orders/:id] error:", error);
+        return c.json({ error: "Erreur serveur" }, 500);
+    }
+});

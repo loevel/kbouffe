@@ -12,6 +12,9 @@ compatibility_flags = ["nodejs_compat"]
 # Variables définies dans .dev.vars :
 #   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
+[vars]
+ENVIRONMENT = "development"
+
 # --- R2 bucket (Images) — désactivé en local ---
 # [[r2_buckets]]
 # binding = "IMAGES_BUCKET"

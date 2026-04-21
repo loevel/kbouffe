@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
+import { CoreEnv as Env, CoreVariables as Variables } from '@kbouffe/module-core';
 import type { MarketplaceWebhookPayload } from '../lib/types.js';
 import { validateWebhookPayload } from '../lib/validation.js';
 
-export const webhookRoutes = new Hono();
+export const webhookRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
  * POST /api/marketplace/webhook/mtn
@@ -13,14 +14,14 @@ webhookRoutes.post('/mtn', async (c) => {
   try {
     // Vérifier la signature/un token secret
     const authorization = c.req.header('Authorization');
-    const expectedSecret = c.env?.MARKETPLACE_WEBHOOK_SECRET;
+    const expectedSecret = c.env.MARKETPLACE_WEBHOOK_SECRET;
 
     if (!expectedSecret || authorization !== `Bearer ${expectedSecret}`) {
       console.warn('Unauthorized webhook call');
       return c.json({ error: 'Non autorisé' }, 401);
     }
 
-    const supabase = c.get('supabase');
+    const supabase = c.var.supabase;
     if (!supabase) {
       return c.json({ error: 'Service indisponible' }, 503);
     }
@@ -61,11 +62,11 @@ webhookRoutes.post('/mtn', async (c) => {
         return c.json({ error: 'Erreur serveur' }, 500);
       }
 
-      // Annuler la souscription via stored procedure
-      await supabase.rpc('marketplace_cancel_on_payment_failure', {
+      // Annuler la souscription via stored procedure (best-effort)
+      supabase.rpc('marketplace_cancel_on_payment_failure', {
         p_reference_id: reference_id,
-      }).catch((err) => {
-        console.error('Error cancelling subscription on payment failure:', err);
+      }).then(({ error: rpcErr }) => {
+        if (rpcErr) console.error('Error cancelling subscription on payment failure:', rpcErr);
       });
 
       return c.json({ success: true, message: 'Paiement marqué comme échoué' });

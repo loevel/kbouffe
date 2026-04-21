@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Phone, Mail, ShoppingBag, TrendingUp, Calendar, ExternalLink, UserCircle, Star, Save, Tag, AlertCircle } from "lucide-react";
-import { Card, Button, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Spinner, EmptyState, Input, Textarea, Select, toast } from "@kbouffe/module-core/ui";
+import { Card, Button, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Spinner, EmptyState, Input, Textarea, Select, toast, authFetch } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { formatCFA, formatDate, formatPhone, formatOrderId } from "@kbouffe/module-core/ui";
 
@@ -47,7 +47,7 @@ export default function CustomerDetailPage() {
         async function load() {
             setLoading(true);
             try {
-                const res = await fetch(`/api/customers/${customerId}`, { cache: "no-store" });
+                const res = await authFetch(`/api/customers/${customerId}`);
                 if (!res.ok) throw new Error("API error");
                 const json = await res.json();
                 setData(json);
@@ -66,7 +66,7 @@ export default function CustomerDetailPage() {
     const handleSaveInfo = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`/api/customers/${customerId}`, {
+            const res = await authFetch(`/api/customers/${customerId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ segment, internalNotes: notes }),

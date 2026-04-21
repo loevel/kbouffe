@@ -3,7 +3,9 @@ import type { Env, Variables } from "../../types";
 import { requireDomain } from "../../lib/admin-rbac";
 
 import { adminUsersRoutes } from "./users";
-import { adminRestaurantsRoutes } from "./restaurants";
+import { restaurantsCrudRoutes } from "./restaurants-crud";
+import { restaurantsKycRoutes } from "./restaurants-kyc";
+import { restaurantsModerationRoutes } from "./restaurants-moderation";
 import { adminSupportRoutes } from "./support";
 import { adminBillingRoutes } from "./billing";
 import { adminModerationRoutes } from "./moderation";
@@ -435,7 +437,9 @@ adminRoutes.get("/stats/charts", async (c) => {
 
 // Mount the sub-routes
 adminRoutes.route("/users", adminUsersRoutes);
-adminRoutes.route("/restaurants", adminRestaurantsRoutes);
+adminRoutes.route("/restaurants", restaurantsCrudRoutes);
+adminRoutes.route("/restaurants", restaurantsKycRoutes);
+adminRoutes.route("/restaurants", restaurantsModerationRoutes);
 // adminRoutes.route("/drivers", adminDriversRoutes); // Decommissioned legacy global drivers
 adminRoutes.route("/support", adminSupportRoutes);
 adminRoutes.route("/billing", adminBillingRoutes);
