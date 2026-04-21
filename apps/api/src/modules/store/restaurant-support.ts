@@ -22,7 +22,30 @@ restaurantSupportRoutes.post("/support/tickets", async (c) => {
     const restaurantId = c.var.restaurantId;
     const userId = c.var.userId;
     const supabase = c.var.supabase;
-    const body = await c.req.json();
+
+    let body: { subject?: string; description?: string; priority?: string; category?: string; type?: string };
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: "Corps de la requête invalide" }, 400);
+    }
+
+    if (!body.subject?.trim() || !body.description?.trim()) {
+        return c.json({ error: "Sujet et description requis" }, 400);
+    }
+
+    // Map frontend category values to the type enum allowed by the DB CHECK constraint
+    const categoryToType: Record<string, string> = {
+        billing: "payment",
+        technical: "technical",
+        account: "account",
+        feature: "other",
+        urgent: "other",
+        general: "general",
+    };
+    const resolvedType = body.type || categoryToType[body.category ?? ""] || "general";
+    const validPriorities = ["low", "medium", "high", "urgent"];
+    const resolvedPriority = validPriorities.includes(body.priority ?? "") ? body.priority! : "medium";
 
     const { data, error } = await supabase
         .from("support_tickets")
@@ -30,17 +53,21 @@ restaurantSupportRoutes.post("/support/tickets", async (c) => {
             restaurant_id: restaurantId,
             reporter_id: userId,
             reporter_type: "restaurant",
-            subject: body.subject,
-            description: body.description,
-            type: body.type || "general",
+            subject: body.subject.trim(),
+            description: body.description.trim(),
+            type: resolvedType,
+            category: body.category || null,
             status: "open",
-            priority: body.priority || "normal",
+            priority: resolvedPriority,
         })
         .select()
         .single();
 
-    if (error) return c.json({ error: "Erreur lors de la création du ticket" }, 500);
-    return c.json(data, 201);
+    if (error) {
+        console.error("[support/tickets POST] Supabase error:", error);
+        return c.json({ error: "Erreur lors de la création du ticket" }, 500);
+    }
+    return c.json({ ticket: data }, 201);
 });
 
 restaurantSupportRoutes.get("/export/:type", async (c) => {
