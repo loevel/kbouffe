@@ -65,12 +65,13 @@ interface CogsPriceData {
  */
 router.get("/forecast", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get all products
     const { data: products } = await supabase
@@ -138,14 +139,15 @@ router.get("/forecast", async (c: any) => {
  */
 router.get("/price-suggestions", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     const targetMargin = parseFloat(c.req.query("targetMargin") || "30");
 
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get products with COGS (from products table)
     // NOTE: COGS would come from a supplier_costs table in Phase 2 migration
@@ -194,14 +196,15 @@ router.get("/price-suggestions", async (c: any) => {
  */
 router.get("/margin-alerts", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     const targetMargin = parseFloat(c.req.query("targetMargin") || "30");
 
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get products
     const { data: products } = await supabase
@@ -286,12 +289,13 @@ router.get("/margin-alerts", async (c: any) => {
  */
 router.get("/cogs-analysis", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get products
     const { data: products } = await supabase
@@ -373,7 +377,7 @@ router.get("/cogs-analysis", async (c: any) => {
  */
 router.post("/apply-price-change", async (c) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     const body = await c.req.json() as {
       products: Array<{ productId: string; newPrice: number }>;
     };
@@ -382,7 +386,8 @@ router.post("/apply-price-change", async (c) => {
       return c.json({ error: "Invalid request" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Bulk update prices
     const updates = body.products.map((p: any) =>

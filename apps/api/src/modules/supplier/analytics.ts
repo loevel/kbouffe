@@ -67,12 +67,13 @@ interface SalesVelocity {
  */
 router.get("/metrics", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get total sales & orders (last 30 days)
     const thirtyDaysAgo = new Date();
@@ -123,12 +124,13 @@ router.get("/metrics", async (c: any) => {
  */
 router.get("/products", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -198,12 +200,13 @@ router.get("/products", async (c: any) => {
  */
 router.get("/buyers", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -283,12 +286,13 @@ router.get("/buyers", async (c: any) => {
  */
 router.get("/categories", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -360,14 +364,15 @@ router.get("/categories", async (c: any) => {
  */
 router.get("/sales-velocity", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     const period = c.req.query("period") || "daily"; // daily, weekly, monthly
 
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
     const daysBack = period === "monthly" ? 90 : period === "weekly" ? 30 : 7;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
@@ -432,12 +437,13 @@ router.get("/sales-velocity", async (c: any) => {
  */
 router.get("/stock", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get all products (NOTE: schema doesn't have stock levels yet)
     // This is a placeholder for future inventory feature

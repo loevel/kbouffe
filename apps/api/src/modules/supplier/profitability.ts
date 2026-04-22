@@ -64,12 +64,13 @@ interface MarketIntelligence {
  */
 router.get("/margin-heatmap", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -176,12 +177,13 @@ router.get("/margin-heatmap", async (c: any) => {
  */
 router.get("/pricing-rules", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: products } = await supabase
       .from("products")
@@ -226,12 +228,13 @@ router.get("/pricing-rules", async (c: any) => {
  */
 router.get("/cross-sell", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -309,12 +312,13 @@ router.get("/cross-sell", async (c: any) => {
  */
 router.get("/market-intelligence", async (c: any) => {
   try {
-    const supplierId = c.req.query("supplierId");
+    const supplierId = c.var.restaurantId;
     if (!supplierId) {
       return c.json({ error: "supplierId required" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY || c.env.SUPABASE_ANON_KEY);
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
+    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
 
     // Get product categories
     const { data: products } = await supabase
