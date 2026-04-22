@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminUsersRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -41,7 +41,8 @@ adminUsersRoutes.post("/", async (c) => {
     const denied = requireDomain(c, "users:write");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const result = createUserSchema.safeParse(body);
 
     if (!result.success) {
@@ -51,11 +52,7 @@ adminUsersRoutes.post("/", async (c) => {
     const { email, password, fullName, phone, role, adminRole } = result.data;
 
     // 1. Create in Supabase Auth via Admin API
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) {
-        return c.json({ error: "Configuration admin manquante (Service Role Key)" }, 500);
-    }
-
-    const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+    const supabaseAdmin = c.var.supabase;
     
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
@@ -123,7 +120,7 @@ adminUsersRoutes.get("/", async (c) => {
     const sortField = c.req.query("sort") ?? "created_at";
     const sortOrder = c.req.query("order") ?? "desc";
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     
     let query = supabase
         .from("users")
@@ -196,7 +193,7 @@ adminUsersRoutes.get("/:id", async (c) => {
     const id = c.req.param("id");
     
     // Fetch from Supabase (Source of Truth)
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     
     // Fetch user separately, then restaurant if needed
     const { data: user, error } = await supabase
@@ -279,7 +276,8 @@ adminUsersRoutes.patch("/:id", async (c) => {
     // Prevent editing own admin role (safety)
     if (id === c.get("userId")) return c.json({ error: "Impossible de modifier son propre compte admin" }, 400);
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const updates: Record<string, any> = {
         updated_at: new Date().toISOString()
     };
@@ -291,7 +289,7 @@ adminUsersRoutes.patch("/:id", async (c) => {
     
     if (Object.keys(updates).length <= 1) return c.json({ error: "Aucun champ valide fourni" }, 400);
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const { data: updated, error } = await supabase
         .from("users")
         .update(updates)
@@ -330,7 +328,7 @@ adminUsersRoutes.delete("/:id", async (c) => {
 
     if (id === c.get("userId")) return c.json({ error: "Impossible de supprimer son propre compte admin" }, 400);
 
-    const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabaseAdmin = c.var.supabase;
 
     // 1. Delete from Supabase Auth
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
@@ -357,7 +355,7 @@ adminUsersRoutes.post("/:id/reset-password", async (c) => {
     if (denied) return denied;
     const id = c.req.param("id");
 
-    const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabaseAdmin = c.var.supabase;
 
     // Get user email first
     const { data: user, error: fetchError } = await supabaseAdmin
@@ -389,7 +387,7 @@ adminUsersRoutes.post("/:id/impersonate", async (c) => {
     if (denied) return denied;
     const id = c.req.param("id");
 
-    const supabaseAdmin = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabaseAdmin = c.var.supabase;
 
     // Fetch user to ensure existence
     const { data: user, error: fetchError } = await supabaseAdmin

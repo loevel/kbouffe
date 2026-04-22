@@ -6,6 +6,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const restaurantRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -86,7 +87,8 @@ restaurantRoutes.patch("/", async (c) => {
     const restaurantId = c.var.restaurantId;
     const supabase = c.var.supabase;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     // Validate tracking IDs before storing (SEC-004: prevent XSS via dangerouslySetInnerHTML)
     const gaId = body.googleAnalyticsId ?? body.google_analytics_id;
@@ -318,7 +320,8 @@ restaurantRoutes.patch("/branding", async (c) => {
     const restaurantId = c.var.restaurantId;
     const supabase = c.var.supabase;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     const { data, error } = await supabase
         .from("restaurants")
@@ -370,7 +373,8 @@ restaurantRoutes.patch("/dine-in", async (c) => {
     const restaurantId = c.var.restaurantId;
     const supabase = c.var.supabase;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     // First get current settings to merge
     const { data: current } = await supabase
@@ -432,7 +436,8 @@ restaurantRoutes.patch("/showcase", async (c) => {
     const restaurantId = c.var.restaurantId;
     const supabase = c.var.supabase;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     const { data, error } = await supabase
         .from("restaurants")

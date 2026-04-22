@@ -1,8 +1,9 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 const MAX_EXPORT_ROWS_PER_TABLE = 50_000;
 const MAX_HISTORY_LIMIT = 50;
@@ -36,10 +37,6 @@ const updateRestoreRequestSchema = z.object({
     status: z.enum(["approved", "rejected", "completed", "cancelled"]),
     review_notes: z.string().trim().min(3, "Ajoutez une note de revue").max(2_000),
 });
-
-function getAdminClient(env: Env) {
-    return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY as string);
-}
 
 function isValidDateInput(value: string | undefined): value is string {
     if (!value) return false;
@@ -91,13 +88,12 @@ function serializeCsv(rows: Array<Record<string, unknown>>): string {
 }
 
 async function updateBackupJob(
-    env: Env,
+    supabase: SupabaseClient,
     jobId: string | null,
     updates: Record<string, unknown>,
 ): Promise<void> {
     if (!jobId) return;
 
-    const supabase = getAdminClient(env);
     await (supabase.from("admin_backup_jobs" as never) as any)
         .update(updates)
         .eq("id", jobId);
@@ -109,7 +105,7 @@ adminBackupRoutes.get("/stats", async (c) => {
     const denied = requireDomain(c, "system");
     if (denied) return denied;
 
-    const supabase = getAdminClient(c.env);
+    const supabase = c.var.supabase;
 
     const tableCounts = await Promise.all(
         (Object.keys(EXPORTABLE_TABLES) as ExportableTable[]).map(async (table) => {
@@ -157,7 +153,7 @@ adminBackupRoutes.get("/history", async (c) => {
         Math.max(1, Number.parseInt(c.req.query("limit") ?? "10", 10) || 10),
     );
 
-    const supabase = getAdminClient(c.env);
+    const supabase = c.var.supabase;
     const { data, error } = await (supabase.from("admin_backup_jobs" as never) as any)
         .select("id, tables, format, status, date_from, date_to, row_count, file_name, file_size_bytes, error_message, created_at, completed_at")
         .order("created_at", { ascending: false })
@@ -194,7 +190,7 @@ adminBackupRoutes.get("/restore-requests", async (c) => {
         Math.max(1, Number.parseInt(c.req.query("limit") ?? "10", 10) || 10),
     );
 
-    const supabase = getAdminClient(c.env);
+    const supabase = c.var.supabase;
     const { data, error } = await (supabase.from("admin_restore_requests" as never) as any)
         .select("id, backup_job_id, restore_scope, source_reference, reason, status, review_notes, created_at, updated_at, reviewed_at")
         .order("created_at", { ascending: false })
@@ -224,12 +220,14 @@ adminBackupRoutes.post("/restore-requests", async (c) => {
     const denied = requireDomain(c, "system");
     if (denied) return denied;
 
-    const payload = restoreRequestSchema.safeParse(await c.req.json());
+    const raw = await parseBody(c);
+    if (!raw) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const payload = restoreRequestSchema.safeParse(raw);
     if (!payload.success) {
         return c.json({ error: payload.error.issues[0]?.message ?? "Données invalides" }, 400);
     }
 
-    const supabase = getAdminClient(c.env);
+    const supabase = c.var.supabase;
     const { data, error } = await (supabase.from("admin_restore_requests" as never) as any)
         .insert({
             backup_job_id: payload.data.backup_job_id ?? null,
@@ -270,13 +268,15 @@ adminBackupRoutes.patch("/restore-requests/:id", async (c) => {
     const denied = requireDomain(c, "system");
     if (denied) return denied;
 
-    const payload = updateRestoreRequestSchema.safeParse(await c.req.json());
+    const raw = await parseBody(c);
+    if (!raw) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const payload = updateRestoreRequestSchema.safeParse(raw);
     if (!payload.success) {
         return c.json({ error: payload.error.issues[0]?.message ?? "Données invalides" }, 400);
     }
 
     const requestId = c.req.param("id");
-    const supabase = getAdminClient(c.env);
+    const supabase = c.var.supabase;
 
     const { data, error } = await (supabase.from("admin_restore_requests" as never) as any)
         .update({
@@ -340,7 +340,7 @@ adminBackupRoutes.get("/export", async (c) => {
         return c.json({ error: "La date de début doit être antérieure à la date de fin" }, 400);
     }
 
-    const supabase = getAdminClient(c.env);
+    const supabase = c.var.supabase;
     const startedAt = new Date().toISOString();
 
     const { data: backupJob, error: backupJobError } = await (supabase.from("admin_backup_jobs" as never) as any)
@@ -382,7 +382,7 @@ adminBackupRoutes.get("/export", async (c) => {
 
         const { data, error } = await query;
         if (error) {
-            await updateBackupJob(c.env, backupJobId, {
+            await updateBackupJob(c.var.supabase, backupJobId, {
                 status: "failed",
                 error_message: `Échec export table ${table}: ${error.message}`,
                 completed_at: new Date().toISOString(),
@@ -410,7 +410,7 @@ adminBackupRoutes.get("/export", async (c) => {
 
     const fileSizeBytes = new TextEncoder().encode(body).byteLength;
 
-    await updateBackupJob(c.env, backupJobId, {
+    await updateBackupJob(c.var.supabase, backupJobId, {
         status: "completed",
         row_count: exportedRowCount,
         file_name: fileName,

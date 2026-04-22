@@ -10,6 +10,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const loyaltyRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -51,7 +52,8 @@ loyaltyRoutes.get("/", async (c) => {
 /** POST /loyalty — create or update program */
 loyaltyRoutes.post("/", async (c) => {
     const { restaurantId, supabase } = c.var;
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const { name, points_per_fcfa, is_active } = body;
 
     if (points_per_fcfa !== undefined && (typeof points_per_fcfa !== "number" || points_per_fcfa < 1)) {
@@ -211,7 +213,8 @@ loyaltyRoutes.post("/rewards", async (c) => {
     const programId = await getProgramId(supabase, restaurantId);
     if (!programId) return c.json({ error: "Aucun programme de fidelite. Creez-en un d'abord." }, 400);
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const { name, description, points_required, reward_type, reward_value } = body;
 
     if (!name?.trim()) return c.json({ error: "Le nom est requis" }, 400);

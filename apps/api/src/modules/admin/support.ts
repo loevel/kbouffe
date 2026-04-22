@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminSupportRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -25,7 +25,7 @@ adminSupportRoutes.get("/", async (c) => {
     const denied = requireDomain(c, "support");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const statusFilter = c.req.query("status") ?? "all";
     const priorityFilter = c.req.query("priority") ?? "all";
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
@@ -87,10 +87,11 @@ adminSupportRoutes.patch("/", async (c) => {
     const denied = requireDomain(c, "support");
     if (denied) return denied;
     
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     if (!body.id) return c.json({ error: "id requis" }, 400);
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const updates: Record<string, any> = {};
 
     if (body.status) {
@@ -120,7 +121,7 @@ adminSupportRoutes.get("/:id", async (c) => {
     if (denied) return denied;
     
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: t, error } = await supabase
         .from("support_tickets")

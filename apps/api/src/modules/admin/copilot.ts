@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminCopilotRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -31,7 +31,8 @@ adminCopilotRoutes.post("/", async (c) => {
     const denied = requireDomain(c, "stats");
     if (denied) return denied;
 
-    const body = await c.req.json<{ query: string }>();
+    const body = await parseBody<{ query: string }>(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const query = body?.query?.trim();
     if (!query) return c.json({ error: "Question requise" }, 400);
 
@@ -66,10 +67,7 @@ adminCopilotRoutes.post("/", async (c) => {
     }
 
     // ── Step 2: Execute intent against Supabase ───────────────────────
-    const supabase = createClient(
-        c.env.SUPABASE_URL,
-        c.env.SUPABASE_SERVICE_ROLE_KEY as string,
-    );
+    const supabase = c.var.supabase;
 
     let data: any[] = [];
     let count: number | null = null;

@@ -10,6 +10,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const galleryRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -39,7 +40,8 @@ galleryRoutes.get("/", async (c) => {
 /** POST /gallery/photos — add a photo */
 galleryRoutes.post("/photos", async (c) => {
     const { restaurantId, supabase } = c.var;
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const { photo_url, alt_text, display_order } = body;
 
     if (!photo_url) return c.json({ error: "photo_url est requis" }, 400);
@@ -84,7 +86,8 @@ galleryRoutes.post("/photos", async (c) => {
 galleryRoutes.patch("/photos/:id", async (c) => {
     const { restaurantId, supabase } = c.var;
     const id = c.req.param("id");
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     const { data: photo } = await (supabase as any)
         .from("restaurant_photos")

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminCatalogRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -11,7 +11,7 @@ adminCatalogRoutes.get("/categories", async (c) => {
     if (denied) return denied;
 
     const restaurantId = c.req.query("restaurantId");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     
     let query = supabase.from("categories").select("*, restaurant:restaurants(name)");
 
@@ -30,8 +30,9 @@ adminCatalogRoutes.post("/categories", async (c) => {
     const denied = requireDomain(c, "catalog:write");
     if (denied) return denied;
 
-    const body = await c.req.json();
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("categories")
@@ -56,8 +57,9 @@ adminCatalogRoutes.patch("/categories/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const body = await c.req.json();
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("categories")
@@ -83,7 +85,7 @@ adminCatalogRoutes.delete("/categories/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { error } = await supabase
         .from("categories")
@@ -112,7 +114,7 @@ adminCatalogRoutes.get("/products", async (c) => {
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
     const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     
     let query = supabase
         .from("products")
@@ -147,8 +149,9 @@ adminCatalogRoutes.post("/products", async (c) => {
     const denied = requireDomain(c, "catalog:write");
     if (denied) return denied;
 
-    const body = await c.req.json();
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("products")
@@ -173,9 +176,10 @@ adminCatalogRoutes.patch("/products/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("products")
@@ -201,7 +205,7 @@ adminCatalogRoutes.delete("/products/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { error } = await supabase
         .from("products")
@@ -304,7 +308,7 @@ adminCatalogRoutes.post("/categories/import-pack", async (c) => {
         const pack = PACKS[packId as keyof typeof PACKS];
         if (!pack) return c.json({ error: "Pack non trouvé" }, 404);
 
-        const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+        const supabase = c.var.supabase;
 
         // 1. Insert Categories
         const categoriesToInsert = pack.categories.map(cat => ({
@@ -375,7 +379,7 @@ adminCatalogRoutes.get("/cuisine-categories", async (c) => {
     const denied = requireDomain(c, "catalog:read");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("cuisine_categories")
@@ -391,14 +395,15 @@ adminCatalogRoutes.post("/cuisine-categories", async (c) => {
     const denied = requireDomain(c, "catalog:write");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const { label, value, icon, sort_order, is_active } = body;
 
     if (!label || !value || !icon) {
         return c.json({ error: "label, value et icon sont requis" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("cuisine_categories")
@@ -429,8 +434,9 @@ adminCatalogRoutes.patch("/cuisine-categories/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const body = await c.req.json();
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("cuisine_categories")
@@ -456,7 +462,7 @@ adminCatalogRoutes.delete("/cuisine-categories/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { error } = await supabase
         .from("cuisine_categories")

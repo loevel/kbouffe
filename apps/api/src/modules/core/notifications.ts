@@ -6,6 +6,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 type NotificationChannel = { email: boolean; push: boolean };
 
@@ -26,7 +27,8 @@ notificationsRoutes.get("/preferences", async (c) => {
 
 /** POST /notifications/preferences */
 notificationsRoutes.post("/preferences", async (c) => {
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     if (body.soundEnabled !== undefined && typeof body.soundEnabled !== "boolean") {
         return c.json({ error: "Champ soundEnabled invalide" }, 400);

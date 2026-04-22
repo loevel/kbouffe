@@ -5,6 +5,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const registerRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -49,7 +50,8 @@ function encodeGeohash(lat: number, lng: number, precision = 6): string {
 
 /** POST /register-restaurant */
 registerRoutes.post("/", async (c) => {
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const { restaurantName, fullName, phone, address, city, postalCode, lat, lng, cuisineType } = body;
 
     if (!restaurantName?.trim()) return c.json({ error: "Nom du restaurant requis" }, 400);

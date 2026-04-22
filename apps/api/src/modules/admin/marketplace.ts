@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminMarketplaceRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -10,7 +10,7 @@ adminMarketplaceRoutes.get("/stats", async (c) => {
     const denied = requireDomain(c, "marketplace:read");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const [
         { count: totalServices },
@@ -44,7 +44,7 @@ adminMarketplaceRoutes.get("/services", async (c) => {
     const denied = requireDomain(c, "marketplace:read");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const category = c.req.query("category");
 
     let query = supabase
@@ -84,10 +84,11 @@ adminMarketplaceRoutes.post("/services", async (c) => {
     const denied = requireDomain(c, "marketplace:write");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     if (!body.name || !body.slug) return c.json({ error: "name et slug requis" }, 400);
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("marketplace_services")
@@ -119,8 +120,9 @@ adminMarketplaceRoutes.patch("/services/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const body = await c.req.json();
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const supabase = c.var.supabase;
 
     const updates: Record<string, any> = {};
     if (body.name !== undefined) updates.name = body.name;
@@ -156,7 +158,7 @@ adminMarketplaceRoutes.delete("/services/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     // Check if there are active purchases
     const { count } = await supabase
@@ -188,7 +190,7 @@ adminMarketplaceRoutes.get("/purchases", async (c) => {
     const denied = requireDomain(c, "marketplace:read");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const status = c.req.query("status");
     const restaurantId = c.req.query("restaurantId");
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
@@ -229,12 +231,13 @@ adminMarketplaceRoutes.post("/purchases", async (c) => {
     const denied = requireDomain(c, "marketplace:write");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     if (!body.restaurantId || !body.serviceId) {
         return c.json({ error: "restaurantId et serviceId requis" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     // Get service details for automatic expiration
     const { data: service } = await supabase
@@ -283,8 +286,9 @@ adminMarketplaceRoutes.patch("/purchases/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const body = await c.req.json();
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const supabase = c.var.supabase;
 
     const updates: Record<string, any> = {};
     if (body.status !== undefined) {

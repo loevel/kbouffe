@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminSystemRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -207,7 +208,8 @@ adminSystemRoutes.put("/settings", async (c) => {
     const denied = requireDomain(c, "system");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     if (typeof body !== "object" || body === null) {
         return c.json({ error: "Format invalide" }, 400);
     }
@@ -253,7 +255,8 @@ adminSystemRoutes.patch("/settings", async (c) => {
     const denied = requireDomain(c, "system");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     if (!body.key || body.value === undefined) {
         return c.json({ error: "key et value requis" }, 400);
     }
@@ -327,7 +330,9 @@ adminSystemRoutes.post("/report-schedules", async (c) => {
     const denied = requireDomain(c, "system");
     if (denied) return denied;
 
-    const payload = reportScheduleSchema.safeParse(await c.req.json());
+    const raw = await parseBody(c);
+    if (!raw) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const payload = reportScheduleSchema.safeParse(raw);
     if (!payload.success) {
         return c.json({ error: payload.error.issues[0]?.message ?? "Données invalides" }, 400);
     }
@@ -384,7 +389,8 @@ adminSystemRoutes.patch("/report-schedules/:id", async (c) => {
     if (denied) return denied;
 
     const scheduleId = c.req.param("id");
-    const updatesRaw = await c.req.json();
+    const updatesRaw = await parseBody(c);
+    if (!updatesRaw) return c.json({ error: "Corps de la requête invalide" }, 400);
     if (!updatesRaw || typeof updatesRaw !== "object") {
         return c.json({ error: "Format invalide" }, 400);
     }

@@ -8,6 +8,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const upsellRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -34,7 +35,8 @@ upsellRoutes.get("/", async (c) => {
 /** POST /upsell-rules */
 upsellRoutes.post("/", async (c) => {
     const { restaurantId, supabase } = c.var;
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const {
         trigger_type = "global",
         trigger_product_id = null,
@@ -78,7 +80,8 @@ upsellRoutes.post("/", async (c) => {
 upsellRoutes.patch("/:id", async (c) => {
     const { restaurantId, supabase } = c.var;
     const id = c.req.param("id");
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     const updates: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(body)) {

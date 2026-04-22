@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminModerationRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -66,7 +67,8 @@ adminModerationRoutes.patch("/reviews", async (c) => {
     const denied = requireDomain(c, "moderation");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     if (!body.id || typeof body.isVisible !== "boolean") {
         return c.json({ error: "id et isVisible (boolean) requis" }, 400);
     }

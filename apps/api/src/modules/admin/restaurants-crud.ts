@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const restaurantsCrudRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -147,7 +147,7 @@ restaurantsCrudRoutes.get("/", async (c) => {
     const sortField = c.req.query("sort") ?? "created_at";
     const sortOrder = c.req.query("order") ?? "desc";
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     
     let query = supabase
         .from("restaurants")
@@ -225,7 +225,7 @@ restaurantsCrudRoutes.get("/health-scores", async (c) => {
     const denied = requireDomain(c, "restaurants:read");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -351,7 +351,7 @@ restaurantsCrudRoutes.get("/:id", async (c) => {
     const id = c.req.param("id");
     
     // Fetch from Supabase (Source of Truth)
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const [restaurantRes, licensesRes] = await Promise.all([
         supabase
             .from("restaurants")
@@ -463,9 +463,10 @@ restaurantsCrudRoutes.patch("/:id", async (c) => {
     if (denied) return denied;
     
     const id = c.req.param("id");
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const preflight = await getComplianceSnapshot(supabase, id, typeof body.kycStatus === "string" ? body.kycStatus : undefined);
 
     if ("isActive" in body && body.isActive === true && !preflight.canPublish) {
@@ -559,7 +560,7 @@ restaurantsCrudRoutes.delete("/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     // Get restaurant info for logging before deletion
     const { data: restaurant } = await supabase
@@ -592,7 +593,7 @@ restaurantsCrudRoutes.get("/:id/members", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     // Get all members for this restaurant
     const { data: membersRaw, error: membersError } = await supabase
@@ -659,10 +660,11 @@ restaurantsCrudRoutes.patch("/:id/members/:memberId", async (c) => {
     if (denied) return denied;
 
     const { id, memberId } = c.req.param();
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const { role, status } = body;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const updates: any = { updated_at: new Date().toISOString() };
     if (role) updates.role = role;
@@ -693,7 +695,7 @@ restaurantsCrudRoutes.delete("/:id/members/:memberId", async (c) => {
     if (denied) return denied;
 
     const { id, memberId } = c.req.param();
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { error } = await supabase
         .from("restaurant_members")
@@ -728,7 +730,7 @@ restaurantsCrudRoutes.get("/:id/modules", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: rows, error } = await supabase
         .from("restaurant_modules")
@@ -752,13 +754,15 @@ restaurantsCrudRoutes.patch("/:id/modules", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const { moduleId, isActive } = await c.req.json<{ moduleId: string; isActive: boolean }>();
+    const body = await parseBody<{ moduleId: string; isActive: boolean }>(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const { moduleId, isActive } = body;
 
     if (!moduleId || typeof isActive !== "boolean") {
         return c.json({ error: "moduleId et isActive sont requis" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { error } = await supabase
         .from("restaurant_modules")

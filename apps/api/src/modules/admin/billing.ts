@@ -1,8 +1,9 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const adminBillingRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -22,10 +23,6 @@ function maskReference(reference: string | null | undefined): string | null {
     if (!reference) return null;
     if (reference.length <= 8) return `${reference.slice(0, 2)}••••`;
     return `${reference.slice(0, 4)}••••${reference.slice(-4)}`;
-}
-
-function getClient(env: Env) {
-    return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY as string);
 }
 
 function buildPayoutEvidence(input: {
@@ -51,7 +48,7 @@ function buildPayoutEvidence(input: {
 }
 
 async function insertPayoutEvent(
-    supabase: ReturnType<typeof getClient>,
+    supabase: SupabaseClient,
     payload: {
         payout_id: string;
         restaurant_id: string;
@@ -84,7 +81,7 @@ adminBillingRoutes.get("/stats", async (c) => {
     const denied = requireDomain(c, "billing:read");
     if (denied) return denied;
 
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 
@@ -136,7 +133,7 @@ adminBillingRoutes.get("/transactions", async (c) => {
     const denied = requireDomain(c, "billing:read");
     if (denied) return denied;
 
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
     const typeFilter = c.req.query("type") ?? "all";
     const directionFilter = c.req.query("direction") ?? "all";
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
@@ -181,7 +178,7 @@ adminBillingRoutes.get("/payouts", async (c) => {
     const denied = requireDomain(c, "billing:read");
     if (denied) return denied;
 
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
     const statusFilter = c.req.query("status") ?? "all";
     const restaurantId = c.req.query("restaurant_id");
     const dateFrom = c.req.query("date_from");
@@ -265,7 +262,8 @@ adminBillingRoutes.post("/payouts/manual", async (c) => {
     const denied = requireDomain(c, "billing:write");
     if (denied) return denied;
 
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const result = manualPayoutSchema.safeParse(body);
     if (!result.success) {
         return c.json({ error: result.error.issues[0]?.message ?? "Données invalides" }, 400);
@@ -277,7 +275,7 @@ adminBillingRoutes.post("/payouts/manual", async (c) => {
         return c.json({ error: "period_from doit être antérieure à period_to" }, 400);
     }
 
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
 
     const { data: restaurant, error: restError } = await supabase
         .from("restaurants")
@@ -365,14 +363,15 @@ adminBillingRoutes.patch("/payouts/:id", async (c) => {
     if (denied) return denied;
 
     const payoutId = c.req.param("id");
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const result = updatePayoutSchema.safeParse(body);
     if (!result.success) {
         return c.json({ error: result.error.issues[0]?.message ?? "Données invalides" }, 400);
     }
 
     const { status, payment_reference, notes, provider_name } = result.data;
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
 
     const { data: current, error: fetchError } = await supabase
         .from("payouts")
@@ -456,7 +455,7 @@ adminBillingRoutes.get("/payouts/:id/retry", async (c) => {
     if (denied) return denied;
 
     const payoutId = c.req.param("id");
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
 
     const { data: payout, error: fetchError } = await supabase
         .from("payouts")
@@ -519,7 +518,7 @@ adminBillingRoutes.get("/payouts/:id/events", async (c) => {
     if (denied) return denied;
 
     const payoutId = c.req.param("id");
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("payout_events")
@@ -551,7 +550,7 @@ adminBillingRoutes.patch("/payouts", async (c) => {
         return c.json({ error: parsed.error.issues[0]?.message ?? "Statut invalide" }, 400);
     }
 
-    const supabase = getClient(c.env);
+    const supabase = c.var.supabase;
     const { data: current, error: fetchError } = await supabase
         .from("payouts")
         .select("id, restaurant_id, status, provider_reference, provider_name")

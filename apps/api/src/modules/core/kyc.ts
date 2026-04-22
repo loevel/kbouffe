@@ -7,6 +7,7 @@
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const kycRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -101,10 +102,11 @@ kycRoutes.get("/check-phone", async (c) => {
 
 // ── POST /verify ──────────────────────────────────────────────────
 kycRoutes.post("/verify", async (c) => {
-    const body = await c.req.json<{
+    const body = await parseBody<{
         phone: string; firstName?: string; lastName?: string;
         dateOfBirth?: string; idNumber?: string; idType?: string;
-    }>();
+    }>(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
 
     if (!body.phone?.trim()) return c.json({ error: "Le numero de telephone est requis" }, 400);
 

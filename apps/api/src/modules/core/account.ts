@@ -8,6 +8,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const accountRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 export const securityRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -36,7 +37,8 @@ accountRoutes.delete("/", async (c) => {
 
 /** POST /security/password — Change password */
 securityRoutes.post("/password", async (c) => {
-    const body = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
     const currentPassword = body.currentPassword?.trim() ?? "";
     const newPassword = body.newPassword?.trim() ?? "";
 

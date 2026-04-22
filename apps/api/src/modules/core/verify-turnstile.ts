@@ -4,6 +4,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { parseBody } from "../../lib/body";
 
 export const verifyTurnstileRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -15,7 +16,9 @@ interface TurnstileVerifyResult {
 }
 
 verifyTurnstileRoutes.post("/", async (c) => {
-    const { token } = await c.req.json();
+    const body = await parseBody(c);
+    if (!body) return c.json({ error: "Corps de la requête invalide" }, 400);
+    const { token } = body as { token?: string };
 
     if (!token) {
         return c.json({ success: false }, 400);
