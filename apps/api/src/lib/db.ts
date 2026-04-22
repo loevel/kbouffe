@@ -23,3 +23,17 @@ export function getTenantClientFromRecord(record: { provider?: string } & Record
 
     throw new Error(`Tenant provider '${provider}' is not supported.`);
 }
+
+/**
+ * Returns a service-role Supabase client for admin operations (bypasses RLS).
+ * Prefer using `c.var.supabase` in admin handlers (set by adminMiddleware).
+ * Use this helper only when outside a Hono request context.
+ */
+export function getAdminClient(env: Env): SupabaseClient {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error("Admin Supabase client requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
+    }
+    return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY as string, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    });
+}

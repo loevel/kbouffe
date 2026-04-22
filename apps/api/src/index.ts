@@ -144,6 +144,19 @@ app.get("/", (c) =>
 // ═══════════════════════════════════════════════════════════════════════
 const api = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+// Cache-Control for public read-only endpoints (CDN + browser caching, 5 min)
+const publicCache = async (c: any, next: any) => {
+    await next();
+    if (c.req.method === "GET") c.header("Cache-Control", "public, max-age=300, s-maxage=300");
+};
+api.use("/stores/*", publicCache);
+api.use("/stores", publicCache);
+api.use("/menu/*", publicCache);
+api.use("/cuisine-categories/*", publicCache);
+api.use("/cuisine-categories", publicCache);
+api.use("/homepage-sections/*", publicCache);
+api.use("/homepage-sections", publicCache);
+
 // ── Public routes (no auth) ──────────────────────────────────────────
 api.route("/stores", storesRoutes);
 api.route("/menu", menuRoutes);
@@ -152,8 +165,6 @@ api.route("/store/gift-cards", giftCardPublicRoutes);     // validation carte ca
 api.route("/store", publicReservationsRoutes);             // public reservation booking
 api.route("/store", publicProductReviewRoutes);            // public product reviews
 api.route("/store", publicRestaurantReviewRoutes);          // public restaurant reviews
-api.route("/coupons/validate", couponValidateRoutes);
-
 // SEC-011: Rate limiting on public coupon validation (5 req/min/IP — prevents brute-force)
 // Backed by Durable Object — shared across all isolates for correctness.
 const couponRateLimiter = async (c: any, next: any) => {
@@ -163,9 +174,22 @@ const couponRateLimiter = async (c: any, next: any) => {
     await next();
 };
 api.use("/coupons/validate/*", couponRateLimiter);
+api.route("/coupons/validate", couponValidateRoutes);
 api.route("/cuisine-categories", cuisineCategoriesPublicRoutes);
 api.route("/homepage-sections", homepageSectionsPublicRoutes);
 api.route("/payments/mtn", paymentWebhookRoutes);         // public webhooks
+// ── Rate limiting on authentication endpoints (CRIT-004) ────────────
+// DO-backed sliding window: 10 attempts / minute per IP — correct across all isolates.
+// Complement with Cloudflare Rate Limiting Rules on /api/auth/* in production.
+const authRateLimiter = async (c: any, next: any) => {
+    const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
+    const { allowed, retryAfter } = await checkRateLimit(c.env.RATE_LIMITER, `auth:${ip}`, { windowMs: 60_000, maxRequests: 10 });
+    if (!allowed) return c.json({ error: `Trop de tentatives. Réessayez dans ${retryAfter}s.` }, 429);
+    await next();
+};
+
+api.use("/auth/*", authRateLimiter);
+api.use("/auth", authRateLimiter);
 api.route("/auth", authRoutes);
 api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
 api.route("/sync-user", authRoutes);       // Combined in authRoutes
@@ -184,19 +208,6 @@ api.use("/marketplace/suppliers/me/*", userAuthMiddleware);
 api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
 
 api.route("/marketplace/suppliers", suppliersRoutes);      // annuaire + inscription
-
-// ── Rate limiting on authentication endpoints (CRIT-004) ────────────
-// DO-backed sliding window: 10 attempts / minute per IP — correct across all isolates.
-// Complement with Cloudflare Rate Limiting Rules on /api/auth/* in production.
-const authRateLimiter = async (c: any, next: any) => {
-    const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "unknown";
-    const { allowed, retryAfter } = await checkRateLimit(c.env.RATE_LIMITER, `auth:${ip}`, { windowMs: 60_000, maxRequests: 10 });
-    if (!allowed) return c.json({ error: `Trop de tentatives. Réessayez dans ${retryAfter}s.` }, 429);
-    await next();
-};
-
-api.use("/auth/*", authRateLimiter);
-api.use("/auth", authRateLimiter);
 
 // ── Auth middleware for merchant routes ───────────────────────────────
 const merchantPaths = [

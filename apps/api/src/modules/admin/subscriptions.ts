@@ -1,20 +1,16 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 
 export const adminSubscriptionsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-function db(c: any) {
-    return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
-}
 
 // ── GET /admin/subscriptions/stats ──────────────────────────────────────────
 adminSubscriptionsRoutes.get("/stats", async (c) => {
     const denied = requireDomain(c, "billing:read");
     if (denied) return denied;
 
-    const supabase = db(c);
+    const supabase = c.var.supabase;
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
     const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
@@ -84,7 +80,7 @@ adminSubscriptionsRoutes.get("/", async (c) => {
     const denied = requireDomain(c, "billing:read");
     if (denied) return denied;
 
-    const supabase = db(c);
+    const supabase = c.var.supabase;
     const statusFilter = c.req.query("status") ?? "active";
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
     const limit = Math.min(100, parseInt(c.req.query("limit") ?? "25"));

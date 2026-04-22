@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 import { getComplianceSnapshot } from "./restaurants-crud";
@@ -12,7 +11,7 @@ restaurantsModerationRoutes.post("/:id/approve", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const snapshot = await getComplianceSnapshot(supabase, id, { kycStatusOverride: "approved" });
     if (!snapshot.canPublish) {
         return c.json({
@@ -62,7 +61,7 @@ restaurantsModerationRoutes.post("/:id/block", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const reason: string = typeof body.reason === "string" ? body.reason : "";
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: updated, error } = await supabase
         .from("restaurants")

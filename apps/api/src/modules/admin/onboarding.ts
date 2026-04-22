@@ -1,13 +1,9 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 
 export const adminOnboardingRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-function db(c: any) {
-    return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
-}
 
 // Onboarding criteria and their weights
 const CRITERIA = [
@@ -34,7 +30,7 @@ adminOnboardingRoutes.get("/", async (c) => {
     const denied = requireDomain(c, "restaurants:read");
     if (denied) return denied;
 
-    const supabase = db(c);
+    const supabase = c.var.supabase;
     const minScore = parseInt(c.req.query("maxScore") ?? "100");
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
     const limit = Math.min(100, parseInt(c.req.query("limit") ?? "30"));
@@ -143,7 +139,7 @@ adminOnboardingRoutes.post("/remind/:id", async (c) => {
     const denied = requireDomain(c, "restaurants:read");
     if (denied) return denied;
 
-    const supabase = db(c);
+    const supabase = c.var.supabase;
     const restaurantId = c.req.param("id");
     const adminId = c.get("userId") as string;
 

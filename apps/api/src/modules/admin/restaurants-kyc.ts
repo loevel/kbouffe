@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
@@ -12,7 +11,7 @@ restaurantsKycRoutes.get("/kyc-pending", async (c) => {
     const denied = requireDomain(c, "restaurants:read");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: restaurants, error } = await supabase
         .from("restaurants")
@@ -56,7 +55,7 @@ restaurantsKycRoutes.get("/:id/licenses", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const [licensesRes, snapshot] = await Promise.all([
         supabase
@@ -91,7 +90,7 @@ restaurantsKycRoutes.put("/:id/licenses", async (c) => {
         return c.json({ error: parsed.error.issues[0]?.message ?? "Données invalides" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const now = new Date().toISOString();
 
     const rows = parsed.data.licenses.map((license) => ({
@@ -153,7 +152,7 @@ restaurantsKycRoutes.get("/:id/kyc/documents/:documentType", async (c) => {
     const field = fieldMap[documentType];
     if (!field) return c.json({ error: "Type de document invalide" }, 400);
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const { data: restaurant, error } = await supabase
         .from("restaurants")
         .select(field)
@@ -184,7 +183,7 @@ restaurantsKycRoutes.post("/:id/kyc/approve", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const snapshot = await getComplianceSnapshot(supabase, id);
 
     const { data: updated, error } = await supabase
@@ -236,7 +235,7 @@ restaurantsKycRoutes.post("/:id/kyc/reject", async (c) => {
             ? body.reason.trim()
             : "Documents non conformes";
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: updated, error } = await supabase
         .from("restaurants")
@@ -281,7 +280,7 @@ restaurantsKycRoutes.get("/:id/kyc/history", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const [restaurantRes, historyRes] = await Promise.all([
         supabase
@@ -375,7 +374,7 @@ restaurantsKycRoutes.post("/:id/kyc/request-info", async (c) => {
 
     if (!message?.trim()) return c.json({ error: "Le message est requis" }, 400);
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: updated, error } = await supabase
         .from("restaurants")

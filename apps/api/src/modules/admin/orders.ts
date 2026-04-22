@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
@@ -48,7 +47,7 @@ adminOrdersRoutes.get("/", async (c) => {
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
     const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     
     let query = supabase
         .from("orders")
@@ -150,7 +149,7 @@ adminOrdersRoutes.get("/stats", async (c) => {
     const denied = requireDomain(c, "orders:read");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const now = new Date();
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
@@ -184,7 +183,7 @@ adminOrdersRoutes.get("/:id", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: order, error } = await supabase
         .from("orders")
@@ -265,7 +264,7 @@ adminOrdersRoutes.post("/:id/refund", async (c) => {
         return c.json({ error: parsed.error.issues[0]?.message ?? "Données invalides" }, 400);
     }
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const { data: order, error: orderError } = await supabase
         .from("orders")
         .select("id, restaurant_id, total, status, payment_status, payment_method, paymentTransactions:payment_transactions(id, reference_id, external_id, provider)")
@@ -377,7 +376,7 @@ adminOrdersRoutes.get("/:id/refunds", async (c) => {
     if (denied) return denied;
 
     const id = c.req.param("id");
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data, error } = await supabase
         .from("refund_events")
@@ -404,7 +403,7 @@ adminOrdersRoutes.patch("/:id/status", async (c) => {
 
     const { status, reason } = parsed.data;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
 
     const { data: updated, error } = await supabase
         .from("orders")

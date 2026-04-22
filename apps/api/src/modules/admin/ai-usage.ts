@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 
@@ -26,7 +25,7 @@ adminAiUsageRoutes.get("/", async (c) => {
     const denied = requireDomain(c, "stats");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const now = new Date();
     const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
@@ -131,7 +130,7 @@ adminAiUsageRoutes.get("/restaurant/:id", async (c) => {
     const denied = requireDomain(c, "stats");
     if (denied) return denied;
 
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
+    const supabase = c.var.supabase;
     const restaurantId = c.req.param("id");
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();

@@ -16,7 +16,8 @@ cuisineCategoriesPublicRoutes.get("/", async (c) => {
         .from("cuisine_categories")
         .select("id, label, value, icon, sort_order")
         .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+        .order("sort_order", { ascending: true })
+        .limit(200);
 
     if (error) return c.json({ error: error.message }, 500);
 

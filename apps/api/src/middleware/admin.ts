@@ -19,17 +19,17 @@ export async function adminMiddleware(
     }
 
     const token = authHeader.slice(7);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_ANON_KEY, {
+    const anonClient = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_ANON_KEY, {
         global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const { data: { user }, error } = await anonClient.auth.getUser(token);
     if (error || !user) {
         return c.json({ error: "Token invalide" }, 401);
     }
 
     // Look up user in Supabase public.users and check admin role
-    const { data: dbUser, error: dbError } = await supabase
+    const { data: dbUser, error: dbError } = await anonClient
         .from("users")
         .select("id, role, admin_role, restaurant_id")
         .eq("id", user.id)
@@ -39,9 +39,14 @@ export async function adminMiddleware(
         return c.json({ error: "Accès réservé aux administrateurs" }, 403);
     }
 
+    // Create a service-role client for all admin operations
+    const adminClient = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    });
+
     c.set("userId", user.id);
     c.set("restaurantId", dbUser.restaurant_id ?? "");
-    c.set("supabase", supabase);
+    c.set("supabase", adminClient);
     c.set("adminRole", (dbUser.admin_role as AdminRole) ?? null);
 
     await next();

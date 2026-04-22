@@ -1,13 +1,9 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { requireDomain } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 
 export const adminSocialMonitorRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-function db(c: any) {
-    return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string);
-}
 
 const PLATFORM_META: Record<string, { label: string; color: string }> = {
     facebook:  { label: "Facebook",  color: "#1877F2" },
@@ -22,7 +18,7 @@ adminSocialMonitorRoutes.get("/stats", async (c) => {
     const denied = requireDomain(c, "stats");
     if (denied) return denied;
 
-    const supabase = db(c);
+    const supabase = c.var.supabase;
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 
@@ -151,7 +147,7 @@ adminSocialMonitorRoutes.get("/", async (c) => {
     const denied = requireDomain(c, "stats");
     if (denied) return denied;
 
-    const supabase = db(c);
+    const supabase = c.var.supabase;
     const platform = c.req.query("platform") ?? "";
     const status = c.req.query("status") ?? "";
     const search = c.req.query("search") ?? "";
