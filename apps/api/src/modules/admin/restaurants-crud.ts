@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 import { parseBody } from "../../lib/body";
+import { escapeIlike } from "../../lib/search";
 
 export const restaurantsCrudRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -155,8 +156,9 @@ restaurantsCrudRoutes.get("/", async (c) => {
 
     // Apply filters
     if (q) {
+        const qs = escapeIlike(String(q).slice(0, 100));
         query = query.or(
-            `name.ilike.%${q}%,slug.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`,
+            `name.ilike.%${qs}%,slug.ilike.%${qs}%,city.ilike.%${qs}%,cuisine_type.ilike.%${qs}%,email.ilike.%${qs}%,phone.ilike.%${qs}%`,
         );
     }
     if (statusFilter === "active") query = query.eq("is_published", true);

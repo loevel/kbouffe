@@ -7,6 +7,7 @@
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
 import type { Env } from "../../types";
+import { escapeIlike, normalizeSearchQuery } from "../../lib/search";
 
 export const storesRoutes = new Hono<{ Bindings: Env }>();
 
@@ -20,7 +21,7 @@ export const storesRoutes = new Hono<{ Bindings: Env }>();
  *   ?limit   — max results (default: 60, max: 100)
  */
 storesRoutes.get("/", async (c) => {
-    const q = c.req.query("q")?.trim() ?? "";
+    const q = normalizeSearchQuery(c.req.query("q"));
     const cuisine = c.req.query("cuisine")?.trim() ?? "";
     const city = c.req.query("city")?.trim() ?? "";
     const sort = c.req.query("sort") ?? "recommended";
@@ -44,10 +45,11 @@ storesRoutes.get("/", async (c) => {
         query = query.eq("cuisine_type", cuisine);
     }
     if (city) {
-        query = query.ilike("city", `%${city}%`);
+        query = query.ilike("city", `%${escapeIlike(city)}%`);
     }
     if (q) {
-        query = query.or(`name.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%`);
+        const qs = escapeIlike(q);
+        query = query.or(`name.ilike.%${qs}%,city.ilike.%${qs}%,cuisine_type.ilike.%${qs}%`);
     }
 
     // Default sorting in DB for base query

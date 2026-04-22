@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
+import { escapeIlike } from "../../lib/search";
 
 export const adminOrdersRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -68,16 +69,17 @@ adminOrdersRoutes.get("/", async (c) => {
         `, { count: "exact" });
 
     if (q) {
+        const qs = escapeIlike(String(q).slice(0, 100));
         const orClauses = [
-            `customer_name.ilike.%${q}%`,
-            `customer_phone.ilike.%${q}%`,
-            `id.ilike.%${q}%`,
+            `customer_name.ilike.%${qs}%`,
+            `customer_phone.ilike.%${qs}%`,
+            `id.ilike.%${qs}%`,
         ];
 
         const { data: restaurantsByName } = await supabase
             .from("restaurants")
             .select("id")
-            .ilike("name", `%${q}%`)
+            .ilike("name", `%${qs}%`)
             .limit(100);
 
         const matchingRestaurantIds = (restaurantsByName ?? [])

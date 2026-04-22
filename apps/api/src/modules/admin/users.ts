@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 import { parseBody } from "../../lib/body";
+import { escapeIlike, normalizeSearchQuery } from "../../lib/search";
 
 export const adminUsersRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -110,7 +111,7 @@ adminUsersRoutes.get("/", async (c) => {
     const denied = requireDomain(c, "users:read");
     if (denied) return denied;
 
-    const q = c.req.query("q") ?? "";
+    const q = normalizeSearchQuery(c.req.query("q"));
     const roleFilter = c.req.query("role") ?? "all";
     const statusFilter = c.req.query("status") ?? "all";
     const fromDate = c.req.query("from") ?? c.req.query("date_from") ?? "";
@@ -128,7 +129,8 @@ adminUsersRoutes.get("/", async (c) => {
 
     // Apply filters
     if (q) {
-        query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%`);
+        const qs = escapeIlike(q);
+        query = query.or(`email.ilike.%${qs}%,full_name.ilike.%${qs}%,phone.ilike.%${qs}%`);
     }
     if (roleFilter !== "all") {
         query = query.eq("role", roleFilter);

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { requireDomain } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 import { parseBody } from "../../lib/body";
+import { escapeIlike } from "../../lib/search";
 
 export const adminCopilotRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -85,7 +86,7 @@ adminCopilotRoutes.post("/", async (c) => {
                 if (params.verified === "true")   q = q.eq("is_verified", true);
                 if (params.verified === "false")  q = q.eq("is_verified", false);
                 if (params.kyc)                   q = q.eq("kyc_status", params.kyc);
-                if (params.q)                     q = q.or(`name.ilike.%${params.q}%,city.ilike.%${params.q}%`);
+                if (params.q) { const qs = escapeIlike(String(params.q).slice(0, 100)); q = q.or(`name.ilike.%${qs}%,city.ilike.%${qs}%`); }
                 q = q.order("created_at", { ascending: false }).limit(limit);
                 const r = await q;
                 data = r.data ?? [];
@@ -99,7 +100,7 @@ adminCopilotRoutes.post("/", async (c) => {
                     .from("users")
                     .select("id,full_name,email,phone,role,created_at", { count: "exact" });
                 if (params.role) q = q.eq("role", params.role);
-                if (params.q)   q = q.or(`full_name.ilike.%${params.q}%,email.ilike.%${params.q}%`);
+                if (params.q) { const qs = escapeIlike(String(params.q).slice(0, 100)); q = q.or(`full_name.ilike.%${qs}%,email.ilike.%${qs}%`); }
                 q = q.order("created_at", { ascending: false }).limit(limit);
                 const r = await q;
                 data = r.data ?? [];

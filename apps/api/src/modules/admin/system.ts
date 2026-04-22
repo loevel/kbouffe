@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireDomain, logAdminAction } from "../../lib/admin-rbac";
 import type { Env, Variables } from "../../types";
 import { parseBody } from "../../lib/body";
+import { escapeIlike } from "../../lib/search";
 
 export const adminSystemRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -67,11 +68,12 @@ adminSystemRoutes.get("/audit", async (c) => {
         `, { count: "exact" });
 
     if (search) {
+        const s = escapeIlike(String(search).slice(0, 100));
         query = query.or([
-            `action.ilike.%${search}%`,
-            `target_id.ilike.%${search}%`,
-            `target_type.ilike.%${search}%`,
-            `ip_address.ilike.%${search}%`,
+            `action.ilike.%${s}%`,
+            `target_id.ilike.%${s}%`,
+            `target_type.ilike.%${s}%`,
+            `ip_address.ilike.%${s}%`,
         ].join(","));
     }
     if (adminId) query = query.eq("admin_id", adminId);

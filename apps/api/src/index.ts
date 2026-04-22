@@ -232,6 +232,32 @@ api.use("/marketplace/subscriptions", authMiddleware);
 api.use("/marketplace/purchase/*", authMiddleware);
 api.use("/marketplace/purchase", authMiddleware);
 
+// Premium service gating + payment flows (services catalogue stays public)
+api.use("/marketplace/check-feature", authMiddleware);
+api.use("/marketplace/check-feature/*", authMiddleware);
+api.use("/marketplace/initiate-payment", authMiddleware);
+api.use("/marketplace/initiate-payment/*", authMiddleware);
+api.use("/marketplace/purchases", authMiddleware);
+api.use("/marketplace/purchases/*", authMiddleware);
+
+// Rate limit on paid flows: 10 payment initiations / minute / user (MoMo calls are billable).
+const makeIpOrUserLimiter = (bucket: string, maxRequests: number, windowMs = 60_000) =>
+    async (c: any, next: any) => {
+        const key = c.var?.userId
+            ?? c.req.header("CF-Connecting-IP")
+            ?? c.req.header("X-Forwarded-For")
+            ?? "unknown";
+        const { allowed, retryAfter } = await checkRateLimit(c.env.RATE_LIMITER, `${bucket}:${key}`, { windowMs, maxRequests });
+        if (!allowed) return c.json({ error: `Trop de tentatives. Réessayez dans ${retryAfter}s.` }, 429);
+        await next();
+    };
+api.use("/marketplace/initiate-payment", makeIpOrUserLimiter("mkt-pay", 10));
+api.use("/marketplace/initiate-payment/*", makeIpOrUserLimiter("mkt-pay", 10));
+api.use("/upload", makeIpOrUserLimiter("upload", 20));
+api.use("/upload/*", makeIpOrUserLimiter("upload", 20));
+api.use("/sms", makeIpOrUserLimiter("sms", 30));
+api.use("/sms/*", makeIpOrUserLimiter("sms", 30));
+
 
 // Chat uses userAuthMiddleware (works for clients + merchants, no restaurant required)
 api.use("/chat/*", userAuthMiddleware);

@@ -7,6 +7,7 @@
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
 import { parseBody } from "../../lib/body";
+import { escapeIlike, normalizeSearchQuery } from "../../lib/search";
 
 export const restaurantRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -224,10 +225,12 @@ restaurantRoutes.get("/badges", async (c) => {
 restaurantRoutes.get("/search", async (c) => {
     const restaurantId = c.var.restaurantId;
     // Strip leading # so "#A3F2C1" and "A3F2C1" both work
-    const q = (c.req.query("q") ?? "").trim().replace(/^#/, "");
+    const q = normalizeSearchQuery((c.req.query("q") ?? "").replace(/^#/, ""));
     const supabase = c.var.supabase;
 
     if (q.length < 2) return c.json({ results: [] });
+
+    const qs = escapeIlike(q);
 
     const [ordersRes, productsRes, customersRes] = await Promise.all([
         // Orders: search by customer_name, customer_phone, or last 6 chars of UUID cast to text
@@ -235,21 +238,21 @@ restaurantRoutes.get("/search", async (c) => {
             .from("orders")
             .select("id, status, total, customer_name, customer_phone, created_at")
             .eq("restaurant_id", restaurantId)
-            .or(`customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`)
+            .or(`customer_name.ilike.%${qs}%,customer_phone.ilike.%${qs}%`)
             .order("created_at", { ascending: false })
             .limit(5),
         supabase
             .from("products")
             .select("id, name, price, category_id")
             .eq("restaurant_id", restaurantId)
-            .ilike("name", `%${q}%`)
+            .ilike("name", `%${qs}%`)
             .limit(5),
         // Customers scoped to this restaurant via orders (distinct by customer_id)
         supabase
             .from("orders")
             .select("customer_id, customer_name, customer_phone")
             .eq("restaurant_id", restaurantId)
-            .or(`customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`)
+            .or(`customer_name.ilike.%${qs}%,customer_phone.ilike.%${qs}%`)
             .not("customer_id", "is", null)
             .limit(10),
     ]);
