@@ -66,7 +66,7 @@ export default function ProductDetailScreen() {
             try {
                 setLoadingCategories(true);
                 const { data, error } = await supabase
-                    .from('product_categories')
+                    .from('categories')
                     .select('id, name, sort_order')
                     .eq('restaurant_id', profile.restaurantId)
                     .order('sort_order', { ascending: true });

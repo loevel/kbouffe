@@ -41,8 +41,7 @@ export async function registerForPushNotifications() {
         user_id: user.id,
         token: token.data,
         platform: 'expo',
-        device_id: token.data.substring(0, 20), // Utiliser une partie du token comme device_id
-        is_active: true,
+        updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id,token' }
     );

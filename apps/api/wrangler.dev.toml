@@ -8,6 +8,10 @@ main = "src/index.ts"
 compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
 
+[dev]
+ip = "0.0.0.0"
+port = 8787
+
 # ── Supabase Auth ──────────────────────────────────────────────────
 # Variables définies dans .dev.vars :
 #   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
