@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -11,11 +12,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { usePermission } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
+import { Springs } from '@/constants/theme';
 
 type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
 
@@ -51,6 +59,37 @@ const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
     delivered: { label: 'Livrée', color: '#64748b' },
     cancelled: { label: 'Annulée', color: '#dc2626' },
 };
+
+function SpringCard({
+    children,
+    onPress,
+    style,
+}: {
+    children: React.ReactNode;
+    onPress: () => void;
+    style?: object;
+}) {
+    const scale = useSharedValue(1);
+    const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+    return (
+        <Animated.View style={[animStyle, style]}>
+            <Pressable
+                onPress={onPress}
+                onPressIn={() => {
+                    scale.value = withSpring(0.96, Springs.snappy);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+                onPressOut={() => {
+                    scale.value = withSpring(1, Springs.snappy);
+                }}
+                style={{ flex: 1 }}
+            >
+                {children}
+            </Pressable>
+        </Animated.View>
+    );
+}
 
 function MetricCard({
     label,
@@ -291,7 +330,7 @@ export default function OverviewScreen() {
                             { label: 'Gérer le menu', icon: 'restaurant-outline', href: '/(tabs)/menu' },
                             { label: 'Consulter les stats', icon: 'bar-chart-outline', href: '/(tabs)/stats' },
                         ].map((action) => (
-                            <TouchableOpacity
+                            <SpringCard
                                 key={action.label}
                                 style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
                                 onPress={() => router.push(action.href as never)}
@@ -300,7 +339,7 @@ export default function OverviewScreen() {
                                     <Ionicons name={action.icon as keyof typeof Ionicons.glyphMap} size={20} color={theme.primary} />
                                 </View>
                                 <Text style={[styles.quickActionLabel, { color: theme.text }]}>{action.label}</Text>
-                            </TouchableOpacity>
+                            </SpringCard>
                         ))}
                     </View>
                 </View>
@@ -340,7 +379,7 @@ export default function OverviewScreen() {
                                         : 'Sur place';
 
                                 return (
-                                    <TouchableOpacity
+                                    <SpringCard
                                         key={order.id}
                                         style={[styles.orderCard, { backgroundColor: theme.surface }]}
                                         onPress={() => router.push(`/order/${order.id}`)}
@@ -362,7 +401,7 @@ export default function OverviewScreen() {
                                             </Text>
                                             <Text style={[styles.orderAmount, { color: theme.text }]}>{order.total_amount.toLocaleString()} FCFA</Text>
                                         </View>
-                                    </TouchableOpacity>
+                                    </SpringCard>
                                 );
                             })}
                         </View>

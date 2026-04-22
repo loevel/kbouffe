@@ -1,15 +1,35 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/colors';
+import { Springs } from '@/constants/theme';
 import { View, Text, StyleSheet } from 'react-native';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
 function TabIcon({ name, color, badge, focused }: { name: TabIconName; color: string; badge?: number; focused: boolean }) {
+    const scale = useSharedValue(1);
+
+    useEffect(() => {
+        scale.value = withSpring(focused ? 1.15 : 1, Springs.snappy);
+    }, [focused, scale]);
+
+    const animStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
     return (
         <View style={styles.iconContainer}>
-            <Ionicons name={name} size={22} color={color} />
+            <Animated.View style={animStyle}>
+                <Ionicons name={name} size={22} color={color} />
+            </Animated.View>
             {badge != null && badge > 0 && (
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
@@ -56,6 +76,9 @@ export default function TabsLayout() {
 
     return (
         <Tabs
+            screenListeners={{
+                tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+            }}
             screenOptions={{
                 tabBarActiveTintColor: colors.primary,
                 tabBarInactiveTintColor: colors.tabIconDefault,

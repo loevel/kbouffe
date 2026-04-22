@@ -33,3 +33,5 @@ export const Colors = {
         tabIconSelected: '#a78bfa',
     },
 };
+
+export type ThemeColors = typeof Colors.light;
