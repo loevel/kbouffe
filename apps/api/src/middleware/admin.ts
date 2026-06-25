@@ -8,12 +8,6 @@
 import type { Context, Next } from "hono";
 import { createClient } from "@supabase/supabase-js";
 import type { AdminRole, Env, Variables } from "../types";
-import { LRUCache } from "../lib/lru-cache";
-
-// Per-isolate cache: userId → admin row. Short TTL (60s) bounds the window during
-// which a revoked admin keeps access, while removing a DB round-trip on /admin/*.
-interface AdminContext { restaurantId: string; adminRole: AdminRole | null; email: string | null }
-const adminCache = new LRUCache<string, AdminContext>(200, 60 * 1000);
 
 export async function adminMiddleware(
     c: Context<{ Bindings: Env; Variables: Variables }>,
@@ -46,35 +40,23 @@ export async function adminMiddleware(
         auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Bypass the cache on mutations (POST/PUT/PATCH/DELETE) so a revoked admin
-    // loses write access immediately; reads tolerate the 60s cache window.
-    const isWrite = c.req.method !== "GET" && c.req.method !== "HEAD";
-    let ctx = isWrite ? undefined : adminCache.get(userId);
-    if (!ctx) {
-        // Look up user in Supabase public.users and check admin role
-        const { data: dbUser, error: dbError } = await anonClient
-            .from("users")
-            .select("id, role, admin_role, restaurant_id")
-            .eq("id", userId)
-            .maybeSingle();
+    // Always revalidate the admin role against the DB — no caching — so a revoked
+    // admin loses access immediately on every request (reads and writes alike).
+    const { data: dbUser, error: dbError } = await anonClient
+        .from("users")
+        .select("id, role, admin_role, restaurant_id")
+        .eq("id", userId)
+        .maybeSingle();
 
-        if (dbError || !dbUser || dbUser.role !== "admin") {
-            return c.json({ error: "Accès réservé aux administrateurs" }, 403);
-        }
-
-        ctx = {
-            restaurantId: dbUser.restaurant_id ?? "",
-            adminRole: (dbUser.admin_role as AdminRole) ?? null,
-            email: (claimsData?.claims?.email as string | undefined) ?? null,
-        };
-        adminCache.set(userId, ctx);
+    if (dbError || !dbUser || dbUser.role !== "admin") {
+        return c.json({ error: "Accès réservé aux administrateurs" }, 403);
     }
 
     c.set("userId", userId);
-    c.set("userEmail", ctx.email);
-    c.set("restaurantId", ctx.restaurantId);
+    c.set("userEmail", (claimsData?.claims?.email as string | undefined) ?? null);
+    c.set("restaurantId", dbUser.restaurant_id ?? "");
     c.set("supabase", adminClient);
-    c.set("adminRole", ctx.adminRole);
+    c.set("adminRole", (dbUser.admin_role as AdminRole) ?? null);
 
     await next();
 }
