@@ -80,8 +80,8 @@ export function AdminSidebar() {
     // Filter based on admin permissions
     const navItems = adminNavItemsDef.filter((item) => {
         if (!item.permission) return true;
-        // If admin role is loading, show all items (they'll be hidden or kept once loaded, and API protects them)
-        if (!adminRole) return true;
+        // Hide permission-gated items until the admin role is loaded (deny-by-default, matches API RBAC)
+        if (!adminRole) return false;
         return can(item.permission);
     });
 
