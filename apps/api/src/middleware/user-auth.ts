@@ -22,20 +22,24 @@ export const userAuthMiddleware = createMiddleware<{
         global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify the JWT locally via JWKS (asymmetric ES256) — no network round-trip
+    // after the first JWKS fetch per isolate (falls back to getUser() for HS256).
+    const { data: claimsData, error } = await supabase.auth.getClaims(token);
+    const userId = claimsData?.claims?.sub;
 
-    if (error || !user) {
+    if (error || !userId) {
         return c.json({ error: "Token invalide ou expiré" }, 401);
     }
 
-    c.set("userId", user.id);
+    c.set("userId", userId);
+    c.set("userEmail", (claimsData?.claims?.email as string | undefined) ?? null);
     c.set("supabase", supabase);
 
     // Optionally resolve restaurantId (merchant or staff) — null for pure clients
     const { data: ownedRestaurant } = await supabase
         .from("restaurants")
         .select("id")
-        .eq("owner_id", user.id)
+        .eq("owner_id", userId)
         .maybeSingle();
 
     if (ownedRestaurant?.id) {
@@ -44,7 +48,7 @@ export const userAuthMiddleware = createMiddleware<{
         const { data: memberData } = await supabase
             .from("restaurant_members")
             .select("restaurant_id")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .eq("status", "active")
             .limit(1)
             .maybeSingle();

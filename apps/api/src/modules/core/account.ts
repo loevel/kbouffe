@@ -49,9 +49,11 @@ securityRoutes.post("/password", async (c) => {
         return c.json({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
     }
 
-    // Verify current password by signing in
-    const { data: userData } = await c.var.supabase.auth.getUser();
-    const email = userData.user?.email ?? "";
+    // Verify current password by signing in. Email comes from the verified JWT
+    // claims set by userAuthMiddleware (no extra network round-trip).
+    const email = c.var.userEmail
+        ?? (await c.var.supabase.auth.getUser()).data.user?.email
+        ?? "";
 
     const { error: verifyError } = await c.var.supabase.auth.signInWithPassword({
         email,

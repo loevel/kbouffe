@@ -37,19 +37,22 @@ export const authMiddleware = createMiddleware<{
         global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const {
-        data: { user },
-        error,
-    } = await supabase.auth.getUser(token);
+    // Verify the JWT locally via JWKS (asymmetric ES256). No network round-trip
+    // after the first JWKS fetch per isolate; falls back to a network getUser()
+    // automatically for legacy HS256 tokens.
+    const { data: claimsData, error } = await supabase.auth.getClaims(token);
+    const userId = claimsData?.claims?.sub;
 
-    if (error || !user) {
+    if (error || !userId) {
         return c.json({ error: "Token invalide ou expiré" }, 401);
     }
+    const userEmail = (claimsData?.claims?.email as string | undefined) ?? null;
 
     // Check per-isolate LRU cache before hitting Supabase
-    const cached = restaurantCache.get(user.id);
+    const cached = restaurantCache.get(userId);
     if (cached) {
-        c.set("userId", user.id);
+        c.set("userId", userId);
+        c.set("userEmail", userEmail);
         c.set("restaurantId", cached.restaurantId);
         c.set("memberRole", cached.memberRole);
         c.set("supabase", supabase);
@@ -60,7 +63,7 @@ export const authMiddleware = createMiddleware<{
     const { data: dbUser } = await supabase
         .from("users")
         .select("restaurant_id")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
 
     let restaurantId = dbUser?.restaurant_id;
@@ -71,7 +74,7 @@ export const authMiddleware = createMiddleware<{
         const { data: memberData } = await supabase
             .from("restaurant_members")
             .select("restaurant_id, role")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .eq("status", "active")
             .limit(1)
             .maybeSingle();
@@ -85,10 +88,11 @@ export const authMiddleware = createMiddleware<{
     }
 
     // Populate cache
-    restaurantCache.set(user.id, { restaurantId, memberRole: memberRole as TeamRole });
+    restaurantCache.set(userId, { restaurantId, memberRole: memberRole as TeamRole });
 
     // Set context variables
-    c.set("userId", user.id);
+    c.set("userId", userId);
+    c.set("userEmail", userEmail);
     c.set("restaurantId", restaurantId);
     c.set("memberRole", memberRole);
     c.set("supabase", supabase);

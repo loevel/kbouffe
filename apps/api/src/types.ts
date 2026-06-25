@@ -72,6 +72,8 @@ export type AdminRole = "super_admin" | "support" | "sales" | "moderator";
 export interface Variables {
     /** Authenticated Supabase user ID */
     userId: string;
+    /** Authenticated user email (from verified JWT claims) */
+    userEmail: string | null;
     /** The merchant's restaurant ID */
     restaurantId: string;
     /** Supabase client authenticated with the user's token */
