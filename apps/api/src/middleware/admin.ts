@@ -46,7 +46,10 @@ export async function adminMiddleware(
         auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    let ctx = adminCache.get(userId);
+    // Bypass the cache on mutations (POST/PUT/PATCH/DELETE) so a revoked admin
+    // loses write access immediately; reads tolerate the 60s cache window.
+    const isWrite = c.req.method !== "GET" && c.req.method !== "HEAD";
+    let ctx = isWrite ? undefined : adminCache.get(userId);
     if (!ctx) {
         // Look up user in Supabase public.users and check admin role
         const { data: dbUser, error: dbError } = await anonClient
