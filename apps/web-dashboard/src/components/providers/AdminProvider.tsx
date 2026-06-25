@@ -41,7 +41,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
                 if (!response.ok) return;
 
                 const payload = await response.json();
-                const dbAdminRole = toAdminRole(payload?.adminRole);
+                const dbAdminRole = toAdminRole(payload?.adminRole) ?? "super_admin";
 
                 if (!cancelled) {
                     setHydratedAdminRole({ userId: session.id, role: dbAdminRole });

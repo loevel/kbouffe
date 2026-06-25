@@ -63,6 +63,7 @@ const { teamRoutes, payoutsRoutes } = hrApi;
 import { chatApi } from "@kbouffe/module-chat";
 const { chatRoutes } = chatApi;
 import { notificationsRoutes } from "./modules/core/notifications";
+import { kycDocumentsRoutes } from "./modules/core/kyc-documents";
 import { loyaltyRoutes } from "./modules/store/loyalty";
 import { upsellRoutes } from "./modules/store/upsell";
 import { galleryRoutes } from "./modules/store/gallery";
@@ -379,6 +380,7 @@ api.route("/supplier", profitabilityRouter);
 // ── Dark Kitchens / Multi-Marques + KYC ─────────────────────────────
 api.route("/restaurant/brands", brandsRoutes);
 api.route("/restaurant/kyc", restaurantKycRoutes);   // PATCH /restaurant/kyc
+api.route("/restaurant/kyc/documents", kycDocumentsRoutes); // POST /:type — private bucket
 
 // ── Facturation TVA (SaaS + Marketplace) ────────────────────────────
 api.use("/billing/*", authMiddleware);
@@ -414,9 +416,11 @@ app.onError((err, c) => {
 import { processSmsQueue, type SmsMessage } from "./lib/sms-queue";
 
 async function runDataPurge(env: Env): Promise<void> {
-    const serviceKey = (env as any).SUPABASE_SERVICE_ROLE_KEY ?? (env as any).SUPABASE_ANON_KEY;
-    if (!serviceKey) return;
-    const db = createClient((env as any).SUPABASE_URL, serviceKey);
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error("[runDataPurge] Aborted: SUPABASE_SERVICE_ROLE_KEY is not configured");
+        return;
+    }
+    const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
     const threeYearsAgo = new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000).toISOString();
     const tenYearsAgo  = new Date(Date.now() - 10 * 365 * 24 * 60 * 60 * 1000).toISOString();

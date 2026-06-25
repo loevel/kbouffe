@@ -5,8 +5,10 @@ import type { TeamRole } from "./lib/permissions";
  * Cloudflare Worker environment bindings.
  */
 export interface Env {
-    /** R2 — Image storage bucket */
+    /** R2 — Public image storage bucket (exposed via r2.dev domain) */
     IMAGES_BUCKET: R2Bucket;
+    /** R2 — Private bucket for KYC docs, invoices, sensitive files (no public domain) */
+    PRIVATE_BUCKET?: R2Bucket;
     /** Supabase project URL */
     SUPABASE_URL: string;
     /** Supabase anon key (for server-side client) */

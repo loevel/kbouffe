@@ -160,14 +160,27 @@ restaurantsKycRoutes.get("/:id/kyc/documents/:documentType", async (c) => {
         .maybeSingle();
 
     if (error || !restaurant) return c.json({ error: "Restaurant introuvable" }, 404);
-    const url = (restaurant as any)[field] as string | null;
-    if (!url) return c.json({ error: "Document introuvable" }, 404);
+    const value = (restaurant as any)[field] as string | null;
+    if (!value) return c.json({ error: "Document introuvable" }, 404);
 
-    const upstream = await fetch(url);
+    // New format: private R2 bucket key (e.g. "kyc/<restaurantId>/niu-...pdf")
+    // Legacy format: full https URL pointing to the public r2.dev bucket.
+    if (!/^https?:\/\//i.test(value)) {
+        const bucket = c.env.PRIVATE_BUCKET;
+        if (!bucket) return c.json({ error: "Stockage privé non configuré" }, 500);
+        const obj = await bucket.get(value);
+        if (!obj) return c.json({ error: "Document introuvable" }, 404);
+        const headers = new Headers();
+        obj.writeHttpMetadata(headers);
+        headers.set("Cache-Control", "no-store");
+        headers.set("Content-Disposition", "inline");
+        return new Response(obj.body, { status: 200, headers });
+    }
+
+    const upstream = await fetch(value);
     if (!upstream.ok || !upstream.body) {
         return c.json({ error: "Impossible de charger le document" }, 502);
     }
-
     const headers = new Headers(upstream.headers);
     headers.set("Cache-Control", "no-store");
     headers.set("Content-Disposition", "inline");

@@ -40,7 +40,10 @@ export async function adminMiddleware(
     }
 
     // Create a service-role client for all admin operations
-    const adminClient = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY as string, {
+    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return c.json({ error: "Service non configuré" }, 500);
+    }
+    const adminClient = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY, {
         auth: { autoRefreshToken: false, persistSession: false },
     });
 

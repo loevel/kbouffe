@@ -5,10 +5,15 @@ main = "src/index.ts"
 compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
 
-# --- R2 bucket (Images) ---
+# --- R2 bucket (Images, public via r2.dev domain) ---
 [[r2_buckets]]
 binding = "IMAGES_BUCKET"
 bucket_name = "kbouffe-images"
+
+# --- R2 bucket (Private: KYC docs, invoices, sensitive files) ---
+[[r2_buckets]]
+binding = "PRIVATE_BUCKET"
+bucket_name = "kbouffe-private"
 
 # ── Supabase Auth ──────────────────────────────────────────────────
 # Set via `wrangler secret put <KEY_NAME>`:
