@@ -37,19 +37,21 @@ export async function withAuth(): Promise<
     };
   }
 
-  // Primary: find restaurant by owner_id
-  const { data: ownedRestaurant } = await supabase
-    .from("restaurants")
-    .select("id")
-    .eq("owner_id", user.id)
+  // Primary: the user's *active* restaurant pointer (users.restaurant_id).
+  // This matches the backend auth middleware and, unlike querying
+  // restaurants.owner_id with .maybeSingle(), works when an owner has
+  // multiple restaurants (maybeSingle errors on >1 row → false 404).
+  const { data: dbUser } = await supabase
+    .from("users")
+    .select("restaurant_id")
+    .eq("id", user.id)
     .maybeSingle();
 
-  let restaurantId = ownedRestaurant?.id;
+  let restaurantId = (dbUser as { restaurant_id?: string } | null)?.restaurant_id ?? undefined;
 
   // Fallback: check restaurant_members (staff accounts)
   if (!restaurantId) {
     const { data: memberData } = await supabase
-      // @ts-expect-error — Table might be missing from generated types
       .from("restaurant_members")
       .select("restaurant_id")
       .eq("user_id", user.id)
@@ -57,8 +59,7 @@ export async function withAuth(): Promise<
       .limit(1)
       .maybeSingle();
 
-    // @ts-expect-error — Property might be missing from inferred type
-    restaurantId = memberData?.restaurant_id;
+    restaurantId = (memberData as { restaurant_id?: string } | null)?.restaurant_id ?? undefined;
   }
 
   if (!restaurantId) {
