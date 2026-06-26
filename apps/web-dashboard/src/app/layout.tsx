@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider, LocaleProvider, ToastProvider } from "@kbouffe/module-core/ui";
 import { CartProvider } from "@/contexts/cart-context";
 import { ClientAppProvider } from "@/components/providers/ClientAppProvider";
-import { PushNotificationProvider } from "@/components/providers/PushNotificationProvider";
+import { PushNotificationManagerLazy } from "@/components/providers/PushNotificationManagerLazy";
 import { PwaInstallPrompt } from "@/components/shared/PwaInstallPrompt";
 import "./globals.css";
 
@@ -94,13 +94,12 @@ export default function RootLayout({
         <ThemeProvider>
           <LocaleProvider>
             <ClientAppProvider>
-              <PushNotificationProvider>
-                <CartProvider>
-                  {children}
-                  <PwaInstallPrompt />
-                  <ToastProvider />
-                </CartProvider>
-              </PushNotificationProvider>
+              <CartProvider>
+                {children}
+                <PwaInstallPrompt />
+                <ToastProvider />
+                <PushNotificationManagerLazy />
+              </CartProvider>
             </ClientAppProvider>
           </LocaleProvider>
         </ThemeProvider>

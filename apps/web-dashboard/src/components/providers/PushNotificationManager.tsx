@@ -4,13 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 /**
- * PushNotificationProvider
- * - Si la permission est déjà accordée → initialise immédiatement (token + listener)
- * - Si la permission est 'default' (jamais demandée) → demande automatiquement
- *   après 3 s (laisse le temps à la page de se charger)
- * - Si la permission est 'denied' → silencieux
+ * PushNotificationManager — version "effet de bord" du PushNotificationProvider.
+ *
+ * Ne rend rien (`return null`) et n'enveloppe aucun enfant : il se place en
+ * sibling de l'app. Chargé en `ssr: false` (voir PushNotificationManagerLazy),
+ * il — et toute la chaîne Firebase qu'il tire — reste hors du bundle serveur
+ * Cloudflare Worker. Le push ne s'exécute de toute façon que dans le navigateur.
+ *
+ * - permission 'granted'  → initialise immédiatement (token + listener)
+ * - permission 'default'  → demande automatiquement après 3 s
+ * - permission 'denied'   → silencieux
  */
-export function PushNotificationProvider({ children }: { children: React.ReactNode }) {
+export default function PushNotificationManager() {
   const { isPermissionGranted, requestPermission, listenForMessages } = usePushNotifications();
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const initializedRef = useRef(false);
@@ -27,11 +32,8 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
     const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
 
     if (permission === 'granted') {
-      // Init immédiate
       initPush();
     } else if (permission === 'default') {
-      // Demande automatique après 3 s (nécessite que l'utilisateur interagisse
-      // avec la page dans les navigateurs modernes — si bloqué, silencieux)
       const timer = setTimeout(() => { initPush(); }, 3000);
       return () => clearTimeout(timer);
     }
@@ -39,7 +41,7 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
-  // Si la permission change (ex. l'utilisateur clique "Activer" dans un composant externe)
+  // Si la permission change (ex. clic "Activer" dans un composant externe)
   useEffect(() => {
     if (!ready) return;
     if (!isPermissionGranted) return;
@@ -71,5 +73,5 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
     };
   }, []);
 
-  return <>{children}</>;
+  return null;
 }
