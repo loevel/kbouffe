@@ -67,7 +67,11 @@ const nextConfig: NextConfig = {
       fallback: [
         {
           source: "/api/:path*",
-          destination: `${process.env.NEXT_PUBLIC_API_WORKER_URL ?? "http://localhost:8787"}/api/:path*`,
+          // Fallback for /api/* routes that have no local Next route handler
+          // (e.g. /api/marketplace/suppliers). Must point at the API worker;
+          // NEXT_PUBLIC_API_WORKER_URL was never defined, so it silently fell
+          // back to localhost and 500'd in production.
+          destination: `${process.env.NEXT_PUBLIC_API_WORKER_URL ?? process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:8787"}/api/:path*`,
         },
       ],
     };
