@@ -575,6 +575,72 @@ securityRoutes.get("/sessions", async (c) => {
     });
 });
 
+// ── 2FA (TOTP) — via la MFA native de Supabase Auth ──────────────────────────
+// Le client est scopé par le JWT de l'utilisateur, donc auth.mfa.* opère sur
+// son propre compte. Périmètre : réglages (activer/vérifier/désactiver).
+
+/** GET /security/2fa — statut 2FA de l'utilisateur courant */
+securityRoutes.get("/2fa", async (c) => {
+    const { data, error } = await c.var.supabase.auth.mfa.listFactors();
+    if (error) return c.json({ enabled: false, factorId: null });
+    const verified = (data?.totp ?? []).find((f) => f.status === "verified");
+    return c.json({ enabled: !!verified, factorId: verified?.id ?? null });
+});
+
+/** POST /security/2fa/enroll — démarre l'enrôlement TOTP (QR + secret) */
+securityRoutes.post("/2fa/enroll", async (c) => {
+    const supabase = c.var.supabase;
+
+    // Nettoie d'éventuels facteurs TOTP non-vérifiés (enrôlements abandonnés)
+    const { data: list } = await supabase.auth.mfa.listFactors();
+    for (const f of list?.all ?? []) {
+        if (f.factor_type === "totp" && f.status === "unverified") {
+            await supabase.auth.mfa.unenroll({ factorId: f.id }).catch(() => {});
+        }
+    }
+
+    const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: `totp-${Date.now()}`,
+    });
+    if (error || !data) {
+        return c.json({ error: error?.message ?? "Erreur lors de l'activation 2FA" }, 400);
+    }
+    return c.json({ factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret });
+});
+
+/** POST /security/2fa/verify — vérifie un code et active le facteur */
+securityRoutes.post("/2fa/verify", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const factorId = typeof body?.factorId === "string" ? body.factorId : "";
+    const code = typeof body?.code === "string" ? body.code.trim() : "";
+    if (!factorId || !code) return c.json({ error: "factorId et code requis" }, 400);
+
+    const supabase = c.var.supabase;
+    const { data: challenge, error: chErr } = await supabase.auth.mfa.challenge({ factorId });
+    if (chErr || !challenge) {
+        return c.json({ error: chErr?.message ?? "Erreur lors de la vérification" }, 400);
+    }
+    const { error: vErr } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challenge.id,
+        code,
+    });
+    if (vErr) return c.json({ error: "Code invalide" }, 400);
+    return c.json({ success: true });
+});
+
+/** DELETE /security/2fa — désactive la 2FA (désenrôle le facteur) */
+securityRoutes.delete("/2fa", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const factorId = typeof body?.factorId === "string" ? body.factorId : "";
+    if (!factorId) return c.json({ error: "factorId requis" }, 400);
+
+    const { error } = await c.var.supabase.auth.mfa.unenroll({ factorId });
+    if (error) return c.json({ error: error.message ?? "Erreur lors de la désactivation 2FA" }, 400);
+    return c.json({ success: true });
+});
+
 // ── Push Notifications ────────────────────────────────────────────────────────
 
 /** POST /push-token — Register or refresh an Expo push token */
