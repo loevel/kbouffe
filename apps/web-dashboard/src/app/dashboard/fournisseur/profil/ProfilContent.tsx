@@ -9,7 +9,7 @@
  *   3. Dossier KYC (lecture seule) : documents soumis, statut coloré
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -27,7 +27,18 @@ import {
     ChevronUp,
     AlertTriangle,
     Shield,
+    Building2,
+    Phone,
+    Mail,
+    MapPin,
+    Save,
 } from "lucide-react";
+
+interface ProfileFormState {
+    description: string;
+    locality: string;
+    address: string;
+}
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier, type SupplierProfile } from "../SupplierContext";
 import type { KYCResult } from "@/components/kyc/FaceLivenessKYC";

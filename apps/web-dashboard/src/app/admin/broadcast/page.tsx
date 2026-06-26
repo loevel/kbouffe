@@ -20,13 +20,25 @@ import {
     RefreshCw,
     ChevronRight,
     AlertTriangle,
+    Activity,
     Brain,
     Copy,
     Check,
     Save,
     Trash2,
     FileText,
+    X,
 } from "lucide-react";
+import {
+    ResponsiveContainer,
+    BarChart,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    Bar,
+} from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "@kbouffe/module-core/ui";
 import { cn } from "@/lib/utils";

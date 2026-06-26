@@ -613,7 +613,7 @@ export function ClientDiscovery() {
                     <p className="text-rose-700 dark:text-rose-300 font-semibold mb-4">{error}</p>
                     <div className="flex items-center justify-center gap-3">
                         <button
-                            onClick={() => fetchRestaurants()}
+                            onClick={() => fetchSections()}
                             className="px-5 py-2.5 rounded-full bg-brand-500 text-white font-semibold text-sm hover:bg-brand-600 transition-all"
                         >
                             Réessayer
