@@ -7,3 +7,4 @@ export { webhookRoutes as marketplaceWebhookRoutes } from './webhooks.js';
 export { suppliersRoutes } from './suppliers.js';
 export { traceRoutes } from './trace.js';
 export { supplierAdminRoutes } from './supplier-admin.js';
+export { marketplaceMessagesRoutes } from './messages.js';

@@ -89,6 +89,7 @@ import {
     suppliersRoutes,
     traceRoutes,
     supplierAdminRoutes,
+    marketplaceMessagesRoutes,
 } from "@kbouffe/module-marketplace";
 
 // ── Durable Objects ──────────────────────────────────────────────────
@@ -208,7 +209,13 @@ api.use("/marketplace/suppliers/me", userAuthMiddleware);
 api.use("/marketplace/suppliers/me/*", userAuthMiddleware);
 api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
 
+// Messagerie fournisseur — userAuthMiddleware : fonctionne pour le fournisseur
+// (résolu via user_id) ET le restaurant (restaurantId résolu si propriétaire).
+api.use("/marketplace/messages", userAuthMiddleware);
+api.use("/marketplace/messages/*", userAuthMiddleware);
+
 api.route("/marketplace/suppliers", suppliersRoutes);      // annuaire + inscription
+api.route("/marketplace/messages", marketplaceMessagesRoutes);  // messagerie B2B
 
 // ── Auth middleware for merchant routes ───────────────────────────────
 const merchantPaths = [

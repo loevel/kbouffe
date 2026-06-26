@@ -3,12 +3,13 @@
 /**
  * RFQModal — Demande de devis (Request For Quotation)
  *
- * Génère un message structuré et propose :
- *  - Ouverture WhatsApp (canal principal au Cameroun)
- *  - Copie dans le presse-papier
+ * Génère un message structuré et propose plusieurs canaux :
+ *  - Envoi in-app KBouffe (POST /api/marketplace/messages → inbox fournisseur)
+ *  - Ouverture WhatsApp (canal direct au Cameroun)
+ *  - Copie / appel / email
  *
- * Pas de backend nécessaire — la communication reste directe
- * fournisseur ↔ restaurant (modèle annuaire, Art.18 Loi 2015/018).
+ * L'envoi in-app alimente la messagerie fournisseur ; les canaux directs
+ * (WhatsApp, tel, email) restent disponibles (modèle annuaire historique).
  */
 
 import { useState } from "react";
@@ -16,8 +17,9 @@ import { motion } from "framer-motion";
 import {
     X, MessageCircle, Copy, Check, Phone, Mail,
     Package, Calendar, Hash, FileText, ExternalLink,
-    Sprout, ChevronRight,
+    Sprout, ChevronRight, Send, Loader2, AlertCircle,
 } from "lucide-react";
+import { authFetch } from "@kbouffe/module-core/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,9 @@ export function RFQModal({ supplier, product, onClose }: Props) {
         notes: "",
     });
     const [copied, setCopied] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [sent, setSent] = useState(false);
+    const [sendError, setSendError] = useState<string | null>(null);
 
     const qty    = form.quantity.trim();
     const unit   = product ? (UNIT_LABELS[product.unit] ?? product.unit) : "";
@@ -120,6 +125,38 @@ export function RFQModal({ supplier, product, onClose }: Props) {
         await navigator.clipboard.writeText(message);
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
+    };
+
+    /** Envoie le devis dans la messagerie in-app du fournisseur. */
+    const handleSendInApp = async () => {
+        setSending(true);
+        setSendError(null);
+        try {
+            const parsedQty = qty ? Number(qty) : null;
+            const res = await authFetch("/api/marketplace/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    supplier_id: supplier.id,
+                    product_id: product?.id ?? null,
+                    message_type: "rfq",
+                    subject: product ? `Devis — ${product.name}` : "Demande de devis",
+                    body: message,
+                    quantity: parsedQty != null && !Number.isNaN(parsedQty) ? parsedQty : null,
+                    unit: product?.unit ?? null,
+                    requested_date: form.delivery_date || null,
+                }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data?.error ?? "Échec de l'envoi");
+            }
+            setSent(true);
+        } catch (e: any) {
+            setSendError(e.message ?? "Échec de l'envoi");
+        } finally {
+            setSending(false);
+        }
     };
 
     return (
@@ -230,7 +267,25 @@ export function RFQModal({ supplier, product, onClose }: Props) {
 
                     {/* Actions */}
                     <div className="space-y-2 pt-1">
-                        {/* WhatsApp — primary CTA */}
+                        {/* In-app — primary CTA (alimente l'inbox fournisseur) */}
+                        <button
+                            onClick={handleSendInApp}
+                            disabled={sending || sent}
+                            className="w-full flex items-center justify-center gap-2.5 py-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors shadow-md"
+                        >
+                            {sent
+                                ? <><Check size={17} /> Devis envoyé dans l'app</>
+                                : sending
+                                    ? <><Loader2 size={17} className="animate-spin" /> Envoi…</>
+                                    : <><Send size={16} /> Envoyer dans l'app KBouffe</>}
+                        </button>
+                        {sendError && (
+                            <p className="flex items-center gap-1.5 text-xs text-red-400">
+                                <AlertCircle size={12} /> {sendError}
+                            </p>
+                        )}
+
+                        {/* WhatsApp — canal direct */}
                         <a
                             href={waLink}
                             target="_blank"
