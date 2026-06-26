@@ -348,6 +348,7 @@ api.route("/analytics", analyticsRoutes);            // /stats
 api.route("/finances", financesRoutes);              // /summary
 api.route("/marketplace", merchantMarketplaceServicesRoutes);  // /services
 api.route("/account", usersRoutes);
+api.route("/customers", customersRoutes);            // CRM — clients du restaurant
 api.route("/security", securityRoutes);
 api.route("/register-restaurant", authRoutes);
 api.route("/kyc", authRoutes);
