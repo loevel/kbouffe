@@ -144,12 +144,23 @@ export function ClientStoresChrome({
         try {
             const coords = await getCurrentCoordinates();
             const result = await getCityFromCoordinates(coords);
-            updateFilters({
-                city: result.city,
-                coords: { lat: coords.latitude, lng: coords.longitude, radius: 15 },
-            });
-            toast.success(`Position détectée : ${result.city}`);
-            setIsCityMenuOpen(false);
+            if (result.uncertain) {
+                // Fix imprécis (WiFi/IP) : on suggère la ville sans imposer de rayon
+                // géographique, et on laisse l'utilisateur confirmer/corriger.
+                updateFilters({ city: result.city, coords: undefined });
+                toast(
+                    `Position approximative${result.accuracyKm ? ` (±${result.accuracyKm} km)` : ""} — vérifiez votre ville`,
+                    { icon: "📍" },
+                );
+                setIsCityMenuOpen(true);
+            } else {
+                updateFilters({
+                    city: result.city,
+                    coords: { lat: coords.latitude, lng: coords.longitude, radius: 15 },
+                });
+                toast.success(`Position détectée : ${result.city}`);
+                setIsCityMenuOpen(false);
+            }
         } catch (error: any) {
             toast.error(error.message || "Impossible de détecter votre position");
         } finally {

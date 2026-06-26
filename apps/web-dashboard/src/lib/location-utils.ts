@@ -5,12 +5,25 @@
 export interface Coordinates {
     latitude: number;
     longitude: number;
+    /** Rayon de précision du fix, en mètres (Geolocation API). */
+    accuracy?: number;
 }
 
 export interface LocationResult {
     city: string;
+    /** true si le fix est trop imprécis pour distinguer les villes (WiFi/IP). */
+    uncertain?: boolean;
+    /** Précision du fix en km (pour le message à l'utilisateur). */
+    accuracyKm?: number;
     raw?: any;
 }
+
+/**
+ * Au-delà de ce rayon de précision, le fix (typiquement WiFi/IP) ne permet pas
+ * de distinguer deux villes camerounaises proches → on demande confirmation
+ * plutôt que d'imposer une ville (ex. Douala faussement détecté « Yaoundé »).
+ */
+const ACCURACY_THRESHOLD_M = 25000;
 
 const SUPPORTED_CITIES = ["Douala", "Yaoundé", "Bafoussam", "Garoua", "Kribi", "Limbé", "Nkongsamba", "Dschang", "Maroua", "Baganté", "Bamendjou"];
 
@@ -70,6 +83,7 @@ export async function getCurrentCoordinates(): Promise<Coordinates> {
                 resolve({
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
                 });
             },
             (error) => {
@@ -101,10 +115,14 @@ export async function getCurrentCoordinates(): Promise<Coordinates> {
  * Utilise Nominatim (OpenStreetMap) - Usage gratuit avec limites
  */
 export async function getCityFromCoordinates(coords: Coordinates): Promise<LocationResult> {
+    // Fix trop imprécis (WiFi/IP) → on ne peut pas distinguer les villes proches.
+    const accuracyKm = coords.accuracy != null ? Math.round(coords.accuracy / 1000) : undefined;
+    const uncertain = coords.accuracy != null && coords.accuracy > ACCURACY_THRESHOLD_M;
+
     // 1. Try geo-distance matching first (most reliable)
     const nearestCity = findNearestCity(coords.latitude, coords.longitude);
     if (nearestCity) {
-        return { city: nearestCity };
+        return { city: nearestCity, uncertain, accuracyKm };
     }
 
     // 2. Fallback: reverse geocoding via Nominatim
