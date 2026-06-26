@@ -10,11 +10,6 @@ import { createMiddleware } from "hono/factory";
 import { createClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "../types";
 import type { TeamRole } from "../lib/permissions";
-import { LRUCache } from "../lib/lru-cache";
-
-// Per-isolate cache: userId → { restaurantId, memberRole }
-// TTL of 5 minutes; max 500 entries (well within Cloudflare memory limits)
-const restaurantCache = new LRUCache<string, { restaurantId: string; memberRole: TeamRole }>(500, 5 * 60 * 1000);
 
 /**
  * Merchant auth middleware.
@@ -48,17 +43,8 @@ export const authMiddleware = createMiddleware<{
     }
     const userEmail = (claimsData?.claims?.email as string | undefined) ?? null;
 
-    // Check per-isolate LRU cache before hitting Supabase
-    const cached = restaurantCache.get(userId);
-    if (cached) {
-        c.set("userId", userId);
-        c.set("userEmail", userEmail);
-        c.set("restaurantId", cached.restaurantId);
-        c.set("memberRole", cached.memberRole);
-        c.set("supabase", supabase);
-        return next();
-    }
-
+    // Always resolve restaurant + role from the DB (no caching) so a removed or
+    // downgraded team member loses access immediately on every request.
     // Resolve the merchant's restaurant + role from Supabase public.users
     const { data: dbUser } = await supabase
         .from("users")
@@ -86,9 +72,6 @@ export const authMiddleware = createMiddleware<{
     if (!restaurantId) {
         return c.json({ error: "Restaurant non trouvé ou accès non autorisé" }, 404);
     }
-
-    // Populate cache
-    restaurantCache.set(userId, { restaurantId, memberRole: memberRole as TeamRole });
 
     // Set context variables
     c.set("userId", userId);
