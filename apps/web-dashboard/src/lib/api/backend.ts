@@ -10,8 +10,25 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 const BACKEND_URL = process.env.API_URL ?? "http://localhost:8787";
+
+/**
+ * Appelle le worker API via le service binding (worker→worker fiable) ; en dev,
+ * fallback sur un fetch URL classique. Le fetch URL workers.dev échoue (CF 1003),
+ * d'où le binding en prod.
+ */
+async function callBackend(url: string, init: RequestInit): Promise<Response> {
+    try {
+        const { env } = getCloudflareContext();
+        const api = (env as unknown as { API?: { fetch: (r: Request) => Promise<Response> } }).API;
+        if (api) return await api.fetch(new Request(url, init));
+    } catch {
+        // contexte CF indisponible (dev/local) → fetch URL ci-dessous
+    }
+    return fetch(url, init);
+}
 
 export async function backendProxy(request: NextRequest, targetPath?: string): Promise<NextResponse> {
     const supabase = await createClient();
@@ -48,7 +65,7 @@ export async function backendProxy(request: NextRequest, targetPath?: string): P
     }
 
     try {
-        const res = await fetch(target.toString(), {
+        const res = await callBackend(target.toString(), {
             method: request.method,
             headers,
             body,
@@ -109,7 +126,7 @@ export async function backendFetch<T = unknown>(
     }
 
     try {
-        const res = await fetch(target.toString(), { method: request.method, headers, body });
+        const res = await callBackend(target.toString(), { method: request.method, headers, body });
         const data = await res.json().catch(() => null) as T | null;
         return { data, status: res.status, ok: res.ok };
     } catch (err) {

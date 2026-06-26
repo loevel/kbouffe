@@ -8,6 +8,12 @@ minify = true
 
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
+# Service binding vers le worker API (kbouffe-api) — communication worker→worker
+# native, fiable (le fetch via l'URL workers.dev renvoie une erreur Cloudflare 1003).
+[[services]]
+binding = "API"
+service = "kbouffe-api"
+
 # Les secrets sont définis via : npx wrangler secret put <KEY>
 
 [alias]
