@@ -7,8 +7,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAdmin } from "@/lib/api/helpers";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
+// Build per-request: on Cloudflare Workers secrets are bound to the request,
+// not to module-load, so reading process.env at module top-level is unreliable.
+const geminiUrl = (key: string) =>
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
 
 const RULE_LABELS: Record<string, string> = {
     featured:  "restaurants mis en avant (sponsorisés + premium + meilleure note)",
@@ -19,6 +22,8 @@ const RULE_LABELS: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GEMINI_URL = geminiUrl(GEMINI_API_KEY ?? "");
     if (!GEMINI_API_KEY) return NextResponse.json({ error: "Gemini non configuré" }, { status: 500 });
 
     const { ctx, error } = await withAdmin();

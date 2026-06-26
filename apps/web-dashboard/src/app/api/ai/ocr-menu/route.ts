@@ -6,9 +6,11 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+// Build per-request: on Cloudflare Workers secrets are bound to the request,
+// not to module-load, so reading process.env at module top-level is unreliable.
+const geminiUrl = (key: string) =>
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
 
 const SYSTEM_PROMPT = `Tu es un expert en extraction de menus de restaurant.
 Tu reçois une photo d'un menu papier, tableau noir, affiche, ou document de restaurant.
@@ -38,6 +40,8 @@ Règles :
 - Si le texte est flou ou illisible, fais de ton mieux et note "?" dans le nom`;
 
 export async function POST(request: NextRequest) {
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GEMINI_URL = geminiUrl(GEMINI_API_KEY ?? "");
     if (!GEMINI_API_KEY) {
         return NextResponse.json(
             { error: "Gemini API key non configurée" },

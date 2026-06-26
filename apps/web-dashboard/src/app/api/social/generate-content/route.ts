@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api/helpers";
 import { checkAiRateLimit, logAiUsage } from "@/lib/ai-rate-limiter";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+// Build per-request: on Cloudflare Workers secrets are bound to the request,
+// not to module-load, so reading process.env at module top-level is unreliable.
+const geminiUrl = (key: string) =>
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
 
 const PLATFORM_SPECS: Record<string, { maxChars: number; style: string }> = {
     facebook: {
@@ -36,6 +38,8 @@ const PLATFORM_SPECS: Record<string, { maxChars: number; style: string }> = {
 };
 
 export async function POST(request: NextRequest) {
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GEMINI_URL = geminiUrl(GEMINI_API_KEY ?? "");
     if (!GEMINI_API_KEY) {
         return NextResponse.json(
             { error: "Gemini API key non configuree" },
