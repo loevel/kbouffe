@@ -62,3 +62,6 @@ firebase-debug.log
 # Firebase Admin credentials
 *service-account*.json
 firebase-adminsdk*.json
+
+# Local working notes
+PROJECT_CANVAS.md
