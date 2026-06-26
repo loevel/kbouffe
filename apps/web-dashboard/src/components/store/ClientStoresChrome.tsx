@@ -163,6 +163,7 @@ export function ClientStoresChrome({
             }
         } catch (error: any) {
             toast.error(error.message || "Impossible de détecter votre position");
+            setIsCityMenuOpen(true); // permet le choix manuel immédiat
         } finally {
             setIsDetectingLocation(false);
         }

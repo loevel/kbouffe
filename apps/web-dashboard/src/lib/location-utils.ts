@@ -140,33 +140,48 @@ export async function getCityFromCoordinates(coords: Coordinates): Promise<Locat
         if (!response.ok) throw new Error("Erreur lors du reverse geocoding");
 
         const data = await response.json();
-        
-        // Walk through all address fields to find a match
+
+        // Hors Cameroun (ex. utilisateur à Montréal) → on ne devine pas.
+        const countryCode = (data.address?.country_code || "").toLowerCase();
+        if (countryCode && countryCode !== "cm") {
+            throw new Error("Position hors de notre zone de service — sélectionnez votre ville manuellement.");
+        }
+
+        // Match sur le nom de ville dans les champs d'adresse
         const addressValues = Object.values(data.address || {}) as string[];
         for (const val of addressValues) {
             const match = SUPPORTED_CITIES.find(c =>
                 val.toLowerCase().includes(c.toLowerCase()) ||
                 c.toLowerCase().includes(val.toLowerCase())
             );
-            if (match) return { city: match, raw: data };
+            if (match) return { city: match, uncertain, accuracyKm, raw: data };
         }
 
-        // Check state/region for broader match (e.g. "Littoral" → Douala)
+        // Région — du plus SPÉCIFIQUE au plus générique (sinon "Sud-Ouest" est
+        // capté par "sud", "Nord-Ouest" par "nord", etc.)
         const region = (data.address?.state || data.address?.region || "").toLowerCase();
-        if (region.includes("littoral")) return { city: "Douala", raw: data };
-        if (region.includes("centre")) return { city: "Yaoundé", raw: data };
-        if (region.includes("nord")) return { city: "Maroua", raw: data };
-        if (region.includes("sud")) return { city: "Kribi", raw: data };
-        if (region.includes("ouest")) return { city: "Bafoussam", raw: data };
-        if (region.includes("sud-ouest") || region.includes("south west")) return { city: "Limbé", raw: data };
+        const REGION_CITY: [string, string][] = [
+            ["sud-ouest", "Limbé"], ["south west", "Limbé"],
+            ["nord-ouest", "Bafoussam"], ["north west", "Bafoussam"],
+            ["extrême-nord", "Maroua"], ["far north", "Maroua"],
+            ["littoral", "Douala"],
+            ["centre", "Yaoundé"],
+            ["ouest", "Bafoussam"],
+            ["sud", "Kribi"],
+            ["nord", "Garoua"],
+        ];
+        for (const [needle, city] of REGION_CITY) {
+            if (region.includes(needle)) return { city, uncertain, accuracyKm, raw: data };
+        }
 
-        // No match at all — default to Douala
-        return { city: "Douala", raw: data };
+        // Au Cameroun mais ville/région non reconnue → choix manuel (pas de défaut Douala trompeur)
+        throw new Error("Impossible d'identifier votre ville précisément — sélectionnez-la manuellement.");
     } catch (error) {
+        // Si Nominatim échoue (réseau), tenter la ville la plus proche, sinon choix manuel
+        if (error instanceof Error && error.message.includes("sélectionnez")) throw error;
         console.error("Reverse Geocoding Error:", error);
-        // Even if Nominatim fails, use nearest city if within 150 km
         const fallback = findNearestCity(coords.latitude, coords.longitude);
-        if (fallback) return { city: fallback };
-        throw new Error("Impossible d'identifier votre ville. Sélectionnez-la manuellement.");
+        if (fallback) return { city: fallback, uncertain, accuracyKm };
+        throw new Error("Impossible d'identifier votre ville — sélectionnez-la manuellement.");
     }
 }
