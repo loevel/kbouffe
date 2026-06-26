@@ -636,3 +636,145 @@ ordersRoutes.post("/:id/refund", async (c) => {
         },
     });
 });
+
+// ── Split payments (POS — diviser l'addition) ───────────────────────────────
+// Le POS est opéré par des caissiers (membres) : on écrit via le client
+// service-role (getAdminClient) avec une vérif explicite restaurant_id à chaque
+// opération (anti-IDOR). Cohérent avec la policy RLS « Service role full access ».
+const SPLIT_METHODS = ["cash", "mobile_money_mtn", "mobile_money_orange"];
+const SPLIT_STATUSES = ["pending", "paid", "failed", "refunded"];
+const SPLIT_SELECT =
+    "id, order_id, label, amount, payment_method, payment_status, payer_phone, payer_name, created_at";
+
+/** GET /orders/:id/splits — liste les parts de paiement d'une commande */
+ordersRoutes.get("/:id/splits", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const id = c.req.param("id");
+    const db = getAdminClient(c);
+
+    const { data: order } = await db
+        .from("orders").select("id").eq("id", id).eq("restaurant_id", restaurantId).single();
+    if (!order) return c.json({ error: "Commande non trouvée" }, 404);
+
+    const { data, error } = await db
+        .from("order_payment_splits")
+        .select(SPLIT_SELECT)
+        .eq("order_id", id)
+        .eq("restaurant_id", restaurantId)
+        .order("created_at", { ascending: true });
+
+    if (error) {
+        console.error("List splits error:", error);
+        return c.json({ error: "Erreur lors du chargement des parts" }, 500);
+    }
+    return c.json({ splits: data ?? [] });
+});
+
+/** POST /orders/:id/splits — crée les parts (la somme doit égaler le total) */
+ordersRoutes.post("/:id/splits", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => null);
+    if (!body || !Array.isArray(body.splits) || body.splits.length < 1) {
+        return c.json({ error: "Au moins une part est requise" }, 400);
+    }
+    const db = getAdminClient(c);
+
+    const { data: order } = await db
+        .from("orders").select("id, total").eq("id", id).eq("restaurant_id", restaurantId).single();
+    if (!order) return c.json({ error: "Commande non trouvée" }, 404);
+
+    const rows: Record<string, unknown>[] = [];
+    let sum = 0;
+    for (const s of body.splits) {
+        const amount = Math.round(Number(s?.amount));
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return c.json({ error: "Montant de part invalide" }, 400);
+        }
+        const method = String(s?.payment_method ?? "");
+        if (!SPLIT_METHODS.includes(method)) {
+            return c.json({ error: "Moyen de paiement invalide" }, 400);
+        }
+        sum += amount;
+        rows.push({
+            order_id: id,
+            restaurant_id: restaurantId,
+            label: (typeof s?.label === "string" && s.label.trim()) || "Part",
+            amount,
+            payment_method: method,
+            payment_status: "pending",
+            payer_name: typeof s?.payer_name === "string" ? s.payer_name.trim() || null : null,
+            payer_phone: typeof s?.payer_phone === "string" ? s.payer_phone.trim() || null : null,
+        });
+    }
+
+    const total = Number((order as { total: number }).total);
+    if (sum !== total) {
+        return c.json({ error: `Le total des parts (${sum}) doit correspondre au total (${total})` }, 400);
+    }
+
+    // Recréation idempotente : on remplace d'éventuelles parts existantes
+    await db.from("order_payment_splits").delete().eq("order_id", id).eq("restaurant_id", restaurantId);
+
+    const { data, error } = await db
+        .from("order_payment_splits")
+        .insert(rows as never)
+        .select(SPLIT_SELECT)
+        .order("created_at", { ascending: true });
+
+    if (error) {
+        console.error("Create splits error:", error);
+        return c.json({ error: "Erreur lors de la création des parts" }, 500);
+    }
+
+    if (typeof body.split_mode === "string") {
+        await db.from("orders")
+            .update({ split_payment_mode: body.split_mode } as never)
+            .eq("id", id).eq("restaurant_id", restaurantId);
+    }
+
+    return c.json({ splits: data ?? [] }, 201);
+});
+
+/** PATCH /orders/:id/splits/:splitId — encaisse/met à jour une part */
+ordersRoutes.patch("/:id/splits/:splitId", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const id = c.req.param("id");
+    const splitId = c.req.param("splitId");
+    const body = await c.req.json().catch(() => null);
+    const status = String(body?.payment_status ?? "");
+    if (!SPLIT_STATUSES.includes(status)) {
+        return c.json({ error: "Statut de paiement invalide" }, 400);
+    }
+    const db = getAdminClient(c);
+
+    const { data: split } = await db
+        .from("order_payment_splits")
+        .select("id").eq("id", splitId).eq("order_id", id).eq("restaurant_id", restaurantId).single();
+    if (!split) return c.json({ error: "Part introuvable" }, 404);
+
+    const { error: updErr } = await db
+        .from("order_payment_splits")
+        .update({ payment_status: status, updated_at: new Date().toISOString() } as never)
+        .eq("id", splitId).eq("restaurant_id", restaurantId);
+    if (updErr) {
+        console.error("Update split error:", updErr);
+        return c.json({ error: "Erreur lors de la mise à jour de la part" }, 500);
+    }
+
+    // Recalcule le statut de paiement de la commande (pas de valeur "partial" en base)
+    const { data: allSplits } = await db
+        .from("order_payment_splits")
+        .select("payment_status").eq("order_id", id).eq("restaurant_id", restaurantId);
+
+    let orderPaymentStatus: "paid" | "pending" | undefined;
+    if (allSplits && allSplits.length > 0) {
+        const allPaid = allSplits.every((s: { payment_status: string }) => s.payment_status === "paid");
+        orderPaymentStatus = allPaid ? "paid" : "pending";
+        await db.from("orders")
+            .update({ payment_status: orderPaymentStatus as never, updated_at: new Date().toISOString() } as never)
+            .eq("id", id).eq("restaurant_id", restaurantId);
+    }
+
+    return c.json({ success: true, order_payment_status: orderPaymentStatus });
+});
