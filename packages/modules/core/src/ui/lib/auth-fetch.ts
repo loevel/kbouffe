@@ -34,3 +34,28 @@ export async function authFetch(url: string, options: RequestInit = {}) {
         headers,
     });
 }
+
+/**
+ * Like authFetch but ALWAYS same-origin: it never prepends NEXT_PUBLIC_API_URL.
+ *
+ * Use this for endpoints that are implemented as Next.js route handlers on the
+ * dashboard itself (e.g. /api/ai/*, /api/notifications) rather than on the Hono
+ * backend. Sending those to the backend worker yields a 404.
+ *
+ * The JWT is still attached (harmless), but these local handlers authenticate
+ * via the session cookie, which is sent automatically on same-origin requests.
+ */
+export async function localFetch(url: string, options: RequestInit = {}) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const headers = new Headers(options.headers);
+    if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    return fetch(url, {
+        ...options,
+        headers,
+    });
+}

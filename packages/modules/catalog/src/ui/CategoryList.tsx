@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Edit, Trash2, FolderOpen, Languages, Loader2 } from "lucide-react";
 import useSWR from "swr";
-import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState, toast, useLocale, useDashboard, authFetch } from "@kbouffe/module-core/ui";
+import { Card, Button, Input, Textarea, Modal, ModalFooter, Toggle, EmptyState, toast, useLocale, useDashboard, authFetch, localFetch } from "@kbouffe/module-core/ui";
 import { useCategories, useProducts, createCategory as apiCreateCategory, updateCategory as apiUpdateCategory, deleteCategory as apiDeleteCategory, importCategoryPack } from "../hooks/use-catalog";
 import type { Category, Product } from "../lib/types";
 
@@ -272,7 +272,7 @@ export function CategoryList({ restaurantId, isAdmin = false }: { restaurantId?:
                                 onClick={async () => {
                                     setCatTranslating(true);
                                     try {
-                                        const res = await authFetch("/api/ai/translate", {
+                                        const res = await localFetch("/api/ai/translate", {
                                             method: "POST",
                                             headers: { "Content-Type": "application/json" },
                                             body: JSON.stringify({ texts: [form.name, form.description] }),

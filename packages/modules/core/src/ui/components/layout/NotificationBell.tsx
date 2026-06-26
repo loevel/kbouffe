@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Bell, ShoppingBag, AlertCircle, Clock, X, BarChart3, Trophy, UserMinus, Megaphone, Trash2 } from "lucide-react";
-import { authFetch } from "../../lib/auth-fetch";
+import { localFetch } from "../../lib/auth-fetch";
 import { createClient } from "../../lib/supabase-client";
 import { useDashboard } from "../../contexts/DashboardContext";
 
@@ -107,7 +107,7 @@ export function NotificationBell() {
 
     const fetchNotifications = useCallback(async () => {
         try {
-            const res = await authFetch("/api/notifications");
+            const res = await localFetch("/api/notifications");
             if (res.ok) {
                 const data = await res.json() as { notifications: KdsNotification[]; unreadCount: number };
                 setNotifications(data.notifications);
@@ -206,7 +206,7 @@ export function NotificationBell() {
     const markAllRead = async () => {
         setIsLoading(true);
         try {
-            const res = await authFetch("/api/notifications/read", {
+            const res = await localFetch("/api/notifications/read", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({}),
@@ -235,7 +235,7 @@ export function NotificationBell() {
         // API call
         setDeleting((prev) => new Set([...prev, id]));
         try {
-            await authFetch("/api/notifications", {
+            await localFetch("/api/notifications", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -259,7 +259,7 @@ export function NotificationBell() {
         setNotifications([]);
         setUnreadCount(0);
         try {
-            await authFetch("/api/notifications", {
+            await localFetch("/api/notifications", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ source: "all" }),
