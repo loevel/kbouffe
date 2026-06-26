@@ -782,5 +782,17 @@ restaurantsCrudRoutes.patch("/:id/modules", async (c) => {
         details: { moduleId, isActive },
     });
 
+    // Prévenir le restaurant que son accès au module/pack a changé.
+    const moduleName = MODULE_CATALOG.find((m) => m.id === moduleId)?.name ?? moduleId;
+    await supabase.from("restaurant_notifications").insert({
+        restaurant_id: id,
+        title: isActive ? `Nouveau pack activé : ${moduleName} 🎉` : `Pack désactivé : ${moduleName}`,
+        body: isActive
+            ? `Vous avez désormais accès au module « ${moduleName} ». Retrouvez-le dans votre tableau de bord.`
+            : `L'accès au module « ${moduleName} » a été désactivé pour votre établissement.`,
+        type: "module_access",
+        payload: { moduleId, isActive },
+    });
+
     return c.json({ success: true });
 });
