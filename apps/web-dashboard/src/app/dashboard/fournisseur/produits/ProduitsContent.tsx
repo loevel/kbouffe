@@ -46,6 +46,7 @@ interface Product {
     name: string;
     category: string;
     price_per_unit: number;
+    cost_per_unit: number | null;
     unit: string;
     min_order_quantity: number;
     available_quantity: number | null;
@@ -61,6 +62,7 @@ interface ProductFormData {
     name: string;
     category: string;
     price_per_unit: string;
+    cost_per_unit: string;
     unit: string;
     min_order_quantity: string;
     available_quantity: string;
@@ -100,6 +102,7 @@ const EMPTY_FORM: ProductFormData = {
     name: "",
     category: "",
     price_per_unit: "",
+    cost_per_unit: "",
     unit: "kg",
     min_order_quantity: "1",
     available_quantity: "",
@@ -124,6 +127,7 @@ function productToFormData(product: Product): ProductFormData {
         name: product.name,
         category: product.category,
         price_per_unit: String(product.price_per_unit),
+        cost_per_unit: product.cost_per_unit != null ? String(product.cost_per_unit) : "",
         unit: product.unit,
         min_order_quantity: String(product.min_order_quantity),
         available_quantity: product.available_quantity != null ? String(product.available_quantity) : "",
@@ -341,6 +345,10 @@ function ProductModal({
         if (!form.category) return setError("La catégorie est requise.");
         if (!form.price_per_unit || isNaN(Number(form.price_per_unit)))
             return setError("Le prix unitaire est invalide.");
+        if (form.cost_per_unit && isNaN(Number(form.cost_per_unit)))
+            return setError("Le coût de revient est invalide.");
+        if (form.cost_per_unit && Number(form.cost_per_unit) >= Number(form.price_per_unit))
+            return setError("Le coût de revient doit être inférieur au prix de vente.");
         if (!form.unit) return setError("L'unité est requise.");
         if (form.photos.length < MIN_PHOTOS)
             return setError(`Au moins ${MIN_PHOTOS} photo est requise.`);
@@ -353,6 +361,7 @@ function ProductModal({
                 name: form.name.trim(),
                 category: form.category,
                 price_per_unit: Math.round(Number(form.price_per_unit)),
+                cost_per_unit: form.cost_per_unit ? Math.round(Number(form.cost_per_unit)) : null,
                 unit: form.unit,
                 min_order_quantity: form.min_order_quantity ? Number(form.min_order_quantity) : 1,
                 available_quantity: form.available_quantity ? Number(form.available_quantity) : null,
@@ -525,6 +534,22 @@ function ProductModal({
                             />
                         </FormField>
                     </div>
+
+                    {/* Cost price — used to compute real margins in analytics */}
+                    <FormField
+                        label="Coût de revient / unité (FCFA)"
+                        hint="Optionnel — sert à calculer vos marges réelles. Si vide, marge estimée à 60% du prix."
+                    >
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Ex : 900"
+                            value={form.cost_per_unit}
+                            onChange={(e) => update("cost_per_unit", e.target.value)}
+                            className={inputClass}
+                        />
+                    </FormField>
 
                     {/* Stock + Region */}
                     <div className="grid grid-cols-2 gap-3">

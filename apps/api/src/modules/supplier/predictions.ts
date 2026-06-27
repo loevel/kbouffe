@@ -16,7 +16,12 @@ import type { Env, Variables } from "../../types";
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-const COST_RATIO = 0.6; // estimated cost = 60% of selling price (no cost column yet)
+const COST_RATIO = 0.6; // fallback when cost_per_unit is not set
+
+/** Real unit cost when known, else a 60% heuristic of the selling price. */
+function effectiveCost(costPerUnit: number | null | undefined, price: number): number {
+  return costPerUnit != null ? costPerUnit : price * COST_RATIO;
+}
 
 interface DemandForecast {
   productId: string;
@@ -182,14 +187,14 @@ router.get("/price-suggestions", async (c: any) => {
 
     const { data: products } = await supabase
       .from("supplier_products")
-      .select("id, name, price_per_unit")
+      .select("id, name, price_per_unit, cost_per_unit")
       .eq("supplier_id", supplierId);
 
     if (!products || products.length === 0) return c.json([]);
 
     const suggestions: PriceRecommendation[] = products.map((product: any) => {
       const price = product.price_per_unit || 0;
-      const estimatedCost = price * COST_RATIO;
+      const estimatedCost = effectiveCost(product.cost_per_unit, price);
       const suggestedPrice = Math.ceil((estimatedCost / (1 - targetMargin / 100)) / 50) * 50;
       const priceDelta = suggestedPrice - price;
       const estimatedMargin =
@@ -227,7 +232,7 @@ router.get("/margin-alerts", async (c: any) => {
 
     const { data: products } = await supabase
       .from("supplier_products")
-      .select("id, name, price_per_unit")
+      .select("id, name, price_per_unit, cost_per_unit")
       .eq("supplier_id", supplierId);
 
     if (!products || products.length === 0) return c.json([]);
@@ -239,7 +244,7 @@ router.get("/margin-alerts", async (c: any) => {
         const stat = stats.get(product.id);
         if (!stat || stat.units === 0) return null;
 
-        const estimatedCost = (product.price_per_unit || 0) * COST_RATIO;
+        const estimatedCost = effectiveCost(product.cost_per_unit, product.price_per_unit || 0);
         const avgPrice = stat.revenue / stat.units;
         if (avgPrice <= 0) return null;
         const currentMargin = Math.round(((avgPrice - estimatedCost) / avgPrice) * 100);
@@ -285,7 +290,7 @@ router.get("/cogs-analysis", async (c: any) => {
 
     const { data: products } = await supabase
       .from("supplier_products")
-      .select("id, name, price_per_unit")
+      .select("id, name, price_per_unit, cost_per_unit")
       .eq("supplier_id", supplierId);
 
     if (!products || products.length === 0) return c.json([]);
@@ -298,7 +303,7 @@ router.get("/cogs-analysis", async (c: any) => {
         if (!stat || stat.units === 0) return null;
 
         const price = product.price_per_unit || 0;
-        const costPerUnit = price * COST_RATIO;
+        const costPerUnit = effectiveCost(product.cost_per_unit, price);
         const totalCost = costPerUnit * stat.units;
         const totalProfit = stat.revenue - totalCost;
         const marginPercent = stat.revenue > 0 ? Math.round((totalProfit / stat.revenue) * 100) : 0;

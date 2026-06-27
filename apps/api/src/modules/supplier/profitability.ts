@@ -15,7 +15,12 @@ import type { Env, Variables } from "../../types";
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-const COST_RATIO = 0.6;
+const COST_RATIO = 0.6; // fallback when cost_per_unit is not set
+
+/** Real unit cost when known, else a 60% heuristic of the selling price. */
+function effectiveCost(costPerUnit: number | null | undefined, price: number): number {
+  return costPerUnit != null ? costPerUnit : price * COST_RATIO;
+}
 
 interface MarginHeatmapCell {
   buyerId: string;
@@ -95,11 +100,13 @@ router.get("/margin-heatmap", async (c: any) => {
 
     const { data: products } = await supabase
       .from("supplier_products")
-      .select("id, name, price_per_unit")
+      .select("id, name, price_per_unit, cost_per_unit")
       .eq("supplier_id", supplierId);
 
     if (!products || products.length === 0) return c.json([]);
-    const priceMap = new Map(products.map((p: any) => [p.id, p.price_per_unit || 0]));
+    const costMap = new Map(
+      products.map((p: any) => [p.id, effectiveCost(p.cost_per_unit, p.price_per_unit || 0)])
+    );
     const nameMap = new Map(products.map((p: any) => [p.id, p.name]));
 
     const { data: orders } = await supabase
@@ -150,7 +157,7 @@ router.get("/margin-heatmap", async (c: any) => {
       }
       const cell = cells.get(key)!;
       const revenue = (item as any).total_price || 0;
-      const cost = (Number((item as any).quantity) || 0) * (priceMap.get(pid) || 0) * COST_RATIO;
+      const cost = (Number((item as any).quantity) || 0) * (costMap.get(pid) || 0);
       cell.revenue += revenue;
       cell.profit += revenue - cost;
       cell.orders += 1;
@@ -180,14 +187,14 @@ router.get("/pricing-rules", async (c: any) => {
 
     const { data: products } = await supabase
       .from("supplier_products")
-      .select("id, name, price_per_unit")
+      .select("id, name, price_per_unit, cost_per_unit")
       .eq("supplier_id", supplierId);
 
     if (!products || products.length === 0) return c.json([]);
 
     const rules: PricingRule[] = products.map((product: any) => {
       const price = product.price_per_unit || 0;
-      const estimatedCost = price * COST_RATIO;
+      const estimatedCost = effectiveCost(product.cost_per_unit, price);
       const targetMargin = 30;
       const calculatedPrice = Math.ceil((estimatedCost / (1 - targetMargin / 100)) / 50) * 50;
       return {

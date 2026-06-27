@@ -249,12 +249,12 @@ suppliersRoutes.post('/me/products', async (c) => {
       return c.json({ error: 'Votre dossier KYC est en attente de validation — vous pourrez ajouter des produits une fois approuvé' }, 403);
     }
 
-    const body = await c.req.json<CreateSupplierProductRequest & { photos?: string[] }>();
+    const body = await c.req.json<CreateSupplierProductRequest & { photos?: string[]; cost_per_unit?: number }>();
     const {
       name, category, price_per_unit, unit,
       description, min_order_quantity, available_quantity,
       origin_region, harvest_date, allergens,
-      is_organic, phytosanitary_note, photos,
+      is_organic, phytosanitary_note, photos, cost_per_unit,
     } = body;
 
     if (!name?.trim() || !category || !price_per_unit || !unit) {
@@ -279,6 +279,7 @@ suppliersRoutes.post('/me/products', async (c) => {
         category,
         description: description?.trim() || null,
         price_per_unit,
+        cost_per_unit: typeof cost_per_unit === "number" && cost_per_unit > 0 ? cost_per_unit : null,
         unit,
         photos: photosList,
         min_order_quantity: min_order_quantity ?? 1,
@@ -588,13 +589,13 @@ suppliersRoutes.post('/:id/products', async (c) => {
     const restaurantId = c.var.restaurantId;
     if (!supabase || !restaurantId) return c.json({ error: 'Non autorisé' }, 401);
     const supplierId = c.req.param('id');
-    const body = await c.req.json<CreateSupplierProductRequest>();
+    const body = await c.req.json<CreateSupplierProductRequest & { cost_per_unit?: number }>();
 
     const {
       name, category, price_per_unit, unit,
       description, min_order_quantity, available_quantity,
       origin_region, harvest_date, allergens,
-      is_organic, phytosanitary_note,
+      is_organic, phytosanitary_note, cost_per_unit,
     } = body;
 
     if (!name?.trim() || !category || !price_per_unit || !unit) {
@@ -624,6 +625,7 @@ suppliersRoutes.post('/:id/products', async (c) => {
         description: description?.trim() || null,
         photos: [],
         price_per_unit,
+        cost_per_unit: typeof cost_per_unit === "number" && cost_per_unit > 0 ? cost_per_unit : null,
         unit,
         min_order_quantity: min_order_quantity ?? 1,
         available_quantity: available_quantity ?? null,
@@ -660,7 +662,7 @@ suppliersRoutes.patch('/supplier-products/:productId', async (c) => {
     const body = await c.req.json<Partial<CreateSupplierProductRequest>>();
 
     const allowed = [
-      'name', 'category', 'description', 'price_per_unit', 'unit', 'min_order_quantity',
+      'name', 'category', 'description', 'price_per_unit', 'cost_per_unit', 'unit', 'min_order_quantity',
       'available_quantity', 'origin_region', 'harvest_date', 'allergens',
       'is_organic', 'phytosanitary_note', 'is_active', 'photos',
     ];

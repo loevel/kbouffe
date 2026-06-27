@@ -68,6 +68,13 @@ interface SalesVelocity {
   avgOrder: number;
 }
 
+const COST_RATIO = 0.6; // fallback when cost_per_unit is not set
+
+/** Real unit cost when known, else a 60% heuristic of the selling price. */
+function effectiveCost(costPerUnit: number | null | undefined, price: number): number {
+  return costPerUnit != null ? costPerUnit : price * COST_RATIO;
+}
+
 /** Build a service-role client (chat/analytics do their own authorization). */
 function db(c: any): SupabaseClient | null {
   if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return null;
@@ -115,11 +122,39 @@ router.get("/metrics", async (c: any) => {
     const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
     const totalCustomers = new Set(valid.map((o: any) => o.restaurant_id)).size;
 
+    // Overall margin from real (or estimated) unit costs.
+    let avgMargin = 0;
+    const orderIds = valid.map((o: any) => o.id);
+    if (orderIds.length > 0 && totalSales > 0) {
+      const { data: items } = await supabase
+        .from("supplier_order_items")
+        .select("product_id, quantity")
+        .in("order_id", orderIds);
+      const productIds = [...new Set((items ?? []).map((i: any) => i.product_id).filter(Boolean))];
+      const costMap = new Map<string, { cost: number | null; price: number }>();
+      if (productIds.length > 0) {
+        const { data: prods } = await supabase
+          .from("supplier_products")
+          .select("id, cost_per_unit, price_per_unit")
+          .in("id", productIds);
+        for (const p of prods ?? []) {
+          costMap.set((p as any).id, { cost: (p as any).cost_per_unit, price: (p as any).price_per_unit || 0 });
+        }
+      }
+      let totalCost = 0;
+      for (const it of items ?? []) {
+        const cm = costMap.get((it as any).product_id);
+        if (!cm) continue;
+        totalCost += effectiveCost(cm.cost, cm.price) * (Number((it as any).quantity) || 0);
+      }
+      avgMargin = Math.max(0, Math.round(((totalSales - totalCost) / totalSales) * 100));
+    }
+
     const metrics: SupplierMetrics = {
       totalSales,
       totalOrders,
       avgOrderValue: Math.round(avgOrderValue),
-      avgMargin: 0, // no cost data on supplier_products
+      avgMargin,
       totalCustomers,
       periodLabel: "30 derniers jours",
     };
@@ -144,7 +179,7 @@ router.get("/products", async (c: any) => {
 
     const { data: products } = await supabase
       .from("supplier_products")
-      .select("id, name, category")
+      .select("id, name, category, cost_per_unit, price_per_unit")
       .eq("supplier_id", supplierId);
 
     if (!products || products.length === 0) return c.json([]);
@@ -178,13 +213,16 @@ router.get("/products", async (c: any) => {
 
     const result: ProductPerformance[] = products.map((p: any) => {
       const s = stats.get(p.id) || { revenue: 0, units: 0 };
+      const cost = effectiveCost(p.cost_per_unit, p.price_per_unit || 0);
+      const avgPrice = s.units > 0 ? s.revenue / s.units : 0;
+      const totalCost = cost * s.units;
       return {
         id: p.id,
         name: p.name,
         revenue: s.revenue,
         unitsSold: s.units,
-        avgMargin: 0, // no cost data
-        roi: 0, // no cost data
+        avgMargin: avgPrice > 0 ? Math.round(((avgPrice - cost) / avgPrice) * 100) : 0,
+        roi: totalCost > 0 ? Math.round(((s.revenue - totalCost) / totalCost) * 100) : 0,
         trend: "flat",
         category: p.category || "Général",
       };
@@ -280,17 +318,18 @@ router.get("/categories", async (c: any) => {
 
     const { data: products } = await supabase
       .from("supplier_products")
-      .select("id, category")
+      .select("id, category, cost_per_unit, price_per_unit")
       .eq("supplier_id", supplierId);
 
     if (!products || products.length === 0) return c.json([]);
 
-    const productCategory = new Map<string, string>();
-    const categoryMap = new Map<string, { sales: number; products: Set<string> }>();
+    const productInfo = new Map<string, { category: string; cost: number; price: number }>();
+    const categoryMap = new Map<string, { sales: number; cost: number; products: Set<string> }>();
     for (const p of products) {
       const cat = (p as any).category || "Général";
-      productCategory.set((p as any).id, cat);
-      if (!categoryMap.has(cat)) categoryMap.set(cat, { sales: 0, products: new Set() });
+      const price = (p as any).price_per_unit || 0;
+      productInfo.set((p as any).id, { category: cat, cost: effectiveCost((p as any).cost_per_unit, price), price });
+      if (!categoryMap.has(cat)) categoryMap.set(cat, { sales: 0, cost: 0, products: new Set() });
       categoryMap.get(cat)!.products.add((p as any).id);
     }
 
@@ -306,13 +345,15 @@ router.get("/categories", async (c: any) => {
     if (orderIds.length > 0) {
       const { data: items } = await supabase
         .from("supplier_order_items")
-        .select("product_id, total_price, order_id")
+        .select("product_id, quantity, total_price, order_id")
         .in("order_id", orderIds);
 
       for (const item of items ?? []) {
-        const cat = productCategory.get((item as any).product_id);
-        if (cat && categoryMap.has(cat)) {
-          categoryMap.get(cat)!.sales += (item as any).total_price || 0;
+        const info = productInfo.get((item as any).product_id);
+        if (info && categoryMap.has(info.category)) {
+          const agg = categoryMap.get(info.category)!;
+          agg.sales += (item as any).total_price || 0;
+          agg.cost += info.cost * (Number((item as any).quantity) || 0);
         }
       }
     }
@@ -323,7 +364,7 @@ router.get("/categories", async (c: any) => {
       .map(([name, data]) => ({
         name,
         salesPercent: totalSales > 0 ? Math.round((data.sales / totalSales) * 100) : 0,
-        avgMargin: 0, // no cost data
+        avgMargin: data.sales > 0 ? Math.max(0, Math.round(((data.sales - data.cost) / data.sales) * 100)) : 0,
         growth: 0, // previous-period comparison not computed
         productCount: data.products.size,
       }))
