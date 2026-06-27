@@ -15,9 +15,12 @@ const SalesVelocity = dynamic(
 );
 
 export default function SupplierAnalyticsPage() {
-  const { supplierId } = useSupplier();
+  const { supplierId, loading } = useSupplier();
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
 
+  if (loading) {
+    return <div className="text-center py-16 text-surface-400">Chargement…</div>;
+  }
   if (!supplierId) {
     return <div className="text-center py-16 text-surface-400">Fournisseur non identifié</div>;
   }

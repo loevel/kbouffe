@@ -9,9 +9,12 @@ import { COGSTracker } from "@/components/supplier/COGSTracker";
 import { Zap, Package, TrendingUp, AlertTriangle, BarChart3 } from "lucide-react";
 
 export default function SupplierAutomationPage() {
-  const { supplierId } = useSupplier();
+  const { supplierId, loading } = useSupplier();
   const [targetMargin, setTargetMargin] = useState(30);
 
+  if (loading) {
+    return <div className="text-center py-16 text-surface-400">Chargement…</div>;
+  }
   if (!supplierId) {
     return <div className="text-center py-16 text-surface-400">Fournisseur non identifié</div>;
   }

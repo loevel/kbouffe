@@ -8,8 +8,11 @@ import { MarketIntelligence } from "@/components/supplier/MarketIntelligence";
 import { TrendingUp, Zap, ShoppingCart, BarChart2, Lightbulb } from "lucide-react";
 
 export default function SupplierProfitabilityPage() {
-  const { supplierId } = useSupplier();
+  const { supplierId, loading } = useSupplier();
 
+  if (loading) {
+    return <div className="text-center py-16 text-surface-400">Chargement…</div>;
+  }
   if (!supplierId) {
     return <div className="text-center py-16 text-surface-400">Fournisseur non identifié</div>;
   }

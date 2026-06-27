@@ -75,6 +75,8 @@ export interface SupplierProfile {
 
 interface SupplierContextValue {
     supplier: SupplierProfile | null;
+    /** Convenience accessor for supplier?.id — several pages consume this directly. */
+    supplierId: string | null;
     loading: boolean;
     refresh: () => Promise<void>;
 }
@@ -83,6 +85,7 @@ interface SupplierContextValue {
 
 const SupplierContext = createContext<SupplierContextValue>({
     supplier: null,
+    supplierId: null,
     loading: true,
     refresh: async () => {},
 });
@@ -151,7 +154,7 @@ export function SupplierProvider({ children }: { children: ReactNode }) {
 
     return (
         <SupplierContext.Provider
-            value={{ supplier, loading, refresh: fetchSupplier }}
+            value={{ supplier, supplierId: supplier?.id ?? null, loading, refresh: fetchSupplier }}
         >
             {children}
         </SupplierContext.Provider>
