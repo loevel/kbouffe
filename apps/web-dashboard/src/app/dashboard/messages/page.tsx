@@ -199,6 +199,40 @@ function MerchantChatView({
 }) {
     const { user } = useDashboard();
 
+    // Mark the whole thread as read on open. This runs for BOTH order- and
+    // conversation-based threads (the order path / useChat never marked read,
+    // so order conversations stayed "unread" forever). Unread is counted from
+    // messages.is_read, and /conversations/:id/read updates by conversation_id,
+    // which is valid for both types.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const { createClient } = await import("@kbouffe/module-core/ui");
+                const supabase = createClient();
+                const headers: Record<string, string> = {};
+                if (supabase) {
+                    const {
+                        data: { session },
+                    } = await supabase.auth.getSession();
+                    if (session?.access_token) {
+                        headers.Authorization = `Bearer ${session.access_token}`;
+                    }
+                }
+                if (cancelled) return;
+                await fetch(`/api/chat/conversations/${conversation.id}/read`, {
+                    method: "POST",
+                    headers,
+                });
+            } catch {
+                // ignore — badge will clear on next list refresh
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [conversation.id]);
+
     // If the conversation has an orderId, use the existing useChat hook
     if (conversation.orderId) {
         return (
@@ -692,7 +726,18 @@ export default function MessagesPage() {
                             <ConversationList
                                 conversations={conversations}
                                 selectedId={selected?.id ?? null}
-                                onSelect={(conv) => setSelected(conv)}
+                                onSelect={(conv) => {
+                                    setSelected(conv);
+                                    // Optimistically clear the unread badge; the
+                                    // read POST in MerchantChatView persists it.
+                                    setConversations((prev) =>
+                                        prev.map((c) =>
+                                            c.id === conv.id
+                                                ? { ...c, unreadCount: 0 }
+                                                : c
+                                        )
+                                    );
+                                }}
                                 filter={filter}
                                 onFilterChange={setFilter}
                             />
