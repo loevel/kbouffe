@@ -1,17 +1,24 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "../../types";
 
 /**
  * Supplier Analytics Routes
  *
- * Provides metrics for suppliers:
- * - GET /api/supplier/metrics — Overview KPIs (total sales, margin %, customers)
- * - GET /api/supplier/products — Product performance (revenue, margin, units, ROI)
- * - GET /api/supplier/buyers — Buyer segments (repeat rate, LTV, churn)
- * - GET /api/supplier/categories — Category breakdown (sales %, growth)
- * - GET /api/supplier/sales-velocity — Orders trend (by day/week/month)
- * - GET /api/supplier/stock — Inventory levels + low stock alerts
+ * Metrics for the marketplace supplier dashboard. The supplier is resolved from
+ * the authenticated user (suppliers.user_id), NOT from a restaurant. Data comes
+ * from the supplier_* tables (supplier_orders, supplier_order_items,
+ * supplier_products) — buyers are RESTAURANTS purchasing from the supplier.
+ *
+ * - GET /api/supplier/metrics        — Overview KPIs (sales, orders, buyers)
+ * - GET /api/supplier/products       — Product performance (revenue, units)
+ * - GET /api/supplier/buyers         — Buyer (restaurant) segments
+ * - GET /api/supplier/categories     — Category breakdown (sales %)
+ * - GET /api/supplier/sales-velocity — Orders trend (day/week/month)
+ * - GET /api/supplier/stock          — Inventory levels + low stock alerts
+ *
+ * NOTE: supplier_products has no cost field, so margin/ROI cannot be derived
+ * and are returned as 0 (revenue / units / sales counts are real).
  */
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -61,53 +68,59 @@ interface SalesVelocity {
   avgOrder: number;
 }
 
+/** Build a service-role client (chat/analytics do their own authorization). */
+function db(c: any): SupabaseClient | null {
+  if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** Resolve the supplier owned by the authenticated user. */
+async function resolveSupplierId(c: any, supabase: SupabaseClient): Promise<string | null> {
+  const userId = c.var.userId;
+  if (!userId) return null;
+  const { data } = await supabase
+    .from("suppliers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+}
+
 /**
- * GET /api/supplier/metrics
- * Overview KPIs for supplier dashboard
+ * GET /api/supplier/metrics — Overview KPIs (last 30 days)
  */
 router.get("/metrics", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    // Get total sales & orders (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
     const { data: orders } = await supabase
-      .from("orders")
+      .from("supplier_orders")
       .select("id, total_amount, restaurant_id, status, created_at")
-      .eq("restaurant_id", supplierId)
-      .gte("created_at", thirtyDaysAgo.toISOString())
-      .order("created_at", { ascending: false });
+      .eq("supplier_id", supplierId)
+      .gte("created_at", daysAgo(30));
 
-    const totalSales = orders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
-    const totalOrders = orders?.length || 0;
+    const valid = (orders ?? []).filter((o: any) => o.status !== "cancelled");
+    const totalSales = valid.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
+    const totalOrders = valid.length;
     const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
-
-    // Get unique customers
-    const { data: customers } = await supabase
-      .from("orders")
-      .select("user_id")
-      .eq("restaurant_id", supplierId)
-      .gte("created_at", thirtyDaysAgo.toISOString());
-
-    const uniqueCustomers = new Set(customers?.map((c: any) => c.user_id) || []).size;
-
-    // Calculate average margin (placeholder: 25% default for now)
-    const avgMargin = 25;
+    const totalCustomers = new Set(valid.map((o: any) => o.restaurant_id)).size;
 
     const metrics: SupplierMetrics = {
       totalSales,
       totalOrders,
       avgOrderValue: Math.round(avgOrderValue),
-      avgMargin,
-      totalCustomers: uniqueCustomers,
+      avgMargin: 0, // no cost data on supplier_products
+      totalCustomers,
       periodLabel: "30 derniers jours",
     };
 
@@ -119,71 +132,61 @@ router.get("/metrics", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/products
- * Product performance metrics
+ * GET /api/supplier/products — Product performance (last 30 days)
  */
 router.get("/products", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    // Get products for this supplier with order stats
     const { data: products } = await supabase
-      .from("products")
-      .select(
-        `
-        id,
-        name,
-        category_id,
-        categories(name)
-      `
-      )
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, category")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
-    }
+    if (!products || products.length === 0) return c.json([]);
 
-    // Fetch order items for these products
-    const productIds = products.map((p: any) => p.id);
-    const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("product_id, quantity, subtotal, created_at")
-      .in("product_id", productIds)
-      .gte("created_at", thirtyDaysAgo.toISOString());
+    // Order items belonging to this supplier's orders in the last 30 days.
+    const { data: orders } = await supabase
+      .from("supplier_orders")
+      .select("id")
+      .eq("supplier_id", supplierId)
+      .neq("status", "cancelled")
+      .gte("created_at", daysAgo(30));
 
-    const productStats = new Map<
-      string,
-      { revenue: number; units: number; trend: number }
-    >();
+    const orderIds = (orders ?? []).map((o: any) => o.id);
 
-    orderItems?.forEach((item: any) => {
-      if (!productStats.has(item.product_id)) {
-        productStats.set(item.product_id, { revenue: 0, units: 0, trend: 0 });
+    const stats = new Map<string, { revenue: number; units: number }>();
+    if (orderIds.length > 0) {
+      const { data: items } = await supabase
+        .from("supplier_order_items")
+        .select("product_id, quantity, total_price, order_id")
+        .in("order_id", orderIds);
+
+      for (const item of items ?? []) {
+        const pid = (item as any).product_id;
+        if (!pid) continue;
+        if (!stats.has(pid)) stats.set(pid, { revenue: 0, units: 0 });
+        const s = stats.get(pid)!;
+        s.revenue += (item as any).total_price || 0;
+        s.units += Number((item as any).quantity) || 0;
       }
-      const stat = productStats.get(item.product_id)!;
-      stat.revenue += item.subtotal || 0;
-      stat.units += item.quantity || 0;
-    });
+    }
 
     const result: ProductPerformance[] = products.map((p: any) => {
-      const stat = productStats.get(p.id) || { revenue: 0, units: 0, trend: 0 };
+      const s = stats.get(p.id) || { revenue: 0, units: 0 };
       return {
         id: p.id,
         name: p.name,
-        revenue: stat.revenue,
-        unitsSold: stat.units,
-        avgMargin: 25, // Placeholder
-        roi: stat.units > 0 ? (stat.revenue / (stat.units * 100)) * 100 : 0, // Simple ROI calc
-        trend: stat.trend > 0 ? "up" : stat.trend < 0 ? "down" : "flat",
-        category: p.categories?.name || "Général",
+        revenue: s.revenue,
+        unitsSold: s.units,
+        avgMargin: 0, // no cost data
+        roi: 0, // no cost data
+        trend: "flat",
+        category: p.category || "Général",
       };
     });
 
@@ -195,85 +198,69 @@ router.get("/products", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/buyers
- * Buyer segments with repeat rate, LTV, churn risk
+ * GET /api/supplier/buyers — Buyer (restaurant) segments (last 30 days)
  */
 router.get("/buyers", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    // Get all orders from this supplier
     const { data: orders } = await supabase
-      .from("orders")
-      .select("user_id, total_amount, created_at")
-      .eq("restaurant_id", supplierId)
-      .gte("created_at", thirtyDaysAgo.toISOString())
+      .from("supplier_orders")
+      .select("restaurant_id, total_amount, status, created_at")
+      .eq("supplier_id", supplierId)
+      .neq("status", "cancelled")
+      .gte("created_at", daysAgo(30))
       .order("created_at", { ascending: false });
 
-    const buyerMap = new Map<
-      string,
-      { orders: number; total: number; lastOrder: string; dates: string[] }
-    >();
-
-    orders?.forEach((order: any) => {
-      if (!buyerMap.has(order.user_id)) {
-        buyerMap.set(order.user_id, {
-          orders: 0,
-          total: 0,
-          lastOrder: order.created_at,
-          dates: [],
-        });
+    const buyerMap = new Map<string, { orders: number; total: number; lastOrder: string }>();
+    for (const order of orders ?? []) {
+      const rid = (order as any).restaurant_id;
+      if (!rid) continue;
+      if (!buyerMap.has(rid)) {
+        buyerMap.set(rid, { orders: 0, total: 0, lastOrder: (order as any).created_at });
       }
-      const buyer = buyerMap.get(order.user_id)!;
-      buyer.orders += 1;
-      buyer.total += order.total_amount || 0;
-      buyer.dates.push(order.created_at);
-      buyer.lastOrder = order.created_at;
+      const b = buyerMap.get(rid)!;
+      b.orders += 1;
+      b.total += (order as any).total_amount || 0;
+      // orders are sorted desc, so the first seen is the most recent
+    }
+
+    // Resolve buyer (restaurant) names.
+    const restaurantIds = Array.from(buyerMap.keys());
+    const nameMap = new Map<string, string>();
+    if (restaurantIds.length > 0) {
+      const { data: restaurants } = await supabase
+        .from("restaurants")
+        .select("id, name")
+        .in("id", restaurantIds);
+      for (const r of restaurants ?? []) {
+        nameMap.set((r as any).id, (r as any).name);
+      }
+    }
+
+    const result: BuyerSegment[] = Array.from(buyerMap.entries()).map(([rid, data]) => {
+      const repeatRate = Math.min(Math.round((data.orders / 10) * 100), 100);
+      const daysSinceLastOrder = Math.floor(
+        (Date.now() - new Date(data.lastOrder).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const churnRisk: BuyerSegment["churnRisk"] =
+        daysSinceLastOrder > 20 ? "high" : daysSinceLastOrder > 10 ? "medium" : "low";
+      return {
+        id: rid,
+        name: nameMap.get(rid) || "Restaurant " + rid.slice(0, 8),
+        totalOrders: data.orders,
+        repeatRate,
+        ltv: data.total,
+        churnRisk,
+        lastOrderDate: data.lastOrder,
+      };
     });
 
-    // Get user names
-    const userIds = Array.from(buyerMap.keys());
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, full_name")
-      .in("id", userIds);
-
-    const userMap = new Map(users?.map((u: any) => [u.id, u.full_name]) || []);
-
-    const result: BuyerSegment[] = Array.from(buyerMap.entries()).map(
-      ([userId, data]) => {
-        // Calculate repeat rate (how many times in 30 days)
-        const repeatRate = Math.min(Math.round((data.orders / 10) * 100), 100); // Normalize to 0-100
-        const ltv = data.total;
-
-        // Churn risk based on days since last order
-        const daysSinceLastOrder = Math.floor(
-          (Date.now() - new Date(data.lastOrder).getTime()) / (1000 * 60 * 60 * 24)
-        );
-        const churnRisk =
-          daysSinceLastOrder > 20 ? "high" : daysSinceLastOrder > 10 ? "medium" : "low";
-
-        return {
-          id: userId,
-          name: userMap.get(userId) || "Client " + userId.slice(0, 8),
-          totalOrders: data.orders,
-          repeatRate,
-          ltv,
-          churnRisk,
-          lastOrderDate: data.lastOrder,
-        };
-      }
-    );
-
-    return c.json(result.sort((a, b) => b.ltv - a.ltv).slice(0, 20)); // Top 20 buyers
+    return c.json(result.sort((a, b) => b.ltv - a.ltv).slice(0, 20));
   } catch (error) {
     console.error("[Supplier API] buyers error:", error);
     return c.json({ error: "Failed to fetch buyers" }, 500);
@@ -281,72 +268,63 @@ router.get("/buyers", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/categories
- * Category performance breakdown
+ * GET /api/supplier/categories — Category performance (last 30 days)
  */
 router.get("/categories", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    // Get all products with categories
     const { data: products } = await supabase
-      .from("products")
-      .select("id, category_id, categories(name)")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, category")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
+    if (!products || products.length === 0) return c.json([]);
+
+    const productCategory = new Map<string, string>();
+    const categoryMap = new Map<string, { sales: number; products: Set<string> }>();
+    for (const p of products) {
+      const cat = (p as any).category || "Général";
+      productCategory.set((p as any).id, cat);
+      if (!categoryMap.has(cat)) categoryMap.set(cat, { sales: 0, products: new Set() });
+      categoryMap.get(cat)!.products.add((p as any).id);
     }
 
-    const productIds = products.map((p: any) => p.id);
+    // Sales per product from this supplier's recent order items.
+    const { data: orders } = await supabase
+      .from("supplier_orders")
+      .select("id")
+      .eq("supplier_id", supplierId)
+      .neq("status", "cancelled")
+      .gte("created_at", daysAgo(30));
 
-    // Get sales by product
-    const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("product_id, subtotal")
-      .in("product_id", productIds)
-      .gte("created_at", thirtyDaysAgo.toISOString());
+    const orderIds = (orders ?? []).map((o: any) => o.id);
+    if (orderIds.length > 0) {
+      const { data: items } = await supabase
+        .from("supplier_order_items")
+        .select("product_id, total_price, order_id")
+        .in("order_id", orderIds);
 
-    const categoryMap = new Map<string, { sales: number; products: Set<string> }>();
-
-    products.forEach((p: any) => {
-      const catName = p.categories?.name || "Général";
-      if (!categoryMap.has(catName)) {
-        categoryMap.set(catName, { sales: 0, products: new Set() });
-      }
-      categoryMap.get(catName)!.products.add(p.id);
-    });
-
-    orderItems?.forEach((item: any) => {
-      const product = products.find((p: any) => p.id === item.product_id);
-      if (product) {
-        const catName = (product as any).categories?.name || "Général";
-        const cat = categoryMap.get(catName);
-        if (cat) {
-          cat.sales += item.subtotal || 0;
+      for (const item of items ?? []) {
+        const cat = productCategory.get((item as any).product_id);
+        if (cat && categoryMap.has(cat)) {
+          categoryMap.get(cat)!.sales += (item as any).total_price || 0;
         }
       }
-    });
+    }
 
-    const totalSales = Array.from(categoryMap.values()).reduce(
-      (sum, cat) => sum + cat.sales,
-      0
-    );
+    const totalSales = Array.from(categoryMap.values()).reduce((s, cat) => s + cat.sales, 0);
 
     const result: CategoryBreakdown[] = Array.from(categoryMap.entries())
       .map(([name, data]) => ({
         name,
         salesPercent: totalSales > 0 ? Math.round((data.sales / totalSales) * 100) : 0,
-        avgMargin: 25, // Placeholder
-        growth: 5, // Placeholder: assume 5% growth
+        avgMargin: 0, // no cost data
+        growth: 0, // previous-period comparison not computed
         productCount: data.products.size,
       }))
       .sort((a, b) => b.salesPercent - a.salesPercent);
@@ -359,61 +337,51 @@ router.get("/categories", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/sales-velocity
- * Orders trend over time (daily/weekly/monthly)
+ * GET /api/supplier/sales-velocity — Orders trend over time
  */
 router.get("/sales-velocity", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    const period = c.req.query("period") || "daily"; // daily, weekly, monthly
+    const period = c.req.query("period") || "daily";
 
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
+
     const daysBack = period === "monthly" ? 90 : period === "weekly" ? 30 : 7;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
     const { data: orders } = await supabase
-      .from("orders")
-      .select("id, total_amount, created_at")
-      .eq("restaurant_id", supplierId)
+      .from("supplier_orders")
+      .select("id, total_amount, status, created_at")
+      .eq("supplier_id", supplierId)
+      .neq("status", "cancelled")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true });
 
     const velocityMap = new Map<string, { orders: number; revenue: number }>();
 
-    orders?.forEach((order: any) => {
+    for (const order of orders ?? []) {
+      const created = new Date((order as any).created_at);
       let dateKey: string;
-
       if (period === "monthly") {
-        dateKey = new Date(order.created_at).toLocaleDateString("fr-FR", {
-          year: "numeric",
-          month: "short",
-        });
+        dateKey = created.toLocaleDateString("fr-FR", { year: "numeric", month: "short" });
       } else if (period === "weekly") {
-        const date = new Date(order.created_at);
         const weekNum = Math.floor(
-          (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7)
+          (created.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7)
         );
         dateKey = `Sem ${weekNum + 1}`;
       } else {
-        dateKey = new Date(order.created_at).toLocaleDateString("fr-FR", {
-          day: "2-digit",
-          month: "short",
-        });
+        dateKey = created.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
       }
 
-      if (!velocityMap.has(dateKey)) {
-        velocityMap.set(dateKey, { orders: 0, revenue: 0 });
-      }
-      const vel = velocityMap.get(dateKey)!;
-      vel.orders += 1;
-      vel.revenue += order.total_amount || 0;
-    });
+      if (!velocityMap.has(dateKey)) velocityMap.set(dateKey, { orders: 0, revenue: 0 });
+      const v = velocityMap.get(dateKey)!;
+      v.orders += 1;
+      v.revenue += (order as any).total_amount || 0;
+    }
 
     const result: SalesVelocity[] = Array.from(velocityMap.entries())
       .map(([date, data]) => ({
@@ -422,7 +390,7 @@ router.get("/sales-velocity", async (c: any) => {
         revenue: data.revenue,
         avgOrder: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
       }))
-      .slice(-14); // Last 14 periods
+      .slice(-14);
 
     return c.json(result);
   } catch (error) {
@@ -432,31 +400,29 @@ router.get("/sales-velocity", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/stock
- * Inventory levels + low stock alerts
+ * GET /api/supplier/stock — Inventory levels + low stock alerts
  */
 router.get("/stock", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    // Get all products (NOTE: schema doesn't have stock levels yet)
-    // This is a placeholder for future inventory feature
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, available_quantity")
-      .eq("restaurant_id", supplierId)
-      .lt("available_quantity", 50); // Low stock threshold
+      .from("supplier_products")
+      .select("id, name, stock_quantity, available_quantity")
+      .eq("supplier_id", supplierId);
+
+    const all = products ?? [];
+    const lowStockProducts = all.filter(
+      (p: any) => Number(p.stock_quantity ?? p.available_quantity ?? 0) < 50
+    );
 
     return c.json({
-      lowStockProducts: products || [],
-      totalProducts: (await supabase.from("products").select("id").eq("restaurant_id", supplierId))
-        .data?.length || 0,
+      lowStockProducts,
+      totalProducts: all.length,
     });
   } catch (error) {
     console.error("[Supplier API] stock error:", error);

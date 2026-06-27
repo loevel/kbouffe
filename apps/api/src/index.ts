@@ -209,6 +209,12 @@ api.use("/marketplace/suppliers/me", userAuthMiddleware);
 api.use("/marketplace/suppliers/me/*", userAuthMiddleware);
 api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
 
+// Analytics fournisseur (/supplier/*) — userAuthMiddleware : un fournisseur n'a
+// pas de restaurant, donc authMiddleware le rejetterait en 404. Le fournisseur
+// est résolu dans les handlers via suppliers.user_id.
+api.use("/supplier/*", userAuthMiddleware);
+api.use("/supplier", userAuthMiddleware);
+
 // Messagerie fournisseur — userAuthMiddleware : fonctionne pour le fournisseur
 // (résolu via user_id) ET le restaurant (restaurantId résolu si propriétaire).
 api.use("/marketplace/messages", userAuthMiddleware);
@@ -226,7 +232,7 @@ const merchantPaths = [
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
     "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
-    "/caisse", "/supplier", "/analytics", "/finances",
+    "/caisse", "/analytics", "/finances",
     "/loyalty", "/upsell-rules", "/gallery",
 ] as const;
 
