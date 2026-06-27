@@ -321,7 +321,44 @@ chat.post("/conversations/:id/upload", async (c) => {
  */
 chat.post("/conversations/:id/read", async (c) => {
     const conversationId = c.req.param("id");
+
+    const userId = c.var.userId;
+    if (!userId) return c.json({ error: "Utilisateur non identifié" }, 401);
+
     const db = chatDb(c);
+
+    // Authorize: only a participant may mark the thread read — the restaurant
+    // owner/member (c.var.restaurantId is resolved by the auth middleware for
+    // both) or, for order threads, the order's customer. (chatDb is service-role,
+    // so this check is what prevents marking arbitrary conversations read.)
+    const { data: conv, error: convErr } = await db
+        .from("conversations")
+        .select("id, restaurant_id, order_id")
+        .eq("id", conversationId)
+        .maybeSingle();
+
+    if (convErr) {
+        console.error("[Chat] Error loading conversation:", convErr);
+        return c.json({ error: "Erreur lors de la mise à jour" }, 500);
+    }
+    if (!conv) return c.json({ error: "Conversation non trouvée" }, 404);
+
+    const restaurantId = c.var.restaurantId;
+    const isMerchant = !!restaurantId && restaurantId === conv.restaurant_id;
+
+    let isCustomer = false;
+    if (!isMerchant && conv.order_id) {
+        const { data: order } = await db
+            .from("orders")
+            .select("customer_id")
+            .eq("id", conv.order_id)
+            .maybeSingle();
+        isCustomer = !!order && order.customer_id === userId;
+    }
+
+    if (!isMerchant && !isCustomer) {
+        return c.json({ error: "Non autorisé" }, 403);
+    }
 
     const { error } = await db
         .from("messages")
