@@ -2,6 +2,25 @@ import { useMemo } from "react";
 import useSWR from "swr";
 import { authFetch } from "@kbouffe/module-core/ui";
 
+/**
+ * Safe JSON fetcher: throws on non-2xx so SWR populates `error` (not `data`).
+ * Without this, an API error body like { error: "..." } would be returned as
+ * `data`, and components doing `data.map(...)` / `data.x.toString()` crash the
+ * whole page with a client-side exception.
+ */
+async function jsonFetcher<T>(url: string): Promise<T> {
+  const res = await authFetch(url);
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  return (await res.json()) as T;
+}
+
+/** Coerce an SWR result to an array, guarding against error/object payloads. */
+function asArray<T>(data: unknown): T[] {
+  return Array.isArray(data) ? (data as T[]) : [];
+}
+
 interface SupplierMetrics {
   totalSales: number;
   totalOrders: number;
@@ -53,7 +72,7 @@ interface SalesVelocity {
 export function useSupplierMetrics(supplierId: string) {
   const { data, error, isLoading } = useSWR<SupplierMetrics>(
     supplierId ? `/api/supplier/metrics?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 } // 1 min cache
   );
 
@@ -70,12 +89,12 @@ export function useSupplierMetrics(supplierId: string) {
 export function useSupplierProducts(supplierId: string) {
   const { data, error, isLoading } = useSWR<ProductPerformance[]>(
     supplierId ? `/api/supplier/products?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
   return {
-    products: data || [],
+    products: asArray<ProductPerformance>(data),
     error,
     isLoading,
   };
@@ -87,12 +106,12 @@ export function useSupplierProducts(supplierId: string) {
 export function useSupplierBuyers(supplierId: string) {
   const { data, error, isLoading } = useSWR<BuyerSegment[]>(
     supplierId ? `/api/supplier/buyers?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
   return {
-    buyers: data || [],
+    buyers: asArray<BuyerSegment>(data),
     error,
     isLoading,
   };
@@ -104,12 +123,12 @@ export function useSupplierBuyers(supplierId: string) {
 export function useSupplierCategories(supplierId: string) {
   const { data, error, isLoading } = useSWR<CategoryBreakdown[]>(
     supplierId ? `/api/supplier/categories?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
   return {
-    categories: data || [],
+    categories: asArray<CategoryBreakdown>(data),
     error,
     isLoading,
   };
@@ -121,12 +140,12 @@ export function useSupplierCategories(supplierId: string) {
 export function useSupplierSalesVelocity(supplierId: string, period: "daily" | "weekly" | "monthly" = "daily") {
   const { data, error, isLoading } = useSWR<SalesVelocity[]>(
     supplierId ? `/api/supplier/sales-velocity?supplierId=${supplierId}&period=${period}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
   return {
-    velocity: data || [],
+    velocity: asArray<SalesVelocity>(data),
     error,
     isLoading,
   };
@@ -226,41 +245,41 @@ interface CogsPriceData {
 export function useDemandForecast(supplierId: string) {
   const { data, error, isLoading } = useSWR<DemandForecast[]>(
     supplierId ? `/api/supplier/forecast?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
-  return { forecast: data || [], error, isLoading };
+  return { forecast: asArray<DemandForecast>(data), error, isLoading };
 }
 
 export function usePriceSuggestions(supplierId: string, targetMargin: number = 30) {
   const { data, error, isLoading } = useSWR<PriceRecommendation[]>(
     supplierId ? `/api/supplier/price-suggestions?supplierId=${supplierId}&targetMargin=${targetMargin}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
-  return { suggestions: data || [], error, isLoading };
+  return { suggestions: asArray<PriceRecommendation>(data), error, isLoading };
 }
 
 export function useMarginAlerts(supplierId: string, targetMargin: number = 30) {
   const { data, error, isLoading } = useSWR<MarginAlert[]>(
     supplierId ? `/api/supplier/margin-alerts?supplierId=${supplierId}&targetMargin=${targetMargin}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
-  return { alerts: data || [], error, isLoading };
+  return { alerts: asArray<MarginAlert>(data), error, isLoading };
 }
 
 export function useCOGSAnalysis(supplierId: string) {
   const { data, error, isLoading } = useSWR<CogsPriceData[]>(
     supplierId ? `/api/supplier/cogs-analysis?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
-  return { analysis: data || [], error, isLoading };
+  return { analysis: asArray<CogsPriceData>(data), error, isLoading };
 }
 
 /**
@@ -314,39 +333,39 @@ interface MarketIntelligence {
 export function useMarginHeatmap(supplierId: string) {
   const { data, error, isLoading } = useSWR<MarginHeatmapCell[]>(
     supplierId ? `/api/supplier/margin-heatmap?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 120000 }
   );
 
-  return { heatmap: data || [], error, isLoading };
+  return { heatmap: asArray<MarginHeatmapCell>(data), error, isLoading };
 }
 
 export function usePricingRules(supplierId: string) {
   const { data, error, isLoading } = useSWR<PricingRule[]>(
     supplierId ? `/api/supplier/pricing-rules?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 120000 }
   );
 
-  return { rules: data || [], error, isLoading };
+  return { rules: asArray<PricingRule>(data), error, isLoading };
 }
 
 export function useCrossSellRecommendations(supplierId: string) {
   const { data, error, isLoading } = useSWR<CrossSellOpportunity[]>(
     supplierId ? `/api/supplier/cross-sell?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 120000 }
   );
 
-  return { recommendations: data || [], error, isLoading };
+  return { recommendations: asArray<CrossSellOpportunity>(data), error, isLoading };
 }
 
 export function useMarketIntelligence(supplierId: string) {
   const { data, error, isLoading } = useSWR<MarketIntelligence[]>(
     supplierId ? `/api/supplier/market-intelligence?supplierId=${supplierId}` : null,
-    (url) => authFetch(url).then((r) => r.json()),
+    jsonFetcher,
     { revalidateOnFocus: false, dedupingInterval: 120000 }
   );
 
-  return { intelligence: data || [], error, isLoading };
+  return { intelligence: asArray<MarketIntelligence>(data), error, isLoading };
 }
