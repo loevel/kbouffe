@@ -1,18 +1,22 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "../../types";
 
 /**
  * Supplier Predictions & Automation Routes
  *
- * Provides AI-powered suggestions for:
- * - Demand forecasting (30-day ahead)
- * - Price optimization (margin-based)
- * - Margin alerts (real-time)
- * - COGS tracking & margin calculations
+ * Demand forecasting, price optimization, margin alerts and COGS tracking for
+ * the marketplace supplier dashboard. The supplier is resolved from the
+ * authenticated user (suppliers.user_id); data comes from supplier_products /
+ * supplier_order_items.
+ *
+ * NOTE: supplier_products has no real cost column yet, so cost is estimated at
+ * 60% of the selling price (a heuristic) for margin/COGS calculations.
  */
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+const COST_RATIO = 0.6; // estimated cost = 60% of selling price (no cost column yet)
 
 interface DemandForecast {
   productId: string;
@@ -59,56 +63,88 @@ interface CogsPriceData {
   roiPercent: number;
 }
 
+function db(c: any): SupabaseClient | null {
+  if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function resolveSupplierId(c: any, supabase: SupabaseClient): Promise<string | null> {
+  const userId = c.var.userId;
+  if (!userId) return null;
+  const { data } = await supabase
+    .from("suppliers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+}
+
+/** Aggregate supplier_order_items (revenue + units) per product for a supplier. */
+async function productSales(
+  supabase: SupabaseClient,
+  productIds: string[]
+): Promise<Map<string, { revenue: number; units: number }>> {
+  const stats = new Map<string, { revenue: number; units: number }>();
+  if (productIds.length === 0) return stats;
+  const { data: items } = await supabase
+    .from("supplier_order_items")
+    .select("product_id, quantity, total_price, created_at")
+    .in("product_id", productIds)
+    .gte("created_at", daysAgo(30));
+  for (const item of items ?? []) {
+    const pid = (item as any).product_id;
+    if (!pid) continue;
+    if (!stats.has(pid)) stats.set(pid, { revenue: 0, units: 0 });
+    const s = stats.get(pid)!;
+    s.revenue += (item as any).total_price || 0;
+    s.units += Number((item as any).quantity) || 0;
+  }
+  return stats;
+}
+
 /**
- * GET /api/supplier/forecast
- * 30-day demand forecast + reorder suggestions
+ * GET /api/supplier/forecast — 30-day demand forecast + reorder suggestions
  */
 router.get("/forecast", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    // Get all products
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, available_quantity")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, available_quantity, stock_quantity")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
+    if (!products || products.length === 0) return c.json([]);
+
+    const productIds = products.map((p: any) => p.id);
+    const { data: orderItems } = await supabase
+      .from("supplier_order_items")
+      .select("product_id, quantity, created_at")
+      .in("product_id", productIds)
+      .gte("created_at", daysAgo(30));
+
+    const productDemand = new Map<string, number>();
+    for (const item of orderItems ?? []) {
+      const pid = (item as any).product_id;
+      productDemand.set(pid, (productDemand.get(pid) || 0) + (Number((item as any).quantity) || 1));
     }
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Get order history for demand calculation
-    const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("product_id, quantity, created_at")
-      .in("product_id", products.map((p: any) => p.id))
-      .gte("created_at", thirtyDaysAgo.toISOString());
-
-    const productDemand = new Map<string, number[]>();
-
-    orderItems?.forEach((item: any) => {
-      if (!productDemand.has(item.product_id)) {
-        productDemand.set(item.product_id, []);
-      }
-      productDemand.get(item.product_id)!.push(item.quantity || 1);
-    });
-
-    const forecasts: DemandForecast[] = products.map((product) => {
-      const quantities = productDemand.get(product.id) || [];
-      const avgPerDay = quantities.length > 0 ? quantities.reduce((a, b) => a + b, 0) / 30 : 0;
+    const forecasts: DemandForecast[] = products.map((product: any) => {
+      const totalQty = productDemand.get(product.id) || 0;
+      const avgPerDay = totalQty / 30;
+      const stock = Number(product.available_quantity ?? product.stock_quantity ?? 0);
       const forecast30d = Math.ceil(avgPerDay * 30);
-      const suggestedQty = Math.max(forecast30d - (product.available_quantity || 0), 0);
-      const daysUntilStockout =
-        avgPerDay > 0 ? Math.floor((product.available_quantity || 0) / avgPerDay) : 999;
+      const suggestedQty = Math.max(forecast30d - stock, 0);
+      const daysUntilStockout = avgPerDay > 0 ? Math.floor(stock / avgPerDay) : 999;
 
       let urgency: "low" | "medium" | "high" = "low";
       if (daysUntilStockout < 7) urgency = "high";
@@ -117,7 +153,7 @@ router.get("/forecast", async (c: any) => {
       return {
         productId: product.id,
         productName: product.name,
-        currentStock: product.available_quantity || 0,
+        currentStock: stock,
         historicalAvgPerDay: Math.round(avgPerDay * 10) / 10,
         forecast30d,
         suggestedReorderQty: suggestedQty,
@@ -134,56 +170,44 @@ router.get("/forecast", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/price-suggestions
- * Auto price recommendations based on margin target
+ * GET /api/supplier/price-suggestions — price recos based on a target margin
  */
 router.get("/price-suggestions", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
     const targetMargin = parseFloat(c.req.query("targetMargin") || "30");
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
-
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    // Get products with COGS (from products table)
-    // NOTE: COGS would come from a supplier_costs table in Phase 2 migration
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, price_per_unit")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
-    }
+    if (!products || products.length === 0) return c.json([]);
 
-    const suggestions: PriceRecommendation[] = products.map((product) => {
-      // Placeholder: assume 60% of selling price is cost (typical food retail)
-      const estimatedCost = (product.price || 0) * 0.6;
-      const suggestedPrice = Math.ceil(
-        (estimatedCost / (1 - targetMargin / 100)) / 50
-      ) * 50; // Round to 50 FCFA
-      const priceDelta = suggestedPrice - (product.price || 0);
-      const estimatedMargin = Math.round(
-        ((suggestedPrice - estimatedCost) / suggestedPrice) * 100
-      );
+    const suggestions: PriceRecommendation[] = products.map((product: any) => {
+      const price = product.price_per_unit || 0;
+      const estimatedCost = price * COST_RATIO;
+      const suggestedPrice = Math.ceil((estimatedCost / (1 - targetMargin / 100)) / 50) * 50;
+      const priceDelta = suggestedPrice - price;
+      const estimatedMargin =
+        suggestedPrice > 0 ? Math.round(((suggestedPrice - estimatedCost) / suggestedPrice) * 100) : 0;
 
       return {
         productId: product.id,
         productName: product.name,
-        currentPrice: product.price || 0,
+        currentPrice: price,
         suggestedPrice,
         priceDelta,
         targetMarginPercent: targetMargin,
         estimatedMargin,
-        confidence: 65, // Placeholder
+        confidence: 65,
       };
     });
 
-    return c.json(suggestions.filter((s) => Math.abs(s.priceDelta) > 100)); // Show only significant changes
+    return c.json(suggestions.filter((s) => Math.abs(s.priceDelta) > 100));
   } catch (error) {
     console.error("[Supplier API] price-suggestions error:", error);
     return c.json({ error: "Failed to fetch price suggestions" }, 500);
@@ -191,90 +215,56 @@ router.get("/price-suggestions", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/margin-alerts
- * Products with margins below target
+ * GET /api/supplier/margin-alerts — products selling below the target margin
  */
 router.get("/margin-alerts", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
     const targetMargin = parseFloat(c.req.query("targetMargin") || "30");
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
-
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    // Get products
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, price_per_unit")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
-    }
+    if (!products || products.length === 0) return c.json([]);
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Get recent order items to calc actual margins
-    const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("product_id, subtotal, quantity")
-      .in("product_id", products.map((p: any) => p.id))
-      .gte("created_at", thirtyDaysAgo.toISOString());
-
-    const productStats = new Map<string, { revenue: number; units: number }>();
-
-    orderItems?.forEach((item: any) => {
-      if (!productStats.has(item.product_id)) {
-        productStats.set(item.product_id, { revenue: 0, units: 0 });
-      }
-      const stat = productStats.get(item.product_id)!;
-      stat.revenue += item.subtotal || 0;
-      stat.units += item.quantity || 0;
-    });
+    const stats = await productSales(supabase, products.map((p: any) => p.id));
 
     const alerts: MarginAlert[] = products
-      .map((product) => {
-        const stat = productStats.get(product.id);
-        if (!stat || stat.units === 0) {
-          return null;
-        }
+      .map((product: any): MarginAlert | null => {
+        const stat = stats.get(product.id);
+        if (!stat || stat.units === 0) return null;
 
-        const estimatedCost = (product.price || 0) * 0.6;
+        const estimatedCost = (product.price_per_unit || 0) * COST_RATIO;
         const avgPrice = stat.revenue / stat.units;
-        const currentMargin = Math.round(
-          ((avgPrice - estimatedCost) / avgPrice) * 100
-        );
+        if (avgPrice <= 0) return null;
+        const currentMargin = Math.round(((avgPrice - estimatedCost) / avgPrice) * 100);
 
-        if (currentMargin < targetMargin) {
-          return {
-            productId: product.id,
-            productName: product.name,
-            currentMargin,
-            targetMargin,
-            daysAboveTarget: 0,
-            recommendation:
-              currentMargin < targetMargin - 10
-                ? `Augmenter le prix de ${Math.ceil(
-                    ((targetMargin - currentMargin) / 100) * 200
-                  )} FCFA`
-                : "Surveiller la marge",
-            severity:
-              currentMargin < targetMargin - 15
-                ? "critical"
-                : currentMargin < targetMargin - 5
-                  ? "warning"
-                  : "info",
-          };
-        }
+        if (currentMargin >= targetMargin) return null;
 
-        return null;
+        return {
+          productId: product.id,
+          productName: product.name,
+          currentMargin,
+          targetMargin,
+          daysAboveTarget: 0,
+          recommendation:
+            currentMargin < targetMargin - 10
+              ? `Augmenter le prix de ${Math.ceil(((targetMargin - currentMargin) / 100) * 200)} FCFA`
+              : "Surveiller la marge",
+          severity:
+            currentMargin < targetMargin - 15
+              ? "critical"
+              : currentMargin < targetMargin - 5
+                ? "warning"
+                : "info",
+        };
       })
-      .filter((a) => a !== null) as MarginAlert[];
+      .filter((a): a is MarginAlert => a !== null);
 
     return c.json(alerts);
   } catch (error) {
@@ -284,84 +274,49 @@ router.get("/margin-alerts", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/cogs-analysis
- * COGS tracking with margin calculations (placeholder until supplier_costs table exists)
+ * GET /api/supplier/cogs-analysis — COGS + margin breakdown (estimated cost)
  */
 router.get("/cogs-analysis", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    // Get products
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, price_per_unit")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
-    }
+    if (!products || products.length === 0) return c.json([]);
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const stats = await productSales(supabase, products.map((p: any) => p.id));
 
-    // Get sales data
-    const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("product_id, quantity, subtotal")
-      .in("product_id", products.map((p: any) => p.id))
-      .gte("created_at", thirtyDaysAgo.toISOString());
+    const analysis: CogsPriceData[] = products
+      .map((product: any): CogsPriceData | null => {
+        const stat = stats.get(product.id);
+        if (!stat || stat.units === 0) return null;
 
-    const productStats = new Map<
-      string,
-      { revenue: number; units: number; product: any }
-    >();
-
-    products.forEach((p: any) => {
-      productStats.set(p.id, {
-        revenue: 0,
-        units: 0,
-        product: p,
-      });
-    });
-
-    orderItems?.forEach((item: any) => {
-      const stat = productStats.get(item.product_id);
-      if (stat) {
-        stat.revenue += item.subtotal || 0;
-        stat.units += item.quantity || 0;
-      }
-    });
-
-    const analysis: CogsPriceData[] = Array.from(productStats.values())
-      .filter((s) => s.units > 0)
-      .map((s) => {
-        // Placeholder: assume 60% cost ratio (will be real COGS from table)
-        const estimatedCostPerUnit = (s.product.price || 0) * 0.6;
-        const totalCost = estimatedCostPerUnit * s.units;
-        const totalProfit = s.revenue - totalCost;
-        const marginPercent = Math.round(
-          ((totalProfit) / s.revenue) * 100
-        );
+        const price = product.price_per_unit || 0;
+        const costPerUnit = price * COST_RATIO;
+        const totalCost = costPerUnit * stat.units;
+        const totalProfit = stat.revenue - totalCost;
+        const marginPercent = stat.revenue > 0 ? Math.round((totalProfit / stat.revenue) * 100) : 0;
 
         return {
-          productId: s.product.id,
-          productName: s.product.name,
-          costPerUnit: Math.round(estimatedCostPerUnit),
-          sellingPrice: s.product.price || 0,
-          unitsSoldLast30d: s.units,
-          totalRevenue: Math.round(s.revenue),
+          productId: product.id,
+          productName: product.name,
+          costPerUnit: Math.round(costPerUnit),
+          sellingPrice: price,
+          unitsSoldLast30d: stat.units,
+          totalRevenue: Math.round(stat.revenue),
           totalCost: Math.round(totalCost),
           totalProfit: Math.round(totalProfit),
           marginPercent,
-          roiPercent: Math.round((totalProfit / totalCost) * 100),
+          roiPercent: totalCost > 0 ? Math.round((totalProfit / totalCost) * 100) : 0,
         };
       })
+      .filter((a): a is CogsPriceData => a !== null)
       .sort((a, b) => b.totalProfit - a.totalProfit);
 
     return c.json(analysis);
@@ -372,30 +327,29 @@ router.get("/cogs-analysis", async (c: any) => {
 });
 
 /**
- * POST /api/supplier/apply-price-change
- * Bulk apply price recommendations (requires auth + supplier verification)
+ * POST /api/supplier/apply-price-change — bulk update supplier product prices
  */
-router.post("/apply-price-change", async (c) => {
+router.post("/apply-price-change", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    const body = await c.req.json() as {
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
+
+    const body = (await c.req.json()) as {
       products: Array<{ productId: string; newPrice: number }>;
     };
-
-    if (!supplierId || !body.products || body.products.length === 0) {
+    if (!body.products || body.products.length === 0) {
       return c.json({ error: "Invalid request" }, 400);
     }
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    // Bulk update prices
-    const updates = body.products.map((p: any) =>
+    // Scope every update to this supplier's products (anti-IDOR).
+    const updates = body.products.map((p) =>
       supabase
-        .from("products")
-        .update({ price: p.newPrice, updated_at: new Date().toISOString() })
+        .from("supplier_products")
+        .update({ price_per_unit: p.newPrice, updated_at: new Date().toISOString() })
         .eq("id", p.productId)
-        .eq("restaurant_id", supplierId)
+        .eq("supplier_id", supplierId)
     );
 
     const results = await Promise.all(updates);

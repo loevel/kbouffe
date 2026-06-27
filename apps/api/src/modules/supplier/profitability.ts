@@ -1,25 +1,28 @@
 import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Env, Variables } from "../../types";
 
 /**
  * Supplier Phase 3 — Profitability & Growth APIs
  *
- * Advanced features:
- * - Margin heatmap (product × buyer)
- * - Pricing rules engine (cost + margin %)
- * - Cross-sell AI recommendations
- * - Market intelligence (benchmarking)
+ * Margin heatmap, pricing rules, cross-sell and market intelligence for the
+ * marketplace supplier dashboard. Supplier resolved via suppliers.user_id; data
+ * from supplier_products / supplier_orders / supplier_order_items. Buyers are
+ * the RESTAURANTS purchasing from the supplier.
+ *
+ * NOTE: no real cost column exists, so cost is estimated at 60% of price.
  */
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+const COST_RATIO = 0.6;
 
 interface MarginHeatmapCell {
   buyerId: string;
   buyerName: string;
   productId: string;
   productName: string;
-  margin: number; // percentage
+  margin: number;
   revenue: number;
   profit: number;
   orders: number;
@@ -42,8 +45,8 @@ interface CrossSellOpportunity {
   primaryProductName: string;
   bundleProductId: string;
   bundleProductName: string;
-  coSellFrequency: number; // times sold together
-  coSellRate: number; // % of sales
+  coSellFrequency: number;
+  coSellRate: number;
   recommendedBuyerSegment: string;
   bundleMargin: number;
 }
@@ -53,116 +56,110 @@ interface MarketIntelligence {
   yourAvgPrice: number;
   marketAvgPrice: number;
   pricePosition: "premium" | "competitive" | "budget";
-  volumeGap: number; // estimated unmet demand
-  growthTrend: number; // % month-over-month
+  volumeGap: number;
+  growthTrend: number;
   recommendation: string;
 }
 
+function db(c: any): SupabaseClient | null {
+  if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  return createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function resolveSupplierId(c: any, supabase: SupabaseClient): Promise<string | null> {
+  const userId = c.var.userId;
+  if (!userId) return null;
+  const { data } = await supabase
+    .from("suppliers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+}
+
 /**
- * GET /api/supplier/margin-heatmap
- * Profitability matrix: product × buyer
+ * GET /api/supplier/margin-heatmap — profitability matrix: product × buyer
  */
 router.get("/margin-heatmap", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Get products
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, price_per_unit")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
-    }
+    if (!products || products.length === 0) return c.json([]);
+    const priceMap = new Map(products.map((p: any) => [p.id, p.price_per_unit || 0]));
+    const nameMap = new Map(products.map((p: any) => [p.id, p.name]));
 
-    // Get orders with buyers
     const { data: orders } = await supabase
-      .from("orders")
-      .select("id, user_id, total_amount, created_at")
-      .eq("restaurant_id", supplierId)
-      .gte("created_at", thirtyDaysAgo.toISOString());
+      .from("supplier_orders")
+      .select("id, restaurant_id, created_at")
+      .eq("supplier_id", supplierId)
+      .neq("status", "cancelled")
+      .gte("created_at", daysAgo(30));
+
+    const orderIds = (orders ?? []).map((o: any) => o.id);
+    if (orderIds.length === 0) return c.json([]);
+    const orderBuyer = new Map((orders ?? []).map((o: any) => [o.id, o.restaurant_id]));
 
     const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("order_id, product_id, quantity, subtotal")
-      .in("product_id", products.map((p: any) => p.id));
+      .from("supplier_order_items")
+      .select("order_id, product_id, quantity, total_price")
+      .in("order_id", orderIds);
 
-    // Get user names
-    const userIds = [...new Set(orders?.map((o: any) => o.user_id) || [])];
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, full_name")
-      .in("id", userIds);
+    // Resolve buyer (restaurant) names.
+    const buyerIds = [...new Set((orders ?? []).map((o: any) => o.restaurant_id).filter(Boolean))];
+    const buyerName = new Map<string, string>();
+    if (buyerIds.length > 0) {
+      const { data: restaurants } = await supabase
+        .from("restaurants")
+        .select("id, name")
+        .in("id", buyerIds);
+      for (const r of restaurants ?? []) buyerName.set((r as any).id, (r as any).name);
+    }
 
-    const userMap = new Map(users?.map((u: any) => [u.id, u.full_name]) || []);
-    const orderMap = new Map(orders?.map((o: any) => [o.id, o]) || []);
-
-    // Build heatmap
-    const heatmap = new Map<
-      string,
-      { buyerId: string; buyerName: string; cells: Map<string, any> }
-    >();
-
-    orderItems?.forEach((item: any) => {
-      const order = orderMap.get(item.order_id);
-      if (!order) return;
-
-      const buyerId = order.user_id;
-      if (!heatmap.has(buyerId)) {
-        heatmap.set(buyerId, {
+    // Aggregate per buyer × product.
+    const cells = new Map<string, MarginHeatmapCell>();
+    for (const item of orderItems ?? []) {
+      const buyerId = orderBuyer.get((item as any).order_id);
+      const pid = (item as any).product_id;
+      if (!buyerId || !pid) continue;
+      const key = `${buyerId}|${pid}`;
+      if (!cells.has(key)) {
+        cells.set(key, {
           buyerId,
-          buyerName: userMap.get(buyerId) || "Client " + buyerId.slice(0, 8),
-          cells: new Map(),
-        });
-      }
-
-      const buyer = heatmap.get(buyerId)!;
-      const key = item.product_id;
-
-      if (!buyer.cells.has(key)) {
-        buyer.cells.set(key, {
+          buyerName: buyerName.get(buyerId) || "Restaurant " + String(buyerId).slice(0, 8),
+          productId: pid,
+          productName: nameMap.get(pid) || "Produit",
+          margin: 0,
           revenue: 0,
           profit: 0,
           orders: 0,
         });
       }
-
-      const cell = buyer.cells.get(key)!;
-      cell.revenue += item.subtotal || 0;
+      const cell = cells.get(key)!;
+      const revenue = (item as any).total_price || 0;
+      const cost = (Number((item as any).quantity) || 0) * (priceMap.get(pid) || 0) * COST_RATIO;
+      cell.revenue += revenue;
+      cell.profit += revenue - cost;
       cell.orders += 1;
+    }
 
-      // Estimate profit (60% cost)
-      const estimatedCost = ((item.quantity || 0) * (products.find((p: any) => p.id === key)?.price || 0)) * 0.6;
-      cell.profit += (item.subtotal || 0) - estimatedCost;
-    });
-
-    // Convert to flat array
-    const result: MarginHeatmapCell[] = [];
-    heatmap.forEach((buyer) => {
-      buyer.cells.forEach((cell, productId) => {
-        const product = products.find((p: any) => p.id === productId);
-        const margin = cell.revenue > 0 ? Math.round((cell.profit / cell.revenue) * 100) : 0;
-        result.push({
-          buyerId: buyer.buyerId,
-          buyerName: buyer.buyerName,
-          productId,
-          productName: product?.name || "Unknown",
-          margin,
-          revenue: cell.revenue,
-          profit: cell.profit,
-          orders: cell.orders,
-        });
-      });
-    });
+    const result = Array.from(cells.values()).map((cell) => ({
+      ...cell,
+      margin: cell.revenue > 0 ? Math.round((cell.profit / cell.revenue) * 100) : 0,
+    }));
 
     return c.json(result.sort((a, b) => b.profit - a.profit).slice(0, 50));
   } catch (error) {
@@ -172,36 +169,27 @@ router.get("/margin-heatmap", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/pricing-rules
- * Pricing rules for products
+ * GET /api/supplier/pricing-rules — suggested pricing rules per product
  */
 router.get("/pricing-rules", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
-
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, price_per_unit")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
-    }
+    if (!products || products.length === 0) return c.json([]);
 
-    // Generate pricing rules (placeholder — would come from supplier_pricing_rules table)
-    const rules: PricingRule[] = products.map((product) => {
-      const estimatedCost = (product.price || 0) * 0.6;
+    const rules: PricingRule[] = products.map((product: any) => {
+      const price = product.price_per_unit || 0;
+      const estimatedCost = price * COST_RATIO;
       const targetMargin = 30;
-      const calculatedPrice = Math.ceil(
-        (estimatedCost / (1 - targetMargin / 100)) / 50
-      ) * 50;
-
+      const calculatedPrice = Math.ceil((estimatedCost / (1 - targetMargin / 100)) / 50) * 50;
       return {
         id: product.id,
         productId: product.id,
@@ -215,7 +203,12 @@ router.get("/pricing-rules", async (c: any) => {
       };
     });
 
-    return c.json(rules.filter((r) => Math.abs(r.calculatedPrice - (products.find((p: any) => p.id === r.productId)?.price || 0)) > 50));
+    return c.json(
+      rules.filter((r) => {
+        const current = (products.find((p: any) => p.id === r.productId) as any)?.price_per_unit || 0;
+        return Math.abs(r.calculatedPrice - current) > 50;
+      })
+    );
   } catch (error) {
     console.error("[Supplier API] pricing-rules error:", error);
     return c.json({ error: "Failed to fetch pricing rules" }, 500);
@@ -223,80 +216,71 @@ router.get("/pricing-rules", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/cross-sell
- * Cross-sell bundle recommendations
+ * GET /api/supplier/cross-sell — products frequently bought together
  */
 router.get("/cross-sell", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Get products
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
+    if (!products || products.length === 0) return c.json([]);
+    const nameMap = new Map(products.map((p: any) => [p.id, p.name]));
+
+    const { data: orders } = await supabase
+      .from("supplier_orders")
+      .select("id")
+      .eq("supplier_id", supplierId)
+      .neq("status", "cancelled")
+      .gte("created_at", daysAgo(30));
+
+    const orderIds = (orders ?? []).map((o: any) => o.id);
+    if (orderIds.length === 0) return c.json([]);
+
+    const { data: orderItems } = await supabase
+      .from("supplier_order_items")
+      .select("order_id, product_id")
+      .in("order_id", orderIds);
+
+    const orderProducts = new Map<string, string[]>();
+    for (const item of orderItems ?? []) {
+      const oid = (item as any).order_id;
+      if (!orderProducts.has(oid)) orderProducts.set(oid, []);
+      orderProducts.get(oid)!.push((item as any).product_id);
     }
 
-    // Get order items
-    const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("order_id, product_id, subtotal")
-      .in("product_id", products.map((p: any) => p.id))
-      .gte("created_at", thirtyDaysAgo.toISOString());
-
-    // Find co-sale patterns
-    const orderMap = new Map<string, string[]>();
-    orderItems?.forEach((item: any) => {
-      if (!orderMap.has(item.order_id)) {
-        orderMap.set(item.order_id, []);
-      }
-      orderMap.get(item.order_id)!.push(item.product_id);
-    });
-
-    const coSellPatterns = new Map<string, Map<string, number>>();
-    orderMap.forEach((productIds) => {
-      for (let i = 0; i < productIds.length; i++) {
-        for (let j = i + 1; j < productIds.length; j++) {
-          const key = [productIds[i], productIds[j]].sort().join("|");
-          if (!coSellPatterns.has(key)) {
-            coSellPatterns.set(key, new Map());
-          }
-          const counter = coSellPatterns.get(key)!;
-          counter.set("count", (counter.get("count") || 0) + 1);
+    const coSell = new Map<string, number>();
+    orderProducts.forEach((pids) => {
+      const unique = [...new Set(pids)];
+      for (let i = 0; i < unique.length; i++) {
+        for (let j = i + 1; j < unique.length; j++) {
+          const key = [unique[i], unique[j]].sort().join("|");
+          coSell.set(key, (coSell.get(key) || 0) + 1);
         }
       }
     });
 
-    // Generate recommendations
+    const totalOrders = orderProducts.size || 1;
     const recommendations: CrossSellOpportunity[] = [];
-    coSellPatterns.forEach((counter, key) => {
+    coSell.forEach((frequency, key) => {
+      if (frequency < 3) return;
       const [p1, p2] = key.split("|");
-      const frequency = counter.get("count") || 0;
-
-      if (frequency >= 3) {
-        // At least 3 co-sales
-        recommendations.push({
-          primaryProductId: p1,
-          primaryProductName: products.find((p: any) => p.id === p1)?.name || "Unknown",
-          bundleProductId: p2,
-          bundleProductName: products.find((p: any) => p.id === p2)?.name || "Unknown",
-          coSellFrequency: frequency,
-          coSellRate: Math.round((frequency / (orderItems?.length || 1)) * 100),
-          recommendedBuyerSegment: "All",
-          bundleMargin: 30,
-        });
-      }
+      recommendations.push({
+        primaryProductId: p1,
+        primaryProductName: nameMap.get(p1) || "Produit",
+        bundleProductId: p2,
+        bundleProductName: nameMap.get(p2) || "Produit",
+        coSellFrequency: frequency,
+        coSellRate: Math.round((frequency / totalOrders) * 100),
+        recommendedBuyerSegment: "All",
+        bundleMargin: 30,
+      });
     });
 
     return c.json(recommendations.sort((a, b) => b.coSellFrequency - a.coSellFrequency).slice(0, 10));
@@ -307,65 +291,46 @@ router.get("/cross-sell", async (c: any) => {
 });
 
 /**
- * GET /api/supplier/market-intelligence
- * Price benchmarking + market gaps
+ * GET /api/supplier/market-intelligence — category price benchmarking
  */
 router.get("/market-intelligence", async (c: any) => {
   try {
-    const supplierId = c.var.restaurantId;
-    if (!supplierId) {
-      return c.json({ error: "supplierId required" }, 400);
-    }
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    if (!c.env.SUPABASE_SERVICE_ROLE_KEY) return c.json({ error: "Service non configuré" }, 500);
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY);
-
-    // Get product categories
     const { data: products } = await supabase
-      .from("products")
-      .select("id, name, price, category_id, categories(name)")
-      .eq("restaurant_id", supplierId);
+      .from("supplier_products")
+      .select("id, name, price_per_unit, category")
+      .eq("supplier_id", supplierId);
 
-    if (!products || products.length === 0) {
-      return c.json([]);
+    if (!products || products.length === 0) return c.json([]);
+
+    const categoryStats = new Map<string, number[]>();
+    for (const product of products) {
+      const cat = (product as any).category || "Général";
+      if (!categoryStats.has(cat)) categoryStats.set(cat, []);
+      categoryStats.get(cat)!.push((product as any).price_per_unit || 0);
     }
 
-    // Group by category
-    const categoryStats = new Map<string, { prices: number[]; avgPrice: number }>();
-
-    products.forEach((product: any) => {
-      const catName = (product as any).categories?.name || "Général";
-      if (!categoryStats.has(catName)) {
-        categoryStats.set(catName, { prices: [], avgPrice: 0 });
+    const intelligence: MarketIntelligence[] = Array.from(categoryStats.entries()).map(
+      ([catName, prices]) => {
+        const yourAvgPrice = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+        // Market benchmark not available yet — use the supplier's own avg as baseline.
+        const marketAvgPrice = yourAvgPrice;
+        const pricePosition: MarketIntelligence["pricePosition"] = "competitive";
+        return {
+          categoryName: catName,
+          yourAvgPrice,
+          marketAvgPrice,
+          pricePosition,
+          volumeGap: 0, // requires market-wide demand data (not available)
+          growthTrend: 0, // requires historical comparison (not computed)
+          recommendation: "Position compétitive maintenue",
+        };
       }
-      const stat = categoryStats.get(catName)!;
-      stat.prices.push(product.price || 0);
-    });
-
-    // Calculate averages
-    const intelligence: MarketIntelligence[] = Array.from(categoryStats.entries()).map(([catName, stat]) => {
-      const yourAvgPrice = Math.round(stat.prices.reduce((a, b) => a + b, 0) / stat.prices.length);
-      const marketAvgPrice = Math.round(yourAvgPrice * 0.95); // Placeholder: assume 5% market avg lower
-
-      let pricePosition: "premium" | "competitive" | "budget" = "competitive";
-      if (yourAvgPrice > marketAvgPrice * 1.1) pricePosition = "premium";
-      else if (yourAvgPrice < marketAvgPrice * 0.9) pricePosition = "budget";
-
-      return {
-        categoryName: catName,
-        yourAvgPrice,
-        marketAvgPrice,
-        pricePosition,
-        volumeGap: Math.round(Math.random() * 1000), // Placeholder
-        growthTrend: 5 + Math.random() * 10, // 5-15% placeholder
-        recommendation:
-          pricePosition === "budget"
-            ? "Augmentez les prix pour améliorer la marge"
-            : pricePosition === "premium"
-              ? "Considérez une réduction pour augmenter le volume"
-              : "Position compétitive maintenue",
-      };
-    });
+    );
 
     return c.json(intelligence);
   } catch (error) {
@@ -375,30 +340,28 @@ router.get("/market-intelligence", async (c: any) => {
 });
 
 /**
- * POST /api/supplier/automation-settings
- * Save automation settings for products
+ * POST /api/supplier/automation-settings — persist automation prefs (no-op stub)
  */
-router.post("/automation-settings", async (c) => {
+router.post("/automation-settings", async (c: any) => {
   try {
-    const body = await c.req.json() as {
-      supplierId: string;
+    const supabase = db(c);
+    if (!supabase) return c.json({ error: "Service non configuré" }, 500);
+    const supplierId = await resolveSupplierId(c, supabase);
+    if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
+
+    const body = (await c.req.json()) as {
       productId: string;
       autoPrice: boolean;
       autoAccept: boolean;
       marginTarget: number;
     };
+    if (!body.productId) return c.json({ error: "Invalid request" }, 400);
 
-    if (!body.supplierId || !body.productId) {
-      return c.json({ error: "Invalid request" }, 400);
-    }
-
-    // TODO: Save to supplier_automation table once schema exists
-    // For now, return success
-
+    // TODO: persist to a supplier_automation table once it exists.
     return c.json({
       success: true,
       message: "Paramètres d'automatisation sauvegardés",
-      settings: body,
+      settings: { ...body, supplierId },
     });
   } catch (error) {
     console.error("[Supplier API] automation-settings error:", error);
