@@ -499,7 +499,20 @@ dashboardRoutes.get("/reports", async (c) => {
     const revenueOrders = orders.filter(isRevenueOrder);
     const cancelledOrders = orders.filter(isCancelled);
     const completedOrders = orders.filter(isCompleted);
-    const activeOrders = orders.filter(isActive);
+
+    // Active orders must not be bound to the report's period window — an
+    // order stuck in "ready" for months is still active today regardless of
+    // when it was created. Same fix as /stats (see totalActiveUnwindowed
+    // above); this endpoint had kept the old windowed count and could
+    // silently under-report stale active orders that fall outside `period`.
+    const DB_ACTIVE_STATUSES = Array.from(ACTIVE_STATUSES).filter((s) => s !== "scheduled");
+    const { data: activeRows, error: activeError } = await c.var.supabase
+        .from("orders")
+        .select("id")
+        .eq("restaurant_id", c.var.restaurantId)
+        .in("status", DB_ACTIVE_STATUSES);
+    if (activeError) console.error("Active orders count error:", activeError);
+    const activeOrdersCount = activeRows?.length ?? orders.filter(isActive).length;
 
     const totalOrders = orders.length;
     const totalRevenue = Math.round(revenueOrders.reduce((sum, order) => sum + order.amount, 0));
@@ -524,7 +537,7 @@ dashboardRoutes.get("/reports", async (c) => {
             revenue: totalRevenue,
             ordersTotal: totalOrders,
             ordersCompleted: completedOrders.length,
-            ordersActive: activeOrders.length,
+            ordersActive: activeOrdersCount,
             ordersCancelled: cancelledOrders.length,
             averageOrderValue,
             completionRate,

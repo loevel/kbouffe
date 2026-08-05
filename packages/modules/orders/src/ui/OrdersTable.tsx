@@ -21,8 +21,16 @@ export function OrdersTable() {
     // Refund modal state
     const [orderToRefund, setOrderToRefund] = useState<Order | null>(null);
 
+    // The "completed" tab id is a UI grouping, not a real order status — the
+    // live order flow only ever reaches "delivered" (see ALLOWED_TRANSITIONS
+    // in orders.ts), while "completed" is a legacy/dashboard-KPI-only value
+    // (see COMPLETED_STATUSES in dashboard.ts). Map it to both so the tab
+    // actually shows the delivered orders users expect, instead of staying
+    // empty.
+    const statusQuery = activeTab === "completed" ? "delivered,completed" : activeTab;
+
     const { orders, total, isLoading } = useOrders({
-        status: activeTab,
+        status: statusQuery,
         search: search.trim(),
         page,
         limit: ITEMS_PER_PAGE,
@@ -31,10 +39,11 @@ export function OrdersTable() {
         delivery: deliveryFilter,
     });
 
-    // Use all orders (no limit) for tab counts
+    // Use all orders (no server pagination) for tab counts.
     const { orders: allOrders } = useOrders({ limit: 200 });
 
     const scheduledCount = allOrders.filter(o => o.status === "scheduled").length;
+    const completedCount = allOrders.filter(o => o.status === "delivered" || o.status === "completed").length;
 
     const statusTabs = [
         { id: "all", label: t.orders.allStatuses },
@@ -43,7 +52,7 @@ export function OrdersTable() {
         { id: "accepted", label: t.orders.acceptedPlural, count: allOrders.filter(o => o.status === "accepted").length },
         { id: "preparing", label: t.orders.preparingPlural, count: allOrders.filter(o => o.status === "preparing").length },
         { id: "ready", label: t.orders.readyPlural, count: allOrders.filter(o => o.status === "ready").length },
-        { id: "completed", label: t.orders.completedPlural },
+        { id: "completed", label: t.orders.completedPlural, count: completedCount },
         { id: "cancelled", label: t.orders.cancelledPlural },
     ];
 
