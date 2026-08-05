@@ -67,8 +67,7 @@ export function ShowcasePageClient({ slug }: { slug: string }) {
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-        fetch(`${API_URL}/api/store/${slug}`)
+        fetch(`/api/store/${slug}`)
             .then(r => {
                 if (!r.ok) throw new Error("Restaurant non trouvé");
                 return r.json();

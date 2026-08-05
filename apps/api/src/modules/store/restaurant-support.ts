@@ -9,13 +9,27 @@ restaurantSupportRoutes.get("/support/tickets", async (c) => {
 
     const { data, error } = await supabase
         .from("support_tickets")
-        .select("id, subject, description, type, status, priority, created_at, updated_at")
+        .select("id, subject, description, type, status, priority, created_at, updated_at, last_replied_at, unread_reporter")
         .eq("restaurant_id", restaurantId)
         .eq("reporter_type", "restaurant")
         .order("created_at", { ascending: false });
 
     if (error) return c.json({ error: "Erreur lors du chargement des tickets" }, 500);
-    return c.json({ tickets: data || [] });
+
+    const tickets = (data || []).map((t: any) => ({
+        id: t.id,
+        subject: t.subject,
+        description: t.description,
+        type: t.type,
+        status: t.status,
+        priority: t.priority,
+        createdAt: t.created_at,
+        updatedAt: t.updated_at,
+        lastRepliedAt: t.last_replied_at,
+        unreadReporter: t.unread_reporter ?? 0,
+    }));
+
+    return c.json({ tickets });
 });
 
 restaurantSupportRoutes.post("/support/tickets", async (c) => {
