@@ -51,6 +51,18 @@ merchantReviewRoutes.get("/", async (c) => {
             }
         }
 
+        // Aggregate stats across ALL reviews for this restaurant, not just the
+        // current page — otherwise "average rating" / "unanswered" would shift
+        // as the merchant paginates, even though they're shown as global totals.
+        const { data: allRatings } = await supabase
+            .from("reviews")
+            .select("rating, response")
+            .eq("restaurant_id", restaurantId);
+        const avgRating = allRatings && allRatings.length > 0
+            ? allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length
+            : 0;
+        const unansweredCount = (allRatings ?? []).filter(r => !r.response).length;
+
         return c.json({
             reviews: (reviews ?? []).map(r => ({
                 ...r,
@@ -59,6 +71,8 @@ merchantReviewRoutes.get("/", async (c) => {
             total: count ?? 0,
             page,
             totalPages: Math.ceil((count ?? 0) / limit),
+            avgRating,
+            unansweredCount,
         });
     } catch (error) {
         console.error("[GET /restaurant/reviews] Unexpected error:", error);
@@ -163,6 +177,17 @@ merchantProductReviewRoutes.get("/", async (c) => {
             }
         }
 
+        // Aggregate stats across ALL product reviews for this restaurant, not
+        // just the current page — see the equivalent comment above for reviews.
+        const { data: allRatings } = await supabase
+            .from("product_reviews")
+            .select("rating, response")
+            .eq("restaurant_id", restaurantId);
+        const avgRating = allRatings && allRatings.length > 0
+            ? allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length
+            : 0;
+        const unansweredCount = (allRatings ?? []).filter(r => !r.response).length;
+
         return c.json({
             reviews: (reviews ?? []).map((review) => ({
                 ...review,
@@ -172,6 +197,8 @@ merchantProductReviewRoutes.get("/", async (c) => {
             total: count ?? 0,
             page,
             totalPages: Math.ceil((count ?? 0) / limit),
+            avgRating,
+            unansweredCount,
         });
     } catch (error) {
         console.error("[GET /restaurant/product-reviews] Unexpected error:", error);

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Star, MessageSquare, Send, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Card, EmptyState, formatDate } from "@kbouffe/module-core/ui";
+import { Card, EmptyState, formatDate, useLocale } from "@kbouffe/module-core/ui";
 import {
     useMerchantProductReviews,
     useMerchantReviews,
@@ -25,6 +25,7 @@ function StarDisplay({ rating, size = 14 }: { rating: number; size?: number }) {
 }
 
 function ReviewCard({ review, onRespond }: { review: MerchantReview; onRespond: (id: string, response: string) => Promise<void> }) {
+    const { t } = useLocale();
     const [showReply, setShowReply] = useState(false);
     const [replyText, setReplyText] = useState(review.response ?? "");
     const [sending, setSending] = useState(false);
@@ -61,7 +62,7 @@ function ReviewCard({ review, onRespond }: { review: MerchantReview; onRespond: 
 
             {review.response && !showReply && (
                 <div className="mt-3 pl-3 border-l-2 border-brand-500 bg-surface-50 dark:bg-surface-800/50 rounded-r-lg p-3">
-                    <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-1">Votre réponse</p>
+                    <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-1">{t.merchantReviews.yourReply}</p>
                     <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">{review.response}</p>
                 </div>
             )}
@@ -72,7 +73,7 @@ function ReviewCard({ review, onRespond }: { review: MerchantReview; onRespond: 
                     className="flex items-center gap-1.5 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                 >
                     <MessageSquare size={14} />
-                    {review.response ? "Modifier la réponse" : "Répondre"}
+                    {review.response ? t.merchantReviews.editReply : t.merchantReviews.reply}
                 </button>
             </div>
 
@@ -81,7 +82,7 @@ function ReviewCard({ review, onRespond }: { review: MerchantReview; onRespond: 
                     <textarea
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
-                        placeholder="Rédigez votre réponse..."
+                        placeholder={t.merchantReviews.replyPlaceholder}
                         className="flex-1 min-h-[80px] rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                     />
                     <button
@@ -98,6 +99,7 @@ function ReviewCard({ review, onRespond }: { review: MerchantReview; onRespond: 
 }
 
 function ProductReviewCard({ review, onRespond }: { review: MerchantProductReview; onRespond: (id: string, response: string) => Promise<void> }) {
+    const { t } = useLocale();
     const [showReply, setShowReply] = useState(false);
     const [replyText, setReplyText] = useState(review.response ?? "");
     const [sending, setSending] = useState(false);
@@ -122,7 +124,7 @@ function ProductReviewCard({ review, onRespond }: { review: MerchantProductRevie
                     </div>
                     <div>
                         <p className="font-semibold text-surface-900 dark:text-white text-sm">{review.customerName}</p>
-                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">Produit: <span className="font-medium">{review.productName}</span></p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">{t.merchantReviews.product}: <span className="font-medium">{review.productName}</span></p>
                         <p className="text-xs text-surface-400 mt-0.5">{formatDate(review.created_at)}</p>
                     </div>
                 </div>
@@ -135,7 +137,7 @@ function ProductReviewCard({ review, onRespond }: { review: MerchantProductRevie
 
             {review.response && !showReply && (
                 <div className="mt-3 pl-3 border-l-2 border-brand-500 bg-surface-50 dark:bg-surface-800/50 rounded-r-lg p-3">
-                    <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-1">Votre réponse</p>
+                    <p className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-1">{t.merchantReviews.yourReply}</p>
                     <p className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">{review.response}</p>
                 </div>
             )}
@@ -146,7 +148,7 @@ function ProductReviewCard({ review, onRespond }: { review: MerchantProductRevie
                     className="flex items-center gap-1.5 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                 >
                     <MessageSquare size={14} />
-                    {review.response ? "Modifier la réponse" : "Répondre"}
+                    {review.response ? t.merchantReviews.editReply : t.merchantReviews.reply}
                 </button>
             </div>
 
@@ -155,7 +157,7 @@ function ProductReviewCard({ review, onRespond }: { review: MerchantProductRevie
                     <textarea
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
-                        placeholder="Rédigez votre réponse..."
+                        placeholder={t.merchantReviews.replyPlaceholder}
                         className="flex-1 min-h-[80px] rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                     />
                     <button
@@ -172,6 +174,7 @@ function ProductReviewCard({ review, onRespond }: { review: MerchantProductRevie
 }
 
 export function MerchantReviewsPage() {
+    const { t } = useLocale();
     const [tab, setTab] = useState<"restaurant" | "product">("restaurant");
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState("");
@@ -184,6 +187,11 @@ export function MerchantReviewsPage() {
     const totalPages = tab === "restaurant" ? restaurantData.totalPages : productData.totalPages;
     const isLoading = tab === "restaurant" ? restaurantData.isLoading : productData.isLoading;
     const reload = tab === "restaurant" ? restaurantData.reload : productData.reload;
+    // Average rating and unanswered count come from the API, computed across
+    // ALL of the merchant's reviews — not just the current page — so they stay
+    // stable while paginating instead of silently changing per page.
+    const avgRating = tab === "restaurant" ? restaurantData.avgRating : productData.avgRating;
+    const unansweredCount = tab === "restaurant" ? restaurantData.unansweredCount : productData.unansweredCount;
 
     const filtered = useMemo(() => {
         if (!search.trim()) return reviews;
@@ -205,11 +213,6 @@ export function MerchantReviewsPage() {
         );
     }, [reviews, search, tab]);
 
-    const avgRating = useMemo(() => {
-        if (reviews.length === 0) return 0;
-        return reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-    }, [reviews]);
-
     const handleRespond = async (reviewId: string, response: string) => {
         const endpoint = tab === "restaurant"
             ? `/api/restaurant/reviews/${reviewId}`
@@ -227,9 +230,9 @@ export function MerchantReviewsPage() {
     return (
         <div>
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-surface-900 dark:text-white">Avis clients</h1>
+                <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{t.merchantReviews.title}</h1>
                 <p className="text-surface-500 dark:text-surface-400 mt-1">
-                    Consultez et répondez aux avis de vos clients
+                    {t.merchantReviews.subtitle}
                 </p>
             </div>
 
@@ -238,32 +241,32 @@ export function MerchantReviewsPage() {
                     onClick={() => { setTab("restaurant"); setPage(1); }}
                     className={`px-3 py-1.5 text-sm rounded-md transition-colors ${tab === "restaurant" ? "bg-brand-500 text-white" : "text-surface-600 dark:text-surface-400"}`}
                 >
-                    Avis restaurant
+                    {t.merchantReviews.tabRestaurant}
                 </button>
                 <button
                     onClick={() => { setTab("product"); setPage(1); }}
                     className={`px-3 py-1.5 text-sm rounded-md transition-colors ${tab === "product" ? "bg-brand-500 text-white" : "text-surface-600 dark:text-surface-400"}`}
                 >
-                    Avis produits
+                    {t.merchantReviews.tabProduct}
                 </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <Card className="p-4">
-                    <p className="text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">Total avis</p>
+                    <p className="text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">{t.merchantReviews.totalReviews}</p>
                     <p className="text-2xl font-bold text-surface-900 dark:text-white mt-1">{total}</p>
                 </Card>
                 <Card className="p-4">
-                    <p className="text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">Note moyenne</p>
+                    <p className="text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">{t.merchantReviews.avgRating}</p>
                     <div className="flex items-center gap-2 mt-1">
                         <p className="text-2xl font-bold text-surface-900 dark:text-white">{avgRating > 0 ? avgRating.toFixed(1) : "—"}</p>
                         <StarDisplay rating={Math.round(avgRating)} size={16} />
                     </div>
                 </Card>
                 <Card className="p-4">
-                    <p className="text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">Sans réponse</p>
+                    <p className="text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">{t.merchantReviews.noResponse}</p>
                     <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-                        {reviews.filter((r) => !r.response).length}
+                        {unansweredCount}
                     </p>
                 </Card>
             </div>
@@ -272,7 +275,7 @@ export function MerchantReviewsPage() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
                 <input
                     type="text"
-                    placeholder={tab === "product" ? "Rechercher un avis ou produit..." : "Rechercher un avis..."}
+                    placeholder={tab === "product" ? t.merchantReviews.searchPlaceholderProduct : t.merchantReviews.searchPlaceholder}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -288,8 +291,8 @@ export function MerchantReviewsPage() {
             ) : filtered.length === 0 ? (
                 <EmptyState
                     icon={<MessageSquare size={48} />}
-                    title="Aucun avis"
-                    description={tab === "product" ? "Vos clients n'ont pas encore laissé d'avis produit." : "Vos clients n'ont pas encore laissé d'avis."}
+                    title={t.merchantReviews.empty}
+                    description={tab === "product" ? t.merchantReviews.emptyDescProduct : t.merchantReviews.emptyDescRestaurant}
                 />
             ) : (
                 <div className="space-y-3">
@@ -315,7 +318,7 @@ export function MerchantReviewsPage() {
                         <ChevronLeft size={16} />
                     </button>
                     <span className="text-sm text-surface-500">
-                        Page {page} / {totalPages}
+                        {t.merchantReviews.page} {page} / {totalPages}
                     </span>
                     <button
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

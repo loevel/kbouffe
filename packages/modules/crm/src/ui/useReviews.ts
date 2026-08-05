@@ -34,6 +34,8 @@ export function useMerchantReviews(page = 1) {
     const [reviews, setReviews] = useState<MerchantReview[]>([]);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
+    const [avgRating, setAvgRating] = useState(0);
+    const [unansweredCount, setUnansweredCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
     const load = useCallback(async () => {
@@ -45,6 +47,8 @@ export function useMerchantReviews(page = 1) {
             setReviews(data.reviews ?? []);
             setTotal(data.total ?? 0);
             setTotalPages(data.totalPages ?? 0);
+            setAvgRating(data.avgRating ?? 0);
+            setUnansweredCount(data.unansweredCount ?? 0);
         } catch {
             setReviews([]);
         } finally {
@@ -54,13 +58,15 @@ export function useMerchantReviews(page = 1) {
 
     useEffect(() => { load(); }, [load]);
 
-    return { reviews, total, totalPages, isLoading, reload: load };
+    return { reviews, total, totalPages, avgRating, unansweredCount, isLoading, reload: load };
 }
 
 export function useMerchantProductReviews(page = 1) {
     const [reviews, setReviews] = useState<MerchantProductReview[]>([]);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
+    const [avgRating, setAvgRating] = useState(0);
+    const [unansweredCount, setUnansweredCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
     const load = useCallback(async () => {
@@ -72,6 +78,8 @@ export function useMerchantProductReviews(page = 1) {
             setReviews(data.reviews ?? []);
             setTotal(data.total ?? 0);
             setTotalPages(data.totalPages ?? 0);
+            setAvgRating(data.avgRating ?? 0);
+            setUnansweredCount(data.unansweredCount ?? 0);
         } catch {
             setReviews([]);
         } finally {
@@ -81,5 +89,5 @@ export function useMerchantProductReviews(page = 1) {
 
     useEffect(() => { load(); }, [load]);
 
-    return { reviews, total, totalPages, isLoading, reload: load };
+    return { reviews, total, totalPages, avgRating, unansweredCount, isLoading, reload: load };
 }
