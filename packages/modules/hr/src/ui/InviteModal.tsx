@@ -89,14 +89,14 @@ export function InviteModal({ isOpen, onClose, onInvited, callerRole, allowedRol
 
     // Invite tab state
     const [inviteEmail, setInviteEmail] = useState("");
-    const [inviteRoles, setInviteRoles] = useState<TeamRole[]>(["viewer"]);
+    const [inviteRoles, setInviteRoles] = useState<TeamRole[]>([]);
 
     // Create tab state
     const [fullName, setFullName] = useState("");
     const [createEmail, setCreateEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
-    const [createRoles, setCreateRoles] = useState<TeamRole[]>(["viewer"]);
+    const [createRoles, setCreateRoles] = useState<TeamRole[]>([]);
 
     const availableRoles = useMemo(
         () =>
@@ -108,12 +108,12 @@ export function InviteModal({ isOpen, onClose, onInvited, callerRole, allowedRol
 
     function resetAndClose() {
         setInviteEmail("");
-        setInviteRoles(["viewer"]);
+        setInviteRoles([]);
         setFullName("");
         setCreateEmail("");
         setPhone("");
         setPassword("");
-        setCreateRoles(["viewer"]);
+        setCreateRoles([]);
         setTab("invite");
         onClose();
     }

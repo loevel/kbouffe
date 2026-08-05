@@ -99,16 +99,30 @@ export async function evaluateBadges(
             const def = BADGE_DEFINITIONS[badge.type];
             const emoji = BADGE_ICON_MAP[def.icon] ?? "🏅";
 
-            // Insert badge (ignore conflict if already exists)
-            await adminDb.from("restaurant_badges").upsert(
-                {
-                    restaurant_id: restaurantId,
-                    badge_type: badge.type,
-                    badge_name: badge.name,
-                    metadata: { icon: def.icon },
-                },
-                { onConflict: "restaurant_id,badge_type", ignoreDuplicates: true },
-            );
+            // Insert badge (ignore conflict if already exists).
+            // `.select()` lets us tell a genuine insert apart from a no-op
+            // caused by ignoreDuplicates — without this check, two concurrent
+            // evaluateBadges() calls (e.g. an order completing and a review
+            // landing at nearly the same time) would both read the same
+            // pre-insert `earned` set and each send its own "Nouveau badge !"
+            // notification for the same badge.
+            const { data: insertedBadge } = await adminDb
+                .from("restaurant_badges")
+                .upsert(
+                    {
+                        restaurant_id: restaurantId,
+                        badge_type: badge.type,
+                        badge_name: badge.name,
+                        metadata: { icon: def.icon },
+                    },
+                    { onConflict: "restaurant_id,badge_type", ignoreDuplicates: true },
+                )
+                .select("id");
+
+            if (!insertedBadge || insertedBadge.length === 0) {
+                // Badge already existed — another call already notified for it.
+                continue;
+            }
 
             // Insert notification
             await adminDb.from("restaurant_notifications").insert({

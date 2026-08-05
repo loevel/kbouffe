@@ -5,6 +5,8 @@ import { Bell, ShoppingBag, AlertCircle, Clock, X, BarChart3, Trophy, UserMinus,
 import { localFetch } from "../../lib/auth-fetch";
 import { createClient } from "../../lib/supabase-client";
 import { useDashboard } from "../../contexts/DashboardContext";
+import { useLocale } from "../../contexts/LocaleContext";
+import type { TranslationKeys } from "../../i18n";
 
 interface KdsNotification {
     id: string;
@@ -17,23 +19,23 @@ interface KdsNotification {
     _source?: "kds" | "engagement";
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, t: TranslationKeys, locale: string): string {
     try {
         const now = Date.now();
         const then = new Date(dateStr).getTime();
-        if (isNaN(then)) return "date invalide";
+        if (isNaN(then)) return t.notifications.invalidDate;
         const diff = Math.max(0, now - then);
         const seconds = Math.floor(diff / 1000);
-        if (seconds < 60) return "à l'instant";
+        if (seconds < 60) return t.notifications.justNow;
         const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `il y a ${minutes} min`;
+        if (minutes < 60) return t.notifications.minutesAgo.replace("{n}", String(minutes));
         const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `il y a ${hours}h`;
+        if (hours < 24) return t.notifications.hoursAgo.replace("{n}", String(hours));
         const days = Math.floor(hours / 24);
-        if (days < 7) return `il y a ${days}j`;
-        return new Date(dateStr).toLocaleDateString("fr-FR");
+        if (days < 7) return t.notifications.daysAgo.replace("{n}", String(days));
+        return new Date(dateStr).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR");
     } catch {
-        return "date invalide";
+        return t.notifications.invalidDate;
     }
 }
 
@@ -58,18 +60,20 @@ function getNotificationIcon(type: string) {
     }
 }
 
-function getNotificationTitle(notif: KdsNotification): string {
+function getNotificationTitle(notif: KdsNotification, t: TranslationKeys): string {
     // Engagement notifications carry title/body in payload
     if (notif.payload?.title) return String(notif.payload.title);
     switch (notif.event_type) {
         case "new_order":
-            return `Nouvelle commande${notif.payload?.customer_name ? ` de ${notif.payload.customer_name}` : ""}`;
+            return notif.payload?.customer_name
+                ? `${t.notifications.newOrderFrom} ${notif.payload.customer_name}`
+                : t.notifications.newOrder;
         case "order_urgent":
-            return "Commande urgente !";
+            return t.notifications.orderUrgent;
         case "status_changed":
-            return "Statut de commande modifie";
+            return t.notifications.statusChanged;
         default:
-            return "Notification";
+            return t.notifications.genericTitle;
     }
 }
 
@@ -96,6 +100,7 @@ function getNotificationBg(type: string, processed: boolean) {
 }
 
 export function NotificationBell() {
+    const { locale, t } = useLocale();
     const { restaurant } = useDashboard();
     const restaurantId = restaurant?.id;
     const [notifications, setNotifications] = useState<KdsNotification[]>([]);
@@ -290,16 +295,16 @@ export function NotificationBell() {
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200 dark:border-surface-700">
                         <h3 className="text-sm font-semibold text-surface-900 dark:text-white">
-                            Notifications
+                            {t.notifications.title}
                         </h3>
                         <div className="flex items-center gap-2">
                             {notifications.length > 0 && (
                                 <button
                                     onClick={deleteAll}
                                     className="text-xs text-red-500 hover:text-red-600 font-medium transition-colors"
-                                    title="Supprimer toutes les notifications"
+                                    title={t.notifications.deleteAllTitle}
                                 >
-                                    Tout supprimer
+                                    {t.notifications.deleteAll}
                                 </button>
                             )}
                             {unreadCount > 0 && (
@@ -308,7 +313,7 @@ export function NotificationBell() {
                                     disabled={isLoading}
                                     className="text-xs text-brand-500 hover:text-brand-600 font-medium disabled:opacity-50"
                                 >
-                                    Tout marquer lu
+                                    {t.notifications.markAllRead}
                                 </button>
                             )}
                             <button
@@ -324,7 +329,7 @@ export function NotificationBell() {
                     <div className="max-h-80 overflow-y-auto">
                         {notifications.length === 0 ? (
                             <div className="px-4 py-8 text-center text-sm text-surface-500">
-                                Aucune notification
+                                {t.notifications.empty}
                             </div>
                         ) : (
                             notifications.map((notif) => (
@@ -337,7 +342,7 @@ export function NotificationBell() {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium text-surface-900 dark:text-white">
-                                            {getNotificationTitle(notif)}
+                                            {getNotificationTitle(notif, t)}
                                         </p>
                                         {notif.payload?.body ? (
                                             <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 line-clamp-2">
@@ -345,11 +350,11 @@ export function NotificationBell() {
                                             </p>
                                         ) : notif.payload?.order_number ? (
                                             <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-                                                Commande #{notif.payload.order_number}
+                                                {t.notifications.orderNumber} #{notif.payload.order_number}
                                             </p>
                                         ) : null}
                                         <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">
-                                            {timeAgo(notif.created_at)}
+                                            {timeAgo(notif.created_at, t, locale)}
                                         </p>
                                     </div>
                                     {!notif.processed && (
@@ -359,8 +364,8 @@ export function NotificationBell() {
                                         onClick={() => deleteNotification(notif.id, notif._source ?? "engagement")}
                                         disabled={deleting.has(notif.id)}
                                         className="mt-0.5 shrink-0 p-1.5 text-surface-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
-                                        aria-label="Supprimer"
-                                        title="Supprimer cette notification"
+                                        aria-label={t.notifications.deleteOne}
+                                        title={t.notifications.deleteOneTitle}
                                     >
                                         <Trash2 size={13} />
                                     </button>

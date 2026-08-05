@@ -161,10 +161,10 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
                             <div className="flex items-center gap-1.5 shrink-0">
                                 {member.hasPin && (
                                     <span
-                                        title="PIN actif"
+                                        title={t.team.pinActive}
                                         className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1"
                                     >
-                                        🔑 <span className="hidden sm:inline">PIN actif</span>
+                                        🔑 <span className="hidden sm:inline">{t.team.pinActive}</span>
                                     </span>
                                 )}
                                 {canManagePins && (
@@ -173,11 +173,11 @@ export function TeamList({ filterRole }: TeamListProps = {}) {
                                         variant="ghost"
                                         leftIcon={<KeyRound size={14} />}
                                         onClick={() => setPinModalMember(member)}
-                                        title={member.hasPin ? "Modifier le PIN" : "Définir un PIN"}
+                                        title={member.hasPin ? t.team.editPinTitle : t.team.setPinTitle}
                                         className="text-xs"
                                     >
                                         <span className="hidden sm:inline">
-                                            {member.hasPin ? "PIN" : "Définir PIN"}
+                                            {member.hasPin ? t.team.editPin : t.team.setPin}
                                         </span>
                                     </Button>
                                 )}
