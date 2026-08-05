@@ -26,6 +26,7 @@ interface ReservationsTableProps {
     processingId: string | null;
     onStatusChange: (id: string, newStatus: string) => void;
     onDelete: (id: string) => void;
+    showUpcomingHint?: boolean;
 }
 
 export function ReservationsTable({
@@ -36,6 +37,7 @@ export function ReservationsTable({
     processingId,
     onStatusChange,
     onDelete,
+    showUpcomingHint,
 }: ReservationsTableProps) {
     const { t } = useLocale();
     const { can } = useDashboard();
@@ -248,6 +250,17 @@ export function ReservationsTable({
             </div>
         );
     };
+
+    if (reservations.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 bg-white dark:bg-surface-900 rounded-xl shadow-sm text-center px-4">
+                <p className="font-semibold text-surface-700 dark:text-surface-300">{t.reservations.noReservations}</p>
+                <p className="text-sm text-surface-500 dark:text-surface-400 mt-1 max-w-md">
+                    {showUpcomingHint ? t.reservations.noReservationsUpcomingHint : t.reservations.noReservationsDesc}
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-3">
