@@ -156,10 +156,9 @@ cd apps/api
 npm run deploy
 ```
 
-### Dashboard (Cloudflare Pages via OpenNext)
+### Dashboard (Cloudflare Workers via OpenNext)
 ```bash
 cd apps/web-dashboard
-npm run build:worker
 npm run deploy
 ```
 
