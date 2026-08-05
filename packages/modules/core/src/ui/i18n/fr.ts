@@ -1392,6 +1392,27 @@ export const fr = {
         paymentWarning: "Assurez-vous que le numéro MoMo est correct pour éviter tout délai de versement.",
     },
 
+    merchantReviews: {
+        title: "Avis clients",
+        subtitle: "Consultez et repondez aux avis de vos clients.",
+        tabRestaurant: "Avis restaurant",
+        tabProduct: "Avis produits",
+        totalReviews: "Total avis",
+        avgRating: "Note moyenne",
+        noResponse: "Sans reponse",
+        searchPlaceholder: "Rechercher un avis...",
+        searchPlaceholderProduct: "Rechercher un avis ou produit...",
+        reply: "Repondre",
+        editReply: "Modifier la reponse",
+        replyPlaceholder: "Redigez votre reponse...",
+        yourReply: "Votre reponse",
+        product: "Produit",
+        empty: "Aucun avis",
+        emptyDescRestaurant: "Vos clients n'ont pas encore laisse d'avis.",
+        emptyDescProduct: "Vos clients n'ont pas encore laisse d'avis produit.",
+        page: "Page",
+    },
+
     scheduledOrders: {
         scheduled: "Programmee",
         scheduledFor: "Programmee pour",

@@ -1394,6 +1394,27 @@ export const en: TranslationKeys = {
         },
     },
 
+    merchantReviews: {
+        title: "Customer Reviews",
+        subtitle: "View and respond to your customers' reviews.",
+        tabRestaurant: "Restaurant reviews",
+        tabProduct: "Product reviews",
+        totalReviews: "Total reviews",
+        avgRating: "Average rating",
+        noResponse: "No response",
+        searchPlaceholder: "Search a review...",
+        searchPlaceholderProduct: "Search a review or product...",
+        reply: "Reply",
+        editReply: "Edit reply",
+        replyPlaceholder: "Write your reply...",
+        yourReply: "Your reply",
+        product: "Product",
+        empty: "No reviews",
+        emptyDescRestaurant: "Your customers haven't left a review yet.",
+        emptyDescProduct: "Your customers haven't left a product review yet.",
+        page: "Page",
+    },
+
     scheduledOrders: {
         scheduled: "Scheduled",
         scheduledFor: "Scheduled for",
