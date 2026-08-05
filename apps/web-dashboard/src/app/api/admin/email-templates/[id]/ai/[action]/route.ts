@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAdmin } from "@/lib/api/helpers";
 
 const WORKER_URL =
-    process.env.API_WORKER_URL ?? "https://kbouffe-api.davechendjou.workers.dev";
+    process.env.API_WORKER_URL ?? "https://api.kbouffe.com";
 
 export async function POST(
     request: NextRequest,

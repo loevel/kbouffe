@@ -73,4 +73,10 @@ CREATE OR REPLACE TRIGGER update_store_announcements_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- 4. Add premium_storefront pack type
-ALTER TYPE marketplace_pack_type ADD VALUE IF NOT EXISTS 'premium_storefront';
+-- NOTE (2026-08-05) : cette ligne référençait le type marketplace_pack_type,
+-- qui n'existe PAS en production — il provenait d'un schéma marketplace
+-- concurrent jamais appliqué (cf. supabase/migrations/_archived_never_applied/).
+-- Le vrai catalogue marketplace en prod est la table marketplace_services
+-- (colonne slug, TEXT) ; "premium_storefront" y existe comme une ligne
+-- (slug = 'premium_storefront'), pas comme valeur d'enum. Supprimé pour que
+-- cette migration reste rejouable sans erreur.
