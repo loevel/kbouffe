@@ -211,3 +211,81 @@ export function usePendingOrderCount() {
 
     return data?.total ?? 0;
 }
+
+// ── useOrderStatusCounts ──────────────────────────────────────────────────
+
+export interface OrderStatusCounts {
+    all: number;
+    scheduled: number;
+    pending: number;
+    accepted: number;
+    preparing: number;
+    ready: number;
+    completed: number;
+    cancelled: number;
+}
+
+const EMPTY_COUNTS: OrderStatusCounts = {
+    all: 0,
+    scheduled: 0,
+    pending: 0,
+    accepted: 0,
+    preparing: 0,
+    ready: 0,
+    completed: 0,
+    cancelled: 0,
+};
+
+// Status filter sent to the API per tab. "completed" groups both terminal
+// values (see the comment in OrdersTable) so its count matches what the tab
+// actually displays.
+const COUNT_STATUS_FILTERS: Record<keyof OrderStatusCounts, string | undefined> = {
+    all: undefined,
+    scheduled: "scheduled",
+    pending: "pending",
+    accepted: "accepted",
+    preparing: "preparing",
+    ready: "ready",
+    completed: "delivered,completed",
+    cancelled: "cancelled",
+};
+
+/**
+ * Exact per-status order counts, straight from the DB via `limit=0` requests
+ * (the API still returns the exact `count` from Postgres, no rows fetched).
+ *
+ * Tab counts used to be derived by client-side filtering a single
+ * `useOrders({ limit: 200 })` sample — accurate only when a restaurant had
+ * 200 orders or fewer. Past that, every tab (Cancelled included, which had
+ * no count badge at all) silently under-counted.
+ */
+export function useOrderStatusCounts() {
+    const { data, isLoading } = useSWR<OrderStatusCounts>(
+        "/api/orders/status-counts",
+        async () => {
+            const entries = Object.entries(COUNT_STATUS_FILTERS) as [
+                keyof OrderStatusCounts,
+                string | undefined,
+            ][];
+
+            const totals = await Promise.all(
+                entries.map(async ([, status]) => {
+                    const qs = new URLSearchParams({ limit: "0" });
+                    if (status) qs.set("status", status);
+                    const res = await authFetch(`/api/orders?${qs.toString()}`);
+                    if (!res.ok) return 0;
+                    const body = (await res.json()) as OrdersResponse;
+                    return body.total ?? 0;
+                }),
+            );
+
+            return entries.reduce((acc, [key], i) => {
+                acc[key] = totals[i];
+                return acc;
+            }, { ...EMPTY_COUNTS });
+        },
+        { revalidateOnFocus: true, refreshInterval: 30_000 },
+    );
+
+    return { counts: data ?? EMPTY_COUNTS, isLoading };
+}
