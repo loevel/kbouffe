@@ -117,7 +117,7 @@ export default function OrderDetailPage() {
                                             )}
                                         </div>
                                     </div>
-                                    <p className="font-medium text-surface-900 dark:text-white">{formatCFA((item.unitPrice || 0) * item.quantity)}</p>
+                                    <p className="font-medium text-surface-900 dark:text-white">{formatCFA((item.unitPrice || (item as any).unit_price || 0) * item.quantity)}</p>
                                 </div>
                             ))}
                         </div>
@@ -207,7 +207,7 @@ export default function OrderDetailPage() {
                     </Card>
 
                     {/* Delivery tracking map (livreur) */}
-                    {order.delivery_type === "delivery" && ["out_for_delivery", "delivering", "delivered"].includes(currentStatus) && (
+                    {order.delivery_type === "delivery" && ["out_for_delivery", "delivering"].includes(currentStatus) && (
                         <Card>
                             <h3 className="font-semibold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
                                 <Truck size={16} className="text-brand-500" />
