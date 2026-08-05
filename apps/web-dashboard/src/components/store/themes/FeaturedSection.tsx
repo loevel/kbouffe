@@ -1,7 +1,31 @@
 "use client";
 
+import { useState } from "react";
 import { ChefHat, Plus } from "lucide-react";
 import type { ThemeProduct } from "./types";
+
+/**
+ * Falls back to the ChefHat placeholder if the image URL 404s (some product
+ * images point to external supplier URLs that can disappear).
+ */
+function FeaturedImage({ src, alt }: { src: string; alt: string }) {
+    const [failed, setFailed] = useState(false);
+    if (failed) {
+        return (
+            <div className="w-full h-full flex items-center justify-center">
+                <ChefHat size={28} className="text-surface-300 dark:text-surface-600" />
+            </div>
+        );
+    }
+    return (
+        <img
+            src={src}
+            alt={alt}
+            onError={() => setFailed(true)}
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+        />
+    );
+}
 
 interface FeaturedSectionProps {
     products: ThemeProduct[];
@@ -41,11 +65,7 @@ export function FeaturedSection({ products, onAdd, onClick, formatPrice, primary
                                     {/* Product image */}
                                     <div className="w-full aspect-square bg-surface-100 dark:bg-surface-800 rounded-t-2xl overflow-hidden">
                                         {product.image_url ? (
-                                            <img
-                                                src={product.image_url}
-                                                alt={product.name}
-                                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                                            />
+                                            <FeaturedImage src={product.image_url} alt={product.name} />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center">
                                                 <ChefHat size={28} className="text-surface-300 dark:text-surface-600" />

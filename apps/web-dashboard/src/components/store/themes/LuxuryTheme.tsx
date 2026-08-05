@@ -1,10 +1,34 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Plus } from "lucide-react";
 import type { ThemeProps } from "./types";
 import { ScarcityBadge } from "./ScarcityBadge";
 import { FeaturedSection } from "./FeaturedSection";
+
+/**
+ * Full-width product image with gradient overlay. Collapses entirely if the
+ * URL fails to load — some product images point to external supplier URLs
+ * that can 404 without warning, and a broken-image icon looks worse than no
+ * image at all.
+ */
+function ProductHeroImage({ src, alt }: { src: string; alt: string }) {
+    const [failed, setFailed] = useState(false);
+    if (failed) return null;
+    return (
+        <div className="relative w-full aspect-[16/9] rounded-2xl overflow-hidden mb-4">
+            <Image
+                src={src}
+                alt={alt}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                onError={() => setFailed(true)}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+        </div>
+    );
+}
 
 /**
  * Luxury / Gastronomic theme.
@@ -88,15 +112,7 @@ export function LuxuryTheme({
                                 >
                                     {/* Full-width image */}
                                     {product.image_url && (
-                                        <div className="relative w-full aspect-[16/9] rounded-2xl overflow-hidden mb-4">
-                                            <Image
-                                                src={product.image_url}
-                                                alt={product.name}
-                                                fill
-                                                className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                                        </div>
+                                        <ProductHeroImage src={product.image_url} alt={product.name} />
                                     )}
 
                                     {/* Info */}

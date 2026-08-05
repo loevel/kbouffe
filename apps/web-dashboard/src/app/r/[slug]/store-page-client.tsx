@@ -694,7 +694,24 @@ function ProductDetailModal({
                                                             <div className="relative shrink-0">
                                                                 <div className="w-20 h-20 rounded-xl overflow-hidden bg-surface-100 dark:bg-surface-800">
                                                                     {p.image_url
-                                                                        ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                                                                        ? (
+                                                                            <>
+                                                                                <img
+                                                                                    src={p.image_url}
+                                                                                    alt={p.name}
+                                                                                    className="w-full h-full object-cover"
+                                                                                    onError={(e) => {
+                                                                                        // Certaines images produits pointent vers des URLs fournisseurs
+                                                                                        // externes qui peuvent 404 — on bascule sur le placeholder plutôt
+                                                                                        // que d'afficher l'icône d'image cassée du navigateur.
+                                                                                        e.currentTarget.style.display = "none";
+                                                                                        const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                                                                        if (fallback) fallback.style.display = "flex";
+                                                                                    }}
+                                                                                />
+                                                                                <div className="hidden w-full h-full items-center justify-center"><ChefHat size={20} className="text-surface-300 dark:text-surface-600" /></div>
+                                                                            </>
+                                                                        )
                                                                         : <div className="w-full h-full flex items-center justify-center"><ChefHat size={20} className="text-surface-300 dark:text-surface-600" /></div>
                                                                     }
                                                                 </div>
