@@ -49,8 +49,29 @@ customersRoutes.get("/", async (c) => {
     }
 
     if (search) {
-        // Since customer is joined, search is a bit more complex in simple Supabase query
-        // For MVP, we'll search by phone/name if possible or fetch all and filter
+        // Sanitize: strip PostgREST special chars to prevent query injection,
+        // same convention as orders.ts.
+        const safe = search.replace(/[%_(),.*!~]/g, "").slice(0, 100).trim();
+        if (safe) {
+            // `customer` is a joined table (users), so it can't be filtered with
+            // a plain .ilike()/.or() on the restaurant_customers query — resolve
+            // matching user ids first, then restrict the main query to them.
+            const { data: matchingUsers, error: usersError } = await c.var.supabase
+                .from("users")
+                .select("id")
+                .or(`full_name.ilike.%${safe}%,phone.ilike.%${safe}%,email.ilike.%${safe}%`);
+
+            if (usersError) throw new Error(usersError.message);
+
+            const matchingIds = (matchingUsers ?? []).map((u: any) => u.id);
+            if (matchingIds.length === 0) {
+                return c.json({
+                    customers: [],
+                    pagination: { page, limit, total: 0, totalPages: 1 }
+                });
+            }
+            query = query.in("customer_id", matchingIds);
+        }
     }
 
     // Order by recency, not spend — sorting by total_spent here silently biased
@@ -95,8 +116,7 @@ customersRoutes.get("/:id", async (c) => {
 
     const [
         { data: rc, error: rcError },
-        { data: orders, error: ordersError },
-        { data: favProducts, error: favError }
+        { data: orders, error: ordersError }
     ] = await Promise.all([
         c.var.supabase
             .from("restaurant_customers")
@@ -110,36 +130,31 @@ customersRoutes.get("/:id", async (c) => {
         
         // Parked (draft) orders aren't real orders yet — same convention as the
         // main orders list (see orders.ts) — so keep them out of the customer's
-        // order history.
+        // order history. Fetched uncapped (well, capped generously at 200) so the
+        // stats below can be derived from this same set instead of a denormalized
+        // column that may use a different filtering rule.
         c.var.supabase
             .from("orders")
-            .select("id, total, status, created_at, items")
+            .select("id, total, status, payment_status, created_at, items")
             .eq("restaurant_id", restaurantId)
             .eq("customer_id", customerId)
             .neq("status", "draft")
             .order("created_at", { ascending: false })
-            .limit(20),
-
-        // Calculate favorite products via order items aggregation (Simplified for MVP).
-        // Filtered the same way as the order history above (excluding drafts) plus
-        // payment_status=paid, so "top products" only counts orders that were
-        // actually paid for — previously this used a different criterion than the
-        // order history query, making the two panels represent different subsets
-        // of the customer's orders.
-        c.var.supabase
-            .from("orders")
-            .select("items")
-            .eq("restaurant_id", restaurantId)
-            .eq("customer_id", customerId)
-            .neq("status", "draft")
-            .eq("payment_status", "paid")
+            .limit(200)
     ]);
 
     if (rcError || !rc) return c.json({ error: "Client introuvable" }, 404);
 
+    const nonDraftOrders = orders || [];
+    // Only paid orders count as "favorite products" / actual spend — this must
+    // stay the same filter used for totalSpent below, otherwise the "Habitudes
+    // de Consommation" panel and the top-line stats represent different subsets
+    // of the customer's orders (see audit finding #5/#6).
+    const paidOrders = nonDraftOrders.filter((o: any) => o.payment_status === "paid");
+
     // Dynamic favorite products logic
     const productCounts: Record<string, { name: string, count: number }> = {};
-    (favProducts || []).forEach((o: any) => {
+    paidOrders.forEach((o: any) => {
         const items = o.items || [];
         items.forEach((item: any) => {
             if (!productCounts[item.productId]) {
@@ -153,6 +168,15 @@ customersRoutes.get("/:id", async (c) => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 3);
 
+    // Derive the header stats from the same non-draft order set shown in the
+    // "Historique Récent" table below, instead of the denormalized
+    // restaurant_customers.orders_count/total_spent columns — those are
+    // maintained by a DB-side trigger/job whose own filtering rule isn't
+    // guaranteed to match (drafts/cancelled orders), which previously let the
+    // displayed stats silently diverge from the visible order rows.
+    const ordersCount = nonDraftOrders.length;
+    const totalSpent = paidOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+
     return c.json({
         id: rc.customer_id,
         profile: {
@@ -163,16 +187,16 @@ customersRoutes.get("/:id", async (c) => {
             joinedAt: rc.created_at,
         },
         stats: {
-            totalSpent: rc.total_spent,
-            ordersCount: rc.orders_count,
+            totalSpent,
+            ordersCount,
             lastOrderAt: rc.last_order_at,
-            avgOrderValue: rc.orders_count > 0 ? Math.round(rc.total_spent / rc.orders_count) : 0,
+            avgOrderValue: ordersCount > 0 ? Math.round(totalSpent / ordersCount) : 0,
             topProducts
         },
         segment: rc.segment,
         internalNotes: rc.internal_notes,
         tags: rc.tags,
-        orders: orders || []
+        orders: nonDraftOrders.slice(0, 20)
     });
 });
 
