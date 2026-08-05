@@ -7,7 +7,7 @@ interface Template {
     id: string;
     label: string;
     text: string;
-    category: "livraison" | "retard" | "confirmation" | "remerciement" | "annulation";
+    category: "livraison" | "retard" | "confirmation" | "remerciement" | "annulation" | "reclamation";
 }
 
 export const MESSAGE_TEMPLATES: Template[] = [
@@ -19,6 +19,8 @@ export const MESSAGE_TEMPLATES: Template[] = [
     { id: "livree",       label: "Livrée",             category: "livraison",    text: "Votre commande vient d'être livrée. Bon appétit ! N'hésitez pas à laisser un avis. 😊" },
     { id: "cancel",       label: "Annulation",         category: "annulation",   text: "Malheureusement, nous devons annuler votre commande. Vous serez remboursé dans les plus brefs délais. Toutes nos excuses." },
     { id: "indispo",      label: "Produit indispo",    category: "annulation",   text: "Un produit de votre commande n'est plus disponible. Nous vous contactons pour un ajustement ou remboursement." },
+    { id: "qualite",      label: "Réclamation qualité", category: "reclamation", text: "Toutes nos excuses pour ce désagrément avec votre plat. Pouvez-vous nous en dire plus ? Nous ferons le nécessaire (ajustement ou remboursement)." },
+    { id: "gout",         label: "Trop épicé / assaisonnement", category: "reclamation", text: "Désolé que le plat ne corresponde pas à vos attentes en termes d'assaisonnement. Nous transmettons votre retour en cuisine et restons à votre disposition." },
 ];
 
 const CATEGORY_COLORS: Record<Template["category"], string> = {
@@ -27,6 +29,7 @@ const CATEGORY_COLORS: Record<Template["category"], string> = {
     confirmation: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400",
     remerciement: "bg-violet-100 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400",
     annulation:   "bg-rose-100 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400",
+    reclamation:  "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400",
 };
 
 interface MessageTemplatesProps {

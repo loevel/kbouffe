@@ -58,12 +58,14 @@ function ConversationList({
     onSelect,
     filter,
     onFilterChange,
+    currentUserId,
 }: {
     conversations: ConversationItem[];
     selectedId: string | null;
     onSelect: (conv: ConversationItem) => void;
     filter: string;
     onFilterChange: (v: string) => void;
+    currentUserId?: string;
 }) {
     const filtered = conversations.filter((c) => {
         if (!filter) return true;
@@ -156,6 +158,13 @@ function ConversationList({
                                                         : "text-surface-500 dark:text-surface-400"
                                                 }`}
                                             >
+                                                {conv.lastMessage &&
+                                                    currentUserId &&
+                                                    conv.lastMessage.senderId === currentUserId && (
+                                                        <span className="text-surface-400">
+                                                            Vous :{" "}
+                                                        </span>
+                                                    )}
                                                 {conv.lastMessage?.contentType === "image"
                                                     ? "📷 Image"
                                                     : conv.lastMessage?.content || "Pas de message"}
@@ -646,6 +655,7 @@ function ChatUI({
 // ── Main page ──
 export default function MessagesPage() {
     const { t } = useLocale();
+    const { user } = useDashboard();
     const [conversations, setConversations] = useState<ConversationItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selected, setSelected] = useState<ConversationItem | null>(null);
@@ -740,6 +750,7 @@ export default function MessagesPage() {
                                 }}
                                 filter={filter}
                                 onFilterChange={setFilter}
+                                currentUserId={user?.id}
                             />
                         </div>
 
