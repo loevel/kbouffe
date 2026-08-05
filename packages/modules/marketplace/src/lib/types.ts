@@ -114,6 +114,9 @@ export interface Supplier {
   updated_at: string;
   // Computed / joined
   products?: SupplierProduct[];
+  /** Present when the query's select() joins the relation under its raw table
+   *  name (`supplier_products(...)`) instead of aliasing it to `products`. */
+  supplier_products?: SupplierProduct[];
   product_count?: number;
 }
 

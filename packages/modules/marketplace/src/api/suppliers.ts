@@ -86,15 +86,18 @@ suppliersRoutes.get('/', async (c) => {
 
     let suppliers = (data ?? []) as unknown as Supplier[];
 
-    // Client-side filters (on joined data)
+    // Client-side filters (on joined data).
+    // NB: le select() ci-dessus renvoie la relation sous la clé `supplier_products`
+    // (c'est aussi ce que le frontend consomme, ex. web-dashboard's SupplierCard),
+    // pas `products` — utiliser le mauvais nom de champ ici les rendait no-op.
     if (category) {
       suppliers = suppliers.filter((s) =>
-        s.products?.some((p) => p.category === category && p.is_active)
+        s.supplier_products?.some((p) => p.category === category && p.is_active)
       );
     }
     if (organic === '1') {
       suppliers = suppliers.filter((s) =>
-        s.products?.some((p) => p.is_organic && p.is_active)
+        s.supplier_products?.some((p) => p.is_organic && p.is_active)
       );
     }
 
