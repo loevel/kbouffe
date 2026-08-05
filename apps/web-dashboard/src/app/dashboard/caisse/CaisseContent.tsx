@@ -104,6 +104,13 @@ function formatDuration(openedAt: string, closedAt?: string) {
     return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }
 
+const STALE_SESSION_HOURS = 24;
+
+function isSessionStale(openedAt: string) {
+    const hours = (Date.now() - new Date(openedAt).getTime()) / 3_600_000;
+    return hours >= STALE_SESSION_HOURS;
+}
+
 const MOVEMENT_CONFIG: Record<
     string,
     { label: string; icon: React.ReactNode; colorClass: string; sign: string }
@@ -421,7 +428,7 @@ function AddMovementModal({
                         </label>
                         <input
                             type="number"
-                            min="1"
+                            min="0"
                             step="500"
                             placeholder="Ex: 5 000"
                             value={amount}
@@ -769,6 +776,17 @@ function OpenSessionView({
                 </div>
             </div>
 
+            {/* Stale session warning */}
+            {isSessionStale(session.openedAt) && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
+                    <AlertTriangle size={16} className="shrink-0" />
+                    <span>
+                        Cette session est ouverte depuis plus de {STALE_SESSION_HOURS}h. Pensez à
+                        clôturer la caisse si la journée est terminée.
+                    </span>
+                </div>
+            )}
+
             {/* Summary cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <SummaryCard
@@ -1067,9 +1085,13 @@ function SessionDetailModal({
 function HistoryView({
     sessions,
     onViewDetails,
+    loadingDetailId,
+    detailError,
 }: {
     sessions: ClosedSession[];
     onViewDetails: (sessionId: string) => void;
+    loadingDetailId: string | null;
+    detailError: string | null;
 }) {
     if (sessions.length === 0) {
         return (
@@ -1090,6 +1112,13 @@ function HistoryView({
                 </h3>
                 <p className="text-xs text-surface-400 mt-0.5">30 dernières sessions clôturées</p>
             </div>
+
+            {detailError && (
+                <div className="flex items-center gap-2 px-5 py-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm">
+                    <AlertTriangle size={16} className="shrink-0" />
+                    {detailError}
+                </div>
+            )}
 
             <div className="divide-y divide-surface-100 dark:divide-surface-700/50">
                 {sessions.map((s) => {
@@ -1169,8 +1198,12 @@ function HistoryView({
                             {/* View Details Button */}
                             <button
                                 onClick={() => onViewDetails(s.id)}
-                                className="shrink-0 px-3 py-2 text-xs font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition"
+                                disabled={loadingDetailId === s.id}
+                                className="shrink-0 px-3 py-2 text-xs font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition disabled:opacity-60 flex items-center gap-1.5"
                             >
+                                {loadingDetailId === s.id && (
+                                    <Loader2 size={12} className="animate-spin" />
+                                )}
                                 Détails
                             </button>
                         </div>
@@ -1204,6 +1237,8 @@ export default function CaissePage() {
     const [showAddMovementModal, setShowAddMovementModal] = useState(false);
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+    const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+    const [detailError, setDetailError] = useState<string | null>(null);
 
     // ── Fetch current session ───────────────────────────────────────────
     const fetchCurrent = useCallback(async () => {
@@ -1257,16 +1292,23 @@ export default function CaissePage() {
 
     // ── Fetch session details ───────────────────────────────────────────
     const fetchSessionDetail = useCallback(async (sessionId: string) => {
+        setLoadingDetailId(sessionId);
+        setDetailError(null);
         try {
             const res = await authFetch(`/api/caisse/${sessionId}/report`);
-            if (!res.ok) return;
+            if (!res.ok) {
+                setDetailError("Impossible de charger les détails de cette session.");
+                return;
+            }
             const data = await res.json();
             setSessionDetail({
                 session: data.session,
                 movements: data.movements ?? [],
             });
         } catch {
-            // silent
+            setDetailError("Erreur réseau. Veuillez réessayer.");
+        } finally {
+            setLoadingDetailId(null);
         }
     }, []);
 
@@ -1368,7 +1410,12 @@ export default function CaissePage() {
                             <Loader2 size={32} className="animate-spin text-brand-500" />
                         </div>
                     ) : (
-                        <HistoryView sessions={history} onViewDetails={handleViewDetails} />
+                        <HistoryView
+                            sessions={history}
+                            onViewDetails={handleViewDetails}
+                            loadingDetailId={loadingDetailId}
+                            detailError={detailError}
+                        />
                     )}
                 </>
             )}
