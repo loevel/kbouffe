@@ -162,6 +162,7 @@ export function ReservationsList() {
                     processingId={processingId}
                     onStatusChange={handleStatusChange}
                     onDelete={handleDelete}
+                    showUpcomingHint={!dateFilter && activeTab === "all"}
                 />
             )}
 

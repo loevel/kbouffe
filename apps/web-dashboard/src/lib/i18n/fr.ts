@@ -921,7 +921,7 @@ export const fr = {
     reservations: {
         title: "Reservations",
         subtitle: "Gerez les reservations de tables de votre restaurant.",
-        allStatuses: "Toutes",
+        allStatuses: "A venir",
         pending: "En attente",
         confirmed: "Confirmee",
         seated: "Installee",
@@ -930,6 +930,7 @@ export const fr = {
         cancelled: "Annulee",
         noReservations: "Aucune reservation",
         noReservationsDesc: "Les reservations apparaitront ici.",
+        noReservationsUpcomingHint: "Seules les reservations a venir sont affichees par defaut. Choisissez une date pour consulter l'historique.",
         searchPlaceholder: "Rechercher par nom ou telephone...",
         addReservation: "Nouvelle reservation",
         addReservationDesc: "Creez une nouvelle reservation pour un client.",

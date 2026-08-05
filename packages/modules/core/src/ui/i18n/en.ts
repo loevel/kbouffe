@@ -1098,7 +1098,7 @@ export const en: TranslationKeys = {
     reservations: {
         title: "Reservations",
         subtitle: "Manage table reservations for your restaurant.",
-        allStatuses: "All",
+        allStatuses: "Upcoming",
         pending: "Pending",
         confirmed: "Confirmed",
         seated: "Seated",
@@ -1107,6 +1107,7 @@ export const en: TranslationKeys = {
         cancelled: "Cancelled",
         noReservations: "No reservations",
         noReservationsDesc: "Reservations will appear here.",
+        noReservationsUpcomingHint: "Only upcoming reservations are shown by default. Pick a date to see past history.",
         searchPlaceholder: "Search by name or phone...",
         addReservation: "New reservation",
         addReservationDesc: "Create a new reservation for a customer.",
