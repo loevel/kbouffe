@@ -1149,6 +1149,8 @@ export const fr = {
         orderNum: "Commande",
         timeAgo: "il y a",
         minutes: "min",
+        hoursShort: "h",
+        daysShort: "j",
         items: "articles",
         dineIn: "Sur place",
         delivery: "Livraison",

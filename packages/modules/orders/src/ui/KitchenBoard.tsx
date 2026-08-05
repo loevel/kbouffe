@@ -50,6 +50,18 @@ function useElapsed(order: KdsOrder) {
     return Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60_000);
 }
 
+// Orders stuck for months (e.g. never marked "delivered") displayed raw
+// minutes as a meaningless 6-digit number — e.g. "194419 min" instead of
+// "135j". Format compactly once the value crosses an hour/day, same idea
+// as a relative-time display.
+function formatElapsed(minutes: number, t: { minutes: string; hoursShort: string; daysShort: string }) {
+    if (minutes < 60) return `${minutes} ${t.minutes}`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}${t.hoursShort}${minutes % 60}`;
+    const days = Math.floor(hours / 24);
+    return `${days}${t.daysShort}${hours % 24}${t.hoursShort}`;
+}
+
 // ── Order Card ────────────────────────────────────────────────────────────
 
 function OrderCard({ order, nextStatus, actionKey, t, urgentThreshold = 15 }: {
@@ -177,7 +189,7 @@ function OrderCard({ order, nextStatus, actionKey, t, urgentThreshold = 15 }: {
                         urgent ? "text-orange-500" : "text-surface-400"
                     )}>
                         <Clock size={11} />
-                        <span>{elapsed} {t.kds.minutes}</span>
+                        <span>{formatElapsed(elapsed, t.kds)}</span>
                     </div>
                     {order.preparation_time_minutes ? (
                         <p className="text-[11px] font-medium text-brand-600 dark:text-brand-300">
