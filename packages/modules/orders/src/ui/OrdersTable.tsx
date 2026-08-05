@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Search, Eye, ArrowUpDown, CalendarClock, Download, RotateCcw } from "lucide-react";
 import { Badge, Button, Card, Dropdown, EmptyState, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Tabs, toast, useLocale, formatDate, formatCFA, formatDateTime, formatOrderId, type Order } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "./OrderStatusBadge";
@@ -10,9 +11,15 @@ import { RefundModal } from "./components/RefundModal";
 
 const ITEMS_PER_PAGE = 10;
 
+const VALID_STATUS_TABS = ["all", "scheduled", "pending", "accepted", "preparing", "ready", "completed", "cancelled"];
+
 export function OrdersTable() {
     const { t } = useLocale();
-    const [activeTab, setActiveTab] = useState("all");
+    const searchParams = useSearchParams();
+    const statusFromUrl = searchParams?.get("status") ?? null;
+    const [activeTab, setActiveTab] = useState(
+        () => (statusFromUrl && VALID_STATUS_TABS.includes(statusFromUrl) ? statusFromUrl : "all")
+    );
     const [search, setSearch] = useState("");
     const [paymentFilter, setPaymentFilter] = useState("all");
     const [deliveryFilter, setDeliveryFilter] = useState("all");
@@ -20,6 +27,18 @@ export function OrdersTable() {
     const [page, setPage] = useState(1);
     // Refund modal state
     const [orderToRefund, setOrderToRefund] = useState<Order | null>(null);
+
+    // Keep the tab in sync when the query string changes without a full
+    // remount — e.g. clicking the "Pending orders" quick-action link while
+    // already on /dashboard/orders only updates the query, it doesn't
+    // recreate this component, so the tab must react to it explicitly.
+    useEffect(() => {
+        if (statusFromUrl && VALID_STATUS_TABS.includes(statusFromUrl)) {
+            setActiveTab(statusFromUrl);
+            setPage(1);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [statusFromUrl]);
 
     // The "completed" tab id is a UI grouping, not a real order status — the
     // live order flow only ever reaches "delivered" (see ALLOWED_TRANSITIONS
