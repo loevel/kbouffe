@@ -49,6 +49,10 @@ ordersRoutes.get("/", async (c) => {
         } else {
             query = query.in("status", statuses);
         }
+    } else {
+        // Parked (draft) orders have their own view — GET /orders/drafts — and
+        // "Commandes Garées" panel, so keep them out of the default order list.
+        query = query.neq("status", "draft");
     }
     if (payment) query = query.eq("payment_status", payment);
     if (delivery) query = query.eq("delivery_type", delivery);

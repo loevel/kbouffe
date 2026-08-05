@@ -32,7 +32,7 @@ interface OrdersResponse {
 
 export interface DashboardStats {
     revenue: { today: number; week: number; month: number };
-    orders: { today: number; pending: number; total: number };
+    orders: { today: number; pending: number; active: number; completed: number; total: number };
     averageOrderValue: number;
     totalCustomers: number;
 }
@@ -191,7 +191,7 @@ export function useDashboardStats(period?: "7d" | "30d" | "3m") {
     return {
         stats: data?.stats ?? {
             revenue: { today: 0, week: 0, month: 0 },
-            orders: { today: 0, pending: 0, total: 0 },
+            orders: { today: 0, pending: 0, active: 0, completed: 0, total: 0 },
             averageOrderValue: 0,
             totalCustomers: 0,
         },
