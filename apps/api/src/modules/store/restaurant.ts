@@ -8,6 +8,7 @@ import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
 import { parseBody } from "../../lib/body";
 import { escapeIlike, normalizeSearchQuery } from "../../lib/search";
+import { withCamelAliases } from "../../lib/case";
 
 export const restaurantRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -47,6 +48,22 @@ const FIELD_MAP: Record<string, string> = {
     themeLayout: "theme_layout",
     onboardingCompleted: "onboarding_completed",
     descriptionI18n: "description_i18n",
+    cuisineTypes: "cuisine_types",
+    welcomeMessage: "welcome_message",
+    socialLinks: "social_links",
+    dailyReportEnabled: "daily_report_enabled",
+    waitAlertThresholdMinutes: "wait_alert_threshold_minutes",
+    freeDeliveryThreshold: "free_delivery_threshold",
+    estimatedDeliveryTime: "estimated_delivery_time",
+    reservationSlotDuration: "reservation_slot_duration",
+    reservationOpenTime: "reservation_open_time",
+    reservationCloseTime: "reservation_close_time",
+    reservationSlotInterval: "reservation_slot_interval",
+    loyaltyEnabled: "loyalty_enabled",
+    loyaltyPointsPerOrder: "loyalty_points_per_order",
+    loyaltyPointValue: "loyalty_point_value",
+    loyaltyMinRedeemPoints: "loyalty_min_redeem_points",
+    loyaltyRewardTiers: "loyalty_reward_tiers",
 };
 
 const ALLOWED_FIELDS = new Set([
@@ -60,6 +77,11 @@ const ALLOWED_FIELDS = new Set([
     "delivery_zones", "delivery_base_fee", "delivery_per_km_fee", "max_delivery_radius_km",
     "notification_info", "meta_pixel_id", "google_analytics_id", "theme_layout",
     "onboarding_completed", "description_i18n",
+    "cuisine_types", "welcome_message", "social_links", "daily_report_enabled",
+    "wait_alert_threshold_minutes", "free_delivery_threshold", "estimated_delivery_time",
+    "reservation_slot_duration", "reservation_open_time", "reservation_close_time",
+    "reservation_slot_interval", "loyalty_enabled", "loyalty_points_per_order",
+    "loyalty_point_value", "loyalty_min_redeem_points", "loyalty_reward_tiers",
 ]);
 
 const GA4_REGEX = /^G-[A-Z0-9]{4,20}$/;
@@ -80,7 +102,7 @@ restaurantRoutes.get("/", async (c) => {
         return c.json({ error: "Restaurant not found" }, 404);
     }
 
-    return c.json({ success: true, id: data.id, restaurant: data });
+    return c.json({ success: true, id: data.id, restaurant: withCamelAliases(data) });
 });
 
 /** PATCH /restaurant — Update restaurant info (accepts camelCase or snake_case fields) */
@@ -121,7 +143,65 @@ restaurantRoutes.patch("/", async (c) => {
         return c.json({ error: "Failed to update restaurant" }, 500);
     }
 
-    return c.json({ success: true, restaurant: data });
+    return c.json({ success: true, restaurant: withCamelAliases(data) });
+});
+
+/** GET /restaurant/loyalty-stats — Real loyalty program counters */
+restaurantRoutes.get("/loyalty-stats", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const supabase = c.var.supabase;
+
+    // "Active members" = customers currently holding loyalty points, not the
+    // full customer list (that's shown elsewhere on /dashboard/customers).
+    const { data: memberRows, error: membersError } = await supabase
+        .from("restaurant_customers")
+        .select("id", { count: "exact" })
+        .eq("restaurant_id", restaurantId)
+        .gt("loyalty_points", 0);
+    const activeMembers = memberRows?.length ?? 0;
+
+    // "Points distributed" = all-time points earned across orders, not the
+    // current outstanding balance (which shrinks as points get redeemed).
+    const { data: earnedRows, error: earnedError } = await supabase
+        .from("orders")
+        .select("loyalty_points_earned")
+        .eq("restaurant_id", restaurantId)
+        .not("loyalty_points_earned", "is", null);
+
+    if (membersError) console.error("Loyalty active members error:", membersError);
+    if (earnedError) console.error("Loyalty points earned error:", earnedError);
+
+    const pointsDistributed = (earnedRows ?? []).reduce(
+        (sum, row) => sum + (row.loyalty_points_earned ?? 0),
+        0,
+    );
+
+    return c.json({
+        activeMembers,
+        pointsDistributed,
+    });
+});
+
+/** GET /restaurant/data-export-stats — Real counts for the data-export preview */
+restaurantRoutes.get("/data-export-stats", async (c) => {
+    const restaurantId = c.var.restaurantId;
+    const supabase = c.var.supabase;
+
+    const [reviewsRes, teamRes] = await Promise.all([
+        supabase
+            .from("reviews")
+            .select("id", { count: "exact" })
+            .eq("restaurant_id", restaurantId),
+        supabase
+            .from("restaurant_members")
+            .select("id", { count: "exact" })
+            .eq("restaurant_id", restaurantId),
+    ]);
+
+    return c.json({
+        reviews: reviewsRes.count ?? 0,
+        team: teamRes.count ?? 0,
+    });
 });
 
 /** GET /restaurant/activity — Activity feed (orders + reviews + messages) */

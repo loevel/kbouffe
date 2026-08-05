@@ -22,6 +22,7 @@ export default function LoyaltySettingsPage() {
     const [pointsValue, setPointsValue] = useState("1");
     const [minRedeemPoints, setMinRedeemPoints] = useState("100");
     const [tiers, setTiers] = useState<RewardTier[]>([]);
+    const [loyaltyStats, setLoyaltyStats] = useState<{ activeMembers: number; pointsDistributed: number } | null>(null);
 
     useEffect(() => {
         if (restaurant) {
@@ -32,6 +33,13 @@ export default function LoyaltySettingsPage() {
             setTiers(restaurant.loyaltyRewardTiers || []);
         }
     }, [restaurant]);
+
+    useEffect(() => {
+        fetch("/api/restaurant/loyalty-stats")
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => setLoyaltyStats(data))
+            .catch(() => setLoyaltyStats(null));
+    }, []);
 
     const handleSave = async () => {
         setSaving(true);
@@ -181,11 +189,15 @@ export default function LoyaltySettingsPage() {
                                 <div className="space-y-6">
                                     <div className="flex items-center justify-between">
                                         <p className="text-sm text-surface-500">{t.loyalty.activeMembers}</p>
-                                        <p className="text-xl font-bold text-surface-900 dark:text-white">124</p>
+                                        <p className="text-xl font-bold text-surface-900 dark:text-white">
+                                            {loyaltyStats ? loyaltyStats.activeMembers.toLocaleString("fr-FR") : "—"}
+                                        </p>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <p className="text-sm text-surface-500">{t.loyalty.pointsEarned}</p>
-                                        <p className="text-xl font-bold text-surface-900 dark:text-white">45,200</p>
+                                        <p className="text-xl font-bold text-surface-900 dark:text-white">
+                                            {loyaltyStats ? loyaltyStats.pointsDistributed.toLocaleString("fr-FR") : "—"}
+                                        </p>
                                     </div>
                                     <div className="pt-4 border-t border-surface-100 dark:border-surface-800">
                                         <p className="text-xs text-surface-400 leading-relaxed italic">

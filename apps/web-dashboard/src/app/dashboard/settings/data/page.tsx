@@ -30,15 +30,19 @@ export default function DataExportPage() {
     const [done, setDone] = useState(false);
 
     useEffect(() => {
-        // Fetch quick stats from existing API endpoints
+        // Fetch quick stats from existing API endpoints. reviews/team used to
+        // be hardcoded to 0 regardless of the restaurant's real data — this
+        // export page's own "content" list below advertises both as included,
+        // so showing zero looked like data loss rather than an unfetched stat.
         Promise.all([
             fetch("/api/analytics/stats").then(r => r.ok ? r.json() : null).catch(() => null),
-        ]).then(([analytics]) => {
+            fetch("/api/restaurant/data-export-stats").then(r => r.ok ? r.json() : null).catch(() => null),
+        ]).then(([analytics, exportStats]) => {
             setStats({
                 products: analytics?.totalProducts ?? 0,
                 orders: analytics?.totalOrders ?? 0,
-                reviews: 0,
-                team: 0,
+                reviews: exportStats?.reviews ?? 0,
+                team: exportStats?.team ?? 0,
             });
             setLoadingStats(false);
         });

@@ -4,6 +4,7 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../../types";
+import { withCamelAliases } from "../../lib/case";
 
 export const syncUserRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -232,7 +233,12 @@ syncUserRoutes.get("/", async (c) => {
         return c.json({
             success: true,
             user: dbUser,
-            restaurant,
+            // This is the actual data source useDashboard() reads restaurant
+            // settings from in production — several dashboard forms expect
+            // camelCase fields (e.g. reservationSlotDuration) on a row that's
+            // stored snake_case, so alias here or those reads silently fall
+            // back to hardcoded defaults regardless of what's saved.
+            restaurant: restaurant ? withCamelAliases(restaurant) : restaurant,
             teamRole,
             activeModules,
         });
