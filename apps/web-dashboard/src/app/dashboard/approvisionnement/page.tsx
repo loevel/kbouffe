@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { CAMEROON_REGIONS } from "@kbouffe/module-marketplace/lib";
+import { useLocale, type TranslationKeys } from "@kbouffe/module-core/ui";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,40 +60,48 @@ interface SuppliersResponse {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PRODUCT_CATEGORIES = [
-    { value: "", label: "Toutes catégories" },
-    { value: "legumes", label: "🥦 Légumes" },
-    { value: "fruits", label: "🍊 Fruits" },
-    { value: "cereales", label: "🌾 Céréales" },
-    { value: "viande", label: "🥩 Viande" },
-    { value: "poisson", label: "🐟 Poisson" },
-    { value: "produits_laitiers", label: "🥛 Produits laitiers" },
-    { value: "epices", label: "🌶 Épices" },
-    { value: "huiles", label: "🫙 Huiles" },
-    { value: "condiments", label: "🧄 Condiments" },
-    { value: "autres", label: "📦 Autres" },
-];
+function getProductCategories(t: TranslationKeys) {
+    return [
+        { value: "", label: t.sourcing.catAll },
+        { value: "legumes", label: `🥦 ${t.sourcing.catVegetables}` },
+        { value: "fruits", label: `🍊 ${t.sourcing.catFruits}` },
+        { value: "cereales", label: `🌾 ${t.sourcing.catCereals}` },
+        { value: "viande", label: `🥩 ${t.sourcing.catMeat}` },
+        { value: "poisson", label: `🐟 ${t.sourcing.catFish}` },
+        { value: "produits_laitiers", label: `🥛 ${t.sourcing.catDairy}` },
+        { value: "epices", label: `🌶 ${t.sourcing.catSpices}` },
+        { value: "huiles", label: `🫙 ${t.sourcing.catOils}` },
+        { value: "condiments", label: `🧄 ${t.sourcing.catCondiments}` },
+        { value: "autres", label: `📦 ${t.sourcing.catOther}` },
+    ];
+}
 
-const SUPPLIER_TYPES = [
-    { value: "", label: "Tous les types" },
-    { value: "individual_farmer", label: "👨‍🌾 Agriculteur" },
-    { value: "cooperative", label: "🤝 Coopérative" },
-    { value: "wholesaler", label: "🏭 Grossiste" },
-];
+function getSupplierTypes(t: TranslationKeys) {
+    return [
+        { value: "", label: t.sourcing.typeAllTypes },
+        { value: "individual_farmer", label: `👨‍🌾 ${t.sourcing.typeFarmer}` },
+        { value: "cooperative", label: `🤝 ${t.sourcing.typeCooperative}` },
+        { value: "wholesaler", label: `🏭 ${t.sourcing.typeWholesaler}` },
+    ];
+}
 
 const TIER_ORDER = { premium: 3, basic: 2, free: 1 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-    legumes: "Légumes", fruits: "Fruits", cereales: "Céréales",
-    viande: "Viande", poisson: "Poisson", produits_laitiers: "Laitiers",
-    epices: "Épices", huiles: "Huiles", condiments: "Condiments", autres: "Autres",
-};
+function getCategoryLabels(t: TranslationKeys): Record<string, string> {
+    return {
+        legumes: t.sourcing.catVegetables, fruits: t.sourcing.catFruits, cereales: t.sourcing.catCereals,
+        viande: t.sourcing.catMeat, poisson: t.sourcing.catFish, produits_laitiers: t.sourcing.catDairy,
+        epices: t.sourcing.catSpices, huiles: t.sourcing.catOils, condiments: t.sourcing.catCondiments, autres: t.sourcing.catOther,
+    };
+}
 
-const TYPE_LABELS: Record<string, string> = {
-    individual_farmer: "Agriculteur",
-    cooperative: "Coopérative",
-    wholesaler: "Grossiste",
-};
+function getTypeLabels(t: TranslationKeys): Record<string, string> {
+    return {
+        individual_farmer: t.sourcing.typeFarmer,
+        cooperative: t.sourcing.typeCooperative,
+        wholesaler: t.sourcing.typeWholesaler,
+    };
+}
 
 const TYPE_COLORS: Record<string, string> = {
     individual_farmer: "bg-green-500/10 text-green-400 border-green-500/20",
@@ -100,11 +109,13 @@ const TYPE_COLORS: Record<string, string> = {
     wholesaler: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 };
 
-const TIER_BADGE: Record<string, { label: string; color: string }> = {
-    premium: { label: "Premium", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" },
-    basic: { label: "Basic", color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
-    free: { label: "", color: "" },
-};
+function getTierBadge(t: TranslationKeys): Record<string, { label: string; color: string }> {
+    return {
+        premium: { label: t.sourcing.premium, color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" },
+        basic: { label: t.sourcing.basic, color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
+        free: { label: "", color: "" },
+    };
+}
 
 // ── Motion variants ───────────────────────────────────────────────────────────
 
@@ -119,11 +130,12 @@ const cardVariants = {
 
 // ── SupplierCard ─────────────────────────────────────────────────────────────
 
-function SupplierCard({ supplier }: { supplier: Supplier }) {
+function SupplierCard({ supplier, t }: { supplier: Supplier; t: TranslationKeys }) {
     const activeProducts = (supplier.supplier_products ?? []).filter(p => p.is_active);
     const hasOrganic = activeProducts.some(p => p.is_organic);
     const hasMinader = !!supplier.minader_cert_url;
-    const tier = TIER_BADGE[supplier.listing_tier];
+    const tier = getTierBadge(t)[supplier.listing_tier];
+    const typeLabels = getTypeLabels(t);
     const preview = activeProducts.slice(0, 3);
 
     return (
@@ -142,7 +154,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
                         {/* Featured star */}
                         {supplier.is_featured && (
                             <span className="absolute top-3 left-3 flex items-center gap-1 text-xs font-semibold text-yellow-400">
-                                <Star size={12} className="fill-yellow-400" /> En vedette
+                                <Star size={12} className="fill-yellow-400" /> {t.sourcing.featured}
                             </span>
                         )}
 
@@ -165,7 +177,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
                                     {supplier.name}
                                 </h3>
                                 <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border mt-1 ${TYPE_COLORS[supplier.type]}`}>
-                                    {TYPE_LABELS[supplier.type]}
+                                    {typeLabels[supplier.type]}
                                 </span>
                             </div>
                             <ChevronRight size={16} className="text-surface-500 group-hover:text-brand-400 transition-colors mt-1 shrink-0" />
@@ -181,7 +193,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
                         <div className="flex items-center gap-2 flex-wrap">
                             {hasOrganic && (
                                 <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
-                                    <Leaf size={10} /> Bio
+                                    <Leaf size={10} /> {t.sourcing.bio}
                                 </span>
                             )}
                             {hasMinader && (
@@ -195,7 +207,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
                         {preview.length > 0 ? (
                             <div className="space-y-1.5">
                                 <p className="text-xs text-surface-500 font-medium">
-                                    {activeProducts.length} produit{activeProducts.length > 1 ? "s" : ""} disponible{activeProducts.length > 1 ? "s" : ""}
+                                    {activeProducts.length} {activeProducts.length > 1 ? t.sourcing.productsAvailable : t.sourcing.productAvailable}
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {preview.map(p => (
@@ -211,7 +223,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-xs text-surface-500 italic">Aucun produit pour l'instant</p>
+                            <p className="text-xs text-surface-500 italic">{t.sourcing.noProductYet}</p>
                         )}
 
                         {/* Footer */}
@@ -221,7 +233,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
                                 <span>{supplier.phone}</span>
                             </div>
                             <span className="text-xs font-medium text-brand-400 group-hover:underline">
-                                Voir le catalogue →
+                                {t.sourcing.viewCatalog}
                             </span>
                         </div>
                     </div>
@@ -234,6 +246,8 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ApprovisionnementPage() {
+    const { t } = useLocale();
+
     // Filters state
     const [q, setQ] = useState("");
     const [product, setProduct] = useState("");
@@ -332,10 +346,10 @@ export default function ApprovisionnementPage() {
                         <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
                             <Sprout size={18} className="text-green-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white">Approvisionnement Agricole</h1>
+                        <h1 className="text-2xl font-bold text-white">{t.sourcing.title}</h1>
                     </div>
                     <p className="text-surface-400 text-sm">
-                        Trouvez vos fournisseurs locaux, comparez les prix et commandez en direct
+                        {t.sourcing.subtitle}
                     </p>
                 </div>
                 <button
@@ -343,7 +357,7 @@ export default function ApprovisionnementPage() {
                     className="flex items-center gap-2 px-3 py-2 text-sm text-surface-400 hover:text-white border border-surface-700 hover:border-surface-600 rounded-xl transition-colors"
                 >
                     <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                    Actualiser
+                    {t.sourcing.refresh}
                 </button>
             </div>
 
@@ -357,7 +371,7 @@ export default function ApprovisionnementPage() {
                         value={q}
                         onChange={e => setQ(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleSearch()}
-                        placeholder="Rechercher un fournisseur..."
+                        placeholder={t.sourcing.searchSupplierPlaceholder}
                         className="w-full pl-10 pr-4 py-2.5 bg-surface-800 border border-surface-700 rounded-xl text-sm text-white placeholder-surface-500 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition"
                     />
                     {q && (
@@ -375,7 +389,7 @@ export default function ApprovisionnementPage() {
                         value={product}
                         onChange={e => setProduct(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleSearch()}
-                        placeholder="Rechercher un produit..."
+                        placeholder={t.sourcing.searchProductPlaceholder}
                         className="w-full pl-10 pr-4 py-2.5 bg-surface-800 border border-surface-700 rounded-xl text-sm text-white placeholder-surface-500 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition"
                     />
                     {product && (
@@ -390,7 +404,7 @@ export default function ApprovisionnementPage() {
                     onClick={handleSearch}
                     className="px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium rounded-xl transition-colors"
                 >
-                    Rechercher
+                    {t.sourcing.search}
                 </button>
 
                 {/* Filters toggle */}
@@ -403,7 +417,7 @@ export default function ApprovisionnementPage() {
                     }`}
                 >
                     <SlidersHorizontal size={15} />
-                    Filtres
+                    {t.sourcing.filters}
                     {activeFiltersCount > 0 && (
                         <span className="bg-brand-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
                             {activeFiltersCount}
@@ -426,14 +440,14 @@ export default function ApprovisionnementPage() {
                             {/* Region */}
                             <div className="space-y-1">
                                 <label className="text-xs font-medium text-surface-400 flex items-center gap-1">
-                                    <MapPin size={11} /> Région
+                                    <MapPin size={11} /> {t.sourcing.region}
                                 </label>
                                 <select
                                     value={region}
                                     onChange={e => setRegion(e.target.value)}
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand-500/50"
                                 >
-                                    <option value="">Toutes les régions</option>
+                                    <option value="">{t.sourcing.allRegions}</option>
                                     {CAMEROON_REGIONS.map(r => (
                                         <option key={r} value={r}>{r}</option>
                                     ))}
@@ -443,14 +457,14 @@ export default function ApprovisionnementPage() {
                             {/* Locality */}
                             <div className="space-y-1">
                                 <label className="text-xs font-medium text-surface-400 flex items-center gap-1">
-                                    <MapPin size={11} /> Ville / Localité
+                                    <MapPin size={11} /> {t.sourcing.locality}
                                 </label>
                                 <input
                                     type="text"
                                     value={locality}
                                     onChange={e => setLocality(e.target.value)}
                                     onKeyDown={e => { if (e.key === "Enter") { setPage(1); fetchSuppliers(1); } }}
-                                    placeholder="Ex: Yaoundé"
+                                    placeholder={t.sourcing.localityPlaceholder}
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 placeholder-surface-500 focus:outline-none focus:border-brand-500/50"
                                 />
                             </div>
@@ -458,15 +472,15 @@ export default function ApprovisionnementPage() {
                             {/* Type */}
                             <div className="space-y-1">
                                 <label className="text-xs font-medium text-surface-400 flex items-center gap-1">
-                                    <Users size={11} /> Type de fournisseur
+                                    <Users size={11} /> {t.sourcing.supplierType}
                                 </label>
                                 <select
                                     value={type}
                                     onChange={e => setType(e.target.value)}
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand-500/50"
                                 >
-                                    {SUPPLIER_TYPES.map(t => (
-                                        <option key={t.value} value={t.value}>{t.label}</option>
+                                    {getSupplierTypes(t).map(st => (
+                                        <option key={st.value} value={st.value}>{st.label}</option>
                                     ))}
                                 </select>
                             </div>
@@ -474,14 +488,14 @@ export default function ApprovisionnementPage() {
                             {/* Category */}
                             <div className="space-y-1">
                                 <label className="text-xs font-medium text-surface-400 flex items-center gap-1">
-                                    <Package size={11} /> Catégorie produit
+                                    <Package size={11} /> {t.sourcing.productCategory}
                                 </label>
                                 <select
                                     value={category}
                                     onChange={e => setCategory(e.target.value)}
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand-500/50"
                                 >
-                                    {PRODUCT_CATEGORIES.map(c => (
+                                    {getProductCategories(t).map(c => (
                                         <option key={c.value} value={c.value}>{c.label}</option>
                                     ))}
                                 </select>
@@ -497,7 +511,7 @@ export default function ApprovisionnementPage() {
                                         <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-0.5 ${organic ? "translate-x-4" : "translate-x-0"}`} />
                                     </div>
                                     <span className="text-sm text-surface-300 flex items-center gap-1">
-                                        <Leaf size={13} className="text-green-400" /> Produits bio uniquement
+                                        <Leaf size={13} className="text-green-400" /> {t.sourcing.organicOnly}
                                     </span>
                                 </label>
 
@@ -509,7 +523,7 @@ export default function ApprovisionnementPage() {
                                         <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-0.5 ${featured ? "translate-x-4" : "translate-x-0"}`} />
                                     </div>
                                     <span className="text-sm text-surface-300 flex items-center gap-1">
-                                        <Star size={13} className="text-yellow-400" /> En vedette uniquement
+                                        <Star size={13} className="text-yellow-400" /> {t.sourcing.featuredOnly}
                                     </span>
                                 </label>
 
@@ -518,7 +532,7 @@ export default function ApprovisionnementPage() {
                                         onClick={clearFilters}
                                         className="ml-auto flex items-center gap-1 text-xs text-surface-400 hover:text-red-400 transition-colors"
                                     >
-                                        <X size={12} /> Réinitialiser les filtres
+                                        <X size={12} /> {t.sourcing.resetFilters}
                                     </button>
                                 )}
                             </div>
@@ -530,10 +544,10 @@ export default function ApprovisionnementPage() {
             {/* ── Results count + active filter tags ── */}
             <div className="flex items-center justify-between">
                 <p className="text-sm text-surface-400">
-                    {loading ? "Chargement..." : (
+                    {loading ? t.common.loading : (
                         <>
                             <span className="font-semibold text-white">{suppliers.length}</span>
-                            {" "}fournisseur{suppliers.length !== 1 ? "s" : ""} trouvé{suppliers.length !== 1 ? "s" : ""}
+                            {" "}{suppliers.length !== 1 ? t.sourcing.suppliersFound : t.sourcing.supplierFound}
                         </>
                     )}
                 </p>
@@ -547,19 +561,19 @@ export default function ApprovisionnementPage() {
                     )}
                     {type && (
                         <span className="flex items-center gap-1 text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2.5 py-1 rounded-full">
-                            {TYPE_LABELS[type]}
+                            {getTypeLabels(t)[type]}
                             <button onClick={() => setType("")}><X size={10} /></button>
                         </span>
                     )}
                     {category && (
                         <span className="flex items-center gap-1 text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2.5 py-1 rounded-full">
-                            {CATEGORY_LABELS[category] ?? category}
+                            {getCategoryLabels(t)[category] ?? category}
                             <button onClick={() => setCategory("")}><X size={10} /></button>
                         </span>
                     )}
                     {organic && (
                         <span className="flex items-center gap-1 text-xs bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-1 rounded-full">
-                            <Leaf size={10} /> Bio
+                            <Leaf size={10} /> {t.sourcing.bio}
                             <button onClick={() => setOrganic(false)}><X size={10} /></button>
                         </span>
                     )}
@@ -585,16 +599,16 @@ export default function ApprovisionnementPage() {
                     <div className="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
                         <Sprout size={28} className="text-surface-600" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">Aucun fournisseur trouvé</h3>
+                    <h3 className="text-lg font-semibold text-white mb-2">{t.sourcing.noSupplierFound}</h3>
                     <p className="text-surface-400 text-sm max-w-sm">
-                        Essayez d'élargir vos critères de recherche ou de supprimer certains filtres.
+                        {t.sourcing.noSupplierFoundDesc}
                     </p>
                     {activeFiltersCount > 0 && (
                         <button
                             onClick={clearFilters}
                             className="mt-4 text-sm text-brand-400 hover:underline"
                         >
-                            Réinitialiser tous les filtres
+                            {t.sourcing.resetAllFilters}
                         </button>
                     )}
                 </div>
@@ -607,7 +621,7 @@ export default function ApprovisionnementPage() {
                     className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                 >
                     {suppliers.map(supplier => (
-                        <SupplierCard key={supplier.id} supplier={supplier} />
+                        <SupplierCard key={supplier.id} supplier={supplier} t={t} />
                     ))}
                 </motion.div>
             )}
@@ -620,17 +634,17 @@ export default function ApprovisionnementPage() {
                         disabled={page <= 1}
                         className="px-4 py-2 text-sm text-surface-400 hover:text-white border border-surface-700 hover:border-surface-600 rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        ← Précédent
+                        {t.sourcing.previous}
                     </button>
                     <span className="text-sm text-surface-400 px-3">
-                        Page {page} / {totalPages}
+                        {t.sourcing.page} {page} / {totalPages}
                     </span>
                     <button
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                         disabled={page >= totalPages}
                         className="px-4 py-2 text-sm text-surface-400 hover:text-white border border-surface-700 hover:border-surface-600 rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        Suivant →
+                        {t.sourcing.next}
                     </button>
                 </div>
             )}

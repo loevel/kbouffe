@@ -29,6 +29,7 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { TraceModal, type TraceSupplier, type TraceProduct } from "@/components/dashboard/approvisionnement/TraceModal";
 import { RFQModal, type RFQSupplier, type RFQProduct } from "@/components/dashboard/approvisionnement/RFQModal";
+import { useLocale, type TranslationKeys } from "@kbouffe/module-core/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,21 +78,25 @@ interface Supplier {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TYPE_LABELS: Record<string, string> = {
-    individual_farmer: "Agriculteur individuel",
-    cooperative: "Coopérative agricole",
-    wholesaler: "Grossiste",
-};
+function getTypeLabels(t: TranslationKeys): Record<string, string> {
+    return {
+        individual_farmer: t.sourcing.typeFarmerIndividual,
+        cooperative: t.sourcing.typeCooperativeAgri,
+        wholesaler: t.sourcing.typeWholesaler,
+    };
+}
 const TYPE_COLORS: Record<string, string> = {
     individual_farmer: "bg-green-500/10 text-green-400 border-green-500/20",
     cooperative: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     wholesaler: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 };
-const CATEGORY_LABELS: Record<string, string> = {
-    legumes: "Légumes", fruits: "Fruits", cereales: "Céréales",
-    viande: "Viande", poisson: "Poisson", produits_laitiers: "Produits laitiers",
-    epices: "Épices", huiles: "Huiles", condiments: "Condiments", autres: "Autres",
-};
+function getCategoryLabels(t: TranslationKeys): Record<string, string> {
+    return {
+        legumes: t.sourcing.catVegetables, fruits: t.sourcing.catFruits, cereales: t.sourcing.catCereals,
+        viande: t.sourcing.catMeat, poisson: t.sourcing.catFish, produits_laitiers: t.sourcing.catDairy,
+        epices: t.sourcing.catSpices, huiles: t.sourcing.catOils, condiments: t.sourcing.catCondiments, autres: t.sourcing.catOther,
+    };
+}
 const UNIT_LABELS: Record<string, string> = {
     kg: "kg", tonne: "tonne", litre: "L",
     caisse: "caisse", colis: "colis", sac: "sac", botte: "botte", piece: "pièce",
@@ -128,9 +133,10 @@ interface ProductCardProps {
     product: SupplierProduct;
     onOrder: (product: SupplierProduct) => void;
     onRFQ: (product: SupplierProduct) => void;
+    t: TranslationKeys;
 }
 
-function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
+function ProductCard({ product, onOrder, onRFQ, t }: ProductCardProps) {
     const [expanded, setExpanded] = useState(false);
     const mainPhoto = product.photos?.[0];
 
@@ -152,7 +158,7 @@ function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                     {product.is_organic && (
                         <span className="flex items-center gap-1 text-xs font-medium bg-green-900/80 text-green-300 px-2 py-0.5 rounded-full border border-green-500/30 backdrop-blur-sm">
-                            <Leaf size={9} /> Bio
+                            <Leaf size={9} /> {t.sourcing.bio}
                         </span>
                     )}
                     {product.is_certified_minader && (
@@ -174,7 +180,7 @@ function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
                     <div>
                         <h3 className="font-semibold text-white text-sm leading-tight">{product.name}</h3>
                         <span className="text-xs text-surface-400 mt-0.5 inline-block">
-                            {CATEGORY_LABELS[product.category] ?? product.category}
+                            {getCategoryLabels(t)[product.category] ?? product.category}
                         </span>
                     </div>
 
@@ -187,11 +193,11 @@ function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
 
                     <div className="flex items-center gap-3 text-xs text-surface-400">
                         <span className="flex items-center gap-1">
-                            <Scale size={10} /> Min. {product.min_order_quantity} {UNIT_LABELS[product.unit] ?? product.unit}
+                            <Scale size={10} /> {t.sourcing.min} {product.min_order_quantity} {UNIT_LABELS[product.unit] ?? product.unit}
                         </span>
                         {product.available_quantity !== null && (
                             <span className="flex items-center gap-1">
-                                <Package size={10} /> {product.available_quantity} dispo
+                                <Package size={10} /> {product.available_quantity} {t.sourcing.inStock}
                             </span>
                         )}
                     </div>
@@ -217,7 +223,7 @@ function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
                             className="flex items-center gap-1 text-xs text-surface-500 hover:text-surface-300 transition-colors"
                         >
                             {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                            {expanded ? "Moins" : "Détails"}
+                            {expanded ? t.sourcing.more : t.sourcing.details}
                         </button>
                     )}
 
@@ -254,14 +260,14 @@ function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
                         onClick={() => onRFQ(product)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-surface-300 hover:text-white bg-surface-700 hover:bg-surface-600 rounded-lg transition-colors"
                     >
-                        <MessageCircle size={12} /> Devis
+                        <MessageCircle size={12} /> {t.sourcing.quote}
                     </button>
                     <button
                         onClick={() => onOrder(product)}
-                        title="Enregistre un achat dans le registre de traçabilité — ne contacte pas le fournisseur"
+                        title={t.sourcing.logPurchaseHint}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors"
                     >
-                        <ShoppingCart size={12} /> Enregistrer l'achat
+                        <ShoppingCart size={12} /> {t.sourcing.logTheOrder}
                     </button>
                 </div>
             </div>
@@ -271,7 +277,7 @@ function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
 
 // ── ContactModal ───────────────────────────────────────────────────────────────
 
-function ContactModal({ supplier, onClose }: { supplier: Supplier; onClose: () => void }) {
+function ContactModal({ supplier, onClose, t }: { supplier: Supplier; onClose: () => void; t: TranslationKeys }) {
     const [copied, setCopied] = useState<"phone" | "email" | null>(null);
 
     const copy = async (text: string, type: "phone" | "email") => {
@@ -294,13 +300,13 @@ function ContactModal({ supplier, onClose }: { supplier: Supplier; onClose: () =
                     </div>
                     <div>
                         <h3 className="font-semibold text-white">{supplier.name}</h3>
-                        <p className="text-sm text-surface-400">{TYPE_LABELS[supplier.type]}</p>
+                        <p className="text-sm text-surface-400">{getTypeLabels(t)[supplier.type]}</p>
                     </div>
                 </div>
 
                 <div className="space-y-3 mb-6">
                     <div className="p-3 bg-surface-800 rounded-xl border border-surface-700">
-                        <p className="text-xs text-surface-400 mb-0.5">Contact</p>
+                        <p className="text-xs text-surface-400 mb-0.5">{t.sourcing.contactLabel}</p>
                         <p className="text-sm font-medium text-white">{supplier.contact_name}</p>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-surface-800 rounded-xl border border-surface-700">
@@ -333,10 +339,10 @@ function ContactModal({ supplier, onClose }: { supplier: Supplier; onClose: () =
 
                 <div className="flex gap-3">
                     <a href={`tel:${supplier.phone}`} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-xl transition-colors">
-                        <Phone size={15} /> Appeler
+                        <Phone size={15} /> {t.sourcing.call}
                     </a>
                     <button onClick={onClose} className="flex-1 py-2.5 bg-surface-700 hover:bg-surface-600 text-white text-sm font-medium rounded-xl transition-colors">
-                        Fermer
+                        {t.sourcing.close}
                     </button>
                 </div>
             </motion.div>
@@ -347,6 +353,7 @@ function ContactModal({ supplier, onClose }: { supplier: Supplier; onClose: () =
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SupplierDetailPage() {
+    const { t } = useLocale();
     const params = useParams();
     const router = useRouter();
     const supplierId = params.id as string;
@@ -375,7 +382,7 @@ export default function SupplierDetailPage() {
                 const data: { success: boolean; supplier: Supplier } = await res.json();
                 setSupplier(data.supplier);
             } catch {
-                setError("Fournisseur introuvable ou non disponible.");
+                setError(t.sourcing.supplierNotFound);
             } finally {
                 setLoading(false);
             }
@@ -394,8 +401,8 @@ export default function SupplierDetailPage() {
         return (
             <div className="flex flex-col items-center justify-center py-32 text-center gap-4">
                 <AlertCircle size={32} className="text-red-400" />
-                <p className="text-surface-300">{error ?? "Fournisseur introuvable."}</p>
-                <button onClick={() => router.back()} className="text-sm text-brand-400 hover:underline">← Retour</button>
+                <p className="text-surface-300">{error ?? t.sourcing.supplierNotFound}</p>
+                <button onClick={() => router.back()} className="text-sm text-brand-400 hover:underline">← {t.common.back}</button>
             </div>
         );
     }
@@ -414,7 +421,7 @@ export default function SupplierDetailPage() {
             {/* ── Modals ── */}
             <AnimatePresence>
                 {showContact && (
-                    <ContactModal supplier={supplier} onClose={() => setShowContact(false)} />
+                    <ContactModal supplier={supplier} onClose={() => setShowContact(false)} t={t} />
                 )}
                 {showTrace && (
                     <TraceModal
@@ -450,7 +457,7 @@ export default function SupplierDetailPage() {
                     onClick={() => router.back()}
                     className="flex items-center gap-2 text-sm text-surface-400 hover:text-white transition-colors"
                 >
-                    <ArrowLeft size={16} /> Retour à l'annuaire
+                    <ArrowLeft size={16} /> {t.sourcing.backToDirectory}
                 </button>
 
                 {/* ── Hero card ── */}
@@ -458,7 +465,7 @@ export default function SupplierDetailPage() {
                     <div className="h-32 bg-gradient-to-br from-green-900/40 via-surface-800 to-surface-900 relative">
                         {supplier.is_featured && (
                             <div className="absolute top-4 right-4 flex items-center gap-1.5 text-sm font-semibold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 rounded-full">
-                                <Star size={14} className="fill-yellow-400" /> En vedette
+                                <Star size={14} className="fill-yellow-400" /> {t.sourcing.featured}
                             </div>
                         )}
                         {supplier.listing_tier !== "free" && (
@@ -467,7 +474,7 @@ export default function SupplierDetailPage() {
                                     ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
                                     : "bg-purple-500/10 text-purple-400 border-purple-500/20"
                             }`}>
-                                {supplier.listing_tier === "premium" ? "Premium" : "Basic"}
+                                {supplier.listing_tier === "premium" ? t.sourcing.premium : t.sourcing.basic}
                             </div>
                         )}
                     </div>
@@ -484,7 +491,7 @@ export default function SupplierDetailPage() {
                             <div className="pb-1 flex-1 min-w-0">
                                 <h1 className="text-xl font-bold text-white truncate">{supplier.name}</h1>
                                 <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full border mt-1 ${TYPE_COLORS[supplier.type]}`}>
-                                    {TYPE_LABELS[supplier.type]}
+                                    {getTypeLabels(t)[supplier.type]}
                                 </span>
                             </div>
 
@@ -494,19 +501,19 @@ export default function SupplierDetailPage() {
                                     onClick={() => { setShowRFQ(true); setRFQProduct(null); }}
                                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-surface-300 hover:text-white border border-surface-700 hover:border-surface-600 rounded-xl transition-colors"
                                 >
-                                    <MessageCircle size={14} /> Demander un devis
+                                    <MessageCircle size={14} /> {t.sourcing.requestQuote}
                                 </button>
                                 <button
                                     onClick={() => setTraceProduct(null)}
                                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-surface-300 hover:text-white border border-surface-700 hover:border-surface-600 rounded-xl transition-colors"
                                 >
-                                    <Receipt size={14} /> Enregistrer un achat
+                                    <Receipt size={14} /> {t.sourcing.logPurchase}
                                 </button>
                                 <button
                                     onClick={() => setShowContact(true)}
                                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-500 rounded-xl transition-colors shadow-md"
                                 >
-                                    <Phone size={14} /> Contacter
+                                    <Phone size={14} /> {t.sourcing.contact}
                                 </button>
                             </div>
                         </div>
@@ -536,29 +543,29 @@ export default function SupplierDetailPage() {
 
                             <div className="space-y-3">
                                 <div>
-                                    <p className="text-xs font-medium text-surface-500 uppercase tracking-wide mb-2">Certifications</p>
+                                    <p className="text-xs font-medium text-surface-500 uppercase tracking-wide mb-2">{t.sourcing.certifications}</p>
                                     <div className="flex flex-wrap gap-2">
                                         {hasOrganic && (
                                             <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-3 py-1.5 rounded-full border border-green-500/20">
-                                                <Leaf size={11} /> Agriculture biologique
+                                                <Leaf size={11} /> {t.sourcing.organicCert}
                                             </span>
                                         )}
                                         {hasCertMinader && (
                                             <span className="flex items-center gap-1 text-xs text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20">
-                                                <Award size={11} /> Certifié MINADER
+                                                <Award size={11} /> {t.sourcing.minaderCert}
                                             </span>
                                         )}
                                         {supplier.rccm && (
-                                            <span className="text-xs text-purple-400 bg-purple-500/10 px-3 py-1.5 rounded-full border border-purple-500/20">RCCM</span>
+                                            <span className="text-xs text-purple-400 bg-purple-500/10 px-3 py-1.5 rounded-full border border-purple-500/20">{t.sourcing.rccm}</span>
                                         )}
                                         {supplier.nif && (
-                                            <span className="text-xs text-orange-400 bg-orange-500/10 px-3 py-1.5 rounded-full border border-orange-500/20">NIF</span>
+                                            <span className="text-xs text-orange-400 bg-orange-500/10 px-3 py-1.5 rounded-full border border-orange-500/20">{t.sourcing.nif}</span>
                                         )}
                                         {supplier.cooperative_number && (
-                                            <span className="text-xs text-teal-400 bg-teal-500/10 px-3 py-1.5 rounded-full border border-teal-500/20">N° Coopérative</span>
+                                            <span className="text-xs text-teal-400 bg-teal-500/10 px-3 py-1.5 rounded-full border border-teal-500/20">{t.sourcing.cooperativeNumber}</span>
                                         )}
                                         {!hasOrganic && !hasCertMinader && !supplier.rccm && !supplier.nif && (
-                                            <span className="text-xs text-surface-500 italic">Aucune certification renseignée</span>
+                                            <span className="text-xs text-surface-500 italic">{t.sourcing.noCertification}</span>
                                         )}
                                     </div>
                                 </div>
@@ -566,15 +573,15 @@ export default function SupplierDetailPage() {
                                 <div className="grid grid-cols-3 gap-3 mt-2">
                                     <div className="bg-surface-800 rounded-xl p-3 text-center">
                                         <p className="text-lg font-bold text-white">{activeProducts.length}</p>
-                                        <p className="text-xs text-surface-400">Produits</p>
+                                        <p className="text-xs text-surface-400">{t.sourcing.products}</p>
                                     </div>
                                     <div className="bg-surface-800 rounded-xl p-3 text-center">
                                         <p className="text-lg font-bold text-white">{categories.length}</p>
-                                        <p className="text-xs text-surface-400">Catégories</p>
+                                        <p className="text-xs text-surface-400">{t.sourcing.categories}</p>
                                     </div>
                                     <div className="bg-surface-800 rounded-xl p-3 text-center">
                                         <p className="text-lg font-bold text-white">{activeProducts.filter(p => p.is_organic).length}</p>
-                                        <p className="text-xs text-surface-400">Bio</p>
+                                        <p className="text-xs text-surface-400">{t.sourcing.bio}</p>
                                     </div>
                                 </div>
                             </div>
@@ -587,7 +594,7 @@ export default function SupplierDetailPage() {
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                             <Package size={18} className="text-brand-400" />
-                            Catalogue produits
+                            {t.sourcing.catalog}
                             {activeProducts.length > 0 && (
                                 <span className="text-sm font-normal text-surface-400">({activeProducts.length})</span>
                             )}
@@ -601,7 +608,7 @@ export default function SupplierDetailPage() {
                                         !filterCategory ? "bg-brand-500/10 text-brand-400 border-brand-500/30" : "text-surface-400 border-surface-700 hover:border-surface-600"
                                     }`}
                                 >
-                                    Tous
+                                    {t.sourcing.catalogAll}
                                 </button>
                                 {categories.map(cat => (
                                     <button
@@ -611,7 +618,7 @@ export default function SupplierDetailPage() {
                                             filterCategory === cat ? "bg-brand-500/10 text-brand-400 border-brand-500/30" : "text-surface-400 border-surface-700 hover:border-surface-600"
                                         }`}
                                     >
-                                        {CATEGORY_LABELS[cat] ?? cat}
+                                        {getCategoryLabels(t)[cat] ?? cat}
                                     </button>
                                 ))}
                             </div>
@@ -621,7 +628,7 @@ export default function SupplierDetailPage() {
                     {activeProducts.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 bg-surface-900 border border-surface-700 rounded-2xl text-center">
                             <Package size={28} className="text-surface-600 mb-3" />
-                            <p className="text-surface-400 text-sm">Ce fournisseur n'a pas encore de produits disponibles.</p>
+                            <p className="text-surface-400 text-sm">{t.sourcing.noProductsYet}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -631,6 +638,7 @@ export default function SupplierDetailPage() {
                                     product={product}
                                     onOrder={p => setTraceProduct(p)}
                                     onRFQ={p => { setRFQProduct(p); setShowRFQ(true); }}
+                                    t={t}
                                 />
                             ))}
                         </div>
@@ -643,15 +651,15 @@ export default function SupplierDetailPage() {
                         <ClipboardList size={20} className="text-green-400" />
                     </div>
                     <div className="flex-1">
-                        <h3 className="font-semibold text-white mb-1">Registre de traçabilité</h3>
+                        <h3 className="font-semibold text-white mb-1">{t.sourcing.traceability}</h3>
                         <p className="text-sm text-surface-400 mb-3">
-                            Consultez l'historique complet de vos achats auprès de tous vos fournisseurs.
+                            {t.sourcing.traceabilityDesc}
                         </p>
                         <button
                             onClick={() => setTraceProduct(null)}
                             className="inline-flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm font-medium rounded-xl border border-green-500/20 transition-colors"
                         >
-                            <Receipt size={14} /> Enregistrer un achat ici
+                            <Receipt size={14} /> {t.sourcing.logPurchaseHere}
                         </button>
                     </div>
                 </div>
