@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { useLocale, formatCFA, Card, Button, ReportStatCard, Badge } from "@kbouffe/module-core/ui";
-import { useOrders, useDashboardStats } from "@kbouffe/module-orders/ui";
+import { useLocale, formatCFA, Card, Button, Badge } from "@kbouffe/module-core/ui";
+import { useOrders } from "@kbouffe/module-orders/ui";
 import { useProducts, useCategories } from "@/hooks/use-data";
 import {
     ResponsiveContainer,
@@ -230,7 +230,6 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function ReportsPage() {
     const { t } = useLocale();
-    const { stats } = useDashboardStats();
     const { orders, isLoading } = useOrders({ limit: 2000 });
     const { products } = useProducts();
     const { categories } = useCategories();
@@ -296,6 +295,27 @@ export default function ReportsPage() {
     const revenueDelta = previousTotalRevenue > 0 ? ((totalRevenue - previousTotalRevenue) / previousTotalRevenue) * 100 : null;
     const ordersDelta = previousOrderCount > 0 ? ((totalOrdersCount - previousOrderCount) / previousOrderCount) * 100 : null;
     const avgDelta = previousAvgOrderValue > 0 ? ((avgOrderValue - previousAvgOrderValue) / previousAvgOrderValue) * 100 : null;
+
+    // ── Clients sur la période ────────────────────────────────────────────────
+    // Calculé depuis les commandes déjà filtrées par période (comme les 3 autres
+    // cartes) plutôt que depuis useDashboardStats(), qui interroge toujours une
+    // fenêtre fixe ~90j côté API et ignorait donc le sélecteur 7j/30j/90j.
+    const customerKey = (order: (typeof filteredOrders)[number]) =>
+        order.customer_id || (order as any).customer_phone || null;
+
+    const customersInPeriod = useMemo(() => {
+        const ids = new Set(filteredOrders.map(customerKey).filter((id): id is string => Boolean(id)));
+        return ids.size;
+    }, [filteredOrders]);
+
+    const previousCustomersInPeriod = useMemo(() => {
+        const ids = new Set(previousFilteredOrders.map(customerKey).filter((id): id is string => Boolean(id)));
+        return ids.size;
+    }, [previousFilteredOrders]);
+
+    const customersDelta = previousCustomersInPeriod > 0
+        ? ((customersInPeriod - previousCustomersInPeriod) / previousCustomersInPeriod) * 100
+        : null;
 
     // Revenue chart — adaptive by period
     const chartSeries = useMemo(() => {
@@ -466,7 +486,7 @@ export default function ReportsPage() {
             ["Taux d'annulation (%)", cancelRate],
             ["Chiffre d'affaires total (FCFA)", totalRevenue],
             ["Panier moyen (FCFA)", Math.round(avgOrderValue)],
-            ["Nombre de clients", stats?.totalCustomers ?? 0],
+            ["Nombre de clients", customersInPeriod],
             ["Nombre de produits actifs", products.filter((p: any) => p.is_available).length],
             ["Nombre de categories", categories.length],
             ["", ""],
@@ -476,7 +496,7 @@ export default function ReportsPage() {
         downloadCsv(`resume-${period}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
         setShowExportMenu(false);
         setExportFeedback("✓ Résumé téléchargé");
-    }, [periodLabel, totalOrdersCount, completedOrders, cancelledOrders, cancelRate, totalRevenue, avgOrderValue, stats, products, categories, topProducts, period]);
+    }, [periodLabel, totalOrdersCount, completedOrders, cancelledOrders, cancelRate, totalRevenue, avgOrderValue, customersInPeriod, products, categories, topProducts, period]);
 
     // Show skeleton during loading
     if (isLoading && orders.length === 0) {
@@ -602,10 +622,11 @@ export default function ReportsPage() {
                     description={`Sur ${periodLabel}`}
                     delta={avgDelta}
                 />
-                <ReportStatCard
+                <TrendCard
                     label={t.reports.customerGrowth}
-                    value={stats?.totalCustomers ?? 0}
-                    description="clients au total"
+                    value={customersInPeriod}
+                    description={`Sur ${periodLabel}`}
+                    delta={customersDelta}
                 />
             </div>
 
