@@ -275,6 +275,7 @@ export const en: TranslationKeys = {
         statsActiveOrders: "Active orders",
         statsTodayRevenue: "Today's revenue",
         statsCompletionRate: "Completion rate",
+        draft: "Parked",
         scheduled: "Scheduled",
         pending: "Pending",
         accepted: "Accepted",

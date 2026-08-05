@@ -251,8 +251,19 @@ storesRoutes.get("/me/dashboard-stats", async (c) => {
         return c.json({ error: "Erreur lors de la calcul des statistiques" }, 500);
     }
 
-    const orders = (ordersRaw as unknown as any[]) ?? [];
+    // Parked (draft) orders aren't real orders yet — exclude them from every stat below.
+    const orders = ((ordersRaw as unknown as any[]) ?? []).filter((o) => o.status !== "draft");
     const paidOrders = orders.filter((o) => o.payment_status === "paid" && o.status !== "cancelled");
+
+    // Active orders (pending/accepted/preparing/ready) shouldn't be bound to the
+    // stats window above — an order stuck in "ready" for months is still active
+    // today and must be surfaced regardless of when it was created.
+    const ACTIVE_STATUSES = ["pending", "accepted", "preparing", "ready"];
+    const { count: activeCount } = await c.get("supabase")
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", c.get("restaurantId"))
+        .in("status", ACTIVE_STATUSES);
 
     const todayPaid = paidOrders.filter((o) => o.created_at >= todayStart);
     const weekPaid = paidOrders.filter((o) => o.created_at >= weekStart);
@@ -288,6 +299,8 @@ storesRoutes.get("/me/dashboard-stats", async (c) => {
             orders: {
                 today: orders.filter((o) => o.created_at >= todayStart).length,
                 pending: orders.filter((o) => o.status === "pending").length,
+                active: activeCount ?? 0,
+                completed: orders.filter((o) => o.status === "completed").length,
                 total: orders.length,
             },
             averageOrderValue: avgOrderValue,

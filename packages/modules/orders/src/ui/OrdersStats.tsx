@@ -23,9 +23,9 @@ export function OrdersStats() {
         );
     }
 
-    const activeCount = stats.orders.pending;
+    const activeCount = stats.orders.active;
     const completionRate = stats.orders.total > 0
-        ? Math.round(((stats.orders.total - stats.orders.pending) / stats.orders.total) * 100)
+        ? Math.round((stats.orders.completed / stats.orders.total) * 100)
         : 0;
 
     return (
