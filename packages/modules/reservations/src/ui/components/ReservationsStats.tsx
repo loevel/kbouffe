@@ -6,9 +6,13 @@ import { Reservation } from "../../lib/types";
 
 interface ReservationsStatsProps {
     allReservations: Reservation[];
+    // True when no explicit date filter is applied — the backend then only
+    // returns upcoming reservations (see reservations.ts default), so the
+    // "Total" card must say so instead of implying it covers every date.
+    isUpcomingOnly?: boolean;
 }
 
-export function ReservationsStats({ allReservations }: ReservationsStatsProps) {
+export function ReservationsStats({ allReservations, isUpcomingOnly }: ReservationsStatsProps) {
     const { t } = useLocale();
 
     const pendingCount = allReservations.filter((r) => r.status === "pending").length;
@@ -21,7 +25,9 @@ export function ReservationsStats({ allReservations }: ReservationsStatsProps) {
             <Card className="p-2.5 text-center border-none shadow-sm hover:shadow-md transition-shadow">
                 <CalendarDays className="mx-auto text-brand-500 mb-1.5" size={16} />
                 <p className="text-lg font-bold text-surface-900 dark:text-white leading-none">{allReservations.length}</p>
-                <p className="text-xs text-surface-500 mt-1">{t.reservations.statsTotal}</p>
+                <p className="text-xs text-surface-500 mt-1">
+                    {isUpcomingOnly ? t.reservations.statsTotalUpcoming : t.reservations.statsTotal}
+                </p>
             </Card>
             <Card className="p-2.5 text-center border-none shadow-sm hover:shadow-md transition-shadow">
                 <Clock className="mx-auto text-yellow-500 mb-1.5" size={16} />

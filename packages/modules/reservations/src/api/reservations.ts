@@ -288,7 +288,12 @@ reservationsRoutes.get("/", async (c) => {
     const date = c.req.query("date");
     const search = c.req.query("search");
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "50", 10)));
+    // Cap raised to 500 — same fix as the customers list (see customers.ts):
+    // the dashboard UI has no server pagination controls of its own and was
+    // silently truncated at 50 rows regardless of how many reservations
+    // actually matched the active filters, under-reporting both the table
+    // and the stats/badge counts derived from it.
+    const limit = Math.min(500, Math.max(1, parseInt(c.req.query("limit") ?? "50", 10)));
 
     let query = c.var.supabase
         .from("reservations")

@@ -114,7 +114,11 @@ export function ReservationsList() {
         return list;
     }, [reservations, sort, minParty]);
 
-    const totalPages = Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE);
+    // Pagination is derived from the fetched (filtered/sorted) set rather than
+    // the raw server `total`, because `minParty` is applied client-side and
+    // would make the two diverge. This is only exact as long as the fetch
+    // itself isn't truncated — see the `limit=500` request in useReservations.
+    const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE));
     const pageReservations = useMemo(() => {
         const start = (page - 1) * ITEMS_PER_PAGE;
         return filteredAndSorted.slice(start, start + ITEMS_PER_PAGE);
@@ -127,8 +131,9 @@ export function ReservationsList() {
 
     return (
         <div className="space-y-6">
-            <ReservationsStats 
-                allReservations={allForStats} 
+            <ReservationsStats
+                allReservations={allForStats}
+                isUpcomingOnly={!dateFilter}
             />
 
             <ReservationsFilters
