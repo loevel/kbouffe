@@ -80,6 +80,17 @@ export function CouponFormModal({ isOpen, onClose, coupon }: Props) {
         setErrors((e) => ({ ...e, [field]: undefined }));
     }
 
+    function setType(value: CouponType) {
+        setForm((f) => ({
+            ...f,
+            type: value,
+            // max_discount only makes sense for percent coupons — drop it when
+            // switching to fixed so a stale value isn't submitted invisibly.
+            max_discount: value === "fixed" ? "" : f.max_discount,
+        }));
+        setErrors((e) => ({ ...e, type: undefined, value: undefined }));
+    }
+
     function validate(): boolean {
         const newErrors: Partial<FormState> = {};
         if (!form.code.trim()) newErrors.code = "Requis";
@@ -87,6 +98,9 @@ export function CouponFormModal({ isOpen, onClose, coupon }: Props) {
         const v = parseFloat(form.value);
         if (!form.value || isNaN(v) || v <= 0) newErrors.value = "Valeur positive requise";
         if (form.type === "percent" && v > 100) newErrors.value = "Maximum 100%";
+        if (form.starts_at && form.expires_at && form.expires_at < form.starts_at) {
+            newErrors.expires_at = t.coupons.dateRangeError;
+        }
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     }
@@ -169,7 +183,7 @@ export function CouponFormModal({ isOpen, onClose, coupon }: Props) {
                     <Select
                         label={t.coupons.type}
                         value={form.type}
-                        onChange={(e: any) => set("type", e.target.value)}
+                        onChange={(e: any) => setType(e.target.value)}
                         options={typeOptions}
                     />
                     <Input
@@ -190,7 +204,7 @@ export function CouponFormModal({ isOpen, onClose, coupon }: Props) {
                         min={0}
                         value={form.min_order}
                         onChange={(e: any) => set("min_order", e.target.value)}
-                        hint={t.common.optional + " — 0 = pas de minimum"}
+                        hint={t.coupons.minOrderHint}
                     />
                     {form.type === "percent" && (
                         <Input
@@ -199,7 +213,7 @@ export function CouponFormModal({ isOpen, onClose, coupon }: Props) {
                             min={0}
                             value={form.max_discount}
                             onChange={(e: any) => set("max_discount", e.target.value)}
-                            hint={t.common.optional + " — plafond en FCFA"}
+                            hint={t.coupons.maxDiscountHint}
                         />
                     )}
                 </div>
@@ -211,7 +225,7 @@ export function CouponFormModal({ isOpen, onClose, coupon }: Props) {
                         min={1}
                         value={form.max_uses}
                         onChange={(e: any) => set("max_uses", e.target.value)}
-                        hint={t.coupons.unlimited + " si vide"}
+                        hint={t.coupons.maxUsesHint}
                     />
                     <Input
                         label={t.coupons.maxUsesPerCustomer}
@@ -235,7 +249,8 @@ export function CouponFormModal({ isOpen, onClose, coupon }: Props) {
                         type="date"
                         value={form.expires_at}
                         onChange={(e: any) => set("expires_at", e.target.value)}
-                        hint={t.common.optional}
+                        error={errors.expires_at}
+                        hint={errors.expires_at ? undefined : t.common.optional}
                     />
                 </div>
 
