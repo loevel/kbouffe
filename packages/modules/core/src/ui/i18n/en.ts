@@ -1228,6 +1228,8 @@ export const en: TranslationKeys = {
         orderNum: "Order",
         timeAgo: "ago",
         minutes: "min",
+        hoursShort: "h",
+        daysShort: "d",
         items: "items",
         dineIn: "Dine-in",
         delivery: "Delivery",
