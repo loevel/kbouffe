@@ -128,15 +128,12 @@ npm run build
 npm run start
 ```
 
-### Déploiement Cloudflare
+### Déploiement Cloudflare (Workers via OpenNext)
 ```bash
-# Build pour Cloudflare Workers
-npm run build:worker
-
 # Preview locale
 npm run preview
 
-# Déployer
+# Build + déployer (kbouffe.com pointe sur ce Worker, pas sur un projet Pages)
 npm run deploy
 ```
 
