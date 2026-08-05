@@ -364,6 +364,26 @@ usersRoutes.post("/support/tickets", async (c) => {
         }
     }
 
+    // Anti-doublon : si ce même reporter a déjà soumis un ticket identique
+    // (même sujet + description) dans les 10 dernières minutes, on renvoie ce
+    // ticket existant plutôt que d'en recréer un — évite la multiplication de
+    // tickets/conversations lors d'un double-clic ou d'un retry client.
+    const dedupWindowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: recentDuplicate } = await db
+        .from("support_tickets")
+        .select("*")
+        .eq("reporter_id", userId)
+        .eq("subject", body.subject || "")
+        .eq("description", body.description || "")
+        .gte("created_at", dedupWindowStart)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (recentDuplicate) {
+        return c.json({ success: true, ticket: recentDuplicate });
+    }
+
     // Insert support ticket
     const { data: ticket, error } = await db
         .from("support_tickets")

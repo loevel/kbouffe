@@ -15,34 +15,67 @@ function chatDb(c: { env: CoreEnv }) {
 }
 
 /**
- * Helper: Obtenir ou créer une conversation pour une commande.
- * Schema réel conversations: id, restaurant_id (NOT NULL), order_id, metadata, created_at, updated_at
+ * Helper: Récupérer une conversation existante pour une commande, sans en créer.
+ * Utilisé par les routes de LECTURE — visiter le chat ne doit pas générer une
+ * conversation vide dans la messagerie du marchand.
  */
-async function getOrCreateOrderConversation(supabase: any, orderId: string, restaurantId: string) {
+async function getExistingOrderConversation(supabase: any, orderId: string) {
     const { data: conv } = await supabase
         .from("conversations")
         .select("*")
         .eq("order_id", orderId)
         .maybeSingle();
 
-    if (conv) return conv;
+    return conv ?? null;
+}
+
+/**
+ * Helper: Obtenir ou créer une conversation pour une commande.
+ * Schema réel conversations: id, restaurant_id (NOT NULL), order_id, metadata, created_at, updated_at
+ *
+ * N'est appelé qu'au moment de l'ENVOI d'un message (jamais à la simple lecture),
+ * pour éviter de créer des conversations vides.
+ *
+ * `conversations.order_id` porte un index UNIQUE partiel (order_id IS NOT NULL) —
+ * voir migration 20260805_conversations_order_id_unique.sql. Le select-puis-insert
+ * ci-dessous reste sujet à une course entre deux requêtes concurrentes (ex: client
+ * et marchand ouvrant le chat en même temps) ; en cas de conflit, on récupère la
+ * ligne créée entre-temps par l'autre requête plutôt que d'échouer ou de dupliquer.
+ */
+async function getOrCreateOrderConversation(
+    supabase: any,
+    orderId: string,
+    restaurantId: string,
+    customerName?: string | null
+) {
+    const existing = await getExistingOrderConversation(supabase, orderId);
+    if (existing) return existing;
 
     const { data: createdConv, error: insertError } = await supabase
         .from("conversations")
         .insert({
             order_id: orderId,
             restaurant_id: restaurantId,
-            metadata: { type: "order_support" },
+            metadata: {
+                type: "order_support",
+                ...(customerName ? { customer_name: customerName } : {}),
+            },
         })
         .select()
         .single();
 
-    if (insertError) {
-        console.error("[Chat] Error creating conversation:", insertError);
-        throw new Error("Failed to create conversation");
+    if (!insertError) return createdConv;
+
+    // Violation de la contrainte unique : une requête concurrente a créé la
+    // conversation entre notre SELECT et notre INSERT. On la récupère plutôt
+    // que de dupliquer ou d'échouer.
+    if (insertError.code === "23505") {
+        const raceWinner = await getExistingOrderConversation(supabase, orderId);
+        if (raceWinner) return raceWinner;
     }
 
-    return createdConv;
+    console.error("[Chat] Error creating conversation:", insertError);
+    throw new Error("Failed to create conversation");
 }
 
 /**
@@ -74,7 +107,11 @@ chat.get("/orders/:orderId/messages", async (c) => {
             return c.json({ error: "Vous n'êtes pas autorisé à accéder à cette conversation" }, 403);
         }
 
-        const conv = await getOrCreateOrderConversation(db, orderId, order.restaurant_id);
+        // Lecture seule : ne pas créer de conversation tant que personne n'a écrit.
+        const conv = await getExistingOrderConversation(db, orderId);
+        if (!conv) {
+            return c.json({ conversationId: null, messages: [] });
+        }
 
         const { data: chatMessages, error } = await db
             .from("messages")
@@ -167,7 +204,16 @@ chat.post("/orders/:orderId/messages", async (c) => {
             return c.json({ error: "Vous n'êtes pas autorisé à envoyer un message pour cette commande" }, 403);
         }
 
-        const conv = await getOrCreateOrderConversation(db, orderId, order.restaurant_id);
+        // Nom du client pour l'affichage côté marchand (metadata.customer_name),
+        // renseigné uniquement à la création de la conversation.
+        const { data: customerProfile } = await db
+            .from("users")
+            .select("full_name, phone")
+            .eq("id", order.customer_id)
+            .maybeSingle();
+        const customerName = customerProfile?.full_name || customerProfile?.phone || null;
+
+        const conv = await getOrCreateOrderConversation(db, orderId, order.restaurant_id, customerName);
 
         // Schema messages: id, conversation_id, sender_id, content, content_type, is_read, created_at
         const { data: inserted, error: insertError } = await db
