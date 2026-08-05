@@ -17,6 +17,10 @@ export const customerReviewRoutes = new Hono<{ Bindings: Env; Variables: Variabl
 /**
  * POST /reviews — Submit a review
  * Body: { orderId, restaurantId, rating (1-5), comment? }
+ *
+ * orderId is REQUIRED: reviews must be tied to a completed order to prevent
+ * unverified/fake reviews. This also gives us a stable anti-duplicate key
+ * (one review per order).
  */
 customerReviewRoutes.post("/", async (c) => {
     try {
@@ -30,42 +34,41 @@ customerReviewRoutes.post("/", async (c) => {
 
         // ── Validate fields ──────────────────────────────────────
         if (!body.restaurantId) return c.json({ error: "restaurantId requis" }, 400);
+        if (!body.orderId) return c.json({ error: "orderId requis — seule une commande terminée peut être notée" }, 400);
         if (!body.rating || body.rating < 1 || body.rating > 5 || !Number.isInteger(body.rating)) {
             return c.json({ error: "La note doit être un entier entre 1 et 5" }, 400);
         }
 
         const supabase = getAdminClient(c.env);
 
-        // ── If orderId is provided, validate the order ───────────
-        if (body.orderId) {
-            const { data: order } = await supabase
-                .from("orders")
-                .select("id, customer_id, restaurant_id, status")
-                .eq("id", body.orderId)
-                .single();
+        // ── Validate the order ────────────────────────────────────
+        const { data: order } = await supabase
+            .from("orders")
+            .select("id, customer_id, restaurant_id, status")
+            .eq("id", body.orderId)
+            .single();
 
-            if (!order) return c.json({ error: "Commande introuvable" }, 404);
-            if (order.customer_id !== userId) {
-                return c.json({ error: "Cette commande ne vous appartient pas" }, 403);
-            }
-            if (order.restaurant_id !== body.restaurantId) {
-                return c.json({ error: "Le restaurant ne correspond pas à la commande" }, 400);
-            }
-            if (!["delivered", "completed", "picked_up"].includes(order.status)) {
-                return c.json({ error: "Vous ne pouvez noter qu'une commande terminée" }, 400);
-            }
+        if (!order) return c.json({ error: "Commande introuvable" }, 404);
+        if (order.customer_id !== userId) {
+            return c.json({ error: "Cette commande ne vous appartient pas" }, 403);
+        }
+        if (order.restaurant_id !== body.restaurantId) {
+            return c.json({ error: "Le restaurant ne correspond pas à la commande" }, 400);
+        }
+        if (!["delivered", "completed"].includes(order.status)) {
+            return c.json({ error: "Vous ne pouvez noter qu'une commande terminée" }, 400);
+        }
 
-            // Check duplicate review for this order
-            const { data: existingReview } = await supabase
-                .from("reviews")
-                .select("id")
-                .eq("order_id", body.orderId)
-                .eq("customer_id", userId)
-                .maybeSingle();
+        // Check duplicate review for this order
+        const { data: existingReview } = await supabase
+            .from("reviews")
+            .select("id")
+            .eq("order_id", body.orderId)
+            .eq("customer_id", userId)
+            .maybeSingle();
 
-            if (existingReview) {
-                return c.json({ error: "Vous avez déjà laissé un avis pour cette commande" }, 409);
-            }
+        if (existingReview) {
+            return c.json({ error: "Vous avez déjà laissé un avis pour cette commande" }, 409);
         }
 
         // ── Verify the restaurant exists ─────────────────────────
@@ -81,7 +84,7 @@ customerReviewRoutes.post("/", async (c) => {
         const { data: review, error: insertError } = await supabase
             .from("reviews")
             .insert({
-                order_id: body.orderId ?? null,
+                order_id: body.orderId,
                 restaurant_id: body.restaurantId,
                 customer_id: userId,
                 rating: body.rating,
@@ -168,7 +171,11 @@ customerReviewRoutes.get("/mine", async (c) => {
 
 /**
  * POST /reviews/product — Submit a product review
- * Body: { productId, restaurantId, rating (1-5), comment? }
+ * Body: { productId, restaurantId, orderId, rating (1-5), comment? }
+ *
+ * orderId is REQUIRED: the customer must have actually ordered this product
+ * in a completed order to review it — same purchase-verification rule as
+ * restaurant reviews, applied per product via order_items.
  */
 customerReviewRoutes.post("/product", async (c) => {
     try {
@@ -176,12 +183,14 @@ customerReviewRoutes.post("/product", async (c) => {
         const body = await c.req.json<{
             productId: string;
             restaurantId: string;
+            orderId?: string;
             rating: number;
             comment?: string;
         }>();
 
         if (!body.productId) return c.json({ error: "productId requis" }, 400);
         if (!body.restaurantId) return c.json({ error: "restaurantId requis" }, 400);
+        if (!body.orderId) return c.json({ error: "orderId requis — seul un produit commandé et livré peut être noté" }, 400);
         if (!body.rating || body.rating < 1 || body.rating > 5 || !Number.isInteger(body.rating)) {
             return c.json({ error: "La note doit être un entier entre 1 et 5" }, 400);
         }
@@ -200,6 +209,49 @@ customerReviewRoutes.post("/product", async (c) => {
             return c.json({ error: "Le produit ne correspond pas au restaurant" }, 400);
         }
 
+        // ── Validate the order: must belong to this customer, be for this
+        //    restaurant, be completed, and actually contain this product ──
+        const { data: order } = await supabase
+            .from("orders")
+            .select("id, customer_id, restaurant_id, status")
+            .eq("id", body.orderId)
+            .single();
+
+        if (!order) return c.json({ error: "Commande introuvable" }, 404);
+        if (order.customer_id !== userId) {
+            return c.json({ error: "Cette commande ne vous appartient pas" }, 403);
+        }
+        if (order.restaurant_id !== body.restaurantId) {
+            return c.json({ error: "Le restaurant ne correspond pas à la commande" }, 400);
+        }
+        if (!["delivered", "completed"].includes(order.status)) {
+            return c.json({ error: "Vous ne pouvez noter qu'un produit d'une commande terminée" }, 400);
+        }
+
+        const { data: orderItem } = await supabase
+            .from("order_items")
+            .select("id")
+            .eq("order_id", body.orderId)
+            .eq("product_id", body.productId)
+            .maybeSingle();
+
+        if (!orderItem) {
+            return c.json({ error: "Ce produit ne fait pas partie de cette commande" }, 400);
+        }
+
+        // Check duplicate review for this order (one review per product per order)
+        const { data: existingReview } = await supabase
+            .from("product_reviews")
+            .select("id")
+            .eq("order_id", body.orderId)
+            .eq("product_id", body.productId)
+            .eq("customer_id", userId)
+            .maybeSingle();
+
+        if (existingReview) {
+            return c.json({ error: "Vous avez déjà laissé un avis pour ce produit sur cette commande" }, 409);
+        }
+
         // Insert (unique constraint will prevent duplicates)
         const { data: review, error: insertError } = await supabase
             .from("product_reviews")
@@ -207,6 +259,7 @@ customerReviewRoutes.post("/product", async (c) => {
                 {
                     product_id: body.productId,
                     restaurant_id: body.restaurantId,
+                    order_id: body.orderId,
                     customer_id: userId,
                     rating: body.rating,
                     comment: body.comment?.trim() || null,

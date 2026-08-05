@@ -241,6 +241,13 @@ export function OrderTrackingClient() {
     const [reviewSubmitted, setReviewSubmitted] = useState(false);
     const [reviewError, setReviewError] = useState<string | null>(null);
 
+    // Per-product reviews: keyed by productId
+    const [productRatings, setProductRatings] = useState<Record<string, number>>({});
+    const [productComments, setProductComments] = useState<Record<string, string>>({});
+    const [productSubmitting, setProductSubmitting] = useState<Record<string, boolean>>({});
+    const [productSubmitted, setProductSubmitted] = useState<Record<string, boolean>>({});
+    const [productErrors, setProductErrors] = useState<Record<string, string>>({});
+
     const fetchOrder = useCallback(async () => {
         const ctrl = new AbortController();
         try {
@@ -323,6 +330,38 @@ export function OrderTrackingClient() {
             setReviewSubmitting(false);
         }
     }, [order, reviewComment, reviewRating, reviewSubmitting]);
+
+    const handleSubmitProductReview = useCallback(async (productId: string) => {
+        if (!order || !order.restaurants?.id || productSubmitting[productId]) return;
+        setProductErrors((prev) => ({ ...prev, [productId]: "" }));
+        setProductSubmitting((prev) => ({ ...prev, [productId]: true }));
+
+        try {
+            const res = await fetch("/api/reviews/product", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orderId: order.id,
+                    restaurantId: order.restaurants.id,
+                    productId,
+                    rating: productRatings[productId] ?? 5,
+                    comment: productComments[productId]?.trim() || undefined,
+                }),
+            });
+
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setProductErrors((prev) => ({ ...prev, [productId]: payload?.error ?? "Erreur lors de l'envoi de l'avis." }));
+                return;
+            }
+
+            setProductSubmitted((prev) => ({ ...prev, [productId]: true }));
+        } catch {
+            setProductErrors((prev) => ({ ...prev, [productId]: "Erreur lors de l'envoi de l'avis." }));
+        } finally {
+            setProductSubmitting((prev) => ({ ...prev, [productId]: false }));
+        }
+    }, [order, productComments, productRatings, productSubmitting]);
 
     return (
         <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
@@ -630,6 +669,73 @@ export function OrderTrackingClient() {
                                         </button>
                                     </div>
                                 )}
+                            </section>
+                        )}
+
+                        {/* Product reviews */}
+                        {["delivered", "completed"].includes(order.status) && order.restaurants?.id && order.items.length > 0 && (
+                            <section id="product-reviews" className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
+                                <h2 className="font-bold text-surface-900 dark:text-white mb-2 flex items-center gap-2">
+                                    <Star size={16} className="text-amber-500" />
+                                    Noter les plats
+                                </h2>
+                                <p className="text-sm text-surface-500 dark:text-surface-400 mb-4">
+                                    Dites-nous ce que vous avez pensé de chaque article commandé.
+                                </p>
+
+                                <div className="space-y-4">
+                                    {order.items.map((item) => (
+                                        <div key={item.productId} className="pt-3 first:pt-0 border-t first:border-t-0 border-surface-100 dark:border-surface-800">
+                                            <p className="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-2">{item.name}</p>
+
+                                            {productSubmitted[item.productId] ? (
+                                                <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-sm text-green-700 dark:text-green-300 font-medium">
+                                                    Merci ! Votre avis sur ce plat a bien été envoyé.
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-1">
+                                                        {[1, 2, 3, 4, 5].map((value) => (
+                                                            <button
+                                                                key={value}
+                                                                type="button"
+                                                                onClick={() => setProductRatings((prev) => ({ ...prev, [item.productId]: value }))}
+                                                                className="p-1"
+                                                                aria-label={`Noter ${item.name} ${value} sur 5`}
+                                                            >
+                                                                <Star
+                                                                    size={18}
+                                                                    className={value <= (productRatings[item.productId] ?? 5) ? "text-amber-500 fill-amber-500" : "text-surface-300 dark:text-surface-700"}
+                                                                />
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    <textarea
+                                                        value={productComments[item.productId] ?? ""}
+                                                        onChange={(e) => setProductComments((prev) => ({ ...prev, [item.productId]: e.target.value }))}
+                                                        placeholder="Un commentaire sur ce plat (optionnel)"
+                                                        className="w-full min-h-[70px] rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                                                    />
+
+                                                    {productErrors[item.productId] && (
+                                                        <p className="text-sm text-red-500">{productErrors[item.productId]}</p>
+                                                    )}
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void handleSubmitProductReview(item.productId)}
+                                                        disabled={productSubmitting[item.productId]}
+                                                        className="inline-flex items-center justify-center gap-2 px-4 h-9 rounded-xl bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700 text-surface-800 dark:text-surface-200 text-sm font-semibold transition-colors disabled:opacity-50"
+                                                    >
+                                                        {productSubmitting[item.productId] ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
+                                                        {productSubmitting[item.productId] ? "Envoi..." : "Envoyer"}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </section>
                         )}
 

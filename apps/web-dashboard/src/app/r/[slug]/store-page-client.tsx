@@ -21,7 +21,6 @@ import {
     CheckCircle2,
     X,
     Minus,
-    Send,
     MessageSquare,
     ChevronLeft,
     ChevronRight,
@@ -293,11 +292,6 @@ function ProductDetailModal({
     const [reviews, setReviews] = useState<ProductReview[]>([]);
     const [stats, setStats] = useState<ProductReviewStats>({ count: 0, average: 0 });
     const [loadingReviews, setLoadingReviews] = useState(true);
-    const [comment, setComment] = useState("");
-    const [rating, setRating] = useState(5);
-    const [submitting, setSubmitting] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
-    const [submitError, setSubmitError] = useState<string | null>(null);
     /** Selected option choices: { [optionName]: choiceLabel } */
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
         // Pre-select first choice for required options
@@ -352,63 +346,6 @@ function ProductDetailModal({
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
     }, [onClose, fullscreen, allImages.length]);
-
-    const handleSubmitReview = async () => {
-        if (rating < 1) return;
-        setSubmitError(null);
-        setSubmitting(true);
-        try {
-            // Get auth token from Supabase session
-            const supabase = createClient();
-            const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
-            if (!token) {
-                setSubmitError("Connectez-vous pour laisser un avis.");
-                return;
-            }
-            const res = await fetch("/api/reviews/product", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    productId: product.id,
-                    restaurantId: restaurant.id,
-                    rating,
-                    comment: comment.trim() || undefined,
-                }),
-            });
-            if (res.ok) {
-                setSubmitted(true);
-                // Mise à jour directe du state — évite le re-fetch réseau
-                const newReview: ProductReview = {
-                    id: crypto.randomUUID(),
-                    rating,
-                    comment: comment.trim() || null,
-                    response: null,
-                    created_at: new Date().toISOString(),
-                    customerName: "Vous",
-                };
-                const updatedReviews = [newReview, ...reviews];
-                const updatedStats: ProductReviewStats = {
-                    count: stats.count + 1,
-                    average: parseFloat(
-                        ((stats.average * stats.count + rating) / (stats.count + 1)).toFixed(1)
-                    ),
-                };
-                setReviews(updatedReviews);
-                setStats(updatedStats);
-                _reviewsCache.set(product.id, { reviews: updatedReviews, stats: updatedStats });
-            } else {
-                const json = await res.json().catch((): { error?: string } => ({}));
-                setSubmitError(json.error ?? "Erreur lors de l'envoi de l'avis.");
-            }
-        } catch {
-            setSubmitError("Erreur lors de l'envoi de l'avis.");
-        } finally {
-            setSubmitting(false);
-        }
-    };
 
     // Compute extra price from selected options
     const optionsExtraPrice = product.options
@@ -741,44 +678,20 @@ function ProductDetailModal({
                                     Avis ({stats.count})
                                 </h3>
 
-                                {/* Submit a review */}
-                                {!submitted ? (
-                                    <div className="mb-5 p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-                                        <p className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-2">Donner votre avis</p>
-                                        <div className="flex gap-1 mb-3">
-                                            {[1, 2, 3, 4, 5].map((s) => (
-                                                <button key={s} onClick={() => setRating(s)} className="p-0.5 transition-transform hover:scale-110">
-                                                    <Star
-                                                        size={22}
-                                                        className={s <= rating ? "text-amber-500 fill-amber-500" : "text-surface-300 dark:text-surface-600"}
-                                                    />
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <textarea
-                                            value={comment}
-                                            onChange={(e) => setComment(e.target.value)}
-                                            placeholder="Partagez votre expérience (optionnel)..."
-                                            className="w-full min-h-[80px] rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none mb-2"
-                                        />
-                                        {submitError && (
-                                            <p className="text-xs text-red-500 mb-2">{submitError}</p>
-                                        )}
-                                        <button
-                                            onClick={handleSubmitReview}
-                                            disabled={submitting}
-                                            className="flex items-center gap-2 px-4 py-2 bg-surface-900 dark:bg-white text-white dark:text-surface-900 rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all"
-                                        >
-                                            <Send size={14} />
-                                            {submitting ? "Envoi..." : "Envoyer"}
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="mb-5 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl flex items-center gap-2">
-                                        <CheckCircle2 size={18} className="text-green-600 dark:text-green-400" />
-                                        <p className="text-sm font-medium text-green-700 dark:text-green-300">Merci pour votre avis !</p>
-                                    </div>
-                                )}
+                                {/* Reviews can only be submitted for a product you've actually
+                                    ordered (server-verified), so there's no orderId available in
+                                    this catalog view — point the customer to their order history
+                                    instead of a form that would always fail purchase verification. */}
+                                <div className="mb-5 p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl flex items-start gap-3">
+                                    <MessageSquare size={18} className="text-surface-400 mt-0.5 shrink-0" />
+                                    <p className="text-sm text-surface-600 dark:text-surface-400">
+                                        Vous avez commandé ce plat ?{" "}
+                                        <Link href="/stores/orders" className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">
+                                            Laissez votre avis depuis votre commande
+                                        </Link>
+                                        .
+                                    </p>
+                                </div>
 
                                 {/* Reviews list */}
                                 {loadingReviews ? (
