@@ -1067,7 +1067,8 @@ export function StorePageClient({ slug }: { slug: string }) {
     const [resSpecial, setResSpecial] = useState("");
     const [resOccasion, setResOccasion] = useState<string>("");
     const [resSelectedZone, setResSelectedZone] = useState<string | null>(null);
-    const [resStep, setResStep] = useState<1 | 2 | 3>(1);
+    const [resStep, setResStep] = useState<1 | 2 | 3 | 4>(1);
+    const [resConfirmedRef, setResConfirmedRef] = useState<string | null>(null);
     const [resAutoFilled, setResAutoFilled] = useState(false);
     // BYOB / droit de bouchon
     const [resByob, setResByob] = useState(false);
@@ -1247,6 +1248,10 @@ export function StorePageClient({ slug }: { slug: string }) {
     }, [data?.restaurant?.primaryColor]);
 
     const submitReservation = useCallback(async (restaurantSlug: string) => {
+        // Garde-fou anti double-soumission : un clic pendant que la requête précédente
+        // est encore en vol (ou après un succès déjà affiché) ne doit rien renvoyer.
+        if (resSubmitting || resConfirmedRef) return;
+
         setResError(null);
         setResSuccess(null);
 
@@ -1296,19 +1301,35 @@ export function StorePageClient({ slug }: { slug: string }) {
                 return;
             }
 
-            setResSuccess(`Réservation confirmée (ref: ${payload.reservation?.id?.slice(-6) ?? "N/A"}).`);
-            setResSpecial("");
-            setResOccasion("");
-            setResSelectedZone(null);
-            setResByob(false);
-            setResCorkageAcknowledged(false);
-            setResStep(1);
+            const ref = payload.reservation?.id?.slice(-6) ?? "N/A";
+            setResSuccess(`Réservation confirmée (ref: ${ref}).`);
+            setResConfirmedRef(ref);
+            // On avance vers un écran de confirmation dédié (step 4) plutôt que de
+            // revenir silencieusement à l'étape 1 : sans ça l'utilisateur n'a aucun
+            // moyen de savoir si sa réservation a bien été prise en compte, et le
+            // bouton "Confirmer" redevenait cliquable → risque de double réservation.
+            setResStep(4);
         } catch {
             setResError("Erreur réseau pendant la réservation.");
         } finally {
             setResSubmitting(false);
         }
-    }, [resName, resPhone, resEmail, resPartySize, resDate, resTime, resSpecial, resSelectedZone, resOccasion, resByob, resCorkageAcknowledged]);
+    }, [resSubmitting, resConfirmedRef, resName, resPhone, resEmail, resPartySize, resDate, resTime, resSpecial, resSelectedZone, resOccasion, resByob, resCorkageAcknowledged]);
+
+    // Réinitialise entièrement le formulaire pour permettre une nouvelle réservation
+    // depuis l'écran de confirmation (étape 4).
+    const startNewReservation = useCallback(() => {
+        setResSpecial("");
+        setResOccasion("");
+        setResSelectedZone(null);
+        setResTime("");
+        setResByob(false);
+        setResCorkageAcknowledged(false);
+        setResSuccess(null);
+        setResError(null);
+        setResConfirmedRef(null);
+        setResStep(1);
+    }, []);
 
     const restaurant = data?.restaurant ?? null;
     const categories = data?.categories ?? EMPTY_CATEGORIES;
@@ -1713,7 +1734,16 @@ export function StorePageClient({ slug }: { slug: string }) {
                                     </div>
                                     {restaurant.hasReservations && (
                                         <button
-                                            onClick={() => setReservationOpen((open) => !open)}
+                                            onClick={() => {
+                                                setReservationOpen((open) => {
+                                                    const willOpen = !open;
+                                                    // Si on ré-ouvre le panneau après une réservation déjà
+                                                    // confirmée, on repart d'un formulaire vierge plutôt que
+                                                    // de réafficher l'écran de confirmation précédent.
+                                                    if (willOpen && resConfirmedRef) startNewReservation();
+                                                    return willOpen;
+                                                });
+                                            }}
                                             className="px-6 py-2.5 rounded-2xl bg-surface-900 dark:bg-white text-white dark:text-surface-900 text-sm font-bold transition-all hover:shadow-xl hover:-translate-y-0.5"
                                         >
                                             {reservationOpen ? "Annuler" : "Réserver une table"}
@@ -1878,8 +1908,12 @@ export function StorePageClient({ slug }: { slug: string }) {
                                                                                         ? zone.image_urls.filter(Boolean)
                                                                                         : zone.image_url ? [zone.image_url] : [];
                                                                                     if (imgs.length === 0) return (
-                                                                                        <div className="w-full h-28 flex items-center justify-center shrink-0" style={{ backgroundColor: zone.color ?? "#6366f1" }}>
-                                                                                            <span className="text-white text-3xl">{zone.type === "vip" ? "👑" : zone.type === "terrace" ? "🌿" : "🍽️"}</span>
+                                                                                        <div
+                                                                                            className="w-full h-28 flex flex-col items-center justify-center gap-1 shrink-0"
+                                                                                            style={{ background: `linear-gradient(155deg, ${zone.color ?? "#6366f1"}, ${zone.color ?? "#6366f1"}cc)` }}
+                                                                                        >
+                                                                                            <span className="text-white text-3xl drop-shadow">{zone.type === "vip" ? "👑" : zone.type === "terrace" ? "🌿" : "🍽️"}</span>
+                                                                                            <span className="text-white/80 text-[10px] font-bold uppercase tracking-wider">{zoneTypeLabels[zone.type] ?? zone.type}</span>
                                                                                         </div>
                                                                                     );
                                                                                     if (imgs.length === 1) return (
@@ -2253,20 +2287,55 @@ export function StorePageClient({ slug }: { slug: string }) {
                                                         {resError && (
                                                             <p className="text-xs text-red-500 font-bold px-1">{resError}</p>
                                                         )}
-                                                        {resSuccess && (
-                                                            <p className="text-[13px] text-emerald-600 dark:text-emerald-400 flex items-center gap-2 font-bold px-1">
-                                                                <CheckCircle2 size={16} />
-                                                                {resSuccess}
-                                                            </p>
-                                                        )}
 
                                                         <button
                                                             onClick={() => submitReservation(restaurant.slug)}
-                                                            disabled={resSubmitting || (resByob && restaurant.corkageFeeAmount > 0 && !resCorkageAcknowledged)}
+                                                            disabled={resSubmitting || !!resConfirmedRef || (resByob && restaurant.corkageFeeAmount > 0 && !resCorkageAcknowledged)}
                                                             className="w-full h-11 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold transition-all shadow-lg shadow-brand-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
                                                         >
                                                             {resSubmitting ? "Traitement..." : "Confirmer ma réservation ✓"}
                                                         </button>
+                                                    </div>
+                                                )}
+
+                                                {/* ── Step 4: Confirmation ── */}
+                                                {resStep === 4 && (
+                                                    <div className="space-y-4 text-center py-2">
+                                                        <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center">
+                                                            <CheckCircle2 size={28} className="text-emerald-500" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-base font-bold text-surface-900 dark:text-white">
+                                                                Réservation confirmée !
+                                                            </p>
+                                                            <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
+                                                                {resSuccess}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="p-3 rounded-2xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700 text-sm text-left space-y-1">
+                                                            <p className="font-bold text-surface-900 dark:text-white">{resName} · {resPartySize} pers.</p>
+                                                            <p className="text-surface-500">{resDate} à {resTime}</p>
+                                                            {resSelectedZone && availability && (() => {
+                                                                const z = availability.zones.find((z) => z.zone.id === resSelectedZone);
+                                                                return z ? <p className="text-xs text-brand-500 font-medium">📍 {z.zone.name}</p> : null;
+                                                            })()}
+                                                        </div>
+
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setReservationOpen(false)}
+                                                                className="flex-1 h-11 rounded-2xl bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300 text-sm font-bold transition-all hover:bg-surface-200 dark:hover:bg-surface-700"
+                                                            >
+                                                                Fermer
+                                                            </button>
+                                                            <button
+                                                                onClick={startNewReservation}
+                                                                className="flex-1 h-11 rounded-2xl bg-surface-900 dark:bg-white text-white dark:text-surface-900 text-sm font-bold transition-all hover:shadow-xl hover:-translate-y-0.5"
+                                                            >
+                                                                Nouvelle réservation
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

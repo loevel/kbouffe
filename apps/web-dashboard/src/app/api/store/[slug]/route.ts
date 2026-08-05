@@ -54,7 +54,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
         // 2. Toutes les requêtes en parallèle — hasPremiumStorefront inclus
         const [
             hasPremium,
-            categoriesRes, productsRes, reviewsRes,
+            categoriesRes, productsRes, reviewsRes, reviewStatsRes,
             showcaseRes, membersRes, badgesRes, announcementsRes,
         ] = await Promise.all([
             hasPremiumStorefront(supabase, rest.id),
@@ -76,6 +76,11 @@ export async function GET(_request: NextRequest, { params }: Params) {
                 .eq("is_visible", true)
                 .order("created_at", { ascending: false })
                 .limit(20),
+            supabase
+                .from("reviews")
+                .select("rating", { count: "exact" })
+                .eq("restaurant_id", rest.id)
+                .eq("is_visible", true),
             supabase
                 .from("showcase_sections")
                 .select("id, section_type, title, subtitle, content, display_order, is_visible, settings")
@@ -104,6 +109,16 @@ export async function GET(_request: NextRequest, { params }: Params) {
         // 3. Résolution des noms — 2 requêtes users en parallèle (étaient séquentielles)
         const reviewData = reviewsRes.data ?? [];
         const memberRows = membersRes.data ?? [];
+
+        // review_count / rating sur `restaurants` sont des compteurs dénormalisés qui ne sont
+        // jamais mis à jour à l'insertion d'un avis (pas de trigger côté DB) — on recalcule
+        // donc à la volée depuis la table `reviews` pour éviter d'afficher "0 avis" alors
+        // que des avis existent bel et bien.
+        const reviewStats = reviewStatsRes.data ?? [];
+        const liveReviewCount = reviewStatsRes.count ?? reviewStats.length;
+        const liveRating = reviewStats.length > 0
+            ? reviewStats.reduce((sum: number, r: any) => sum + (r.rating ?? 0), 0) / reviewStats.length
+            : rest.rating ?? 0;
 
         const customerIds = [...new Set(reviewData.map((r: any) => r.customer_id).filter(Boolean))] as string[];
         const memberUserIds = [...new Set(memberRows.map((m: any) => m.user_id).filter(Boolean))] as string[];
@@ -145,8 +160,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
                 cuisineType: rest.cuisine_type,
                 primaryColor: rest.primary_color,
                 openingHours: rest.opening_hours,
-                rating: rest.rating,
-                reviewCount: rest.review_count,
+                rating: liveRating,
+                reviewCount: liveReviewCount,
                 orderCount: rest.order_count,
                 isVerified: rest.is_verified,
                 isPremium: rest.is_premium,
