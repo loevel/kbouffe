@@ -22,12 +22,17 @@ export function useReservations(params?: {
   status?: string;
   search?: string;
   date?: string;
+  limit?: number;
 }) {
   const searchParams = new URLSearchParams();
   if (params?.status && params.status !== "all")
     searchParams.set("status", params.status);
   if (params?.search) searchParams.set("search", params.search);
   if (params?.date) searchParams.set("date", params.date);
+  // Request the backend's max cap by default — without this, the API's own
+  // `limit=50` default silently truncated both the table and the stats
+  // counts derived from the same fetch.
+  searchParams.set("limit", String(params?.limit ?? 500));
 
   const qs = searchParams.toString();
   const key = `/api/reservations${qs ? `?${qs}` : ""}`;
