@@ -7,6 +7,46 @@ import type { Database } from "@/lib/supabase/types";
 // pour servir admin.kbouffe.com/xyz avec le contenu de kbouffe.com/admin/xyz.
 const ADMIN_HOST = "admin.kbouffe.com";
 
+// Hôtes "système" qui ne doivent jamais être traités comme un sous-domaine
+// personnalisé de restaurant.
+const ROOT_HOSTS = new Set(["kbouffe.com", "www.kbouffe.com"]);
+
+// Sous-domaines réservés à l'infrastructure — jamais attribuables à un
+// restaurant (doit rester en synchro avec la contrainte SQL
+// restaurants_custom_subdomain_reserved_check).
+const RESERVED_SUBDOMAINS = new Set([
+    "www", "admin", "api", "blog", "app", "mail", "ns1", "ns2",
+    "status", "docs", "staging", "dev", "cdn", "assets", "mcp",
+]);
+
+// Extrait le sous-domaine candidat (ex: "pizza-momo" pour
+// pizza-momo.kbouffe.com), ou null si l'hôte ne peut pas correspondre à un
+// sous-domaine personnalisé de restaurant (host système, wildcard *.*.kbouffe.com…).
+function extractCandidateSubdomain(request: NextRequest): string | null {
+    const host = (request.headers.get("host") ?? "").toLowerCase();
+    if (!host.endsWith(".kbouffe.com")) return null;
+    if (ROOT_HOSTS.has(host) || host === ADMIN_HOST) return null;
+    const subdomain = host.slice(0, -".kbouffe.com".length);
+    if (!subdomain || subdomain.includes(".") || RESERVED_SUBDOMAINS.has(subdomain)) return null;
+    return subdomain;
+}
+
+// Résout un sous-domaine vers le slug du restaurant correspondant via la
+// fonction Postgres resolve_custom_subdomain (SECURITY DEFINER) — retourne
+// null si aucun restaurant n'a ce sous-domaine ou si son abonnement
+// premium_storefront n'est pas actif (cf. migration 20260805000000).
+async function resolveCustomSubdomainSlug(
+    supabase: ReturnType<typeof createServerClient<Database>>,
+    subdomain: string
+): Promise<string | null> {
+    const { data, error } = await supabase.rpc(
+        "resolve_custom_subdomain" as never,
+        { p_subdomain: subdomain } as never
+    );
+    if (error) return null;
+    return (data as unknown as string | null) ?? null;
+}
+
 function resolveRoleHomePath(role: string | undefined) {
     if (role === "admin") return "/admin";
     if (role === "merchant") return "/dashboard";
@@ -77,6 +117,29 @@ export async function updateSession(request: NextRequest) {
             },
         }
     );
+
+    // Sous-domaine personnalisé restaurant (ex: pizza-momo.kbouffe.com) —
+    // feature du pack "premium_storefront". Résolu en une requête RPC et
+    // réécrit en interne vers /r/<slug> ; aucune page ne "voit" jamais l'hôte
+    // custom directement. Sous-domaine inconnu ou abonnement inactif → on ne
+    // sert rien dessus, on renvoie vers le domaine principal.
+    const candidateSubdomain = extractCandidateSubdomain(request);
+    if (candidateSubdomain) {
+        const slug = await resolveCustomSubdomainSlug(supabase, candidateSubdomain);
+        if (slug) {
+            const realPathname = request.nextUrl.pathname;
+            const url = request.nextUrl.clone();
+            url.pathname = `/r/${slug}${realPathname === "/" ? "" : realPathname}`;
+            const rewritten = NextResponse.rewrite(url, { request });
+            supabaseResponse.cookies.getAll().forEach((cookie) => rewritten.cookies.set(cookie));
+            return rewritten;
+        }
+        const url = request.nextUrl.clone();
+        url.protocol = "https:";
+        url.host = "kbouffe.com";
+        url.pathname = "/";
+        return NextResponse.redirect(url);
+    }
 
     // Rafraîchit la session si elle est expirée
     const { data: { user } } = await supabase.auth.getUser();
