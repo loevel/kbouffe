@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { KeyRound, Loader2 } from "lucide-react";
-import { Modal, ModalFooter, Button, toast, authFetch } from "@kbouffe/module-core/ui";
+import { Modal, ModalFooter, Button, toast, authFetch, useLocale } from "@kbouffe/module-core/ui";
 
 interface PinSetupModalProps {
     isOpen: boolean;
@@ -21,13 +21,14 @@ export function PinSetupModal({
     hasPin,
     onSuccess,
 }: PinSetupModalProps) {
+    const { t } = useLocale();
     const [pin, setPin] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const title = hasPin
-        ? `Modifier le PIN — ${memberName}`
-        : `Définir le PIN — ${memberName}`;
+        ? `${t.team.editPinModalTitle} — ${memberName}`
+        : `${t.team.setPinModalTitle} — ${memberName}`;
 
     const handlePinChange = (value: string) => {
         // Only allow digits, max 4 characters
@@ -40,7 +41,7 @@ export function PinSetupModal({
         e.preventDefault();
 
         if (!/^\d{4}$/.test(pin)) {
-            setError("Le PIN doit être composé exactement de 4 chiffres.");
+            setError(t.team.pinInvalid);
             return;
         }
 
@@ -57,16 +58,16 @@ export function PinSetupModal({
             const data = await res.json() as { success?: boolean; error?: string };
 
             if (!res.ok || !data.success) {
-                setError(data.error ?? "Erreur lors de la définition du PIN.");
+                setError(data.error ?? t.team.pinSetError);
                 return;
             }
 
-            toast.success(`PIN défini pour ${memberName}`);
+            toast.success(`${t.team.pinSetSuccess} ${memberName}`);
             setPin("");
             onSuccess?.();
             onClose();
         } catch {
-            setError("Erreur réseau. Veuillez réessayer.");
+            setError(t.team.pinNetworkError);
         } finally {
             setLoading(false);
         }
@@ -83,11 +84,7 @@ export function PinSetupModal({
             isOpen={isOpen}
             onClose={handleClose}
             title={title}
-            description={
-                hasPin
-                    ? "Saisissez un nouveau PIN à 4 chiffres pour remplacer l'actuel."
-                    : "Ce PIN permettra à ce membre de s'identifier sur les tablettes PDV."
-            }
+            description={hasPin ? t.team.pinDescEdit : t.team.pinDesc}
             size="sm"
         >
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -111,7 +108,7 @@ export function PinSetupModal({
                         htmlFor="pin-input"
                         className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5"
                     >
-                        Code PIN (4 chiffres)
+                        {t.team.pinCodeLabel}
                     </label>
                     <input
                         id="pin-input"
@@ -146,14 +143,14 @@ export function PinSetupModal({
                         onClick={handleClose}
                         disabled={loading}
                     >
-                        Annuler
+                        {t.common.cancel}
                     </Button>
                     <Button
                         type="submit"
                         disabled={pin.length !== 4 || loading}
                         leftIcon={loading ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
                     >
-                        {loading ? "Enregistrement…" : hasPin ? "Modifier le PIN" : "Définir le PIN"}
+                        {loading ? t.team.pinSaving : hasPin ? t.team.editPinModalTitle : t.team.setPinModalTitle}
                     </Button>
                 </ModalFooter>
             </form>
