@@ -28,9 +28,9 @@ export default function MarketingContent() {
                         <Sparkles size={22} className="text-white" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-surface-900 dark:text-white">Upsells & Extras</h3>
+                        <h3 className="font-bold text-surface-900 dark:text-white">{t.marketing.upsellsTitle}</h3>
                         <p className="text-sm text-surface-500 dark:text-surface-400">
-                            Suggérez des extras avant le paiement — +15 à 25% de panier moyen
+                            {t.marketing.upsellsDesc}
                         </p>
                     </div>
                 </div>
@@ -46,9 +46,9 @@ export default function MarketingContent() {
                         <Send size={22} className="text-white" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-surface-900 dark:text-white">Social Publisher</h3>
+                        <h3 className="font-bold text-surface-900 dark:text-white">{t.marketing.socialTitle}</h3>
                         <p className="text-sm text-surface-500 dark:text-surface-400">
-                            Publiez sur Facebook, Instagram, TikTok & Telegram en un clic avec l'IA
+                            {t.marketing.socialDesc}
                         </p>
                     </div>
                 </div>
@@ -64,9 +64,9 @@ export default function MarketingContent() {
                         <Calendar size={22} className="text-white" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-surface-900 dark:text-white">Calendrier de Contenu IA</h3>
+                        <h3 className="font-bold text-surface-900 dark:text-white">{t.marketing.calendarTitle}</h3>
                         <p className="text-sm text-surface-500 dark:text-surface-400">
-                            Planifiez une semaine entiere de publications en 1 clic
+                            {t.marketing.calendarDesc}
                         </p>
                     </div>
                 </div>
@@ -84,8 +84,8 @@ export default function MarketingContent() {
                             <Tag size={18} className="text-green-500" />
                         </div>
                         <div>
-                            <h4 className="font-bold text-surface-900 dark:text-white text-sm">Codes promo</h4>
-                            <p className="text-xs text-surface-500">Créez des réductions pour vos clients</p>
+                            <h4 className="font-bold text-surface-900 dark:text-white text-sm">{t.coupons.title}</h4>
+                            <p className="text-xs text-surface-500">{t.marketing.promoCardDesc}</p>
                         </div>
                     </Link>
                     <Link
@@ -96,8 +96,8 @@ export default function MarketingContent() {
                             <Sparkles size={18} className="text-amber-500" />
                         </div>
                         <div>
-                            <h4 className="font-bold text-surface-900 dark:text-white text-sm">Upsells & Extras</h4>
-                            <p className="text-xs text-surface-500">+15-25% de panier moyen</p>
+                            <h4 className="font-bold text-surface-900 dark:text-white text-sm">{t.marketing.upsellsTitle}</h4>
+                            <p className="text-xs text-surface-500">{t.marketing.upsellsCardDesc}</p>
                         </div>
                     </Link>
                 </div>
