@@ -337,12 +337,24 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                         >
                                             {/* Image */}
                                             {item.imageUrl ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={item.imageUrl}
-                                                    alt={item.name}
-                                                    className="w-16 h-16 rounded-lg object-cover shrink-0"
-                                                />
+                                                <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 relative">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={item.imageUrl}
+                                                        alt={item.name}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            // Image produit externe potentiellement 404 — on bascule
+                                                            // sur le placeholder plutôt que d'afficher l'icône cassée.
+                                                            e.currentTarget.style.display = "none";
+                                                            const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                                            if (fallback) fallback.style.display = "flex";
+                                                        }}
+                                                    />
+                                                    <div className="hidden w-full h-full items-center justify-center bg-surface-200 dark:bg-surface-700 absolute inset-0">
+                                                        <ChefHat size={20} className="text-surface-400" />
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <div className="w-16 h-16 rounded-lg bg-surface-200 dark:bg-surface-700 flex items-center justify-center shrink-0">
                                                     <ChefHat size={20} className="text-surface-400" />
@@ -577,10 +589,12 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                     <span>Sous-total</span>
                                     <span>{formatCFA(subtotal)}</span>
                                 </div>
-                                <div className="flex justify-between text-surface-600 dark:text-surface-400">
-                                    <span>Livraison</span>
-                                    <span>{deliveryFee === 0 ? "Gratuit" : formatCFA(deliveryFee)}</span>
-                                </div>
+                                {deliveryFee > 0 && (
+                                    <div className="flex justify-between text-surface-600 dark:text-surface-400">
+                                        <span>Livraison</span>
+                                        <span>{formatCFA(deliveryFee)}</span>
+                                    </div>
+                                )}
                                 {giftCardApplied && giftCardAmount > 0 && (
                                     <div className="flex justify-between text-green-600 dark:text-green-400">
                                         <span className="flex items-center gap-1">

@@ -1,10 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Plus, ShoppingBag } from "lucide-react";
 import type { ThemeProps } from "./types";
 import { ScarcityBadge } from "./ScarcityBadge";
 import { FeaturedSection } from "./FeaturedSection";
+
+/**
+ * Story-card image background — falls back to the ShoppingBag placeholder
+ * if the URL 404s instead of showing a broken-image icon.
+ */
+function StoryImage({ src, alt }: { src: string; alt: string }) {
+    const [failed, setFailed] = useState(false);
+    if (failed) {
+        return (
+            <div className="w-full h-full bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-800 flex items-center justify-center">
+                <ShoppingBag size={48} className="text-surface-400" />
+            </div>
+        );
+    }
+    return (
+        <Image
+            src={src}
+            alt={alt}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={() => setFailed(true)}
+        />
+    );
+}
 
 /**
  * Story / Instagram-like theme.
@@ -84,12 +109,7 @@ export function StoryTheme({
                                     {/* Image background */}
                                     <div className="relative aspect-[4/5] w-full">
                                         {product.image_url ? (
-                                            <Image
-                                                src={product.image_url}
-                                                alt={product.name}
-                                                fill
-                                                className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                            />
+                                            <StoryImage src={product.image_url} alt={product.name} />
                                         ) : (
                                             <div className="w-full h-full bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-800 flex items-center justify-center">
                                                 <ShoppingBag size={48} className="text-surface-400" />

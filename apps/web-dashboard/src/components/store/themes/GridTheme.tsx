@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ChefHat, Plus, Info, ImagePlus } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { motion } from "framer-motion";
@@ -22,6 +23,11 @@ function ProductCard({
     onAdd: () => void;
     onClick: () => void;
 }) {
+    // Certaines images produits pointent vers des URLs externes (fournisseurs)
+    // qui peuvent disparaître (404) — on retombe alors sur le placeholder plutôt
+    // que d'afficher l'icône d'image cassée du navigateur.
+    const [imgFailed, setImgFailed] = useState(false);
+
     return (
         <motion.div
             layout
@@ -69,10 +75,11 @@ function ProductCard({
             {/* Image + add button */}
             <div className="relative shrink-0">
                 <div className="w-28 h-28 rounded-2xl overflow-hidden bg-surface-100 dark:bg-surface-800">
-                    {product.image_url ? (
+                    {product.image_url && !imgFailed ? (
                         <img
                             src={product.image_url}
                             alt={product.name}
+                            onError={() => setImgFailed(true)}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                     ) : (
