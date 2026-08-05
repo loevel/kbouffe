@@ -258,9 +258,10 @@ function ProductCard({ product, onOrder, onRFQ }: ProductCardProps) {
                     </button>
                     <button
                         onClick={() => onOrder(product)}
+                        title="Enregistre un achat dans le registre de traçabilité — ne contacte pas le fournisseur"
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors"
                     >
-                        <ShoppingCart size={12} /> Commander
+                        <ShoppingCart size={12} /> Enregistrer l'achat
                     </button>
                 </div>
             </div>

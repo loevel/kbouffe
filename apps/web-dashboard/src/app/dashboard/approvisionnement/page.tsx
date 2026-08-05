@@ -257,22 +257,30 @@ export default function ApprovisionnementPage() {
         featured ? "1" : "",
     ].filter(Boolean).length;
 
-    const fetchSuppliers = useCallback(async (resetPage = false) => {
+    // `overrides` permet aux appelants (ex: bouton "effacer") de fournir la
+    // valeur qu'ils viennent tout juste de définir via setState, plutôt que de
+    // compter sur `q`/`product`/`locality` capturés dans cette fermeture — qui
+    // reflètent encore l'ancien état au moment de l'appel.
+    const fetchSuppliers = useCallback(async (
+        pageToFetch: number,
+        overrides?: { q?: string; product?: string; locality?: string }
+    ) => {
         setLoading(true);
-        const currentPage = resetPage ? 1 : page;
-        if (resetPage) setPage(1);
 
         try {
             const params = new URLSearchParams();
-            if (q.trim()) params.set("q", q.trim());
-            if (product.trim()) params.set("product", product.trim());
+            const qVal = (overrides?.q ?? q).trim();
+            const productVal = (overrides?.product ?? product).trim();
+            const localityVal = (overrides?.locality ?? locality).trim();
+            if (qVal) params.set("q", qVal);
+            if (productVal) params.set("product", productVal);
             if (region) params.set("region", region);
-            if (locality.trim()) params.set("locality", locality.trim());
+            if (localityVal) params.set("locality", localityVal);
             if (type) params.set("type", type);
             if (category) params.set("category", category);
             if (organic) params.set("organic", "1");
             if (featured) params.set("featured", "1");
-            params.set("page", String(currentPage));
+            params.set("page", String(pageToFetch));
 
             const res = await fetch(`/api/marketplace/suppliers?${params.toString()}`);
             if (!res.ok) throw new Error("Erreur serveur");
@@ -284,20 +292,32 @@ export default function ApprovisionnementPage() {
         } finally {
             setLoading(false);
         }
-    }, [q, product, region, locality, type, category, organic, featured, page]);
+    }, [q, product, region, locality, type, category, organic, featured]);
 
+    // Un seul point de vérité pour le fetch : on réagit aux changements d'état
+    // au lieu d'appeler fetchSuppliers() juste après un setState (qui capturait
+    // encore l'ancienne valeur à cause de la fermeture React — les filtres
+    // "Bio uniquement", région, type, catégorie et "en vedette" n'avaient donc
+    // jamais d'effet sur le premier clic).
     useEffect(() => {
-        fetchSuppliers();
+        fetchSuppliers(page);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page]);
 
-    // Search on Enter / blur
-    const handleSearch = () => fetchSuppliers(true);
+    useEffect(() => {
+        setPage(1);
+        fetchSuppliers(1);
+        // Note: `locality` est volontairement exclu — recherche sur Entrée
+        // seulement (voir son onKeyDown), pas à chaque frappe.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [region, type, category, organic, featured]);
+
+    // Search on Enter / blur (nom du fournisseur / produit — pas de fetch auto)
+    const handleSearch = () => { setPage(1); fetchSuppliers(1); };
 
     const clearFilters = () => {
         setRegion(""); setLocality(""); setType(""); setCategory("");
         setOrganic(false); setFeatured(false);
-        fetchSuppliers(true);
     };
 
     const LIMIT = 20;
@@ -319,7 +339,7 @@ export default function ApprovisionnementPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => fetchSuppliers(true)}
+                    onClick={() => fetchSuppliers(page)}
                     className="flex items-center gap-2 px-3 py-2 text-sm text-surface-400 hover:text-white border border-surface-700 hover:border-surface-600 rounded-xl transition-colors"
                 >
                     <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
@@ -341,7 +361,7 @@ export default function ApprovisionnementPage() {
                         className="w-full pl-10 pr-4 py-2.5 bg-surface-800 border border-surface-700 rounded-xl text-sm text-white placeholder-surface-500 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition"
                     />
                     {q && (
-                        <button onClick={() => { setQ(""); fetchSuppliers(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white">
+                        <button onClick={() => { setQ(""); setPage(1); fetchSuppliers(1, { q: "" }); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white">
                             <X size={14} />
                         </button>
                     )}
@@ -359,7 +379,7 @@ export default function ApprovisionnementPage() {
                         className="w-full pl-10 pr-4 py-2.5 bg-surface-800 border border-surface-700 rounded-xl text-sm text-white placeholder-surface-500 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition"
                     />
                     {product && (
-                        <button onClick={() => { setProduct(""); fetchSuppliers(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white">
+                        <button onClick={() => { setProduct(""); setPage(1); fetchSuppliers(1, { product: "" }); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white">
                             <X size={14} />
                         </button>
                     )}
@@ -410,7 +430,7 @@ export default function ApprovisionnementPage() {
                                 </label>
                                 <select
                                     value={region}
-                                    onChange={e => { setRegion(e.target.value); fetchSuppliers(true); }}
+                                    onChange={e => setRegion(e.target.value)}
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand-500/50"
                                 >
                                     <option value="">Toutes les régions</option>
@@ -429,7 +449,7 @@ export default function ApprovisionnementPage() {
                                     type="text"
                                     value={locality}
                                     onChange={e => setLocality(e.target.value)}
-                                    onKeyDown={e => e.key === "Enter" && fetchSuppliers(true)}
+                                    onKeyDown={e => { if (e.key === "Enter") { setPage(1); fetchSuppliers(1); } }}
                                     placeholder="Ex: Yaoundé"
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 placeholder-surface-500 focus:outline-none focus:border-brand-500/50"
                                 />
@@ -442,7 +462,7 @@ export default function ApprovisionnementPage() {
                                 </label>
                                 <select
                                     value={type}
-                                    onChange={e => { setType(e.target.value); fetchSuppliers(true); }}
+                                    onChange={e => setType(e.target.value)}
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand-500/50"
                                 >
                                     {SUPPLIER_TYPES.map(t => (
@@ -458,7 +478,7 @@ export default function ApprovisionnementPage() {
                                 </label>
                                 <select
                                     value={category}
-                                    onChange={e => { setCategory(e.target.value); fetchSuppliers(true); }}
+                                    onChange={e => setCategory(e.target.value)}
                                     className="w-full bg-surface-900 border border-surface-700 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand-500/50"
                                 >
                                     {PRODUCT_CATEGORIES.map(c => (
@@ -471,7 +491,7 @@ export default function ApprovisionnementPage() {
                             <div className="col-span-2 md:col-span-4 flex items-center gap-4 pt-2 border-t border-surface-700/50">
                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                     <div
-                                        onClick={() => { setOrganic(v => !v); fetchSuppliers(true); }}
+                                        onClick={() => setOrganic(v => !v)}
                                         className={`w-9 h-5 rounded-full transition-colors flex items-center ${organic ? "bg-green-500" : "bg-surface-600"}`}
                                     >
                                         <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-0.5 ${organic ? "translate-x-4" : "translate-x-0"}`} />
@@ -483,7 +503,7 @@ export default function ApprovisionnementPage() {
 
                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                     <div
-                                        onClick={() => { setFeatured(v => !v); fetchSuppliers(true); }}
+                                        onClick={() => setFeatured(v => !v)}
                                         className={`w-9 h-5 rounded-full transition-colors flex items-center ${featured ? "bg-yellow-500" : "bg-surface-600"}`}
                                     >
                                         <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-0.5 ${featured ? "translate-x-4" : "translate-x-0"}`} />
@@ -522,25 +542,25 @@ export default function ApprovisionnementPage() {
                     {region && (
                         <span className="flex items-center gap-1 text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2.5 py-1 rounded-full">
                             <MapPin size={10} /> {region}
-                            <button onClick={() => { setRegion(""); fetchSuppliers(true); }}><X size={10} /></button>
+                            <button onClick={() => setRegion("")}><X size={10} /></button>
                         </span>
                     )}
                     {type && (
                         <span className="flex items-center gap-1 text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2.5 py-1 rounded-full">
                             {TYPE_LABELS[type]}
-                            <button onClick={() => { setType(""); fetchSuppliers(true); }}><X size={10} /></button>
+                            <button onClick={() => setType("")}><X size={10} /></button>
                         </span>
                     )}
                     {category && (
                         <span className="flex items-center gap-1 text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-2.5 py-1 rounded-full">
                             {CATEGORY_LABELS[category] ?? category}
-                            <button onClick={() => { setCategory(""); fetchSuppliers(true); }}><X size={10} /></button>
+                            <button onClick={() => setCategory("")}><X size={10} /></button>
                         </span>
                     )}
                     {organic && (
                         <span className="flex items-center gap-1 text-xs bg-green-500/10 text-green-400 border border-green-500/20 px-2.5 py-1 rounded-full">
                             <Leaf size={10} /> Bio
-                            <button onClick={() => { setOrganic(false); fetchSuppliers(true); }}><X size={10} /></button>
+                            <button onClick={() => setOrganic(false)}><X size={10} /></button>
                         </span>
                     )}
                 </div>
