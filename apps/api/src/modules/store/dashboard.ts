@@ -407,11 +407,19 @@ dashboardRoutes.get("/stats", async (c) => {
     // Active orders (pending/accepted/preparing/ready/...) must not be bound to the
     // stats window above — an order stuck in "ready" for months is still active
     // today and must be surfaced regardless of when it was created.
-    const { count: totalActiveUnwindowed } = await c.var.supabase
+    // NB: ACTIVE_STATUSES includes "scheduled", which isn't a value of the
+    // order_status DB enum (it only ever appears client-side) — passing it to
+    // `.in()` makes Postgres reject the whole query (22P02), so it's filtered
+    // out here. `head: true` + `count: "exact"` also silently fails against the
+    // RLS-scoped anon-key client used here, so fetch ids instead.
+    const DB_ACTIVE_STATUSES = Array.from(ACTIVE_STATUSES).filter((s) => s !== "scheduled");
+    const { data: activeRows, error: activeError } = await c.var.supabase
         .from("orders")
-        .select("id", { count: "exact", head: true })
+        .select("id")
         .eq("restaurant_id", c.var.restaurantId)
-        .in("status", Array.from(ACTIVE_STATUSES));
+        .in("status", DB_ACTIVE_STATUSES);
+    if (activeError) console.error("Active orders count error:", activeError);
+    const totalActiveUnwindowed = activeRows?.length ?? null;
 
     const revenueOrders = orders.filter(isRevenueOrder);
 
