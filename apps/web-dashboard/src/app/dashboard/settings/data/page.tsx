@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { SettingsNav } from "@/components/dashboard/settings/SettingsNav";
+import { useLocale } from "@kbouffe/module-core/ui";
 import {
     Download,
     Loader2,
@@ -24,6 +25,7 @@ type Stats = {
 };
 
 export default function DataExportPage() {
+    const { t } = useLocale();
     const [stats, setStats] = useState<Stats | null>(null);
     const [loadingStats, setLoadingStats] = useState(true);
     const [downloading, setDownloading] = useState(false);
@@ -87,8 +89,8 @@ export default function DataExportPage() {
     return (
         <>
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-surface-900 dark:text-white">Paramètres</h1>
-                <p className="text-surface-500 dark:text-surface-400 mt-1">Gérez les informations de votre restaurant</p>
+                <h1 className="text-2xl font-bold text-surface-900 dark:text-white">{t.settings.title}</h1>
+                <p className="text-surface-500 dark:text-surface-400 mt-1">{t.settings.subtitle}</p>
             </div>
             <SettingsNav />
 

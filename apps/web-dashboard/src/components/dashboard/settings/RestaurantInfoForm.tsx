@@ -137,9 +137,9 @@ export function RestaurantInfoForm() {
                         value={form.priceRange} 
                         onChange={(e) => updateField("priceRange", e.target.value)}
                         options={[
-                            { value: "1", label: "FCFA (Économique)" },
-                            { value: "2", label: "FCFA FCFA (Moyen)" },
-                            { value: "3", label: "FCFA FCFA FCFA (Cher)" },
+                            { value: "1", label: "₣ (Économique)" },
+                            { value: "2", label: "₣₣ (Moyen)" },
+                            { value: "3", label: "₣₣₣ (Cher)" },
                         ]}
                     />
                     <div className="md:col-span-2">

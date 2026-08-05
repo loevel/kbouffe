@@ -242,7 +242,7 @@ export function GalleryForm() {
       return;
     }
     try {
-      await addPhoto(trimmed, "Photo URL");
+      await addPhoto(trimmed, "");
       setGalleryUrlInput("");
       toast.success("Photo ajoutée avec succès");
     } catch (error) {

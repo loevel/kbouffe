@@ -47,6 +47,18 @@ export function PaymentSettingsForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Mobile Money marked "accepted" with no number configured leaves
+        // customers with no way to actually pay — require at least one.
+        if (
+            methods.mobileMoney &&
+            !credentials.orangeMoneyNumber.trim() &&
+            !credentials.mtnMomoNumber.trim()
+        ) {
+            toast.error(t.settings.mobileMoneyNumberRequired);
+            return;
+        }
+
         setLoading(true);
 
         const payload: any = {
