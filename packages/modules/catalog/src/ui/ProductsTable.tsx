@@ -402,7 +402,7 @@ export function ProductsTable({ restaurantId, isAdmin = false }: { restaurantId?
                                                 {((product.options as unknown as Array<{ name: string }>)?.length ?? 0)} option(s)
                                             </span>
                                         ) : (
-                                            <span className="text-xs text-surface-400">\u2014</span>
+                                            <span className="text-xs text-surface-400">{"\u2014"}</span>
                                         )}
                                     </TableCell>
                                     <TableCell>
