@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/supabase/types";
 
+// Sous-domaine dédié à la section admin (Cloudflare Custom Domain → même worker).
+// Tout le trafic hors /api et /admin y est réécrit en interne vers /admin/*,
+// pour servir admin.kbouffe.com/xyz avec le contenu de kbouffe.com/admin/xyz.
+const ADMIN_HOST = "admin.kbouffe.com";
+
 function resolveRoleHomePath(role: string | undefined) {
     if (role === "admin") return "/admin";
     if (role === "merchant") return "/dashboard";
@@ -10,13 +15,44 @@ function resolveRoleHomePath(role: string | undefined) {
     return "/stores";
 }
 
+// Calcule le pathname "logique" à utiliser pour le routage/l'auth : sur
+// admin.kbouffe.com, tout ce qui n'est pas déjà /api ou /admin est traité
+// comme s'il était préfixé par /admin.
+function resolveLogicalPathname(request: NextRequest) {
+    const realPathname = request.nextUrl.pathname;
+    const isAdminHost = (request.headers.get("host") ?? "") === ADMIN_HOST;
+    const pathname =
+        isAdminHost && !realPathname.startsWith("/api") && !realPathname.startsWith("/admin")
+            ? `/admin${realPathname === "/" ? "" : realPathname}`
+            : realPathname;
+    return { realPathname, pathname };
+}
+
+// Applique la réécriture /admin/* si la requête vient de admin.kbouffe.com
+// et qu'aucune redirection n'a eu lieu ; transfère les cookies Supabase posés
+// par updateSession sur la nouvelle réponse.
+function withAdminRewrite(
+    request: NextRequest,
+    response: NextResponse,
+    realPathname: string,
+    logicalPathname: string
+) {
+    if (realPathname === logicalPathname) return response;
+    const url = request.nextUrl.clone();
+    url.pathname = logicalPathname;
+    const rewritten = NextResponse.rewrite(url, { request });
+    response.cookies.getAll().forEach((cookie) => rewritten.cookies.set(cookie));
+    return rewritten;
+}
+
 export async function updateSession(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     // Skip Supabase si les variables d'environnement ne sont pas configurées
     if (!supabaseUrl || !supabaseAnonKey) {
-        return NextResponse.next({ request });
+        const { realPathname, pathname } = resolveLogicalPathname(request);
+        return withAdminRewrite(request, NextResponse.next({ request }), realPathname, pathname);
     }
 
     let supabaseResponse = NextResponse.next({ request });
@@ -47,7 +83,7 @@ export async function updateSession(request: NextRequest) {
     const role = String(user?.user_metadata?.role ?? "").toLowerCase();
     const homePath = resolveRoleHomePath(role);
 
-    const pathname = request.nextUrl.pathname;
+    const { realPathname, pathname } = resolveLogicalPathname(request);
 
     // Page de connexion admin — accessible publiquement (pas de protection)
     if (pathname === "/admin/login") {
@@ -58,7 +94,7 @@ export async function updateSession(request: NextRequest) {
             return NextResponse.redirect(url);
         }
         // Sinon, laisser passer (afficher le formulaire de connexion)
-        return supabaseResponse;
+        return withAdminRewrite(request, supabaseResponse, realPathname, pathname);
     }
 
     // Routes protégées → rediriger vers /admin/login si non connecté sur /admin
@@ -115,5 +151,5 @@ export async function updateSession(request: NextRequest) {
         }
     }
 
-    return supabaseResponse;
+    return withAdminRewrite(request, supabaseResponse, realPathname, pathname);
 }
