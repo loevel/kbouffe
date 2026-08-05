@@ -35,7 +35,11 @@ ordersRoutes.get("/", async (c) => {
     const payment = c.req.query("payment");
     const delivery = c.req.query("delivery");
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10));
-    const limit = Math.min(100, Math.max(0, parseInt(c.req.query("limit") ?? "50", 10)));
+    // Cap raised to 500 — same fix as customers/reservations (see those
+    // modules): the tab-count and KDS board queries request limit=200 with
+    // no server pagination of their own, so the previous cap of 100 silently
+    // truncated and under-counted their results for busy restaurants.
+    const limit = Math.min(500, Math.max(0, parseInt(c.req.query("limit") ?? "50", 10)));
 
     let query = supabase
         .from("orders")
