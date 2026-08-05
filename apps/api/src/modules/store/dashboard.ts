@@ -182,6 +182,7 @@ async function fetchOrders(
             .from("orders")
             .select(projection)
             .eq("restaurant_id", restaurantId)
+            .neq("status", "draft") // parked orders aren't real orders yet — keep them out of every stat
             .gte("created_at", sinceIso)
             .order("created_at", { ascending: false });
 
@@ -403,6 +404,15 @@ dashboardRoutes.get("/stats", async (c) => {
         return c.json({ error: "Erreur lors du calcul des statistiques" }, 500);
     }
 
+    // Active orders (pending/accepted/preparing/ready/...) must not be bound to the
+    // stats window above — an order stuck in "ready" for months is still active
+    // today and must be surfaced regardless of when it was created.
+    const { count: totalActiveUnwindowed } = await c.var.supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", c.var.restaurantId)
+        .in("status", Array.from(ACTIVE_STATUSES));
+
     const revenueOrders = orders.filter(isRevenueOrder);
 
     const todayOrders = orders.filter((order) => order.createdAtMs >= todayStartMs);
@@ -413,7 +423,7 @@ dashboardRoutes.get("/stats", async (c) => {
     const totalRevenue = revenueOrders.reduce((sum, order) => sum + order.amount, 0);
     const totalCancelled = orders.filter(isCancelled).length;
     const totalCompleted = orders.filter(isCompleted).length;
-    const totalActive = orders.filter(isActive).length;
+    const totalActive = totalActiveUnwindowed ?? orders.filter(isActive).length;
     const totalOrders = orders.length;
 
     const averageOrderValue = revenueOrders.length > 0
