@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { ordersUi } from "@kbouffe/module-orders";
 const { OrdersTable, OrdersStats } = ordersUi;
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -14,7 +15,10 @@ export default function OrdersPage() {
                 <p className="text-surface-500 dark:text-surface-400 mt-1">{t.orders.subtitle}</p>
             </div>
             <OrdersStats />
-            <OrdersTable />
+            {/* OrdersTable reads ?status= via useSearchParams, which requires a Suspense boundary */}
+            <Suspense fallback={null}>
+                <OrdersTable />
+            </Suspense>
         </>
     );
 }
