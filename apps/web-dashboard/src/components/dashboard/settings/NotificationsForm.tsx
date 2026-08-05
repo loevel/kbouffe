@@ -259,7 +259,7 @@ export function NotificationsForm() {
                                         {t.smsNotifications.whatsappChannel}
                                     </p>
                                     <p className="text-sm text-surface-500">
-                                        {t.smsNotifications.smsEnabledDesc}
+                                        {t.smsNotifications.whatsappEnabledDesc}
                                     </p>
                                 </div>
                             </div>

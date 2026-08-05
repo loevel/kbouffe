@@ -13,39 +13,39 @@ interface PremiumUpgradeCardProps {
 
 const BENEFITS: Record<string, string[]> = {
     "Pixels & Analytics": [
-        "Integrez votre Meta Pixel et Google Analytics",
+        "Intégrez votre Meta Pixel et Google Analytics",
         "Suivez les conversions e-commerce automatiquement",
         "Optimisez vos campagnes publicitaires",
     ],
     "Themes": [
-        "3 themes professionnels (Grille, Luxe, Story)",
+        "3 thèmes professionnels (Grille, Luxe, Story)",
         "Personnalisez l'apparence de votre vitrine",
-        "Demarquez-vous de la concurrence",
+        "Démarquez-vous de la concurrence",
     ],
     "Annonces": [
-        "Affichez des bandeaux sur votre vitrine en temps reel",
+        "Affichez des bandeaux sur votre vitrine en temps réel",
         "3 niveaux : info, warning, urgent",
-        "Programmation par date de debut/fin",
+        "Programmation par date de début/fin",
     ],
     "Social Publisher": [
         "Publiez sur Facebook, Instagram, TikTok & Telegram",
-        "Generation de contenu par IA",
+        "Génération de contenu par IA",
         "Programmation et historique des publications",
     ],
     "Conseiller IA": [
         "Analyse intelligente de votre restaurant",
-        "Recommandations personnalisees pour augmenter vos revenus",
+        "Recommandations personnalisées pour augmenter vos revenus",
         "Posez des questions en langage naturel",
     ],
     "Calendrier de Contenu": [
         "Planifiez une semaine de publications en 1 clic",
-        "Contenu adapte a chaque plateforme",
-        "Suggestions basees sur votre menu",
+        "Contenu adapté à chaque plateforme",
+        "Suggestions basées sur votre menu",
     ],
     "Feed Produits": [
         "Synchronisez vos plats sur Instagram Shopping",
         "Compatible Facebook Commerce Manager & Google Merchant",
-        "Mise a jour automatique toutes les 30 minutes",
+        "Mise à jour automatique toutes les 30 minutes",
     ],
 };
 
@@ -61,11 +61,11 @@ export function PremiumUpgradeCard({ feature, description, variant = "page" }: P
                 <div className="flex items-center gap-2 mb-2">
                     <Lock size={14} className="text-amber-500" />
                     <span className="text-sm font-bold text-amber-700 dark:text-amber-400">
-                        Fonctionnalite Premium
+                        Fonctionnalité Premium
                     </span>
                 </div>
                 <p className="text-xs text-surface-500 dark:text-surface-400 mb-3">
-                    {description ?? `Activez le pack Premium Storefront pour debloquer "${feature}".`}
+                    {description ?? `Activez le pack Premium Storefront pour débloquer "${feature}".`}
                 </p>
                 <Link href="/dashboard/marketplace">
                     <Button variant="outline" className="text-xs h-8">
@@ -88,7 +88,7 @@ export function PremiumUpgradeCard({ feature, description, variant = "page" }: P
                 </h3>
                 <p className="text-sm text-surface-500 max-w-md mx-auto mb-6">
                     {description ??
-                        "Cette fonctionnalite est disponible avec le pack Vitrine Premium. Debloquez-la pour offrir une experience professionnelle a vos clients."}
+                        "Cette fonctionnalité est disponible avec le pack Vitrine Premium. Débloquez-la pour offrir une expérience professionnelle à vos clients."}
                 </p>
 
                 {benefits.length > 0 && (
@@ -104,7 +104,7 @@ export function PremiumUpgradeCard({ feature, description, variant = "page" }: P
 
                 <Link href="/dashboard/marketplace">
                     <Button leftIcon={<Crown size={16} />}>
-                        Debloquer avec Premium
+                        Débloquer avec Premium
                         <ArrowRight size={14} className="ml-1" />
                     </Button>
                 </Link>
