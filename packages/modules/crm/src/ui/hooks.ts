@@ -15,7 +15,7 @@ export function useCustomers() {
         async function loadCustomers() {
             setIsLoading(true);
             try {
-                const response = await authFetch("/api/customers?limit=200");
+                const response = await authFetch("/api/customers?limit=500");
                 if (!response.ok) throw new Error("API customers indisponible");
 
                 const data = await response.json() as any;
