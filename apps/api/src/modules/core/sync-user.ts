@@ -105,6 +105,7 @@ syncUserRoutes.post("/", async (c) => {
                 .from("restaurants")
                 .insert({
                     id: restaurantId,
+                    owner_id: user.id,
                     name: restaurantName.trim(),
                     slug,
                     lat,
@@ -119,9 +120,10 @@ syncUserRoutes.post("/", async (c) => {
                     is_verified: false,
                     is_premium: false,
                 });
-            
+
             if (restError) {
                 console.error("Sync restaurant creation error:", restError);
+                return c.json({ error: "Erreur lors de la création du restaurant" }, 500);
             }
         }
 
