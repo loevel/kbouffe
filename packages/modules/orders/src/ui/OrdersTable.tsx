@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Search, Eye, ArrowUpDown, CalendarClock, Download, RotateCcw } from "lucide-react";
 import { Badge, Button, Card, Dropdown, EmptyState, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TablePagination, Tabs, toast, useLocale, formatDate, formatCFA, formatDateTime, formatOrderId, type Order } from "@kbouffe/module-core/ui";
 import { OrderStatusBadge } from "./OrderStatusBadge";
-import { useOrders } from "../hooks/use-orders";
+import { useOrders, useOrderStatusCounts } from "../hooks/use-orders";
 import { RefundModal } from "./components/RefundModal";
 
 const ITEMS_PER_PAGE = 10;
@@ -15,6 +15,8 @@ const VALID_STATUS_TABS = ["all", "scheduled", "pending", "accepted", "preparing
 
 export function OrdersTable() {
     const { t } = useLocale();
+    const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
     const statusFromUrl = searchParams?.get("status") ?? null;
     const [activeTab, setActiveTab] = useState(
@@ -58,22 +60,38 @@ export function OrdersTable() {
         delivery: deliveryFilter,
     });
 
-    // Use all orders (no server pagination) for tab counts.
-    const { orders: allOrders } = useOrders({ limit: 200 });
-
-    const scheduledCount = allOrders.filter(o => o.status === "scheduled").length;
-    const completedCount = allOrders.filter(o => o.status === "delivered" || o.status === "completed").length;
+    // Exact per-status counts from the DB (see useOrderStatusCounts) —
+    // previously derived by client-filtering a 200-row sample, which
+    // silently under-counted every tab (Cancelled had no count at all) past
+    // 200 total orders.
+    const { counts } = useOrderStatusCounts();
 
     const statusTabs = [
         { id: "all", label: t.orders.allStatuses },
-        ...(scheduledCount > 0 ? [{ id: "scheduled", label: t.orders.scheduled, count: scheduledCount }] : []),
-        { id: "pending", label: t.orders.pending, count: allOrders.filter(o => o.status === "pending").length },
-        { id: "accepted", label: t.orders.acceptedPlural, count: allOrders.filter(o => o.status === "accepted").length },
-        { id: "preparing", label: t.orders.preparingPlural, count: allOrders.filter(o => o.status === "preparing").length },
-        { id: "ready", label: t.orders.readyPlural, count: allOrders.filter(o => o.status === "ready").length },
-        { id: "completed", label: t.orders.completedPlural, count: completedCount },
-        { id: "cancelled", label: t.orders.cancelledPlural },
+        ...(counts.scheduled > 0 ? [{ id: "scheduled", label: t.orders.scheduled, count: counts.scheduled }] : []),
+        { id: "pending", label: t.orders.pending, count: counts.pending },
+        { id: "accepted", label: t.orders.acceptedPlural, count: counts.accepted },
+        { id: "preparing", label: t.orders.preparingPlural, count: counts.preparing },
+        { id: "ready", label: t.orders.readyPlural, count: counts.ready },
+        { id: "completed", label: t.orders.completedPlural, count: counts.completed },
+        { id: "cancelled", label: t.orders.cancelledPlural, count: counts.cancelled },
     ];
+
+    // Clicking a tab now also reflects the selection in the URL (?status=…)
+    // so the filter is shareable/bookmarkable and survives a refresh —
+    // previously only the initial URL was read, tab clicks left it stale.
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+        setPage(1);
+        const params = new URLSearchParams(searchParams?.toString() ?? "");
+        if (tab === "all") {
+            params.delete("status");
+        } else {
+            params.set("status", tab);
+        }
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : (pathname ?? "/dashboard/orders"), { scroll: false });
+    };
 
     const filtered = useMemo(() => {
         // Server already handles filtering, sorting, and pagination
@@ -153,7 +171,7 @@ export function OrdersTable() {
         <>
         <Card padding="none">
             <div className="p-4 pb-0">
-                <Tabs tabs={statusTabs} activeTab={activeTab} onTabChange={(t) => { setActiveTab(t); setPage(1); }} />
+                <Tabs tabs={statusTabs} activeTab={activeTab} onTabChange={handleTabChange} />
             </div>
             <div className="p-4">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
