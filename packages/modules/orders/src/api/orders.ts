@@ -319,7 +319,7 @@ ordersRoutes.patch("/:id", async (c) => {
     // 1. Fetch current order to check state
     const { data: currentOrder, error: fetchError } = await supabase
         .from("orders")
-        .select("status")
+        .select("status, payment_method, payment_status")
         .eq("id", id)
         .eq("restaurant_id", restaurantId)
         .single();
@@ -397,6 +397,16 @@ ordersRoutes.patch("/:id", async (c) => {
         updateData.delivered_at = new Date().toISOString();
         if (body.delivery_note) updateData.delivery_note = String(body.delivery_note).slice(0, 500);
         if (body.delivered_by) updateData.delivered_by = String(body.delivered_by).slice(0, 100);
+
+        // Cash (pay-on-delivery) orders are settled at the door: mark them paid
+        // once delivered, unless the merchant already touched payment_status in
+        // this same request. Online methods (mobile money, card) stay untouched —
+        // their payment_status is only ever set by the provider webhook (SEC-010).
+        const currentPMethod = (currentOrder as any).payment_method as string | undefined;
+        const currentPStatus = (currentOrder as any).payment_status as string | undefined;
+        if (currentPMethod === "cash" && (currentPStatus ?? "pending") === "pending" && updateData.payment_status === undefined) {
+            updateData.payment_status = "paid";
+        }
     }
 
     if (body.scheduled_for !== undefined) {
