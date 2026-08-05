@@ -37,22 +37,55 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Récupérer le restaurant de l'utilisateur
-        const { data: restaurant, error: restaurantError } = await supabase
-            .from("restaurants")
-            .select("*")
-            .eq("owner_id", authUser.id)
-            .single();
+        // Résoudre le restaurant: d'abord via users.restaurant_id (propriétaire),
+        // puis repli sur restaurant_members (membre d'équipe invité). Doit rester
+        // cohérent avec apps/api/src/middleware/auth.ts, qui utilise cette même
+        // résolution pour toutes les autres routes (orders, reports, menu...).
+        // Chercher par restaurants.owner_id ratait ce cas et laissait
+        // `restaurant` bloqué à null pour ces comptes (page /dashboard/store
+        // coincée en chargement infini).
+        let restaurantId: string | null = (userProfile as any).restaurant_id ?? null;
+        let teamRole: string = "owner";
 
-        if (restaurantError) {
-            console.warn("[sync-user] No restaurant found for user", {
-                userId: authUser.id,
-                error: restaurantError.message,
-            });
+        if (!restaurantId) {
+            const { data: memberData } = await supabase
+                .from("restaurant_members" as any)
+                .select("restaurant_id, role")
+                .eq("user_id", authUser.id)
+                .eq("status", "active")
+                .limit(1)
+                .maybeSingle();
+
+            restaurantId = (memberData as any)?.restaurant_id ?? null;
+            teamRole = (memberData as any)?.role ?? "owner";
+        }
+
+        if (!restaurantId) {
+            console.warn("[sync-user] No restaurant found for user", { userId: authUser.id });
             return NextResponse.json({
                 user: userProfile,
                 restaurant: null,
                 teamRole: "owner",
+                activeModules: [],
+            });
+        }
+
+        const { data: restaurant, error: restaurantError } = await supabase
+            .from("restaurants")
+            .select("*")
+            .eq("id", restaurantId)
+            .single();
+
+        if (restaurantError || !restaurant) {
+            console.warn("[sync-user] Restaurant id resolved but row not found", {
+                userId: authUser.id,
+                restaurantId,
+                error: restaurantError?.message,
+            });
+            return NextResponse.json({
+                user: userProfile,
+                restaurant: null,
+                teamRole,
                 activeModules: [],
             });
         }
@@ -69,7 +102,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             user: userProfile,
             restaurant,
-            teamRole: "owner",
+            teamRole,
             activeModules,
         });
     } catch (error) {
@@ -122,15 +155,41 @@ export async function POST(request: NextRequest) {
             user = newUser;
         }
 
-        // Créer le restaurant s'il n'existe pas
-        const { data: existingRestaurant } = await supabase
-            .from("restaurants")
-            .select("*")
-            .eq("owner_id", authUser.id)
-            .single();
+        // Récupérer le restaurant existant: via users.restaurant_id, puis repli
+        // restaurant_members (voir même logique que le GET ci-dessus) — avant de
+        // conclure qu'il n'y en a pas et d'en créer un nouveau. Sans ce repli, un
+        // membre d'équipe invité avant sa toute première connexion se voyait
+        // attribuer un second restaurant en doublon plutôt que rejoindre celui
+        // auquel il a été invité.
+        let restaurant: any = null;
+        let restaurantId: string | undefined = (user as any)?.restaurant_id ?? undefined;
 
-        let restaurant = existingRestaurant;
-        let restaurantId = existingRestaurant?.id;
+        if (restaurantId) {
+            const { data } = await supabase
+                .from("restaurants")
+                .select("*")
+                .eq("id", restaurantId)
+                .single();
+            restaurant = data;
+        } else {
+            const { data: memberData } = await supabase
+                .from("restaurant_members" as any)
+                .select("restaurant_id")
+                .eq("user_id", authUser.id)
+                .eq("status", "active")
+                .limit(1)
+                .maybeSingle();
+
+            restaurantId = (memberData as any)?.restaurant_id ?? undefined;
+            if (restaurantId) {
+                const { data } = await supabase
+                    .from("restaurants")
+                    .select("*")
+                    .eq("id", restaurantId)
+                    .single();
+                restaurant = data;
+            }
+        }
 
         if (!restaurant) {
             const { data: newRestaurant } = await supabase
