@@ -14,6 +14,34 @@ import { View, Text, StyleSheet } from 'react-native';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
+// react-navigation's default tab label truncates with an ellipsis ("Com...",
+// "Para...") once 7 tabs share 402pt of width — there just isn't room for
+// full French words at a fixed font size. Shrinking the font instead of
+// cutting the word keeps every label readable.
+function TabLabel({ title, color }: { title: string; color: string }) {
+    return (
+        <Text
+            style={[tabLabelStyles.label, { color }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            allowFontScaling={false}
+        >
+            {title}
+        </Text>
+    );
+}
+
+const tabLabelStyles = StyleSheet.create({
+    label: {
+        fontSize: 10,
+        fontWeight: '700',
+        marginTop: 4,
+        letterSpacing: 0.2,
+        textAlign: 'center',
+    },
+});
+
 function TabIcon({ name, color, badge, focused }: { name: TabIconName; color: string; badge?: number; focused: boolean }) {
     const scale = useSharedValue(1);
 
@@ -97,14 +125,7 @@ export default function TabsLayout() {
                 },
                 tabBarItemStyle: {
                     paddingVertical: 4,
-                    paddingHorizontal: 2,
-                },
-                tabBarLabelStyle: {
-                    fontSize: 10,
-                    fontWeight: '700',
-                    marginTop: 4,
-                    marginBottom: 0,
-                    letterSpacing: 0.3,
+                    paddingHorizontal: 1,
                 },
                 tabBarHideOnKeyboard: true,
                 headerShown: false,
@@ -115,6 +136,7 @@ export default function TabsLayout() {
                 options={{
                     title: 'Aperçu',
                     tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} color={color} focused={focused} />,
+                    tabBarLabel: ({ color }) => <TabLabel title="Aperçu" color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -122,6 +144,7 @@ export default function TabsLayout() {
                 options={{
                     title: 'Commandes',
                     tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'receipt' : 'receipt-outline'} color={color} focused={focused} />,
+                    tabBarLabel: ({ color }) => <TabLabel title="Commandes" color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -129,6 +152,7 @@ export default function TabsLayout() {
                 options={{
                     title: 'Menu',
                     tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'restaurant' : 'restaurant-outline'} color={color} focused={focused} />,
+                    tabBarLabel: ({ color }) => <TabLabel title="Menu" color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -136,6 +160,7 @@ export default function TabsLayout() {
                 options={{
                     title: 'Stats',
                     tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} color={color} focused={focused} />,
+                    tabBarLabel: ({ color }) => <TabLabel title="Stats" color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -143,12 +168,28 @@ export default function TabsLayout() {
                 options={{
                     title: 'Messages',
                     tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} color={color} focused={focused} />,
+                    tabBarLabel: ({ color }) => <TabLabel title="Messages" color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="notifications"
+                options={{
+                    // Previously undeclared — expo-router auto-added this file as
+                    // a raw 7th tab with the filename as title ("notifi...") and
+                    // no icon (rendered as react-navigation's fallback glyph, the
+                    // stray "▽" seen in the tab bar). Declaring it explicitly
+                    // gives it a real icon/label and keeps it out of the way of
+                    // the truncation fix above.
+                    title: 'Activité',
+                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'notifications' : 'notifications-outline'} color={color} focused={focused} />,
+                    tabBarLabel: ({ color }) => <TabLabel title="Activité" color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="settings"
                 options={{
                     title: 'Paramètres',
+                    tabBarLabel: ({ color }) => <TabLabel title="Paramètres" color={color} />,
                     tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'settings' : 'settings-outline'} color={color} focused={focused} />,
                 }}
             />

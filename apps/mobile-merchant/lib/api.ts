@@ -24,6 +24,8 @@ export function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
+const DEFAULT_TIMEOUT_MS = 15_000;
+
 export async function apiFetch<T = unknown>(
     path: string,
     tokenOrOptions?: string | RequestInit,
@@ -46,7 +48,25 @@ export async function apiFetch<T = unknown>(
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
     });
 
-    const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+    // Without a timeout, a hung request never resolves nor rejects, so
+    // screens that await apiFetch inside Promise.all (e.g. notifications.tsx)
+    // stay stuck on their loading spinner forever. Abort after a fixed delay
+    // so callers always get a settled promise to catch.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
+    } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+            throw new ApiError('La requête a expiré, veuillez réessayer.', 0, null);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+
     const contentType = res.headers.get('content-type') ?? '';
     const isJson = contentType.includes('application/json');
     const payload = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);

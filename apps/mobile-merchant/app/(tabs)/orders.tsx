@@ -35,6 +35,12 @@ const DEFAULT_STATUS_CONFIG: StatusConfig = { label: 'Statut inconnu', color: '#
 
 const TERMINAL_STATUSES = new Set<string>(['delivered', 'completed', 'cancelled', 'refunded']);
 
+// "draft" orders are unsent carts (getNextStatus/getNextLabel return null for
+// them, so they render with no action button at all) — they don't belong
+// mixed into the "En cours" queue alongside orders the merchant can actually
+// act on. Keep them visible under "Toutes" only.
+const NOT_ACTIONABLE_STATUSES = new Set<string>(['draft']);
+
 const STATUS_FALLBACKS: Record<string, string[]> = {
     out_for_delivery: ['delivering'],
     delivering: ['out_for_delivery'],
@@ -236,7 +242,12 @@ export default function OrdersScreen() {
     };
 
     const filteredOrders = useMemo(
-        () => (filter === 'active' ? orders.filter((order) => !TERMINAL_STATUSES.has(order.status)) : orders),
+        () =>
+            filter === 'active'
+                ? orders.filter(
+                      (order) => !TERMINAL_STATUSES.has(order.status) && !NOT_ACTIONABLE_STATUSES.has(order.status)
+                  )
+                : orders,
         [filter, orders]
     );
 

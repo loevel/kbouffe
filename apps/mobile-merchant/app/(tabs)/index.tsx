@@ -161,7 +161,7 @@ export default function OverviewScreen() {
                     total_amount,
                     created_at,
                     delivery_type,
-                    users!customer_id(name)
+                    customer_name
                 `)
                 .eq('restaurant_id', profile.restaurantId)
                 .order('created_at', { ascending: false })
@@ -200,7 +200,7 @@ export default function OverviewScreen() {
                 total_amount: order.total_amount ?? 0,
                 created_at: order.created_at,
                 delivery_type: order.delivery_type,
-                customer_name: order.users?.name ?? null,
+                customer_name: order.customer_name ?? null,
             })),
         });
     }, [profile?.restaurantId]);
@@ -294,7 +294,7 @@ export default function OverviewScreen() {
                     {canSeeFinances && (
                         <MetricCard
                             label="CA du jour"
-                            value={`${(overview?.todayRevenue ?? 0).toLocaleString()} F`}
+                            value={`${(overview?.todayRevenue ?? 0).toLocaleString()} FCFA`}
                             subtitle={`${overview?.todayOrdersCount ?? 0} commande${overview?.todayOrdersCount && overview.todayOrdersCount > 1 ? 's' : ''} aujourd'hui`}
                             accent={theme.success}
                         />
@@ -325,10 +325,10 @@ export default function OverviewScreen() {
                     </View>
                     <View style={styles.quickActions}>
                         {[
-                            { label: 'Voir les commandes', icon: 'receipt-outline', href: '/(tabs)/orders' },
-                            { label: 'Écran cuisine', icon: 'layers-outline', href: '/kitchen' },
-                            { label: 'Gérer le menu', icon: 'restaurant-outline', href: '/(tabs)/menu' },
-                            { label: 'Consulter les stats', icon: 'bar-chart-outline', href: '/(tabs)/stats' },
+                            { label: 'Commandes', icon: 'receipt-outline', href: '/(tabs)/orders' },
+                            { label: 'Cuisine', icon: 'layers-outline', href: '/kitchen' },
+                            { label: 'Menu', icon: 'restaurant-outline', href: '/(tabs)/menu' },
+                            { label: 'Stats', icon: 'bar-chart-outline', href: '/(tabs)/stats' },
                         ].map((action) => (
                             <SpringCard
                                 key={action.label}

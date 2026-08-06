@@ -86,10 +86,23 @@ export default function MessageScreen() {
                 return;
             }
 
+            // metadata.customer_name is only set at conversation-creation time
+            // and never backfilled — fall back to the linked order's
+            // customer_name instead of showing the generic "Client" label.
+            let customerName = convData.metadata?.customer_name;
+            if (!customerName && convData.order_id) {
+                const { data: orderData } = await supabase
+                    .from('orders')
+                    .select('customer_name')
+                    .eq('id', convData.order_id)
+                    .maybeSingle();
+                customerName = orderData?.customer_name;
+            }
+
             setConversation({
                 id: convData.id,
                 orderId: convData.order_id,
-                customerName: convData.metadata?.customer_name || 'Client',
+                customerName: customerName || 'Client',
                 metadata: convData.metadata,
             });
 
@@ -178,7 +191,9 @@ export default function MessageScreen() {
                             .from('messages')
                             .update({ is_read: true })
                             .eq('id', newMsg.id)
-                            .catch(() => {});
+                            .then(({ error }) => {
+                                if (error) console.error('Erreur marquage message lu:', error);
+                            });
                     }
                 }
             )

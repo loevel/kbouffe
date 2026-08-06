@@ -84,6 +84,25 @@ export default function MessagesScreen() {
 
             if (msgError) throw msgError;
 
+            // metadata.customer_name is only populated at conversation-creation
+            // time (see packages/modules/chat/src/api/index.ts) and is never
+            // backfilled afterwards. Fall back to the linked order's
+            // customer_name so we don't show the generic "Client" label for
+            // every conversation that predates that field.
+            const orderIds = Array.from(
+                new Set(convData.map((c: any) => c.order_id).filter(Boolean))
+            );
+            const orderNames = new Map<string, string>();
+            if (orderIds.length > 0) {
+                const { data: orders } = await supabase
+                    .from('orders')
+                    .select('id, customer_name')
+                    .in('id', orderIds);
+                for (const order of orders || []) {
+                    if (order.customer_name) orderNames.set(order.id, order.customer_name);
+                }
+            }
+
             // Build conversations with last message and unread count
             const lastMessages = new Map<string, any>();
             const unreadCounts = new Map<string, number>();
@@ -108,7 +127,10 @@ export default function MessagesScreen() {
                     id: conv.id,
                     orderId: conv.order_id,
                     type: metadata.type || 'order_support',
-                    customerName: metadata.customer_name || 'Client',
+                    customerName:
+                        metadata.customer_name ||
+                        (conv.order_id && orderNames.get(conv.order_id)) ||
+                        'Client',
                     subject: metadata.subject,
                     lastMessage: lastMsg
                         ? {
