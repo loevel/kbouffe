@@ -15,6 +15,7 @@ import {
     LifeBuoy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 
 interface SupportConversation {
     ticket: {
@@ -66,25 +67,18 @@ function formatRelativeTime(dateStr: string) {
     }
 }
 
-function statusLabel(status: string) {
-    switch (status) {
-        case "open":
-            return "Ouvert";
-        case "in_progress":
-            return "En cours";
-        case "resolved":
-            return "Résolu";
-        case "closed":
-            return "Fermé";
-        default:
-            return status;
-    }
+function statusLabel(status: string, labels: Record<string, string>) {
+    if (labels[status]) return labels[status];
+    // Fallback for any other internal status value: never show the raw
+    // snake_case string to the user.
+    return status.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
 function StatusIcon({ status }: { status: string }) {
     switch (status) {
         case "resolved":
         case "closed":
+        case "auto_closed":
             return <CheckCircle2 size={14} className="text-green-500" />;
         case "in_progress":
             return <Clock size={14} className="text-amber-500" />;
@@ -105,6 +99,8 @@ function TicketList({
     onSelect: (conv: SupportConversation) => void;
     onNew: () => void;
 }) {
+    const { t } = useDashboardLocale();
+    const s = t.clientSupport;
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-16">
@@ -118,15 +114,17 @@ function TicketList({
             <div className="flex items-center justify-between">
                 <p className="text-sm text-surface-500 dark:text-surface-400">
                     {conversations.length === 0
-                        ? "Aucune demande en cours"
-                        : `${conversations.length} demande${conversations.length > 1 ? "s" : ""}`}
+                        ? s.noneInProgress
+                        : s.requestCount
+                            .replace(/\{\{n\}\}/g, String(conversations.length))
+                            .replace(/\{\{s\}\}/g, conversations.length > 1 ? "s" : "")}
                 </p>
                 <button
                     onClick={onNew}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors"
                 >
                     <Plus size={16} />
-                    Nouvelle demande
+                    {s.newRequest}
                 </button>
             </div>
 
@@ -136,7 +134,7 @@ function TicketList({
                         <LifeBuoy size={28} className="text-surface-400" />
                     </div>
                     <p className="text-surface-500 dark:text-surface-400 text-sm">
-                        Vous n&apos;avez pas encore de demande de support.
+                        {s.emptyDesc}
                     </p>
                 </div>
             ) : (
@@ -173,7 +171,7 @@ function TicketList({
                                         </span>
                                     )}
                                     <span className="text-[10px] text-surface-400 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-800">
-                                        {statusLabel(conv.ticket.status)}
+                                        {statusLabel(conv.ticket.status, s.status)}
                                     </span>
                                 </div>
                             </div>
@@ -195,6 +193,8 @@ function NewTicketForm({
     onCreated: () => void;
     recentOrders: { id: string; restaurant_id: string; restaurant_name: string; created_at: string }[];
 }) {
+    const { locale, t } = useDashboardLocale();
+    const s = t.clientSupport;
     const [subject, setSubject] = useState("");
     const [description, setDescription] = useState("");
     const [selectedOrder, setSelectedOrder] = useState("");
@@ -219,7 +219,7 @@ function NewTicketForm({
             }
 
             if (!body.restaurant_id) {
-                setError("Aucun restaurant associé. Veuillez effectuer une commande d'abord.");
+                setError(s.errorNoRestaurant);
                 setIsSubmitting(false);
                 return;
             }
@@ -232,12 +232,12 @@ function NewTicketForm({
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || "Erreur lors de la création");
+                throw new Error(data.error || s.errorCreate);
             }
 
             onCreated();
         } catch (err: any) {
-            setError(err.message || "Erreur inattendue");
+            setError(err.message || s.errorUnexpected);
         } finally {
             setIsSubmitting(false);
         }
@@ -250,19 +250,19 @@ function NewTicketForm({
                 className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 mb-4"
             >
                 <ArrowLeft size={16} />
-                Retour
+                {s.back}
             </button>
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-sm font-semibold text-surface-900 dark:text-white mb-1.5">
-                        Sujet
+                        {s.subject}
                     </label>
                     <input
                         type="text"
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
-                        placeholder="Ex : Problème avec ma commande"
+                        placeholder={s.subjectPlaceholder}
                         required
                         className="w-full px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
@@ -271,17 +271,17 @@ function NewTicketForm({
                 {recentOrders.length > 0 && (
                     <div>
                         <label className="block text-sm font-semibold text-surface-900 dark:text-white mb-1.5">
-                            Commande concernée (optionnel)
+                            {s.relatedOrder}
                         </label>
                         <select
                             value={selectedOrder}
                             onChange={(e) => setSelectedOrder(e.target.value)}
                             className="w-full px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                         >
-                            <option value="">Aucune commande spécifique</option>
+                            <option value="">{s.noSpecificOrder}</option>
                             {recentOrders.map((order) => (
                                 <option key={order.id} value={order.id}>
-                                    {order.restaurant_name} — {new Date(order.created_at).toLocaleDateString("fr-FR")}
+                                    {order.restaurant_name} — {new Date(order.created_at).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR")}
                                 </option>
                             ))}
                         </select>
@@ -290,12 +290,12 @@ function NewTicketForm({
 
                 <div>
                     <label className="block text-sm font-semibold text-surface-900 dark:text-white mb-1.5">
-                        Description
+                        {s.description}
                     </label>
                     <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Décrivez votre problème en détail..."
+                        placeholder={s.descriptionPlaceholder}
                         required
                         rows={4}
                         className="w-full px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
@@ -312,7 +312,7 @@ function NewTicketForm({
                     className="w-full px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2"
                 >
                     {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-                    Envoyer la demande
+                    {s.send}
                 </button>
             </form>
         </div>
@@ -327,6 +327,8 @@ function SupportChatView({
     conversation: SupportConversation;
     onBack: () => void;
 }) {
+    const { t } = useDashboardLocale();
+    const s = t.clientSupport;
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -468,7 +470,7 @@ function SupportChatView({
         }
     };
 
-    const isClosed = conversation.ticket.status === "closed" || conversation.ticket.status === "resolved";
+    const isClosed = ["closed", "auto_closed", "resolved"].includes(conversation.ticket.status);
 
     return (
         <div className="flex flex-col h-[500px]">
@@ -487,7 +489,7 @@ function SupportChatView({
                     <div className="flex items-center gap-2">
                         <StatusIcon status={conversation.ticket.status} />
                         <span className="text-[11px] text-surface-500">
-                            {statusLabel(conversation.ticket.status)}
+                            {statusLabel(conversation.ticket.status, s.status)}
                         </span>
                     </div>
                 </div>
@@ -505,7 +507,7 @@ function SupportChatView({
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
                         <MessageCircle size={28} className="text-surface-300 dark:text-surface-600" />
-                        <p className="text-sm text-surface-500">Aucun message pour le moment.</p>
+                        <p className="text-sm text-surface-500">{s.noMessages}</p>
                     </div>
                 ) : (
                     messages.map((msg) => {
@@ -525,7 +527,7 @@ function SupportChatView({
                                                 : "text-surface-400"
                                         }`}
                                     >
-                                        {isMe ? "Vous" : "Restaurant"}
+                                        {isMe ? s.you : s.restaurant}
                                     </p>
                                     <div
                                         className={`rounded-2xl px-4 py-2 ${
@@ -568,7 +570,7 @@ function SupportChatView({
             {/* Input bar */}
             {isClosed ? (
                 <div className="pt-3 border-t border-surface-200 dark:border-surface-800 text-center">
-                    <p className="text-sm text-surface-500">Cette conversation est fermée.</p>
+                    <p className="text-sm text-surface-500">{s.conversationClosed}</p>
                 </div>
             ) : (
                 <div className="pt-3 border-t border-surface-200 dark:border-surface-800">
@@ -584,7 +586,7 @@ function SupportChatView({
                                     handleSend();
                                 }
                             }}
-                            placeholder="Votre message..."
+                            placeholder={s.messagePlaceholder}
                             className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                         />
                         <button
@@ -607,6 +609,8 @@ function SupportChatView({
 
 // ── Main SupportPanelReal ──
 export function SupportPanelReal() {
+    const { t } = useDashboardLocale();
+    const s = t.clientSupport;
     const [view, setView] = useState<"list" | "new" | "chat">("list");
     const [conversations, setConversations] = useState<SupportConversation[]>([]);
     const [selectedConv, setSelectedConv] = useState<SupportConversation | null>(null);
@@ -668,10 +672,10 @@ export function SupportPanelReal() {
     return (
         <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
             <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">
-                Aide & support
+                {s.title}
             </h2>
             <p className="text-surface-600 dark:text-surface-400 mb-5">
-                Besoin d&apos;aide ? Contactez directement le restaurant.
+                {s.subtitle}
             </p>
 
             {view === "list" && (

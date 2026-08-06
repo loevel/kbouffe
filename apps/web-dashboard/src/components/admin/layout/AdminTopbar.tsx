@@ -95,7 +95,7 @@ export function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
                 {/* Language toggle */}
                 <Dropdown
                     items={([
-                        { label: "Francais", onClick: () => setLocale("fr" as Locale) },
+                        { label: "Français", onClick: () => setLocale("fr" as Locale) },
                         { label: "English", onClick: () => setLocale("en" as Locale) },
                     ] as const).map((item) => ({ ...item }))}
                     trigger={

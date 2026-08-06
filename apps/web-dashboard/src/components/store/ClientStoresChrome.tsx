@@ -35,10 +35,12 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { KbouffeIcon } from "@/components/brand/Logo";
+import { useLocale } from "@kbouffe/module-core/ui";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 import { useUserSession, useCartTotals, useSearchStore } from "@/store/client-store";
 import {
     clientSectionPath,
-    sectionGroups,
+    getSectionGroups,
     type ClientSectionIcon,
     type ClientSectionId,
 } from "@/components/store/client-sections";
@@ -97,10 +99,31 @@ export function ClientStoresChrome({
     const [modeOpen, setModeOpen] = useState(false);
     const [searchHistory, setSearchHistory] = useState<string[]>([]);
     const searchDropdownRef = useRef<HTMLDivElement>(null);
-    const { logout } = useUserSession();
+    const { logout, session } = useUserSession();
     const { itemCount } = useCartTotals();
     const { filters, updateFilters } = useSearchStore();
     const [scrolled, setScrolled] = useState(false);
+    const { setLocale } = useLocale();
+    const { t } = useDashboardLocale();
+    const sectionGroups = useMemo(() => getSectionGroups(t), [t]);
+    const localeSyncedRef = useRef(false);
+
+    // Make the language selector reflect the language actually saved on the
+    // account the first time we know it, so it never shows a stale value
+    // (e.g. a leftover browser setting) that disagrees with the stored
+    // preference. Only applies when the user hasn't already picked a locale
+    // in this browser — never overwrites an explicit in-session choice.
+    useEffect(() => {
+        if (localeSyncedRef.current) return;
+        const savedLanguage = session?.preferences?.language;
+        if (savedLanguage !== "fr" && savedLanguage !== "en") return;
+        const hasExplicitOverride =
+            typeof window !== "undefined" && localStorage.getItem("kbouffe-locale");
+        if (!hasExplicitOverride) {
+            setLocale(savedLanguage);
+        }
+        localeSyncedRef.current = true;
+    }, [session?.preferences?.language, setLocale]);
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -129,7 +152,7 @@ export function ClientStoresChrome({
         setSearchHistory(getHistory());
     };
 
-    const flatItems = useMemo(() => sectionGroups.flatMap((group) => group.items), []);
+    const flatItems = useMemo(() => sectionGroups.flatMap((group) => group.items), [sectionGroups]);
 
     async function handleSignOut() {
         logout();
