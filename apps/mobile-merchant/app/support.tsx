@@ -68,14 +68,18 @@ export default function SupportScreen() {
     const [description, setDescription] = useState('');
     const [ticketType, setTicketType] = useState('general');
     const [priority, setPriority] = useState('normal');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadTickets = useCallback(async () => {
         if (!session) { setLoading(false); return; }
         try {
             const data = await apiFetch<{ tickets: Ticket[] }>('/api/restaurant/support/tickets', session.access_token);
             setTickets(data.tickets || []);
-        } catch {
+            setErrorMessage(null);
+        } catch (err) {
+            console.error('Erreur lors du chargement des tickets:', err);
             setTickets([]);
+            setErrorMessage(getErrorMessage(err, 'Impossible de charger les tickets'));
         } finally {
             setLoading(false);
         }
@@ -129,6 +133,16 @@ export default function SupportScreen() {
                     <Ionicons name="add" size={24} color={theme.primary} />
                 </TouchableOpacity>
             </View>
+
+            {errorMessage && (
+                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                    <Ionicons name="alert-circle" size={18} color={theme.error} />
+                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                    <TouchableOpacity onPress={loadTickets} style={[s.retryButton, { borderColor: theme.error }]}>
+                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <FlatList
                 data={tickets}
@@ -301,6 +315,10 @@ const styles = (theme: any) =>
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
 
         list: { padding: 16, gap: 10, paddingBottom: 40 },
+        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
+        errorBannerText: { flex: 1, fontSize: 13 },
+        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+        retryButtonText: { fontWeight: '700', fontSize: 13 },
         listHeader: { gap: 14, marginBottom: 4 },
         sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, paddingHorizontal: 2 },
 

@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -91,6 +91,7 @@ export default function CustomersScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [page, setPage] = useState(1);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadCustomers = useCallback(
         async (pageNum: number = 1) => {
@@ -113,8 +114,14 @@ export default function CustomersScreen() {
 
                 setCustomers(processed);
                 setPage(pageNum);
+                setErrorMessage(null);
             } catch (error) {
+                // Previously only console.error'd, so a failed fetch rendered
+                // the exact same "Aucun client pour le moment" empty state as
+                // a restaurant that genuinely has zero customers — no way to
+                // tell a broken request apart from reality.
                 console.error('Erreur lors du chargement des clients:', error);
+                setErrorMessage(getErrorMessage(error, 'Impossible de charger les clients'));
             } finally {
                 setLoading(false);
             }
@@ -226,6 +233,16 @@ export default function CustomersScreen() {
                 )}
             </View>
 
+            {errorMessage && (
+                <View style={s.errorBanner}>
+                    <Ionicons name="alert-circle" size={18} color={theme.error} />
+                    <Text style={s.errorBannerText}>{errorMessage}</Text>
+                    <TouchableOpacity onPress={() => loadCustomers(page)} style={s.retryButton}>
+                        <Text style={s.retryButtonText}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <FlatList
                 data={customers}
                 keyExtractor={(item) => item.id}
@@ -277,6 +294,27 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             paddingVertical: 10,
             fontSize: 14,
         },
+        errorBanner: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginHorizontal: 12,
+            marginBottom: 8,
+            padding: 12,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: theme.error,
+            backgroundColor: `${theme.error}15`,
+        },
+        errorBannerText: { flex: 1, color: theme.error, fontSize: 13 },
+        retryButton: {
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: theme.error,
+        },
+        retryButtonText: { color: theme.error, fontWeight: '700', fontSize: 13 },
         list: { padding: 12, gap: 10, paddingBottom: 24 },
         customerCard: {
             backgroundColor: theme.surface,

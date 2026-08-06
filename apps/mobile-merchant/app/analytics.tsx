@@ -30,6 +30,7 @@ export default function AnalyticsScreen() {
     const theme = useTheme();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<AnalyticsData | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadAnalytics = useCallback(async () => {
         if (!session) {
@@ -43,17 +44,13 @@ export default function AnalyticsScreen() {
                 session.access_token
             );
             setData(analytics);
+            setErrorMessage(null);
         } catch (err) {
-            // API non implémentée, afficher données vides
-            console.log('Analytics non disponibles');
-            setData({
-                revenue_14d: 0,
-                orders_count: 0,
-                avg_order_value: 0,
-                peak_hour: '-',
-                cancellation_rate: 0,
-                top_products: [],
-            });
+            // Previously treated every failure as "API non implémentée" and
+            // rendered all-zero data — indistinguishable from a restaurant
+            // that genuinely had 0 CA/commandes over the period.
+            console.error('Erreur lors du chargement des analytics:', err);
+            setErrorMessage(getErrorMessage(err, 'Impossible de charger les analytics'));
         } finally {
             setLoading(false);
         }
@@ -85,10 +82,20 @@ export default function AnalyticsScreen() {
             </View>
 
             <ScrollView contentContainerStyle={s.content}>
+                {errorMessage && (
+                    <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                        <Ionicons name="alert-circle" size={18} color={theme.error} />
+                        <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                        <TouchableOpacity onPress={loadAnalytics} style={[s.retryButton, { borderColor: theme.error }]}>
+                            <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <View style={[s.kpiCard, { backgroundColor: theme.surface }]}>
                     <Text style={[s.kpiLabel, { color: theme.textSecondary }]}>CA 14 derniers jours</Text>
                     <Text style={[s.kpiValue, { color: theme.text }]}>
-                        {(data?.revenue_14d ?? 0).toLocaleString()} F
+                        {(data?.revenue_14d ?? 0).toLocaleString()} FCFA
                     </Text>
                 </View>
 
@@ -100,7 +107,7 @@ export default function AnalyticsScreen() {
                     <View style={[s.metricCard, { backgroundColor: theme.surface }]}>
                         <Text style={[s.metricLabel, { color: theme.textSecondary }]}>Panier moyen</Text>
                         <Text style={[s.metricValue, { color: theme.text }]}>
-                            {(data?.avg_order_value ?? 0).toLocaleString()} F
+                            {(data?.avg_order_value ?? 0).toLocaleString()} FCFA
                         </Text>
                     </View>
                     <View style={[s.metricCard, { backgroundColor: theme.surface }]}>
@@ -122,7 +129,7 @@ export default function AnalyticsScreen() {
                                     <Text style={[s.productName, { color: theme.text }]}>{product.name}</Text>
                                     <Text style={[s.productSold, { color: theme.textSecondary }]}>{product.sold} vendus</Text>
                                 </View>
-                                <Text style={[s.productRevenue, { color: theme.text }]}>{product.revenue.toLocaleString()} F</Text>
+                                <Text style={[s.productRevenue, { color: theme.text }]}>{product.revenue.toLocaleString()} FCFA</Text>
                             </View>
                         ))}
                     </View>
@@ -149,6 +156,10 @@ const styles = (theme: any) =>
         backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32, gap: 16 },
+        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
+        errorBannerText: { flex: 1, fontSize: 13 },
+        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+        retryButtonText: { fontWeight: '700', fontSize: 13 },
         kpiCard: { borderRadius: 12, padding: 20, alignItems: 'center' },
         kpiLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
         kpiValue: { fontSize: 28, fontWeight: '700' },

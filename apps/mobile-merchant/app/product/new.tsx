@@ -40,6 +40,7 @@ export default function NewProductScreen() {
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
     const [categories, setCategories] = useState<CategoryRow[]>([]);
     const [showCategorySelector, setShowCategorySelector] = useState(false);
+    const [categoriesError, setCategoriesError] = useState<string | null>(null);
 
     const parsedPrice = Number.parseInt(price, 10);
     const canSubmit = name.trim().length > 0 && Number.isFinite(parsedPrice) && parsedPrice > 0 && !saving;
@@ -59,8 +60,13 @@ export default function NewProductScreen() {
 
                 if (error) throw error;
                 setCategories(data || []);
+                setCategoriesError(null);
             } catch (error) {
+                // Previously left categories=[] silently — rendered the same
+                // "Aucune catégorie trouvée" whether the restaurant truly had
+                // none or the query just failed.
                 console.error('Erreur lors du chargement des catégories:', error);
+                setCategoriesError(getErrorMessage(error, 'Impossible de charger les catégories'));
             } finally {
                 setLoading(false);
             }
@@ -216,7 +222,9 @@ export default function NewProductScreen() {
                     {showCategorySelector && (
                         <View style={s.categoryList}>
                             {categories.length === 0 ? (
-                                <Text style={s.noCategoriesText}>Aucune catégorie trouvée</Text>
+                                <Text style={s.noCategoriesText}>
+                                    {categoriesError ?? 'Aucune catégorie trouvée'}
+                                </Text>
                             ) : (
                                 categories.map(cat => (
                                     <TouchableOpacity

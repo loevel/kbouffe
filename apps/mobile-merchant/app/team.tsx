@@ -77,6 +77,7 @@ export default function TeamScreen() {
     const [createPassword, setCreatePassword] = useState('');
     const [selectedRole, setSelectedRole] = useState<AssignableRole>('cashier');
     const [sending, setSending] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadTeam = useCallback(async () => {
         if (!session) { setLoading(false); return; }
@@ -87,8 +88,10 @@ export default function TeamScreen() {
             );
             setMembers(data.members);
             setCallerRole(data.callerRole);
+            setErrorMessage(null);
         } catch (err) {
             console.error('Erreur chargement équipe:', err);
+            setErrorMessage(getErrorMessage(err, "Impossible de charger l'équipe"));
         } finally {
             setLoading(false);
         }
@@ -284,6 +287,16 @@ export default function TeamScreen() {
                     <View style={s.backButton} />
                 )}
             </View>
+
+            {errorMessage && (
+                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                    <Ionicons name="alert-circle" size={18} color={theme.error} />
+                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                    <TouchableOpacity onPress={loadTeam} style={[s.retryButton, { borderColor: theme.error }]}>
+                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <FlatList
                 data={members}
@@ -481,6 +494,10 @@ const styles = (theme: any) =>
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
 
         list: { padding: 12, gap: 8, paddingBottom: 24 },
+        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
+        errorBannerText: { flex: 1, fontSize: 13 },
+        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+        retryButtonText: { fontWeight: '700', fontSize: 13 },
         memberCard: {
             flexDirection: 'row', alignItems: 'center', gap: 12,
             borderRadius: 14, padding: 12, borderWidth: 1,

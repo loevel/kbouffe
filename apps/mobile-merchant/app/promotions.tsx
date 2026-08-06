@@ -71,6 +71,7 @@ export default function PromotionsScreen() {
     const [formType, setFormType] = useState<'percent' | 'fixed'>('percent');
     const [formValue, setFormValue] = useState('');
     const [formMinOrder, setFormMinOrder] = useState('');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadCoupons = useCallback(async () => {
         if (!session) {
@@ -98,8 +99,10 @@ export default function PromotionsScreen() {
             }));
 
             setCoupons(processed);
+            setErrorMessage(null);
         } catch (error) {
             console.error('Erreur lors du chargement des coupons:', error);
+            setErrorMessage(getErrorMessage(error, 'Impossible de charger les codes promo'));
         } finally {
             setLoading(false);
         }
@@ -257,6 +260,16 @@ export default function PromotionsScreen() {
                     <Ionicons name="add" size={24} color={theme.primary} />
                 </TouchableOpacity>
             </View>
+
+            {errorMessage && (
+                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                    <Ionicons name="alert-circle" size={18} color={theme.error} />
+                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                    <TouchableOpacity onPress={loadCoupons} style={[s.retryButton, { borderColor: theme.error }]}>
+                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <FlatList
                 data={coupons}
@@ -419,6 +432,10 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text, flex: 1, textAlign: 'center' },
         list: { padding: 12, gap: 10, paddingBottom: 24 },
+        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
+        errorBannerText: { flex: 1, fontSize: 13 },
+        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+        retryButtonText: { fontWeight: '700', fontSize: 13 },
         couponCard: {
             backgroundColor: theme.surface,
             borderRadius: 12,
@@ -440,7 +457,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             flexDirection: 'row',
             alignItems: 'center',
             gap: 8,
-            paddingTopVertical: 8,
+            paddingTop: 8,
             borderTopWidth: 1,
             borderTopColor: theme.border,
         },

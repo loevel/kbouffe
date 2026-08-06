@@ -57,6 +57,7 @@ export default function ZonesSettingsScreen() {
             });
         } catch (err) {
             console.error('Erreur chargement livraison:', err);
+            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de charger les paramètres de livraison'));
         } finally {
             setLoading(false);
         }

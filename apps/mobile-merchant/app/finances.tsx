@@ -264,7 +264,7 @@ export default function FinancesScreen() {
                         <Text style={s.statLabel}>Commandes</Text>
                         <Text style={s.statValue}>{finances.summary.transactionCount}</Text>
                     </View>
-                    <View style={[s.statRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTopVertical: 10 }]}>
+                    <View style={[s.statRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 10 }]}>
                         <Text style={s.statLabel}>Panier moyen</Text>
                         <Text style={s.statValue}>{(finances.summary.avgOrderValue / 1000).toFixed(1)}K FCFA</Text>
                     </View>

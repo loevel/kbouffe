@@ -61,6 +61,7 @@ export default function BrandingSettingsScreen() {
             }
         } catch (err) {
             console.error('Erreur chargement branding:', err);
+            Alert.alert('Erreur', getErrorMessage(err, "Impossible de charger l'identité visuelle"));
         } finally {
             setLoading(false);
         }

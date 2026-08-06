@@ -72,6 +72,7 @@ export default function ReservationsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<'today' | 'week' | 'all'>('today');
     const [actioningId, setActioningId] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const getFilteredDate = useCallback(() => {
         const today = new Date();
@@ -133,8 +134,10 @@ export default function ReservationsScreen() {
                 const dateB = new Date(`${b.date}T${b.time}`);
                 return dateA.getTime() - dateB.getTime();
             }));
+            setErrorMessage(null);
         } catch (error) {
             console.error('Erreur lors du chargement des réservations:', error);
+            setErrorMessage(getErrorMessage(error, 'Impossible de charger les réservations'));
         } finally {
             setLoading(false);
         }
@@ -271,6 +274,16 @@ export default function ReservationsScreen() {
                 ))}
             </View>
 
+            {errorMessage && (
+                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                    <Ionicons name="alert-circle" size={18} color={theme.error} />
+                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                    <TouchableOpacity onPress={loadReservations} style={[s.retryButton, { borderColor: theme.error }]}>
+                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <FlatList
                 data={reservations}
                 keyExtractor={(item) => item.id}
@@ -328,6 +341,10 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         filterButtonText: { fontSize: 12, fontWeight: '600', color: theme.textSecondary },
         filterButtonTextActive: { color: '#fff' },
         list: { padding: 12, gap: 12, paddingBottom: 24 },
+        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
+        errorBannerText: { flex: 1, fontSize: 13 },
+        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+        retryButtonText: { fontWeight: '700', fontSize: 13 },
         reservationCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 14, gap: 10, borderWidth: 1, borderColor: theme.border },
         reservationHeader: {
             flexDirection: 'row',
@@ -347,7 +364,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
         statusText: { fontSize: 11, fontWeight: '600' },
         occasion: { fontSize: 11, color: theme.textSecondary, fontStyle: 'italic' },
-        actionsContainer: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', paddingTopVertical: 8, borderTopWidth: 1, borderTopColor: theme.border },
+        actionsContainer: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border },
         actionButton: {
             paddingHorizontal: 12,
             paddingVertical: 8,

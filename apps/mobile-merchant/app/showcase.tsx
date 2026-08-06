@@ -62,6 +62,7 @@ export default function ShowcaseScreen() {
             if (data.social_links) setSocialLinks(data.social_links);
         } catch (err) {
             console.error('Erreur chargement vitrine:', err);
+            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de charger la vitrine'));
         } finally {
             setLoading(false);
         }

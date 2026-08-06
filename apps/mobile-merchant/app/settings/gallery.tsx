@@ -44,10 +44,12 @@ export default function GallerySettingsScreen() {
             setImages(data.photos || []);
             setError(null);
         } catch (err) {
-            // API n'existe pas encore, afficher l'écran vide
-            console.log('Galerie non disponible', err);
+            // The /api/restaurant/gallery route exists (see apps/api/src/modules/
+            // store/restaurant.ts) — a fetch failure here is a real error, not
+            // an unimplemented endpoint. Previously masked as an empty gallery.
+            console.error('Erreur lors du chargement de la galerie:', err);
             setImages([]);
-            setError(null);
+            setError(getErrorMessage(err, 'Impossible de charger la galerie'));
         } finally {
             setLoading(false);
         }

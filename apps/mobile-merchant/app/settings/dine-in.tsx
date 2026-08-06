@@ -57,6 +57,7 @@ export default function DineInSettingsScreen() {
             });
         } catch (err) {
             console.error('Erreur chargement dine-in:', err);
+            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de charger les paramètres sur place'));
         } finally {
             setLoading(false);
         }

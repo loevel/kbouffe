@@ -47,6 +47,7 @@ export default function GiftCardsScreen() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [amount, setAmount] = useState('');
     const [beneficiary, setBeneficiary] = useState('');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadCards = useCallback(async () => {
         if (!session) {
@@ -58,11 +59,13 @@ export default function GiftCardsScreen() {
             const data = await apiFetch<GiftCardsResponse>('/api/gift-cards', session.access_token);
             setCards(data.cards || []);
             setStats(data.stats);
+            setErrorMessage(null);
         } catch (err) {
-            // API non implémentée
-            console.log('Gift cards non disponibles');
-            setCards([]);
-            setStats({ active_count: 0, total_balance: 0 });
+            // Previously treated every failure as "API non implémentée" and
+            // silently reset to all-zero stats — indistinguishable from a
+            // restaurant that genuinely has no gift cards.
+            console.error('Erreur lors du chargement des cartes cadeaux:', err);
+            setErrorMessage(getErrorMessage(err, 'Impossible de charger les cartes cadeaux'));
         } finally {
             setLoading(false);
         }
@@ -134,6 +137,15 @@ export default function GiftCardsScreen() {
                 contentContainerStyle={s.content}
                 ListHeaderComponent={
                     <>
+                        {errorMessage && (
+                            <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                                <Ionicons name="alert-circle" size={18} color={theme.error} />
+                                <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                                <TouchableOpacity onPress={loadCards} style={[s.retryButton, { borderColor: theme.error }]}>
+                                    <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                         <View style={[s.statsRow, { gap: 12 }]}>
                             <View style={[s.statCard, { backgroundColor: theme.surface }]}>
                                 <Text style={[s.statLabel, { color: theme.textSecondary }]}>Cartes actives</Text>
@@ -141,7 +153,7 @@ export default function GiftCardsScreen() {
                             </View>
                             <View style={[s.statCard, { backgroundColor: theme.surface }]}>
                                 <Text style={[s.statLabel, { color: theme.textSecondary }]}>Solde total</Text>
-                                <Text style={[s.statValue, { color: theme.text }]}>{stats.total_balance.toLocaleString()} F</Text>
+                                <Text style={[s.statValue, { color: theme.text }]}>{stats.total_balance.toLocaleString()} FCFA</Text>
                             </View>
                         </View>
                     </>
@@ -175,7 +187,7 @@ export default function GiftCardsScreen() {
                                 />
                             </View>
                             <Text style={[s.progressText, { color: theme.text }]}>
-                                {item.balance.toLocaleString()} F / {item.initial_amount.toLocaleString()} F
+                                {item.balance.toLocaleString()} FCFA / {item.initial_amount.toLocaleString()} FCFA
                             </Text>
                         </View>
                     </TouchableOpacity>
@@ -270,6 +282,10 @@ const styles = (theme: any) =>
         backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32 },
+        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
+        errorBannerText: { flex: 1, fontSize: 13 },
+        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+        retryButtonText: { fontWeight: '700', fontSize: 13 },
         statsRow: { marginBottom: 16, flexDirection: 'row' },
         statCard: { flex: 1, borderRadius: 12, padding: 12 },
         statLabel: { fontSize: 11, fontWeight: '600' },

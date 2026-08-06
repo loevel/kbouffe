@@ -86,14 +86,20 @@ export default function MarketplaceScreen() {
     const [purchasing, setPurchasing] = useState(false);
     const [purchaseStatus, setPurchaseStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [paymentStep, setPaymentStep] = useState<'details' | 'pending'>('details');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadServices = useCallback(async () => {
         if (!session) { setLoading(false); return; }
         try {
             const data = await apiFetch<{ services: Service[] }>('/api/marketplace/services', session.access_token);
             setServices(data.services || []);
-        } catch {
+            setErrorMessage(null);
+        } catch (error) {
+            // Previously swallowed silently, rendering the same "Aucun
+            // service disponible" empty state as a genuinely empty catalog —
+            // no way to tell a failed request apart from reality.
             setServices([]);
+            setErrorMessage(getErrorMessage(error, 'Impossible de charger les services'));
         } finally {
             setLoading(false);
         }
@@ -173,6 +179,16 @@ export default function MarketplaceScreen() {
                 <Text style={s.title}>Marketplace</Text>
                 <View style={s.backButton} />
             </View>
+
+            {errorMessage && (
+                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                    <Ionicons name="alert-circle" size={18} color={theme.error} />
+                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                    <TouchableOpacity onPress={loadServices} style={[s.retryButton, { borderColor: theme.error }]}>
+                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <FlatList
                 data={services}
@@ -432,6 +448,13 @@ const styles = (theme: any) =>
         backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32, gap: 14 },
+        errorBanner: {
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 10, borderWidth: 1,
+        },
+        errorBannerText: { flex: 1, fontSize: 13 },
+        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+        retryButtonText: { fontWeight: '700', fontSize: 13 },
 
         serviceCard: { borderRadius: 14, padding: 16, gap: 10 },
         cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
