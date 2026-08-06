@@ -124,8 +124,10 @@ export default function TabsLayout() {
                     shadowRadius: 8,
                 },
                 tabBarItemStyle: {
+                    // 5 tabs now instead of 7 — back off the cramped 1pt
+                    // horizontal padding used to fit 7 into ~400pt.
                     paddingVertical: 4,
-                    paddingHorizontal: 1,
+                    paddingHorizontal: 6,
                 },
                 tabBarHideOnKeyboard: true,
                 headerShown: false,
@@ -155,22 +157,14 @@ export default function TabsLayout() {
                     tabBarLabel: ({ color }) => <TabLabel title="Menu" color={color} />,
                 }}
             />
-            <Tabs.Screen
-                name="stats"
-                options={{
-                    title: 'Stats',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} color={color} focused={focused} />,
-                    tabBarLabel: ({ color }) => <TabLabel title="Stats" color={color} />,
-                }}
-            />
-            <Tabs.Screen
-                name="messages"
-                options={{
-                    title: 'Messages',
-                    tabBarIcon: ({ color, focused }) => <TabIcon name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} color={color} focused={focused} />,
-                    tabBarLabel: ({ color }) => <TabLabel title="Messages" color={color} />,
-                }}
-            />
+            {/* Stats and Messages stay fully routable (quick action on Aperçu,
+                entries in Paramètres, deep links from Activité) but are hidden
+                from the tab bar itself — with Activité already surfacing both
+                message and review counts, 7 tabs crammed into ~400pt was more
+                than the bar needed to carry. href: null keeps the route
+                registered without rendering a tab button for it. */}
+            <Tabs.Screen name="stats" options={{ title: 'Stats', href: null }} />
+            <Tabs.Screen name="messages" options={{ title: 'Messages', href: null }} />
             <Tabs.Screen
                 name="notifications"
                 options={{
