@@ -155,9 +155,9 @@ export default function ReservationsScreen() {
 
         setActioningId(reservationId);
         try {
-            await apiFetch('/api/reservations', session.access_token, {
+            await apiFetch(`/api/reservations/${reservationId}`, session.access_token, {
                 method: 'PATCH',
-                body: JSON.stringify({ id: reservationId, status: newStatus }),
+                body: JSON.stringify({ status: newStatus }),
             });
 
             setReservations((prev) =>

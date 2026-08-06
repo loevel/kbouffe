@@ -76,8 +76,10 @@ function mapOptions(value: unknown): { name: string; price: number }[] {
 
                 if (option && typeof option === 'object') {
                     const raw = option as Record<string, unknown>;
-                    const name = asString(raw.name) ?? asString(raw.label) ?? `Option ${index + 1}`;
-                    const price = asAmount(raw.price ?? raw.extra_price ?? raw.extraPrice);
+                    const label = asString(raw.name) ?? asString(raw.label) ?? `Option ${index + 1}`;
+                    const value = asString(raw.value);
+                    const name = value ? `${label}: ${value}` : label;
+                    const price = asAmount(raw.price ?? raw.extra_price ?? raw.extraPrice ?? raw.price_adjustment);
                     return { name, price };
                 }
 
@@ -116,7 +118,7 @@ function mapItems(value: unknown): OrderDetail['items'] {
 
             const quantity = Math.max(1, Math.round(asAmount(raw.quantity) || 1));
             const unitPrice = asAmount(raw.unit_price ?? raw.unitPrice ?? raw.price);
-            const options = mapOptions(raw.order_item_options ?? raw.options ?? raw.selected_options ?? raw.selectedOptions);
+            const options = mapOptions(raw.order_item_options ?? raw.options ?? raw.selected_options ?? raw.selectedOptions ?? []);
             const id = asString(raw.id) ?? `${index}`;
 
             return {
@@ -150,7 +152,20 @@ export default function OrderDetailScreen() {
             try {
                 const { data, error } = await supabase
                     .from('orders')
-                    .select('*')
+                    .select(`
+                        *,
+                        order_items(
+                            id,
+                            name,
+                            quantity,
+                            price,
+                            order_item_options(
+                                name,
+                                value,
+                                price_adjustment
+                            )
+                        )
+                    `)
                     .eq('id', id)
                     .single();
 
@@ -167,7 +182,7 @@ export default function OrderDetailScreen() {
                 const specialInstructions = asString(row.special_instructions) ?? asString(row.notes);
                 const customerName = asString(row.customer_name);
                 const customerPhone = asString(row.customer_phone);
-                const items = mapItems(row.items);
+                const items = mapItems(row.order_items ?? row.items);
 
                 const mapped: OrderDetail = {
                     id: typeof row.id === 'string' ? row.id : id,
