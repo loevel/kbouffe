@@ -344,11 +344,27 @@ export default function StatsScreen() {
                     <View style={s.errorCard}>
                         <Ionicons name="alert-circle-outline" size={16} color={theme.error} />
                         <Text style={s.errorText}>{errorMessage}</Text>
+                        {!payload && (
+                            <TouchableOpacity onPress={onRefresh} style={s.retryBtn}>
+                                <Text style={s.retryBtnText}>Réessayer</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
 
                 {loading ? (
                     <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+                ) : !payload ? (
+                    // A failed request must not fall through to zeroed-out
+                    // metric cards — "0 FCFA / 0 commandes" reads as "this
+                    // restaurant sold nothing today" when it actually means
+                    // "the request failed", which is misleading and, worse,
+                    // silently contradicts real data shown on other tabs.
+                    errorMessage ? null : (
+                        <View style={s.errorCard}>
+                            <Text style={s.errorText}>Aucune donnée disponible</Text>
+                        </View>
+                    )
                 ) : (
                     <>
                         <View style={s.cardsGrid}>
@@ -429,6 +445,14 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             backgroundColor: `${theme.error}14`,
         },
         errorText: { color: theme.error, fontSize: 12, flex: 1 },
+        retryBtn: {
+            borderWidth: 1,
+            borderColor: theme.error,
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+        },
+        retryBtnText: { color: theme.error, fontSize: 12, fontWeight: '700' },
         cardsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
         card: {
             flexBasis: '48%',

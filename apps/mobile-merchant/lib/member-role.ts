@@ -1,6 +1,6 @@
 const MEMBER_ROLE_LABELS: Record<string, string> = {
-    owner: 'Proprietaire',
-    manager: 'Gerant',
+    owner: 'Propriétaire',
+    manager: 'Gérant',
     cashier: 'Caissier',
     cook: 'Cuisinier',
     driver: 'Livreur',
@@ -8,6 +8,6 @@ const MEMBER_ROLE_LABELS: Record<string, string> = {
 };
 
 export function getMemberRoleLabel(role: string | null | undefined) {
-    if (!role) return 'Gerant';
-    return MEMBER_ROLE_LABELS[role] ?? 'Gerant';
+    if (!role) return 'Gérant';
+    return MEMBER_ROLE_LABELS[role] ?? 'Gérant';
 }

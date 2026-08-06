@@ -36,6 +36,40 @@ interface BadgesResponse {
 
 const ACTIVE_ORDER_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'delivering'];
 
+// The `messages` table has no `restaurant_id` column (schema: id,
+// conversation_id, sender_id, content, content_type, is_read, created_at —
+// see packages/modules/chat/src/api/index.ts). Filtering messages directly
+// by restaurant_id therefore matched nothing and silently produced a
+// permanently-zero unread badge. Resolve the restaurant's conversation ids
+// first, then scope the messages queries to those.
+async function getRestaurantConversationIds(restaurantId: string): Promise<string[]> {
+    const { data } = await supabase.from('conversations').select('id').eq('restaurant_id', restaurantId);
+    return (data ?? []).map((c: any) => c.id);
+}
+
+async function countUnreadMessages(restaurantId: string): Promise<{ count: number | null }> {
+    const conversationIds = await getRestaurantConversationIds(restaurantId);
+    if (conversationIds.length === 0) return { count: 0 };
+    const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .in('conversation_id', conversationIds)
+        .eq('is_read', false);
+    return { count: count ?? 0 };
+}
+
+async function fetchRecentMessages(restaurantId: string): Promise<{ data: any[] }> {
+    const conversationIds = await getRestaurantConversationIds(restaurantId);
+    if (conversationIds.length === 0) return { data: [] };
+    const { data } = await supabase
+        .from('messages')
+        .select('id, content, created_at')
+        .in('conversation_id', conversationIds)
+        .order('created_at', { ascending: false })
+        .limit(15);
+    return { data: data ?? [] };
+}
+
 function formatRelativeDate(timestamp: string) {
     const deltaMs = Date.now() - new Date(timestamp).getTime();
     const minutes = Math.max(0, Math.floor(deltaMs / 60_000));
@@ -74,11 +108,7 @@ export default function NotificationsScreen() {
                         .in('status', ACTIVE_ORDER_STATUSES)
                     : Promise.resolve({ count: 0 } as { count: number | null }),
                 profile?.restaurantId
-                    ? supabase
-                        .from('messages')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('restaurant_id', profile.restaurantId)
-                        .eq('is_read', false)
+                    ? countUnreadMessages(profile.restaurantId)
                     : Promise.resolve({ count: 0 } as { count: number | null }),
                 profile?.restaurantId
                     ? supabase
@@ -134,22 +164,13 @@ export default function NotificationsScreen() {
                             .eq('restaurant_id', profile.restaurantId)
                             .order('created_at', { ascending: false })
                             .limit(15),
-                        supabase
-                            .from('messages')
-                            .select('id, content, created_at')
-                            .eq('restaurant_id', profile.restaurantId)
-                            .order('created_at', { ascending: false })
-                            .limit(15),
+                        fetchRecentMessages(profile.restaurantId),
                         supabase
                             .from('orders')
                             .select('id', { count: 'exact', head: true })
                             .eq('restaurant_id', profile.restaurantId)
                             .in('status', ACTIVE_ORDER_STATUSES),
-                        supabase
-                            .from('messages')
-                            .select('id', { count: 'exact', head: true })
-                            .eq('restaurant_id', profile.restaurantId)
-                            .eq('is_read', false),
+                        countUnreadMessages(profile.restaurantId),
                         supabase
                             .from('reviews')
                             .select('id', { count: 'exact', head: true })

@@ -7,6 +7,15 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { usePermissions } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
+
+// Phone numbers are stored as raw digits (e.g. "699999999") and rendered
+// as-is, unformatted, next to the role. Group them so they're readable.
+function formatPhone(phone?: string | null) {
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 6) return phone;
+    return digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+}
 import type { Permission } from '@/lib/permissions';
 
 export default function SettingsScreen() {
@@ -24,7 +33,7 @@ export default function SettingsScreen() {
 
     const s = styles(theme);
 
-    type MenuItem = { label: string; icon: string; href: string; permission?: Permission };
+    type MenuItem = { label: string; icon: keyof typeof Ionicons.glyphMap; href: string; permission?: Permission };
     type MenuSection = { title: string; items: MenuItem[] };
 
     const allSections: MenuSection[] = [
@@ -69,7 +78,7 @@ export default function SettingsScreen() {
                 { label: 'Zones de livraison', icon: 'map-outline', href: '/settings/zones', permission: 'settings:manage' },
                 { label: 'Modes de paiement', icon: 'card-outline', href: '/settings/payments', permission: 'settings:manage' },
                 { label: 'Notifications push', icon: 'notifications-outline', href: '/settings/notifications' },
-                { label: 'Identité visuelle', icon: 'palette-outline', href: '/settings/branding', permission: 'settings:manage' },
+                { label: 'Identité visuelle', icon: 'color-palette-outline', href: '/settings/branding', permission: 'settings:manage' },
                 { label: 'Service sur place', icon: 'restaurant-outline', href: '/settings/dine-in', permission: 'settings:manage' },
                 { label: 'Galerie photos', icon: 'images-outline', href: '/settings/gallery', permission: 'settings:manage' },
                 { label: 'Sécurité', icon: 'shield-checkmark-outline', href: '/settings/security' },
@@ -101,7 +110,7 @@ export default function SettingsScreen() {
                     <View style={s.restaurantInfo}>
                         <Text style={[s.restaurantName, { color: theme.text }]}>{profile?.restaurantName ?? 'Restaurant'}</Text>
                         <Text style={[s.restaurantRole, { color: theme.textSecondary }]}>
-                            {getMemberRoleLabel(profile?.memberRole)} · {profile?.phone ?? ''}
+                            {getMemberRoleLabel(profile?.memberRole)} · {formatPhone(profile?.phone)}
                         </Text>
                     </View>
                 </View>
@@ -112,7 +121,7 @@ export default function SettingsScreen() {
                         <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>{section.title}</Text>
                         {section.items.map((item) => (
                             <TouchableOpacity key={item.label} style={s.menuItem} onPress={() => router.push(item.href as never)}>
-                                <Ionicons name={item.icon as any} size={20} color={theme.primary} />
+                                <Ionicons name={item.icon} size={20} color={theme.primary} />
                                 <Text style={[s.menuLabel, { color: theme.text }]}>{item.label}</Text>
                                 <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
                             </TouchableOpacity>
