@@ -6,7 +6,7 @@ export type Locale = "fr" | "en";
 export const translations: Record<Locale, TranslationKeys> = { fr, en };
 
 export const localeLabels: Record<Locale, string> = {
-    fr: "Francais",
+    fr: "Français",
     en: "English",
 };
 

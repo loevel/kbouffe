@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { authFetch } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 
 interface ClientNotification {
     id: string;
@@ -80,6 +81,8 @@ function getNotificationBg(type: string, isRead: boolean) {
 }
 
 export function ClientNotificationsPanel() {
+    const { t } = useDashboardLocale();
+    const n = t.clientNotifications;
     const [notifications, setNotifications] = useState<ClientNotification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -213,10 +216,10 @@ export function ClientNotificationsPanel() {
         return (
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
                 <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">
-                    Notifications
+                    {n.title}
                 </h2>
                 <p className="text-surface-600 dark:text-surface-400 mb-5">
-                    Suivez vos commandes en temps reel.
+                    {n.subtitle}
                 </p>
                 <div className="flex items-center justify-center py-8">
                     <div className="w-6 h-6 border-2 border-surface-300 dark:border-surface-600 border-t-brand-500 rounded-full animate-spin" />
@@ -229,15 +232,15 @@ export function ClientNotificationsPanel() {
         return (
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
                 <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">
-                    Notifications
+                    {n.title}
                 </h2>
                 <p className="text-surface-600 dark:text-surface-400 mb-5">
-                    Suivez vos commandes en temps reel.
+                    {n.subtitle}
                 </p>
                 <div className="text-center py-8">
                     <Bell size={32} className="mx-auto text-surface-300 dark:text-surface-600 mb-3" />
                     <p className="text-sm text-surface-500 dark:text-surface-400">
-                        Connectez-vous pour voir vos notifications
+                        {n.loginPrompt}
                     </p>
                 </div>
             </div>
@@ -249,10 +252,10 @@ export function ClientNotificationsPanel() {
             <div className="flex items-center justify-between mb-5">
                 <div>
                     <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">
-                        Notifications
+                        {n.title}
                     </h2>
                     <p className="text-surface-600 dark:text-surface-400">
-                        Suivez vos commandes en temps reel.
+                        {n.subtitle}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -261,7 +264,7 @@ export function ClientNotificationsPanel() {
                             onClick={deleteAll}
                             className="text-sm font-semibold text-red-500 hover:text-red-600 transition-colors"
                         >
-                            Tout supprimer
+                            {n.deleteAll}
                         </button>
                     )}
                     {unreadCount > 0 && (
@@ -270,7 +273,7 @@ export function ClientNotificationsPanel() {
                             disabled={markingRead}
                             className="text-sm font-semibold text-brand-500 hover:text-brand-600 disabled:opacity-50"
                         >
-                            {markingRead ? "..." : "Marquer tout comme lu"}
+                            {markingRead ? "..." : n.markAllRead}
                         </button>
                     )}
                 </div>
@@ -280,7 +283,7 @@ export function ClientNotificationsPanel() {
                 <div className="text-center py-8">
                     <Bell size={32} className="mx-auto text-surface-300 dark:text-surface-600 mb-3" />
                     <p className="text-sm text-surface-500 dark:text-surface-400">
-                        Aucune notification pour le moment
+                        {n.empty}
                     </p>
                 </div>
             ) : (
@@ -314,7 +317,7 @@ export function ClientNotificationsPanel() {
                                             href={`/stores/orders`}
                                             className="text-xs font-medium text-brand-500 hover:text-brand-600"
                                         >
-                                            Voir la commande
+                                            {n.viewOrder}
                                         </Link>
                                     )}
                                 </div>
@@ -323,8 +326,8 @@ export function ClientNotificationsPanel() {
                                 onClick={() => deleteNotification(notif.id)}
                                 disabled={deleting.has(notif.id)}
                                 className="mt-0.5 shrink-0 p-1.5 text-surface-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
-                                aria-label="Supprimer"
-                                title="Supprimer cette notification"
+                                aria-label={t.common.delete}
+                                title={n.deleteTooltip}
                             >
                                 <Trash2 size={14} />
                             </button>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, MapPin, Pencil, Plus, Star, Trash2, X, Loader2 } from "lucide-react";
 import { usePreferencesStore, type DeliveryAddress } from "@/store/client-store";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 import toast from "react-hot-toast";
 
 // ── Address card ────────────────────────────────────────────────────────────
@@ -17,6 +18,8 @@ function AddressCard({
     onDelete: (id: string) => void;
     onSetDefault: (id: string) => void;
 }) {
+    const { t } = useDashboardLocale();
+    const a = t.clientAddresses;
     return (
         <div className={`p-4 rounded-xl border transition-all ${address.isDefault ? "border-brand-300 dark:border-brand-500/50 bg-brand-50 dark:bg-brand-500/5" : "border-surface-200 dark:border-surface-700"}`}>
             <div className="flex items-start justify-between gap-2">
@@ -27,7 +30,7 @@ function AddressCard({
                             <p className="font-semibold text-surface-900 dark:text-white text-sm">{address.label}</p>
                             {address.isDefault && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-medium">
-                                    Par défaut
+                                    {a.default}
                                 </span>
                             )}
                         </div>
@@ -46,7 +49,7 @@ function AddressCard({
                         <button
                             onClick={() => onSetDefault(address.id)}
                             className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
-                            title="Définir par défaut"
+                            title={a.setDefaultTooltip}
                         >
                             <Star size={14} />
                         </button>
@@ -54,14 +57,14 @@ function AddressCard({
                     <button
                         onClick={() => onEdit(address)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                        title="Modifier"
+                        title={a.editTooltip}
                     >
                         <Pencil size={13} />
                     </button>
                     <button
                         onClick={() => onDelete(address.id)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                        title="Supprimer"
+                        title={a.deleteTooltip}
                     >
                         <Trash2 size={13} />
                     </button>
@@ -93,6 +96,8 @@ function AddressFormModal({
     onSave: (data: AddressForm) => void;
     onCancel: () => void;
 }) {
+    const { t } = useDashboardLocale();
+    const a = t.clientAddresses;
     const [form, setForm] = useState<AddressForm>(initial ?? defaultForm);
     const [errors, setErrors] = useState<Partial<Record<keyof AddressForm, string>>>({});
 
@@ -101,9 +106,9 @@ function AddressFormModal({
 
     const validate = () => {
         const e: typeof errors = {};
-        if (!form.label.trim()) e.label = "Requis";
-        if (!form.addressLine1.trim()) e.addressLine1 = "Requis";
-        if (!form.district.trim()) e.district = "Requis";
+        if (!form.label.trim()) e.label = a.required;
+        if (!form.addressLine1.trim()) e.addressLine1 = a.required;
+        if (!form.district.trim()) e.district = a.required;
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -111,6 +116,15 @@ function AddressFormModal({
     const handleSubmit = (ev: React.FormEvent) => {
         ev.preventDefault();
         if (validate()) onSave(form);
+    };
+
+    const labels: Record<string, string> = {
+        label: a.fieldLabel,
+        addressLine1: a.fieldAddressLine1,
+        addressLine2: a.fieldAddressLine2,
+        district: a.fieldDistrict,
+        city: a.fieldCity,
+        deliveryInstructions: a.fieldInstructions,
     };
 
     return (
@@ -121,7 +135,7 @@ function AddressFormModal({
             >
                 <div className="flex items-center justify-between">
                     <h3 className="font-bold text-surface-900 dark:text-white text-lg">
-                        {initial ? "Modifier l'adresse" : "Nouvelle adresse"}
+                        {initial ? a.editTitle : a.newTitle}
                     </h3>
                     <button type="button" onClick={onCancel} className="w-8 h-8 rounded-lg flex items-center justify-center text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                         <X size={16} />
@@ -129,14 +143,6 @@ function AddressFormModal({
                 </div>
 
                 {(["label", "addressLine1", "addressLine2", "district", "city", "deliveryInstructions"] as const).map((key) => {
-                    const labels: Record<string, string> = {
-                        label: "Nom de l'adresse (ex: Domicile)",
-                        addressLine1: "Adresse principale *",
-                        addressLine2: "Complément d'adresse",
-                        district: "Quartier *",
-                        city: "Ville *",
-                        deliveryInstructions: "Instructions pour le livreur",
-                    };
                     return (
                         <div key={key}>
                             <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1.5">
@@ -162,7 +168,7 @@ function AddressFormModal({
                     >
                         {form.isDefault && <CheckCircle2 size={12} className="text-white" />}
                     </div>
-                    <span className="text-sm text-surface-700 dark:text-surface-300">Définir comme adresse par défaut</span>
+                    <span className="text-sm text-surface-700 dark:text-surface-300">{a.setAsDefault}</span>
                 </label>
 
                 <div className="flex gap-3 pt-2">
@@ -171,13 +177,13 @@ function AddressFormModal({
                         onClick={onCancel}
                         className="flex-1 h-11 rounded-xl border border-surface-300 dark:border-surface-600 text-sm font-semibold text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                     >
-                        Annuler
+                        {a.cancel}
                     </button>
                     <button
                         type="submit"
                         className="flex-1 h-11 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors"
                     >
-                        {initial ? "Enregistrer" : "Ajouter"}
+                        {initial ? a.save : a.addAction}
                     </button>
                 </div>
             </form>
@@ -187,6 +193,8 @@ function AddressFormModal({
 
 // ── Main panel ─────────────────────────────────────────────────────────────
 export function AddressesPanelReal() {
+    const { t } = useDashboardLocale();
+    const a = t.clientAddresses;
     const { addresses, setAddresses, addAddress, updateAddress, removeAddress, setDefaultAddress } = usePreferencesStore();
     const [formOpen, setFormOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<DeliveryAddress | null>(null);
@@ -245,12 +253,12 @@ export function AddressesPanelReal() {
                 // Actually, fetchAddresses() is safer to get the real ID from DB
                 await fetchAddresses();
                 setFormOpen(false);
-                toast.success("Adresse ajoutée avec succès");
+                toast.success(a.toastAdded);
             } else {
-                toast.error("Erreur lors de l'ajout de l'adresse");
+                toast.error(a.toastAddError);
             }
         } catch (error) {
-            toast.error("Erreur réseau");
+            toast.error(a.toastNetworkError);
         } finally {
             setIsSaving(false);
         }
@@ -275,12 +283,12 @@ export function AddressesPanelReal() {
             if (res.ok) {
                 updateAddress(editTarget.id, data);
                 setEditTarget(null);
-                toast.success("Adresse mise à jour");
+                toast.success(a.toastUpdated);
             } else {
-                toast.error("Erreur lors de la mise à jour");
+                toast.error(a.toastUpdateError);
             }
         } catch (error) {
-            toast.error("Erreur réseau");
+            toast.error(a.toastNetworkError);
         } finally {
             setIsSaving(false);
         }
@@ -296,14 +304,14 @@ export function AddressesPanelReal() {
                 if (res.ok) {
                     removeAddress(id);
                     setDeleteConfirm(null);
-                    toast.success("Adresse supprimée avec succès");
+                    toast.success(a.toastDeleted);
                 } else {
                     const data = await res.json();
-                    toast.error(data.error || "Erreur lors de la suppression de l'adresse");
+                    toast.error(data.error || a.toastDeleteError);
                 }
             } catch (error) {
                 console.error("Delete error:", error);
-                toast.error("Erreur réseau lors de la suppression");
+                toast.error(a.toastNetworkErrorDelete);
             } finally {
                 setIsSaving(false);
             }
@@ -322,10 +330,10 @@ export function AddressesPanelReal() {
             });
             if (res.ok) {
                 setDefaultAddress(id);
-                toast.success("Adresse par défaut mise à jour");
+                toast.success(a.toastDefaultUpdated);
             }
         } catch (error) {
-            toast.error("Erreur lors du changement d'adresse par défaut");
+            toast.error(a.toastDefaultError);
         }
     };
 
@@ -333,7 +341,7 @@ export function AddressesPanelReal() {
         return (
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-12 flex flex-col items-center justify-center">
                 <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
-                <p className="text-surface-500 text-sm">Chargement de vos adresses...</p>
+                <p className="text-surface-500 text-sm">{a.loading}</p>
             </div>
         );
     }
@@ -349,11 +357,13 @@ export function AddressesPanelReal() {
                 
                 <div className="flex items-start justify-between mb-5">
                     <div>
-                        <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">Mes adresses</h2>
+                        <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">{a.title}</h2>
                         <p className="text-surface-600 dark:text-surface-400 text-sm">
                             {addresses.length > 0
-                                ? `${addresses.length} adresse${addresses.length > 1 ? "s" : ""} enregistrée${addresses.length > 1 ? "s" : ""}`
-                                : "Aucune adresse enregistrée"}
+                                ? a.savedCount
+                                    .replace(/\{\{n\}\}/g, String(addresses.length))
+                                    .replace(/\{\{s\}\}/g, addresses.length > 1 ? "s" : "")
+                                : a.noneRegistered}
                         </p>
                     </div>
                     <button
@@ -362,15 +372,15 @@ export function AddressesPanelReal() {
                         disabled={isSaving}
                     >
                         <Plus size={15} />
-                        Ajouter
+                        {a.add}
                     </button>
                 </div>
 
                 {addresses.length === 0 ? (
                     <div className="text-center py-12">
                         <MapPin size={40} className="mx-auto text-surface-200 dark:text-surface-700 mb-3" />
-                        <p className="text-sm font-medium text-surface-600 dark:text-surface-400 mb-1">Aucune adresse enregistrée</p>
-                        <p className="text-xs text-surface-500 dark:text-surface-500">Ajoutez une adresse pour commander encore plus vite !</p>
+                        <p className="text-sm font-medium text-surface-600 dark:text-surface-400 mb-1">{a.noneRegistered}</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-500">{a.emptyDesc}</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -378,7 +388,7 @@ export function AddressesPanelReal() {
                             <div key={addr.id}>
                                 {deleteConfirm === addr.id && (
                                     <div className="mb-2 p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-xs text-red-700 dark:text-red-300 text-center font-medium animate-pulse">
-                                        Cliquez à nouveau sur <Trash2 size={11} className="inline" /> pour confirmer la suppression
+                                        <Trash2 size={11} className="inline" /> {a.deleteConfirm}
                                     </div>
                                 )}
                                 <AddressCard

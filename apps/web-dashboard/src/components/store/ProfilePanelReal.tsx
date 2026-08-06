@@ -4,13 +4,14 @@ import { useState } from "react";
 import { Camera, CheckCircle2, Loader2, Pencil, Phone, User, X } from "lucide-react";
 import { useUserSession } from "@/store/client-store";
 import { createClient } from "@/lib/supabase/client";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 
 // ── Inline field ─────────────────────────────────────────────────────────────
-function StaticField({ label, value }: { label: string; value?: string | null }) {
+function StaticField({ label, value, emptyValue }: { label: string; value?: string | null; emptyValue: string }) {
     return (
         <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50">
             <p className="text-xs uppercase tracking-wide font-medium text-surface-500 dark:text-surface-400 mb-1">{label}</p>
-            <p className="font-semibold text-surface-900 dark:text-white text-sm">{value || "—"}</p>
+            <p className="font-semibold text-surface-900 dark:text-white text-sm">{value || emptyValue}</p>
         </div>
     );
 }
@@ -30,6 +31,8 @@ function EditProfileModal({
     onSave: (data: ProfileForm) => Promise<void>;
     onCancel: () => void;
 }) {
+    const { t } = useDashboardLocale();
+    const p = t.clientProfile;
     const [form, setForm]       = useState<ProfileForm>(initial);
     const [saving, setSaving]   = useState(false);
     const [success, setSuccess] = useState(false);
@@ -47,7 +50,7 @@ function EditProfileModal({
             setSuccess(true);
             setTimeout(onCancel, 800);
         } catch (e) {
-            setError(e instanceof Error ? e.message : "Erreur lors de la sauvegarde");
+            setError(e instanceof Error ? e.message : p.errorSave);
         } finally {
             setSaving(false);
         }
@@ -60,7 +63,7 @@ function EditProfileModal({
                 className="w-full max-w-md bg-white dark:bg-surface-900 rounded-2xl shadow-2xl p-6 space-y-4"
             >
                 <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-surface-900 dark:text-white text-lg">Modifier mon profil</h3>
+                    <h3 className="font-bold text-surface-900 dark:text-white text-lg">{p.editTitle}</h3>
                     <button type="button" onClick={onCancel} className="w-8 h-8 rounded-lg flex items-center justify-center text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                         <X size={16} />
                     </button>
@@ -68,7 +71,7 @@ function EditProfileModal({
 
                 <div>
                     <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1.5">
-                        Nom complet
+                        {p.fullName}
                     </label>
                     <div className="relative">
                         <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
@@ -76,14 +79,14 @@ function EditProfileModal({
                             value={form.name}
                             onChange={(e) => set("name", e.target.value)}
                             className="w-full h-10 pl-9 pr-3 rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-colors"
-                            placeholder="Votre nom"
+                            placeholder={p.namePlaceholder}
                         />
                     </div>
                 </div>
 
                 <div>
                     <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1.5">
-                        Numéro de téléphone
+                        {p.phone}
                     </label>
                     <div className="relative">
                         <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
@@ -91,7 +94,7 @@ function EditProfileModal({
                             value={form.phone}
                             onChange={(e) => set("phone", e.target.value)}
                             className="w-full h-10 pl-9 pr-3 rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-colors"
-                            placeholder="+237 6XX XXX XXX"
+                            placeholder={p.phonePlaceholder}
                             type="tel"
                         />
                     </div>
@@ -107,7 +110,7 @@ function EditProfileModal({
                         onClick={onCancel}
                         className="flex-1 h-11 rounded-xl border border-surface-300 dark:border-surface-600 text-sm font-semibold text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                     >
-                        Annuler
+                        {p.cancel}
                     </button>
                     <button
                         type="submit"
@@ -119,7 +122,7 @@ function EditProfileModal({
                         ) : success ? (
                             <CheckCircle2 size={15} />
                         ) : null}
-                        {success ? "Sauvegardé !" : saving ? "Sauvegarde…" : "Enregistrer"}
+                        {success ? p.saved : saving ? p.saving : p.save}
                     </button>
                 </div>
             </form>
@@ -129,6 +132,8 @@ function EditProfileModal({
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 export function ProfilePanelReal() {
+    const { t } = useDashboardLocale();
+    const p = t.clientProfile;
     const session      = useUserSession((s) => s.session);
     const updateProfile = useUserSession((s) => s.updateProfile);
     const [editing, setEditing] = useState(false);
@@ -148,7 +153,7 @@ export function ProfilePanelReal() {
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.message ?? "Erreur de sauvegarde");
+                throw new Error(err.message ?? p.errorSave);
             }
         }
     };
@@ -162,7 +167,7 @@ export function ProfilePanelReal() {
             const fileExt = file.name.split('.').pop();
             const fileName = `${session.id}/${Date.now()}.${fileExt}`;
 
-            if (!supabase) throw new Error("Supabase client non initialisé");
+            if (!supabase) throw new Error(p.errorSupabase);
 
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
@@ -186,12 +191,12 @@ export function ProfilePanelReal() {
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.message ?? "Erreur de sauvegarde de l'avatar");
+                throw new Error(err.message ?? p.errorAvatarSave);
             }
 
         } catch (err: any) {
             console.error("Avatar upload error:", err);
-            alert(err.message ?? "Une erreur est survenue lors du téléchargement.");
+            alert(err.message ?? p.errorAvatarUpload);
         } finally {
             setUploadingAvatar(false);
         }
@@ -204,9 +209,9 @@ export function ProfilePanelReal() {
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6">
                 <div className="flex items-start justify-between mb-5">
                     <div>
-                        <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">Mon profil</h2>
+                        <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">{p.title}</h2>
                         <p className="text-surface-600 dark:text-surface-400 text-sm">
-                            {isAuthenticated ? "Gérez vos informations personnelles" : "Connectez-vous pour gérer votre profil"}
+                            {isAuthenticated ? p.subtitleAuth : p.subtitleGuest}
                         </p>
                     </div>
                     {isAuthenticated && (
@@ -215,7 +220,7 @@ export function ProfilePanelReal() {
                             className="flex items-center gap-2 px-3 py-2 rounded-xl border border-surface-300 dark:border-surface-600 text-sm font-semibold text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                         >
                             <Pencil size={14} />
-                            Modifier
+                            {p.edit}
                         </button>
                     )}
                 </div>
@@ -245,22 +250,22 @@ export function ProfilePanelReal() {
                             </div>
                         </label>
                         <div>
-                            <p className="font-semibold text-surface-900 dark:text-white text-lg">{session?.name ?? "Utilisateur Kbouffe"}</p>
+                            <p className="font-semibold text-surface-900 dark:text-white text-lg">{session?.name ?? p.defaultName}</p>
                             <p className="text-sm text-surface-500 dark:text-surface-400">{session?.email}</p>
                         </div>
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <StaticField label="Nom complet"   value={session?.name} />
-                    <StaticField label="Téléphone"     value={session?.phone} />
+                    <StaticField label={p.fullName} value={session?.name} emptyValue={p.emptyValue} />
+                    <StaticField label={p.phone} value={session?.phone} emptyValue={p.emptyValue} />
                     <div className="md:col-span-2">
-                        <StaticField label="Adresse e-mail" value={session?.email} />
+                        <StaticField label={p.email} value={session?.email} emptyValue={p.emptyValue} />
                     </div>
                     <div className="md:col-span-2">
-                        <StaticField label="Statut du compte" value={
-                            !session ? "Non connecté" :
-                            session.isVerified ? "Compte vérifié" : "En attente de vérification"
+                        <StaticField label={p.accountStatus} emptyValue={p.emptyValue} value={
+                            !session ? p.statusGuest :
+                            session.isVerified ? p.statusVerified : p.statusUnverified
                         } />
                     </div>
                 </div>
@@ -271,7 +276,7 @@ export function ProfilePanelReal() {
                             href="/login"
                             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors"
                         >
-                            Se connecter
+                            {p.login}
                         </a>
                     </div>
                 )}

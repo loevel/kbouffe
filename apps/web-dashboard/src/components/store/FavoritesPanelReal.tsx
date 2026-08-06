@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Heart, Search, UtensilsCrossed, X, Loader2 } from "lucide-react";
 import { usePreferencesStore } from "@/store/client-store";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 import toast from "react-hot-toast";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -21,6 +22,8 @@ function FavoriteCard({
     favorite: FavoriteRestaurant;
     onRemove: () => void;
 }) {
+    const { t } = useDashboardLocale();
+    const f = t.clientFavorites;
     const initial = favorite.restaurantName[0]?.toUpperCase() ?? "R";
     const colors = [
         "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
@@ -63,12 +66,12 @@ function FavoriteCard({
                     href={`/r/${favorite.restaurantSlug}`}
                     className="px-3 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 text-xs font-semibold text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors opacity-0 group-hover:opacity-100"
                 >
-                    Commander
+                    {f.order}
                 </Link>
                 <button
                     onClick={onRemove}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                    title="Retirer des favoris"
+                    title={f.removeTooltip}
                 >
                     <X size={16} />
                 </button>
@@ -79,6 +82,8 @@ function FavoriteCard({
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 export function FavoritesPanelReal() {
+    const { t } = useDashboardLocale();
+    const f = t.clientFavorites;
     const [favorites, setFavorites] = useState<FavoriteRestaurant[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -121,12 +126,12 @@ export function FavoritesPanelReal() {
                     .map(f => f.restaurantSlug);
                 updatePrefs({ favoriteRestaurants: currentSlugs });
                 
-                toast.success("Retiré des favoris");
+                toast.success(f.toastRemoved);
             } else {
-                toast.error("Erreur lors de la suppression");
+                toast.error(f.toastRemoveError);
             }
         } catch (error) {
-            toast.error("Erreur réseau");
+            toast.error(f.toastNetworkError);
         } finally {
             setIsDeleting(null);
         }
@@ -136,7 +141,7 @@ export function FavoritesPanelReal() {
         return (
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-12 flex flex-col items-center justify-center">
                 <Loader2 className="w-8 h-8 text-rose-500 animate-spin mb-4" />
-                <p className="text-surface-500 text-sm">Chargement de vos favoris...</p>
+                <p className="text-surface-500 text-sm">{f.loading}</p>
             </div>
         );
     }
@@ -145,11 +150,13 @@ export function FavoritesPanelReal() {
         <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6 relative">
             <div className="flex items-start justify-between mb-5">
                 <div>
-                    <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">Mes favoris</h2>
+                    <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-1">{f.title}</h2>
                     <p className="text-surface-600 dark:text-surface-400 text-sm">
                         {favorites.length > 0
-                            ? `${favorites.length} restaurant${favorites.length > 1 ? "s" : ""} enregistré${favorites.length > 1 ? "s" : ""}`
-                            : "Gérez vos restaurants préférés"}
+                            ? f.savedCount
+                                .replace(/\{\{n\}\}/g, String(favorites.length))
+                                .replace(/\{\{s\}\}/g, favorites.length > 1 ? "s" : "")
+                            : f.manageSubtitle}
                     </p>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
@@ -163,17 +170,17 @@ export function FavoritesPanelReal() {
                         <UtensilsCrossed size={30} className="text-surface-200 dark:text-surface-700" />
                     </div>
                     <p className="text-base font-bold text-surface-900 dark:text-white mb-1">
-                        Vous n'avez pas encore de favoris
+                        {f.emptyTitle}
                     </p>
                     <p className="text-sm text-surface-500 dark:text-surface-400 mb-6 max-w-xs">
-                        Cliquez sur le cœur ❤ lors de votre prochaine visite pour ajouter un restaurant ici.
+                        {f.emptyDesc}
                     </p>
                     <Link
                         href="/stores"
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors"
                     >
                         <Search size={15} />
-                        Explorer les restaurants
+                        {f.exploreCta}
                     </Link>
                 </div>
             ) : (
@@ -193,7 +200,7 @@ export function FavoritesPanelReal() {
                             className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 dark:text-brand-400 hover:underline"
                         >
                             <Search size={14} />
-                            Découvrir plus de restaurants
+                            {f.discoverMore}
                         </Link>
                     </div>
                 </div>

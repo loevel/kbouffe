@@ -26,6 +26,8 @@ import { PreferencesPanelReal } from "./PreferencesPanelReal";
 import { ClientNotificationsPanel } from "./ClientNotificationsPanel";
 import { SupportPanelReal } from "./SupportPanelReal";
 import { ReservationsPanelReal } from "./ReservationsPanelReal";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
+import type { TranslationKeys } from "@/lib/i18n";
 
 function PanelShell({
     title,
@@ -54,6 +56,8 @@ export function NotificationsPanel() {
 }
 
 export function SecurityPanel() {
+    const { t } = useDashboardLocale();
+    const s = t.clientSecurity;
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [newPassword, setNewPassword] = useState("");
@@ -65,12 +69,12 @@ export function SecurityPanel() {
         setMessage(null);
 
         if (newPassword !== confirmPassword) {
-            setMessage({ type: "error", text: "Les mots de passe ne correspondent pas" });
+            setMessage({ type: "error", text: s.errorMismatch });
             return;
         }
 
         if (newPassword.length < 6) {
-            setMessage({ type: "error", text: "Le mot de passe doit contenir au moins 6 caractères" });
+            setMessage({ type: "error", text: s.errorTooShort });
             return;
         }
 
@@ -85,10 +89,10 @@ export function SecurityPanel() {
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.error || "Une erreur est survenue");
+                throw new Error(data.error || s.errorGeneric);
             }
 
-            setMessage({ type: "success", text: "Mot de passe mis à jour avec succès" });
+            setMessage({ type: "success", text: s.success });
             setNewPassword("");
             setConfirmPassword("");
             setTimeout(() => {
@@ -103,7 +107,7 @@ export function SecurityPanel() {
     };
 
     return (
-        <PanelShell title="Sécurité" subtitle="Protégez votre compte et vos données.">
+        <PanelShell title={s.title} subtitle={s.subtitle}>
             <div className="space-y-6">
                 <div className={`p-4 rounded-xl border transition-all ${isEditing ? "border-brand-500 bg-brand-50/50 dark:bg-brand-500/5" : "border-surface-200 dark:border-surface-700"}`}>
                     <div className="flex items-center justify-between mb-4">
@@ -112,16 +116,16 @@ export function SecurityPanel() {
                                 <Lock size={20} className="text-surface-600 dark:text-surface-400" />
                             </div>
                             <div>
-                                <p className="font-bold text-surface-900 dark:text-white">Mot de passe</p>
-                                <p className="text-xs text-surface-500">Dernière modification il y a 3 mois</p>
+                                <p className="font-bold text-surface-900 dark:text-white">{s.password}</p>
+                                <p className="text-xs text-surface-500">{s.lastChanged}</p>
                             </div>
                         </div>
                         {!isEditing && (
-                            <button 
+                            <button
                                 onClick={() => setIsEditing(true)}
                                 className="text-sm font-bold text-brand-600 dark:text-brand-400 hover:underline"
                             >
-                                Modifier
+                                {s.edit}
                             </button>
                         )}
                     </div>
@@ -130,7 +134,7 @@ export function SecurityPanel() {
                         <form onSubmit={handlePasswordChange} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-surface-500 uppercase tracking-wider">Nouveau mot de passe</label>
+                                    <label className="text-xs font-bold text-surface-500 uppercase tracking-wider">{s.newPassword}</label>
                                     <input
                                         type="password"
                                         value={newPassword}
@@ -141,7 +145,7 @@ export function SecurityPanel() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-surface-500 uppercase tracking-wider">Confirmer le mot de passe</label>
+                                    <label className="text-xs font-bold text-surface-500 uppercase tracking-wider">{s.confirmPassword}</label>
                                     <input
                                         type="password"
                                         value={confirmPassword}
@@ -169,7 +173,7 @@ export function SecurityPanel() {
                                     }}
                                     className="px-4 py-2 text-sm font-bold text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-xl transition-colors"
                                 >
-                                    Annuler
+                                    {s.cancel}
                                 </button>
                                 <button
                                     type="submit"
@@ -179,10 +183,10 @@ export function SecurityPanel() {
                                     {isLoading ? (
                                         <>
                                             <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            Mise à jour...
+                                            {s.updating}
                                         </>
                                     ) : (
-                                        "Confirmer le changement"
+                                        s.confirmChange
                                     )}
                                 </button>
                             </div>
@@ -196,11 +200,11 @@ export function SecurityPanel() {
                             <Smartphone size={20} className="text-surface-600 dark:text-surface-400" />
                         </div>
                         <div>
-                            <p className="font-bold text-surface-900 dark:text-white">Appareils connectés</p>
-                            <p className="text-xs text-surface-500">2 appareils actifs</p>
+                            <p className="font-bold text-surface-900 dark:text-white">{s.devices}</p>
+                            <p className="text-xs text-surface-500">{s.devicesActive}</p>
                         </div>
                     </div>
-                    <button className="text-sm font-bold text-brand-600 dark:text-brand-400 hover:underline">Voir</button>
+                    <button className="text-sm font-bold text-brand-600 dark:text-brand-400 hover:underline">{s.view}</button>
                 </div>
             </div>
         </PanelShell>
@@ -210,8 +214,10 @@ export function SecurityPanel() {
 
 
 export function PaymentMethodsPanel() {
+    const { t } = useDashboardLocale();
+    const p = t.clientPayments;
     return (
-        <PanelShell title="Moyens de paiement" subtitle="Choisissez vos méthodes de paiement pour accélérer le checkout.">
+        <PanelShell title={p.title} subtitle={p.subtitle}>
             <div className="space-y-3">
                 <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -221,7 +227,7 @@ export function PaymentMethodsPanel() {
                             <p className="text-sm text-surface-500 dark:text-surface-400">+237 6XX XXX 102</p>
                         </div>
                     </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">Principal</span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">{p.primary}</span>
                 </div>
                 <div className="p-4 rounded-xl border border-surface-200 dark:border-surface-700 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -231,10 +237,10 @@ export function PaymentMethodsPanel() {
                             <p className="text-sm text-surface-500 dark:text-surface-400">+237 6XX XXX 884</p>
                         </div>
                     </div>
-                    <button className="text-sm font-semibold text-brand-600 dark:text-brand-400">Utiliser</button>
+                    <button className="text-sm font-semibold text-brand-600 dark:text-brand-400">{p.use}</button>
                 </div>
                 <button className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors">
-                    Ajouter un moyen de paiement
+                    {p.addMethod}
                 </button>
             </div>
         </PanelShell>
@@ -298,6 +304,9 @@ export const clientSectionPath: Record<ClientSectionId, string> = {
     support: "/stores/support",
 };
 
+// Kept as a French fallback for any caller that doesn't have translations
+// handy yet. Prefer getSectionGroups(t) so the sidebar follows the active
+// language.
 export const sectionGroups: ClientSectionGroup[] = [
     {
         title: "Découvrir",
@@ -326,6 +335,38 @@ export const sectionGroups: ClientSectionGroup[] = [
         ],
     },
 ];
+
+export function getSectionGroups(t: TranslationKeys): ClientSectionGroup[] {
+    const nav = t.clientNav;
+    return [
+        {
+            title: nav.groupDiscover,
+            items: [
+                { id: "restaurants", label: nav.home, icon: "home" },
+                { id: "orders", label: nav.orders, icon: "orders" },
+                { id: "reservations", label: nav.reservations, icon: "reservations" },
+            ],
+        },
+        {
+            title: nav.groupAccount,
+            items: [
+                { id: "favorites", label: nav.favorites, icon: "favorites" },
+                { id: "addresses", label: nav.addresses, icon: "addresses" },
+                { id: "payments", label: nav.payments, icon: "payments" },
+                { id: "preferences", label: nav.preferences, icon: "preferences" },
+            ],
+        },
+        {
+            title: nav.groupSecurity,
+            items: [
+                { id: "notifications", label: nav.notifications, icon: "notifications" },
+                { id: "security", label: nav.security, icon: "security" },
+                { id: "profile", label: nav.profile, icon: "profile" },
+                { id: "support", label: nav.support, icon: "support" },
+            ],
+        },
+    ];
+}
 
 export function renderSectionPanel(section: ClientSectionId) {
     switch (section) {

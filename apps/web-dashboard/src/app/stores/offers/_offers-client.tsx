@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { toast } from "react-hot-toast";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface OfferProduct {
@@ -64,6 +65,7 @@ function ProductCard({
     product: OfferProduct;
     restaurant: OfferGroup;
 }) {
+    const { t } = useDashboardLocale();
     const { addItem } = useCart();
     const [adding, setAdding] = useState(false);
 
@@ -73,9 +75,9 @@ function ProductCard({
         setAdding(true);
         addItem(
             { id: restaurant.restaurantId, name: restaurant.restaurantName, slug: restaurant.restaurantSlug },
-            { id: product.id, name: product.name, price: product.price, imageUrl: product.imageUrl }
+            { id: product.id, cartKey: product.id, name: product.name, price: product.price, imageUrl: product.imageUrl }
         );
-        toast.success(`${product.name} ajouté au panier`, { duration: 1500 });
+        toast.success(`${product.name} ${t.clientOffers.addedToCart}`, { duration: 1500 });
         setTimeout(() => setAdding(false), 600);
     }
 
@@ -133,6 +135,8 @@ function ProductCard({
 
 // ── Restaurant Row ────────────────────────────────────────────────────────────
 function RestaurantRow({ group }: { group: OfferGroup }) {
+    const { t } = useDashboardLocale();
+    const o = t.clientOffers;
     const rowRef = useRef<HTMLDivElement>(null);
 
     const scroll = (dir: number) => {
@@ -172,7 +176,7 @@ function RestaurantRow({ group }: { group: OfferGroup }) {
                             {maxDiscount >= 30 && (
                                 <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400">
                                     <Flame size={9} />
-                                    Jusqu&apos;à -{maxDiscount}%
+                                    {o.upTo} -{maxDiscount}%
                                 </span>
                             )}
                         </div>
@@ -187,8 +191,8 @@ function RestaurantRow({ group }: { group: OfferGroup }) {
                             {group.deliveryFee !== null && (
                                 <span>
                                     {group.deliveryFee === 0
-                                        ? "Livraison gratuite"
-                                        : `${formatPrice(group.deliveryFee)} livraison`}
+                                        ? o.freeDelivery
+                                        : `${formatPrice(group.deliveryFee)} ${o.deliverySuffix}`}
                                 </span>
                             )}
                         </div>
@@ -226,7 +230,7 @@ function RestaurantRow({ group }: { group: OfferGroup }) {
                     className="shrink-0 w-[120px] flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-surface-200 dark:border-surface-700 text-surface-400 dark:text-surface-600 hover:border-brand-300 hover:text-brand-500 dark:hover:border-brand-700 dark:hover:text-brand-400 transition-all text-sm font-medium snap-start"
                 >
                     <ShoppingBag size={20} />
-                    <span className="text-xs text-center leading-tight">Voir le menu</span>
+                    <span className="text-xs text-center leading-tight">{o.viewMenu}</span>
                 </Link>
             </div>
         </section>
@@ -235,6 +239,8 @@ function RestaurantRow({ group }: { group: OfferGroup }) {
 
 // ── Hero Banner ───────────────────────────────────────────────────────────────
 function HeroBanner({ count }: { count: number }) {
+    const { t } = useDashboardLocale();
+    const o = t.clientOffers;
     return (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-500 via-rose-400 to-orange-400 p-6 sm:p-8 mb-8">
             {/* Background decoration */}
@@ -247,16 +253,16 @@ function HeroBanner({ count }: { count: number }) {
             <div className="relative z-10 max-w-sm">
                 <div className="flex items-center gap-2 mb-3">
                     <span className="px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-black uppercase tracking-wider">
-                        Économies garanties
+                        {o.badge}
                     </span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight mb-2">
-                    Les meilleures offres du moment
+                    {o.heroTitle}
                 </h1>
                 <p className="text-rose-100 text-sm font-medium">
                     {count > 0
-                        ? `${count} article${count > 1 ? "s" : ""} en promotion aujourd'hui`
-                        : "Des réductions exclusives, livrées chez vous"}
+                        ? `${count} ${count > 1 ? o.items : o.item} ${o.heroCountSuffix}`
+                        : o.heroEmpty}
                 </p>
             </div>
         </div>
@@ -265,21 +271,23 @@ function HeroBanner({ count }: { count: number }) {
 
 // ── Empty State ───────────────────────────────────────────────────────────────
 function EmptyOffers() {
+    const { t } = useDashboardLocale();
+    const o = t.clientOffers;
     const router = useRouter();
     return (
         <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="text-6xl mb-4">🏷️</div>
             <h3 className="text-xl font-bold text-surface-900 dark:text-white mb-2">
-                Aucune offre disponible
+                {o.emptyTitle}
             </h3>
             <p className="text-surface-500 dark:text-surface-400 mb-6 max-w-xs">
-                Revenez bientôt, de nouvelles promotions sont ajoutées régulièrement par nos restaurants partenaires.
+                {o.emptyDesc}
             </p>
             <button
                 onClick={() => router.push("/stores")}
                 className="px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold transition-colors"
             >
-                Explorer les restaurants
+                {o.exploreCta}
             </button>
         </div>
     );
@@ -287,6 +295,8 @@ function EmptyOffers() {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function OffersClient() {
+    const { t } = useDashboardLocale();
+    const o = t.clientOffers;
     const [groups, setGroups] = useState<OfferGroup[]>([]);
     const [totalProducts, setTotalProducts] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -304,12 +314,13 @@ export function OffersClient() {
                 setGroups(data.groups ?? []);
                 setTotalProducts(data.totalProducts ?? 0);
             } catch {
-                setError("Impossible de charger les offres.");
+                setError(o.errorLoad);
             } finally {
                 setLoading(false);
             }
         }
         load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
@@ -325,11 +336,11 @@ export function OffersClient() {
                     </button>
                     <div className="flex items-center gap-2">
                         <Tag size={18} className="text-rose-500" />
-                        <h1 className="text-base font-bold text-surface-900 dark:text-white">Offres</h1>
+                        <h1 className="text-base font-bold text-surface-900 dark:text-white">{o.pageTitle}</h1>
                     </div>
                     {totalProducts > 0 && (
                         <span className="ml-auto text-xs text-surface-400 dark:text-surface-500">
-                            {totalProducts} article{totalProducts > 1 ? "s" : ""}
+                            {totalProducts} {totalProducts > 1 ? o.items : o.item}
                         </span>
                     )}
                 </div>
@@ -343,8 +354,8 @@ export function OffersClient() {
                 {!loading && !error && groups.length > 0 && (
                     <div className="flex gap-2 mb-6">
                         {[
-                            { id: "articles" as const, label: "Articles en promo" },
-                            { id: "commerces" as const, label: `Commerces (${groups.length})` },
+                            { id: "articles" as const, label: o.tabProducts },
+                            { id: "commerces" as const, label: `${o.tabStores} (${groups.length})` },
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -366,7 +377,7 @@ export function OffersClient() {
                     <div className="flex flex-col items-center justify-center py-24 gap-4">
                         <Loader2 size={36} className="text-rose-400 animate-spin" />
                         <p className="text-surface-500 dark:text-surface-400 text-sm">
-                            Chargement des offres...
+                            {o.loading}
                         </p>
                     </div>
                 )}
@@ -380,7 +391,7 @@ export function OffersClient() {
                             onClick={() => window.location.reload()}
                             className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold rounded-xl transition-colors"
                         >
-                            Réessayer
+                            {o.retry}
                         </button>
                     </div>
                 )}
@@ -441,7 +452,7 @@ export function OffersClient() {
                                             <span>{group.city}</span>
                                         </div>
                                         <p className="text-xs text-rose-500 font-semibold mt-1">
-                                            {group.products.length} article{group.products.length > 1 ? "s" : ""} en promo
+                                            {group.products.length} {group.products.length > 1 ? o.items : o.item} {o.onPromo}
                                         </p>
                                     </div>
 

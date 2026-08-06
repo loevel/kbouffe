@@ -17,6 +17,7 @@ import {
     Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ClientReservation {
@@ -55,24 +56,24 @@ interface ClientReservation {
 }
 
 // ── Status display ────────────────────────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-    pending:   { label: "En attente",   color: "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-300 border-yellow-100 dark:border-yellow-500/20",   icon: <Clock size={12} /> },
-    confirmed: { label: "Confirmée",    color: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border-blue-100 dark:border-blue-500/20",               icon: <CheckCircle2 size={12} /> },
-    seated:    { label: "Installé",     color: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300 border-green-100 dark:border-green-500/20",         icon: <CheckCircle2 size={12} /> },
-    completed: { label: "Terminée",     color: "bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 border-surface-200 dark:border-surface-700", icon: <CheckCircle2 size={12} /> },
-    no_show:   { label: "Absent",       color: "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300 border-orange-100 dark:border-orange-500/20",   icon: <XCircle size={12} /> },
-    cancelled: { label: "Annulée",      color: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 border-red-100 dark:border-red-500/20",                    icon: <X size={12} /> },
+const STATUS_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
+    pending:   { color: "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-300 border-yellow-100 dark:border-yellow-500/20",   icon: <Clock size={12} /> },
+    confirmed: { color: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border-blue-100 dark:border-blue-500/20",               icon: <CheckCircle2 size={12} /> },
+    seated:    { color: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300 border-green-100 dark:border-green-500/20",         icon: <CheckCircle2 size={12} /> },
+    completed: { color: "bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 border-surface-200 dark:border-surface-700", icon: <CheckCircle2 size={12} /> },
+    no_show:   { color: "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300 border-orange-100 dark:border-orange-500/20",   icon: <XCircle size={12} /> },
+    cancelled: { color: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 border-red-100 dark:border-red-500/20",                    icon: <X size={12} /> },
 };
 
-const OCCASION_LABELS: Record<string, { label: string; icon: string }> = {
-    birthday:    { label: "Anniversaire", icon: "🎂" },
-    dinner:      { label: "Dîner",        icon: "🍽️" },
-    surprise:    { label: "Surprise",     icon: "🎁" },
-    business:    { label: "Business",     icon: "💼" },
-    anniversary: { label: "Célébration",  icon: "💍" },
-    date:        { label: "Rendez-vous",  icon: "❤️" },
-    family:      { label: "Famille",      icon: "👨‍👩‍👧‍👦" },
-    other:       { label: "Autre",        icon: "📌" },
+const OCCASION_ICON: Record<string, string> = {
+    birthday: "🎂",
+    dinner: "🍽️",
+    surprise: "🎁",
+    business: "💼",
+    anniversary: "💍",
+    date: "❤️",
+    family: "👨‍👩‍👧‍👦",
+    other: "📌",
 };
 
 // ── Reservation card ──────────────────────────────────────────────────────────
@@ -89,19 +90,23 @@ function ReservationCard({
     onSubmitReview?: (reservationId: string, restaurantId: string, rating: number, comment: string) => Promise<boolean>;
     isSubmittingReview?: boolean;
 }) {
+    const { locale, t } = useDashboardLocale();
+    const r = t.clientReservations;
     const [showReview, setShowReview] = useState(false);
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState("");
     const [reviewError, setReviewError] = useState<string | null>(null);
     const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
-    const meta = STATUS_MAP[reservation.status] ?? STATUS_MAP.pending;
-    const occasion = reservation.occasion ? OCCASION_LABELS[reservation.occasion] : null;
+    const style = STATUS_STYLE[reservation.status] ?? STATUS_STYLE.pending;
+    const statusLabel = (r.status as Record<string, string>)[reservation.status] ?? r.status.pending;
+    const occasionLabel = reservation.occasion ? (r.occasion as Record<string, string>)[reservation.occasion] : null;
+    const occasionIcon = reservation.occasion ? OCCASION_ICON[reservation.occasion] : null;
     const isPast = ["completed", "no_show", "cancelled"].includes(reservation.status);
     const cancellable = ["pending", "confirmed"].includes(reservation.status);
     const reviewable = reservation.status === "completed";
 
-    const dateLabel = new Date(`${reservation.date}T${reservation.time}`).toLocaleDateString("fr-FR", {
+    const dateLabel = new Date(`${reservation.date}T${reservation.time}`).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", {
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -139,9 +144,9 @@ function ReservationCard({
                             <p className="text-xs text-surface-500 capitalize">{dateLabel}</p>
                         </div>
                     </div>
-                    <span className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${meta.color}`}>
-                        {meta.icon}
-                        {meta.label}
+                    <span className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${style.color}`}>
+                        {style.icon}
+                        {statusLabel}
                     </span>
                 </div>
 
@@ -156,7 +161,7 @@ function ReservationCard({
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                         <Users size={14} className="text-surface-400" />
-                        {reservation.party_size} pers.
+                        {reservation.party_size} {r.person}
                     </span>
                     {reservation.table_zones && (
                         <span className="inline-flex items-center gap-1.5">
@@ -170,13 +175,13 @@ function ReservationCard({
                     {reservation.restaurant_tables && (
                         <span className="inline-flex items-center gap-1.5">
                             <MapPin size={14} className="text-surface-400" />
-                            Table #{reservation.restaurant_tables.number}
+                            {r.table} #{reservation.restaurant_tables.number}
                         </span>
                     )}
-                    {occasion && (
+                    {occasionLabel && (
                         <span className="inline-flex items-center gap-1.5">
-                            <span>{occasion.icon}</span>
-                            {occasion.label}
+                            <span>{occasionIcon}</span>
+                            {occasionLabel}
                         </span>
                     )}
                 </div>
@@ -191,7 +196,7 @@ function ReservationCard({
                 {/* Cancellation reason */}
                 {reservation.status === "cancelled" && reservation.cancellation_reason && (
                     <p className="mt-2 text-xs text-red-500 font-medium">
-                        Raison : {reservation.cancellation_reason}
+                        {r.cancellationReason} : {reservation.cancellation_reason}
                     </p>
                 )}
 
@@ -208,7 +213,7 @@ function ReservationCard({
                             ) : (
                                 <X size={12} />
                             )}
-                            Annuler la réservation
+                            {r.cancel}
                         </button>
                     </div>
                 )}
@@ -222,7 +227,7 @@ function ReservationCard({
                                 className="text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors inline-flex items-center gap-1.5"
                             >
                                 <Star size={12} />
-                                Laisser un avis
+                                {r.leaveReview}
                             </button>
                         ) : (
                             <div className="space-y-2">
@@ -233,7 +238,7 @@ function ReservationCard({
                                             type="button"
                                             onClick={() => setRating(value)}
                                             className="p-0.5"
-                                            aria-label={`Noter ${value} sur 5`}
+                                            aria-label={`${value}/5`}
                                         >
                                             <Star
                                                 size={16}
@@ -246,7 +251,7 @@ function ReservationCard({
                                 <textarea
                                     value={comment}
                                     onChange={(e) => setComment(e.target.value)}
-                                    placeholder="Votre avis (optionnel)"
+                                    placeholder={r.reviewPlaceholder}
                                     className="w-full min-h-[72px] rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                                 />
 
@@ -264,21 +269,21 @@ function ReservationCard({
                                                 setReviewSubmitted(true);
                                                 setShowReview(false);
                                             } else {
-                                                setReviewError("Impossible d'envoyer l'avis.");
+                                                setReviewError(r.reviewError);
                                             }
                                         }}
                                         disabled={isSubmittingReview}
                                         className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition-colors disabled:opacity-50"
                                     >
                                         {isSubmittingReview ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                                        {isSubmittingReview ? "Envoi..." : "Envoyer"}
+                                        {isSubmittingReview ? r.sending : r.send}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setShowReview(false)}
                                         className="text-xs text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
                                     >
-                                        Annuler
+                                        {r.cancelReview}
                                     </button>
                                 </div>
                             </div>
@@ -289,7 +294,7 @@ function ReservationCard({
                 {reviewSubmitted && (
                     <div className="mt-3 pt-3 border-t border-surface-100 dark:border-surface-800">
                         <p className="text-xs font-medium text-green-600 dark:text-green-400">
-                            Merci ! Votre avis a été envoyé.
+                            {r.reviewThanks}
                         </p>
                     </div>
                 )}
@@ -300,6 +305,8 @@ function ReservationCard({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function ReservationsPanelReal() {
+    const { t } = useDashboardLocale();
+    const r = t.clientReservations;
     const [reservations, setReservations] = useState<ClientReservation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCancellingId, setIsCancellingId] = useState<string | null>(null);
@@ -333,14 +340,14 @@ export function ReservationsPanelReal() {
                 body: JSON.stringify({ id, action: "cancel" }),
             });
             if (res.ok) {
-                toast.success("Réservation annulée");
+                toast.success(r.toastCancelled);
                 await fetchReservations();
             } else {
                 const err = await res.json();
-                toast.error(err.error || "Impossible d'annuler");
+                toast.error(err.error || r.toastCancelError);
             }
         } catch {
-            toast.error("Erreur réseau");
+            toast.error(r.toastNetworkError);
         } finally {
             setIsCancellingId(null);
         }
@@ -366,15 +373,15 @@ export function ReservationsPanelReal() {
             });
 
             if (res.ok) {
-                toast.success("Merci pour votre avis");
+                toast.success(r.toastReviewThanks);
                 return true;
             }
 
             const err = await res.json().catch(() => ({}));
-            toast.error(err?.error || "Impossible d'envoyer l'avis");
+            toast.error(err?.error || r.toastReviewError);
             return false;
         } catch {
-            toast.error("Erreur réseau");
+            toast.error(r.toastNetworkError);
             return false;
         } finally {
             setIsSubmittingReviewId(null);
@@ -385,7 +392,7 @@ export function ReservationsPanelReal() {
         return (
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-12 flex flex-col items-center justify-center">
                 <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
-                <p className="text-surface-500 text-sm">Chargement de vos réservations...</p>
+                <p className="text-surface-500 text-sm">{r.loading}</p>
             </div>
         );
     }
@@ -395,28 +402,28 @@ export function ReservationsPanelReal() {
             <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-8 text-center">
                 <CalendarClock size={48} className="mx-auto text-surface-200 dark:text-surface-700 mb-4" />
                 <h2 className="text-xl font-bold text-surface-900 dark:text-white mb-2">
-                    Aucune réservation
+                    {r.emptyTitle}
                 </h2>
                 <p className="text-surface-500 dark:text-surface-400 text-sm mb-6 max-w-xs mx-auto">
-                    Vos réservations apparaîtront ici. Réservez une table dans votre restaurant préféré !
+                    {r.emptyDesc}
                 </p>
                 <Link
                     href="/stores"
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl transition-colors text-sm"
                 >
                     <ChefHat size={16} />
-                    Explorer les restaurants
+                    {r.exploreCta}
                 </Link>
             </div>
         );
     }
 
-    const upcoming = reservations.filter((r) =>
-        ["pending", "confirmed"].includes(r.status)
+    const upcoming = reservations.filter((res) =>
+        ["pending", "confirmed"].includes(res.status)
     );
-    const active = reservations.filter((r) => r.status === "seated");
-    const past = reservations.filter((r) =>
-        ["completed", "no_show", "cancelled"].includes(r.status)
+    const active = reservations.filter((res) => res.status === "seated");
+    const past = reservations.filter((res) =>
+        ["completed", "no_show", "cancelled"].includes(res.status)
     );
 
     return (
@@ -426,11 +433,11 @@ export function ReservationsPanelReal() {
                 <section>
                     <h2 className="text-lg font-bold text-surface-900 dark:text-white mb-3 flex items-center gap-2">
                         <PartyPopper size={16} className="text-green-500" />
-                        En cours
+                        {r.activeSection}
                     </h2>
                     <div className="space-y-3">
-                        {active.map((r) => (
-                            <ReservationCard key={r.id} reservation={r} />
+                        {active.map((res) => (
+                            <ReservationCard key={res.id} reservation={res} />
                         ))}
                     </div>
                 </section>
@@ -441,16 +448,16 @@ export function ReservationsPanelReal() {
                 <section>
                     <h2 className="text-lg font-bold text-surface-900 dark:text-white mb-3 flex items-center gap-2">
                         <CalendarClock size={16} className="text-brand-500" />
-                        À venir
+                        {r.upcomingSection}
                         <span className="ml-1 text-sm font-normal text-surface-500">({upcoming.length})</span>
                     </h2>
                     <div className="space-y-3">
-                        {upcoming.map((r) => (
+                        {upcoming.map((res) => (
                             <ReservationCard
-                                key={r.id}
-                                reservation={r}
+                                key={res.id}
+                                reservation={res}
                                 onCancel={handleCancel}
-                                isCancelling={isCancellingId === r.id}
+                                isCancelling={isCancellingId === res.id}
                             />
                         ))}
                     </div>
@@ -462,16 +469,16 @@ export function ReservationsPanelReal() {
                 <section>
                     <h2 className="text-lg font-bold text-surface-900 dark:text-white mb-3 flex items-center gap-2">
                         <Clock size={16} className="text-surface-400" />
-                        Historique
+                        {r.historySection}
                         <span className="ml-1 text-sm font-normal text-surface-500">({past.length})</span>
                     </h2>
                     <div className="space-y-3">
-                        {past.map((r) => (
+                        {past.map((res) => (
                             <ReservationCard
-                                key={r.id}
-                                reservation={r}
+                                key={res.id}
+                                reservation={res}
                                 onSubmitReview={handleSubmitReview}
-                                isSubmittingReview={isSubmittingReviewId === r.id}
+                                isSubmittingReview={isSubmittingReviewId === res.id}
                             />
                         ))}
                     </div>
