@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { formatOrderNumber } from '@/lib/order-status';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -70,13 +71,13 @@ export default function KitchenScreen() {
                 .from('orders')
                 .select(`
                     id,
-                    order_number,
+                    invoice_number,
                     customer_name,
-                    total_amount,
+                    total,
                     status,
                     created_at,
                     order_items(
-                        product_name,
+                        name,
                         quantity
                     )
                 `)
@@ -88,13 +89,13 @@ export default function KitchenScreen() {
 
             const processed: Order[] = (ordersData || []).map((o: any) => ({
                 id: o.id,
-                orderId: o.order_number || o.id.slice(-6).toUpperCase(),
+                orderId: formatOrderNumber(o),
                 customerName: o.customer_name || 'Client',
                 items: (o.order_items || []).map((item: any) => ({
-                    name: item.product_name,
+                    name: item.name,
                     quantity: item.quantity,
                 })),
-                totalAmount: o.total_amount,
+                totalAmount: o.total,
                 status: o.status,
                 createdAt: o.created_at,
             }));

@@ -101,6 +101,24 @@ export const STATUS_FALLBACKS: Record<string, string[]> = {
     completed: ['delivered'],
 };
 
+/**
+ * Dérive un numéro affichable pour une commande.
+ *
+ * La table `orders` n'a pas de colonne `order_number` — plusieurs écrans la
+ * sélectionnaient malgré tout, ce qui faisait échouer toute la requête. La
+ * colonne réelle est `invoice_number`, nullable ; on retombe alors sur la fin
+ * de l'UUID, comme le faisait déjà l'écran Commandes.
+ */
+export function formatOrderNumber(row: {
+    invoice_number?: string | null;
+    order_number?: string | null;
+    id?: string | null;
+}): string {
+    const explicit = row.order_number ?? row.invoice_number;
+    if (typeof explicit === 'string' && explicit.trim().length > 0) return explicit;
+    return typeof row.id === 'string' ? row.id.slice(-6).toUpperCase() : '—';
+}
+
 type DeliveryType = 'delivery' | 'pickup' | 'dine_in';
 
 const DELIVERY_META: Record<DeliveryType, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {

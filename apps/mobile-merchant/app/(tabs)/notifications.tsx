@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { formatOrderNumber } from '@/lib/order-status';
 import { supabase } from '@/lib/supabase';
 
 interface ActivityEvent {
@@ -123,7 +124,7 @@ export default function NotificationsScreen() {
             if (!nextEvents.length && profile?.restaurantId) {
                 const { data: recentOrders } = await supabase
                     .from('orders')
-                    .select('id, order_number, customer_name, total_amount, created_at')
+                    .select('id, invoice_number, customer_name, total, created_at')
                     .eq('restaurant_id', profile.restaurantId)
                     .order('created_at', { ascending: false })
                     .limit(10);
@@ -131,8 +132,8 @@ export default function NotificationsScreen() {
                 nextEvents = (recentOrders ?? []).map((order: any) => ({
                     id: order.id,
                     type: 'order_new',
-                    title: `Commande #${order.order_number ?? String(order.id).slice(-6).toUpperCase()}`,
-                    subtitle: `${order.customer_name ?? 'Client'} — ${(order.total_amount ?? 0).toLocaleString()} FCFA`,
+                    title: `Commande #${formatOrderNumber(order)}`,
+                    subtitle: `${order.customer_name ?? 'Client'} — ${(order.total ?? 0).toLocaleString()} FCFA`,
                     timestamp: order.created_at,
                 }));
             }
@@ -154,7 +155,7 @@ export default function NotificationsScreen() {
                     const [ordersRes, reviewsRes, messagesRes, activeOrdersRes, unreadMessagesRes, pendingReviewsRes] = await Promise.all([
                         supabase
                             .from('orders')
-                            .select('id, order_number, customer_name, total_amount, created_at')
+                            .select('id, invoice_number, customer_name, total, created_at')
                             .eq('restaurant_id', profile.restaurantId)
                             .order('created_at', { ascending: false })
                             .limit(15),
@@ -182,8 +183,8 @@ export default function NotificationsScreen() {
                         ...(ordersRes.data ?? []).map((order: any) => ({
                             id: order.id,
                             type: 'order_new',
-                            title: `Commande #${order.order_number ?? String(order.id).slice(-6).toUpperCase()}`,
-                            subtitle: `${order.customer_name ?? 'Client'} — ${(order.total_amount ?? 0).toLocaleString()} FCFA`,
+                            title: `Commande #${formatOrderNumber(order)}`,
+                            subtitle: `${order.customer_name ?? 'Client'} — ${(order.total ?? 0).toLocaleString()} FCFA`,
                             timestamp: order.created_at,
                         })),
                         ...(reviewsRes.data ?? []).map((review: any) => ({

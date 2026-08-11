@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { formatOrderNumber } from '@/lib/order-status';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -77,7 +78,7 @@ export default function CustomerScreen() {
             }>(`/api/customers?page=1&limit=1000`, session.access_token),
             supabase
                 .from('orders')
-                .select('id, order_number, total, status, created_at')
+                .select('id, invoice_number, total, status, created_at')
                 .eq('restaurant_id', profile.restaurantId)
                 .eq('customer_id', id)
                 .order('created_at', { ascending: false }),
@@ -100,7 +101,7 @@ export default function CustomerScreen() {
             setOrders(
                 ordersResult.value.data.map((o: any) => ({
                     id: o.id,
-                    orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
+                    orderNumber: formatOrderNumber(o),
                     totalAmount: o.total,
                     status: o.status,
                     createdAt: o.created_at,

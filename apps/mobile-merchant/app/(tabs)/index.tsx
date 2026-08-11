@@ -23,7 +23,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { usePermission } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
-import { ACTIVE_STATUSES, getDeliveryMeta, type OrderStatus } from '@/lib/order-status';
+import { ACTIVE_STATUSES, formatOrderNumber, getDeliveryMeta, type OrderStatus } from '@/lib/order-status';
 import { EmptyState, ErrorBanner, ErrorState, LoadingState, StatusBadge } from '@/components/ui';
 import { Springs } from '@/constants/theme';
 
@@ -125,7 +125,7 @@ export default function OverviewScreen() {
                     .select(`
                         id,
                         status,
-                        total_amount,
+                        total,
                         created_at
                     `)
                     .eq('restaurant_id', profile.restaurantId)
@@ -139,9 +139,9 @@ export default function OverviewScreen() {
                     .from('orders')
                     .select(`
                         id,
-                        order_number,
+                        invoice_number,
                         status,
-                        total_amount,
+                        total,
                         created_at,
                         delivery_type,
                         customer_name
@@ -178,12 +178,12 @@ export default function OverviewScreen() {
                 categoriesCountRes,
             ] = responses;
 
-            const todayOrders = (todayOrdersRes.data ?? []) as { status: OrderStatus; total_amount: number; created_at: string }[];
+            const todayOrders = (todayOrdersRes.data ?? []) as { status: OrderStatus; total: number; created_at: string }[];
             const deliveredToday = todayOrders.filter((order) => order.status === 'delivered');
             const recentOrders = (recentOrdersRes.data ?? []) as any[];
 
             setOverview({
-                todayRevenue: deliveredToday.reduce((sum, order) => sum + (order.total_amount ?? 0), 0),
+                todayRevenue: deliveredToday.reduce((sum, order) => sum + (order.total ?? 0), 0),
                 todayOrdersCount: todayOrders.length,
                 activeOrdersCount: activeOrdersRes.count ?? 0,
                 cancelledOrdersCount: todayOrders.filter((order) => order.status === 'cancelled').length,
@@ -192,9 +192,9 @@ export default function OverviewScreen() {
                 categoriesCount: categoriesCountRes.count ?? 0,
                 recentOrders: recentOrders.map((order) => ({
                     id: order.id,
-                    order_number: order.order_number,
+                    order_number: formatOrderNumber(order),
                     status: order.status,
-                    total_amount: order.total_amount ?? 0,
+                    total_amount: order.total ?? 0,
                     created_at: order.created_at,
                     delivery_type: order.delivery_type,
                     customer_name: order.customer_name ?? null,
