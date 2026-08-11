@@ -5,7 +5,6 @@ import {
     RefreshControl,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -15,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
-import { ErrorBanner } from '@/components/ui';
+import { EmptyState, ErrorBanner, SearchBar } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -219,21 +218,12 @@ export default function CustomersScreen() {
                 <View style={s.backButton} />
             </View>
 
-            <View style={[s.searchContainer, { backgroundColor: theme.surface }]}>
-                <Ionicons name="search" size={18} color={theme.textSecondary} />
-                <TextInput
-                    style={[s.searchInput, { color: theme.text }]}
-                    placeholder="Rechercher..."
-                    placeholderTextColor={theme.textSecondary}
-                    value={searchText}
-                    onChangeText={setSearchText}
-                />
-                {searchText.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchText('')}>
-                        <Ionicons name="close" size={18} color={theme.textSecondary} />
-                    </TouchableOpacity>
-                )}
-            </View>
+            <SearchBar
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder="Nom, téléphone…"
+                style={s.search}
+            />
 
             {errorMessage && (
                 <ErrorBanner message={errorMessage} onRetry={() => loadCustomers(page)} style={s.banner} />
@@ -246,12 +236,16 @@ export default function CustomersScreen() {
                 contentContainerStyle={s.list}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
                 ListEmptyComponent={
-                    <View style={s.empty}>
-                        <Text style={s.emptyIcon}>👥</Text>
-                        <Text style={s.emptyText}>
-                            {searchText ? 'Aucun client trouvé' : 'Aucun client pour le moment'}
-                        </Text>
-                    </View>
+                    searchText ? (
+                        <EmptyState
+                            icon="search-outline"
+                            title="Aucun client trouvé"
+                            message={`Aucun client ne correspond à « ${searchText.trim()} ».`}
+                            action={{ label: 'Effacer la recherche', onPress: () => setSearchText('') }}
+                        />
+                    ) : (
+                        <EmptyState icon="people-outline" title="Aucun client pour le moment" />
+                    )
                 }
             />
         </SafeAreaView>
@@ -274,22 +268,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         },
         backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text, flex: 1, textAlign: 'center' },
-        searchContainer: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            marginHorizontal: 12,
-            marginVertical: 8,
-            paddingHorizontal: 12,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: theme.border,
-        },
-        searchInput: {
-            flex: 1,
-            paddingVertical: 10,
-            fontSize: 14,
-        },
+        search: { marginHorizontal: 12, marginTop: 12 },
         banner: { marginHorizontal: 12, marginBottom: 8 },
         list: { padding: 12, gap: 10, paddingBottom: 24 },
         customerCard: {
@@ -330,7 +309,4 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         metricValue: { fontSize: 13, fontWeight: '700', color: theme.text },
         metricLabel: { fontSize: 10, color: theme.textSecondary },
         metricSeparator: { width: 1, height: 20, backgroundColor: theme.border },
-        empty: { alignItems: 'center', marginTop: 70, paddingHorizontal: 20 },
-        emptyIcon: { fontSize: 46, marginBottom: 10 },
-        emptyText: { fontSize: 14, color: theme.textSecondary, textAlign: 'center' },
     });

@@ -258,7 +258,7 @@ export default function PromotionsScreen() {
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Codes promo</Text>
-                <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton}>
+                <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Nouvelle promotion">
                     <Ionicons name="add" size={24} color={theme.primary} />
                 </TouchableOpacity>
             </View>

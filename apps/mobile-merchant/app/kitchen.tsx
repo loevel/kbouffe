@@ -193,7 +193,7 @@ export default function KitchenScreen() {
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Écran cuisine</Text>
-                <TouchableOpacity onPress={onRefresh} style={s.backButton}>
+                <TouchableOpacity onPress={onRefresh} style={s.backButton} accessibilityRole="button" accessibilityLabel="Rafraîchir">
                     <Ionicons name="refresh" size={22} color={theme.text} />
                 </TouchableOpacity>
             </View>

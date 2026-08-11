@@ -128,7 +128,7 @@ export default function GiftCardsScreen() {
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Cartes cadeaux</Text>
-                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton}>
+                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Nouvelle carte cadeau">
                     <Ionicons name="add" size={22} color={theme.primary} />
                 </TouchableOpacity>
             </View>

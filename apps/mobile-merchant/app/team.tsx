@@ -283,7 +283,7 @@ export default function TeamScreen() {
                 </TouchableOpacity>
                 <Text style={s.title}>Équipe</Text>
                 {canInvite ? (
-                    <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton}>
+                    <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Ajouter un membre">
                         <Ionicons name="person-add" size={22} color={theme.primary} />
                     </TouchableOpacity>
                 ) : (

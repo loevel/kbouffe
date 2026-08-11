@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
-import { useToast } from '@/components/ui';
+import { EmptyState, useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface GalleryImage {
@@ -102,7 +102,14 @@ export default function GallerySettingsScreen() {
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Galerie photos</Text>
-                <TouchableOpacity style={s.backButton}>
+                {/* L'ajout de photo n'est pas encore implémenté côté app : ce bouton
+                    n'avait aucun onPress et ne faisait donc rien du tout. */}
+                <TouchableOpacity
+                    onPress={() => toast.show("L'ajout de photos se fait depuis le tableau de bord web pour le moment.")}
+                    style={s.backButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ajouter une photo"
+                >
                     <Ionicons name="add" size={22} color={theme.primary} />
                 </TouchableOpacity>
             </View>
@@ -110,16 +117,16 @@ export default function GallerySettingsScreen() {
             <ScrollView contentContainerStyle={s.content}>
                 {error && (
                     <View style={[s.errorBox, { backgroundColor: `${theme.error}15`, borderColor: theme.error }]}>
-                        <Text style={{ color: '#991b1b' }}>{error}</Text>
+                        <Text style={{ color: theme.error }}>{error}</Text>
                     </View>
                 )}
 
                 {images.length === 0 ? (
-                    <View style={s.emptyState}>
-                        <Text style={s.emptyIcon}>🖼️</Text>
-                        <Text style={[s.emptyText, { color: theme.text }]}>Aucune photo pour le moment</Text>
-                        <Text style={[s.emptySubtext, { color: theme.textSecondary }]}>Ajoutez des photos pour montrer votre restaurant</Text>
-                    </View>
+                    <EmptyState
+                        icon="images-outline"
+                        title="Aucune photo pour le moment"
+                        message="Les photos de votre restaurant apparaîtront ici."
+                    />
                 ) : (
                     <FlatList
                         scrollEnabled={false}

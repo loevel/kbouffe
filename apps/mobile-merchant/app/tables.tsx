@@ -228,7 +228,7 @@ export default function TablesScreen() {
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Tables</Text>
-                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton}>
+                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Ajouter une table">
                     <Ionicons name="add-circle" size={22} color={theme.primary} />
                 </TouchableOpacity>
             </View>

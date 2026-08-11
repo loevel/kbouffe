@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
-import { Button, EmptyState, ErrorBanner, LoadingState, StatusBadge, useToast } from '@/components/ui';
+import { Button, EmptyState, ErrorBanner, LoadingState, SearchBar, StatusBadge, useToast } from '@/components/ui';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
     NOT_ACTIONABLE_STATUSES,
@@ -97,6 +97,7 @@ export default function OrdersScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [filter, setFilter] = useState<'active' | 'all'>('active');
+    const [query, setQuery] = useState('');
 
     const fetchOrders = useCallback(async () => {
         if (!profile?.restaurantId) {
@@ -222,15 +223,23 @@ export default function OrdersScreen() {
         }
     };
 
-    const filteredOrders = useMemo(
-        () =>
-            filter === 'active'
-                ? orders.filter(
-                      (order) => !TERMINAL_STATUSES.has(order.status) && !NOT_ACTIONABLE_STATUSES.has(order.status)
-                  )
-                : orders,
-        [filter, orders]
-    );
+    const filteredOrders = useMemo(() => {
+        const byStatus = filter === 'active'
+            ? orders.filter(
+                  (order) => !TERMINAL_STATUSES.has(order.status) && !NOT_ACTIONABLE_STATUSES.has(order.status)
+              )
+            : orders;
+
+        const needle = query.trim().toLowerCase();
+        if (!needle) return byStatus;
+
+        // Recherche sur ce qui identifie une commande au comptoir : son numéro,
+        // le nom du client, son téléphone, et le numéro de table en salle.
+        return byStatus.filter((order) =>
+            [order.order_number, order.customer_name, order.customer_phone, order.table_number]
+                .some((field) => field?.toLowerCase().includes(needle))
+        );
+    }, [filter, orders, query]);
 
     const s = styles(theme);
 
@@ -239,8 +248,11 @@ export default function OrdersScreen() {
         const delivery = getDeliveryMeta(item.delivery_type);
         const nextLabel = getNextLabel(item);
         const time = new Date(item.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        // `?? '?'` ne rattrapait pas une chaîne vide : les commandes sur place
+        // sans numéro affichaient « Table » suivi d'un espace orphelin.
+        const tableNumber = item.table_number?.trim();
         const deliveryLabel = item.delivery_type === 'dine_in'
-            ? `Table ${item.table_number ?? '?'}`
+            ? (tableNumber ? `Table ${tableNumber}` : delivery.label)
             : delivery.label;
 
         return (
@@ -297,6 +309,14 @@ export default function OrdersScreen() {
                         accessibilityLabel="Ouvrir l'écran cuisine"
                     />
                 </View>
+                <SearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="N° de commande, client, téléphone…"
+                    resultCount={filteredOrders.length}
+                    style={s.search}
+                />
+
                 <View style={s.filterRow}>
                     {(['active', 'all'] as const).map((f) => (
                         <TouchableOpacity
@@ -327,15 +347,24 @@ export default function OrdersScreen() {
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
                     ListEmptyComponent={
                         errorMessage ? null : (
-                            <EmptyState
-                                icon="receipt-outline"
-                                title={filter === 'active' ? 'Aucune commande en cours' : 'Aucune commande'}
-                                message={
-                                    filter === 'active'
-                                        ? 'Les nouvelles commandes arrivent ici en temps réel.'
-                                        : 'Aucune commande enregistrée pour le moment.'
-                                }
-                            />
+                            query.trim() ? (
+                                <EmptyState
+                                    icon="search-outline"
+                                    title="Aucun résultat"
+                                    message={`Aucune commande ne correspond à « ${query.trim()} ».`}
+                                    action={{ label: 'Effacer la recherche', onPress: () => setQuery('') }}
+                                />
+                            ) : (
+                                <EmptyState
+                                    icon="receipt-outline"
+                                    title={filter === 'active' ? 'Aucune commande en cours' : 'Aucune commande'}
+                                    message={
+                                        filter === 'active'
+                                            ? 'Les nouvelles commandes arrivent ici en temps réel.'
+                                            : 'Aucune commande enregistrée pour le moment.'
+                                    }
+                                />
+                            )
                         )
                     }
                 />
@@ -350,6 +379,7 @@ const styles = (theme: any) => StyleSheet.create({
     titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     title: { fontSize: 22, fontWeight: '700', color: theme.text },
     banner: { marginHorizontal: 12, marginTop: 12 },
+    search: { marginBottom: 10 },
     filterRow: { flexDirection: 'row', gap: 8 },
     filterBtn: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
     filterBtnActive: { backgroundColor: theme.primary, borderColor: theme.primary },

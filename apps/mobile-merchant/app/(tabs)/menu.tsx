@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
     Switch, RefreshControl, SectionList,
@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { supabase } from '@/lib/supabase';
 import { getErrorMessage } from '@/lib/api';
-import { EmptyState, ErrorBanner, ErrorState, LoadingState, useToast } from '@/components/ui';
+import { EmptyState, ErrorBanner, ErrorState, LoadingState, SearchBar, useToast } from '@/components/ui';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import type { ProductRow } from '@/lib/types';
@@ -30,6 +30,7 @@ export default function MenuScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
+    const [query, setQuery] = useState('');
 
     const fetchMenu = useCallback(async () => {
         if (!profile?.restaurantId) return;
@@ -86,6 +87,26 @@ export default function MenuScreen() {
 
     const onRetry = async () => { setLoading(true); await fetchMenu(); setLoading(false); };
 
+    // La recherche traverse les sections : on filtre les produits puis on retire
+    // les catégories devenues vides, pour ne pas laisser d'en-têtes orphelins.
+    const visibleSections = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        if (!needle) return sections;
+        return sections
+            .map((section) => ({
+                ...section,
+                products: section.products.filter((p) =>
+                    [p.name, p.description].some((field) => field?.toLowerCase().includes(needle))
+                ),
+            }))
+            .filter((section) => section.products.length > 0);
+    }, [sections, query]);
+
+    const resultCount = useMemo(
+        () => visibleSections.reduce((sum, section) => sum + section.products.length, 0),
+        [visibleSections]
+    );
+
     const s = styles(theme);
 
     if (loading) return (
@@ -126,8 +147,16 @@ export default function MenuScreen() {
             {/* Rafraîchissement en échec : le menu affiché est celui du dernier chargement réussi. */}
             {errorMessage && <ErrorBanner message={errorMessage} onRetry={onRetry} style={s.banner} />}
 
+            <SearchBar
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Rechercher un plat…"
+                resultCount={resultCount}
+                style={s.search}
+            />
+
             <SectionList
-                sections={sections.map((s) => ({ title: s.name, data: s.products }))}
+                sections={visibleSections.map((s) => ({ title: s.name, data: s.products }))}
                 keyExtractor={(item) => item.id}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
                 renderSectionHeader={({ section }) => (
@@ -160,12 +189,21 @@ export default function MenuScreen() {
                 )}
                 contentContainerStyle={s.list}
                 ListEmptyComponent={
-                    <EmptyState
-                        icon="restaurant-outline"
-                        title="Aucun produit dans le menu"
-                        message="Ajoutez vos plats pour qu'ils soient commandables."
-                        action={{ label: 'Ajouter un produit', onPress: () => router.push('/product/new') }}
-                    />
+                    query.trim() ? (
+                        <EmptyState
+                            icon="search-outline"
+                            title="Aucun résultat"
+                            message={`Aucun plat ne correspond à « ${query.trim()} ».`}
+                            action={{ label: 'Effacer la recherche', onPress: () => setQuery('') }}
+                        />
+                    ) : (
+                        <EmptyState
+                            icon="restaurant-outline"
+                            title="Aucun produit dans le menu"
+                            message="Ajoutez vos plats pour qu'ils soient commandables."
+                            action={{ label: 'Ajouter un produit', onPress: () => router.push('/product/new') }}
+                        />
+                    )
                 }
             />
         </SafeAreaView>
@@ -190,4 +228,5 @@ const styles = (theme: any) => StyleSheet.create({
     unavailable: { opacity: 0.4 },
     productPrice: { fontSize: 13, fontWeight: '700' },
     banner: { margin: 12 },
+    search: { marginHorizontal: 12, marginTop: 12 },
 });
