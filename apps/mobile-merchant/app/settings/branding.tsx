@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -15,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 type ThemeLayout = 'grid' | 'luxury' | 'story';
@@ -45,6 +45,7 @@ export default function BrandingSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [themeLayout, setThemeLayout] = useState<ThemeLayout>('grid');
@@ -62,11 +63,11 @@ export default function BrandingSettingsScreen() {
             }
         } catch (err) {
             console.error('Erreur chargement branding:', err);
-            Alert.alert('Erreur', getErrorMessage(err, "Impossible de charger l'identité visuelle"));
+            toast.error(getErrorMessage(err, "Impossible de charger l'identité visuelle"));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => { loadBranding(); }, [loadBranding]);
 
@@ -78,9 +79,9 @@ export default function BrandingSettingsScreen() {
                 method: 'PATCH',
                 body: JSON.stringify({ theme_layout: themeLayout, primary_color: primaryColor }),
             });
-            Alert.alert('Succès', 'Identité visuelle mise à jour');
+            toast.success('Identité visuelle mise à jour');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'enregistrer'));
+            toast.error(getErrorMessage(err, 'Impossible d\'enregistrer'));
         } finally {
             setSaving(false);
         }

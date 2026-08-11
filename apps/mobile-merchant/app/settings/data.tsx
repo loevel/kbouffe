@@ -15,12 +15,14 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 export default function DataSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [exporting, setExporting] = useState<string | null>(null);
 
     const handleExport = async (exportType: 'all' | 'products' | 'orders' | 'reviews' | 'team') => {
@@ -44,12 +46,12 @@ export default function DataSettingsScreen() {
                     title: filename,
                     url: `data:application/json;base64,${Buffer.from(jsonString).toString('base64')}`,
                 });
-            } catch (shareErr) {
-                // Si le partage échoue, afficher un message de succès
-                Alert.alert('Export réussi', `Les données ont été exportées en JSON (${Math.round(jsonString.length / 1024)} KB)`);
+            } catch {
+                // La feuille de partage a échoué, mais l'export lui-même a réussi.
+                toast.success(`Données exportées en JSON (${Math.round(jsonString.length / 1024)} KB)`);
             }
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'exporter les données'));
+            toast.error(getErrorMessage(err, 'Impossible d\'exporter les données'));
         } finally {
             setExporting(null);
         }
@@ -150,11 +152,11 @@ export default function DataSettingsScreen() {
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: theme.text }]}>Suppression de données</Text>
 
-                    <View style={[s.dangerCard, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}>
+                    <View style={[s.dangerCard, { backgroundColor: `${theme.error}15`, borderColor: theme.error }]}>
                         <View style={s.dangerContent}>
                             <Ionicons name="warning-outline" size={20} color="#dc2626" />
                             <View style={{ flex: 1 }}>
-                                <Text style={[s.dangerTitle, { color: '#991b1b' }]}>Zone dangereuse</Text>
+                                <Text style={[s.dangerTitle, { color: theme.error }]}>Zone dangereuse</Text>
                                 <Text style={[s.dangerDescription, { color: '#7f1d1d' }]}>
                                     Supprimer toutes les données du restaurant (irréversible)
                                 </Text>
@@ -174,7 +176,7 @@ export default function DataSettingsScreen() {
                                             style: 'destructive',
                                             onPress: () => {
                                                 // Implémenter la suppression
-                                                Alert.alert('À venir', 'Suppression non encore implémentée');
+                                                toast.show('Suppression non encore implémentée');
                                             },
                                         },
                                     ]

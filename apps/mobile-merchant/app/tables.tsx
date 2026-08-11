@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { PermissionGate } from '@/components/PermissionGate';
@@ -41,6 +42,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string
 export default function TablesScreen() {
     const { profile, session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [tables, setTables] = useState<Table[]>([]);
@@ -126,14 +128,14 @@ export default function TablesScreen() {
                 .update(updateData)
                 .eq('id', table.id);
 
-            Alert.alert('Succès', `Table ${table.number} mise à jour`);
+            toast.success(`Table ${table.number} mise à jour`);
             setShowActionModal(false);
             setCustomerCount('');
             setSelectedTable(null);
             await loadTables();
         } catch (error) {
             console.error('Erreur:', error);
-            Alert.alert('Erreur', 'Impossible de mettre à jour la table');
+            toast.error('Impossible de mettre à jour la table');
         } finally {
             setProcessing(false);
         }
@@ -141,7 +143,7 @@ export default function TablesScreen() {
 
     const handleCreateTable = async () => {
         if (!tableNumber.trim() || !tableCapacity.trim() || !profile?.restaurantId) {
-            Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+            toast.error('Veuillez remplir tous les champs');
             return;
         }
 
@@ -154,14 +156,14 @@ export default function TablesScreen() {
                 status: 'available',
             });
 
-            Alert.alert('Succès', `Table ${tableNumber} créée`);
+            toast.success(`Table ${tableNumber} créée`);
             setShowCreateModal(false);
             setTableNumber('');
             setTableCapacity('');
             await loadTables();
         } catch (error) {
             console.error('Erreur:', error);
-            Alert.alert('Erreur', 'Impossible de créer la table');
+            toast.error('Impossible de créer la table');
         } finally {
             setProcessing(false);
         }

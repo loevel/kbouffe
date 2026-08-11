@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import type { CategoryRow } from '@/lib/types';
@@ -32,6 +33,7 @@ export default function NewProductScreen() {
     const { session, profile } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
@@ -89,7 +91,7 @@ export default function NewProductScreen() {
                 setSelectedImage(result.assets[0].uri);
             }
         } catch (error) {
-            Alert.alert('Erreur', 'Impossible de sélectionner une image');
+            toast.error('Impossible de sélectionner une image');
         }
     };
 
@@ -128,7 +130,7 @@ export default function NewProductScreen() {
         const parsedPrice = Number.parseInt(price, 10);
 
         if (!name.trim() || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
-            Alert.alert('Erreur', 'Le nom et le prix sont obligatoires');
+            toast.error('Le nom et le prix sont obligatoires');
             return;
         }
 
@@ -153,10 +155,10 @@ export default function NewProductScreen() {
                 }),
             });
 
-            Alert.alert('Succès', 'Produit créé');
+            toast.success('Produit créé');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de créer le produit'));
+            toast.error(getErrorMessage(error, 'Impossible de créer le produit'));
         } finally {
             setSaving(false);
         }

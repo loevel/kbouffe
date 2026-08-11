@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     RefreshControl,
@@ -17,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
-import { ErrorBanner } from '@/components/ui';
+import { ErrorBanner, useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface Coupon {
@@ -59,6 +58,7 @@ interface CouponsResponse {
 export default function PromotionsScreen() {
     const { session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -122,7 +122,7 @@ export default function PromotionsScreen() {
 
     const handleCreateCoupon = async () => {
         if (!formCode.trim() || !formName.trim() || !formValue) {
-            Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
+            toast.error('Veuillez remplir tous les champs obligatoires');
             return;
         }
 
@@ -142,7 +142,7 @@ export default function PromotionsScreen() {
                 }),
             });
 
-            Alert.alert('Succès', 'Code promo créé');
+            toast.success('Code promo créé');
             setShowModal(false);
             setFormCode('');
             setFormName('');
@@ -151,7 +151,7 @@ export default function PromotionsScreen() {
             setFormMinOrder('');
             await loadCoupons();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de créer le code promo'));
+            toast.error(getErrorMessage(error, 'Impossible de créer le code promo'));
         } finally {
             setCreating(false);
         }
@@ -172,7 +172,7 @@ export default function PromotionsScreen() {
                 )
             );
         } catch (error) {
-            Alert.alert('Erreur', 'Impossible de mettre à jour le code promo');
+            toast.error('Impossible de mettre à jour le code promo');
         }
     };
 

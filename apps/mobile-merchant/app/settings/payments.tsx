@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Switch,
@@ -15,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface PaymentProvider {
@@ -65,6 +65,7 @@ export default function PaymentSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [providers, setProviders] = useState<PaymentProvider[]>([]);
@@ -91,11 +92,11 @@ export default function PaymentSettingsScreen() {
             setPaymentAccountId(restaurantData.payment_account_id);
             setMethods(normalizeMethods(restaurantData.payment_methods));
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de charger les paramètres de paiement'));
+            toast.error(getErrorMessage(error, 'Impossible de charger les paramètres de paiement'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => {
         loadData();
@@ -114,7 +115,7 @@ export default function PaymentSettingsScreen() {
     const handleSave = async () => {
         if (!session) return;
         if (!Object.values(methods).some(Boolean)) {
-            Alert.alert('Validation', 'Activez au moins un mode de paiement.');
+            toast.error('Activez au moins un mode de paiement.');
             return;
         }
 
@@ -126,10 +127,10 @@ export default function PaymentSettingsScreen() {
                     payment_methods: methods,
                 }),
             });
-            Alert.alert('Succès', 'Modes de paiement mis à jour.');
+            toast.success('Modes de paiement mis à jour.');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de sauvegarder les modes de paiement'));
+            toast.error(getErrorMessage(error, 'Impossible de sauvegarder les modes de paiement'));
         } finally {
             setSaving(false);
         }

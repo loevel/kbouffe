@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
-    Switch, RefreshControl, SectionList, Alert,
+    Switch, RefreshControl, SectionList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { supabase } from '@/lib/supabase';
 import { getErrorMessage } from '@/lib/api';
-import { EmptyState, ErrorBanner, ErrorState, LoadingState } from '@/components/ui';
+import { EmptyState, ErrorBanner, ErrorState, LoadingState, useToast } from '@/components/ui';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import type { ProductRow } from '@/lib/types';
@@ -23,6 +23,7 @@ interface MenuSection {
 export default function MenuScreen() {
     const { profile } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
     const [sections, setSections] = useState<MenuSection[]>([]);
     const [loading, setLoading] = useState(true);
@@ -77,10 +78,7 @@ export default function MenuScreen() {
             // Sans rollback, le switch restait sur une valeur jamais enregistrée :
             // un plat en rupture pouvait sembler encore disponible à la vente.
             applyValue(product.is_available);
-            Alert.alert(
-                'Mise à jour impossible',
-                `La disponibilité de « ${product.name} » n'a pas pu être enregistrée.\n\n${error.message}`
-            );
+            toast.error(`Disponibilité de « ${product.name} » non enregistrée : ${error.message}`);
         }
     };
 

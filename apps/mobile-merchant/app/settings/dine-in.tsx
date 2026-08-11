@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -18,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface DineInSettings {
@@ -33,6 +33,7 @@ export default function DineInSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<DineInSettings>({
@@ -58,11 +59,11 @@ export default function DineInSettingsScreen() {
             });
         } catch (err) {
             console.error('Erreur chargement dine-in:', err);
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de charger les paramètres sur place'));
+            toast.error(getErrorMessage(err, 'Impossible de charger les paramètres sur place'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => { loadSettings(); }, [loadSettings]);
 
@@ -80,9 +81,9 @@ export default function DineInSettingsScreen() {
                     table_numbering_enabled: settings.table_numbering_enabled,
                 }),
             });
-            Alert.alert('Succès', 'Paramètres enregistrés');
+            toast.success('Paramètres enregistrés');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'enregistrer'));
+            toast.error(getErrorMessage(err, 'Impossible d\'enregistrer'));
         } finally {
             setSaving(false);
         }

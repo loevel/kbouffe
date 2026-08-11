@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -17,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -48,6 +48,7 @@ export default function ShowcaseScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [description, setDescription] = useState('');
@@ -63,11 +64,11 @@ export default function ShowcaseScreen() {
             if (data.social_links) setSocialLinks(data.social_links);
         } catch (err) {
             console.error('Erreur chargement vitrine:', err);
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de charger la vitrine'));
+            toast.error(getErrorMessage(err, 'Impossible de charger la vitrine'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => { loadShowcase(); }, [loadShowcase]);
 
@@ -83,9 +84,9 @@ export default function ShowcaseScreen() {
                     social_links: socialLinks,
                 }),
             });
-            Alert.alert('Succès', 'Vitrine mise à jour');
+            toast.success('Vitrine mise à jour');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'enregistrer'));
+            toast.error(getErrorMessage(err, 'Impossible d\'enregistrer'));
         } finally {
             setSaving(false);
         }

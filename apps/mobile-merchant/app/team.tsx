@@ -20,7 +20,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
-import { ErrorBanner } from '@/components/ui';
+import { ErrorBanner, useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { PermissionGate } from '@/components/PermissionGate';
@@ -65,6 +65,7 @@ type InviteMode = 'invite' | 'create';
 export default function TeamScreen() {
     const { session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [members, setMembers] = useState<TeamMember[]>([]);
@@ -121,7 +122,7 @@ export default function TeamScreen() {
 
         if (inviteMode === 'invite') {
             if (!inviteEmail.trim()) {
-                Alert.alert('Erreur', 'Veuillez entrer une adresse email');
+                toast.error('Veuillez entrer une adresse email');
                 return;
             }
             setSending(true);
@@ -130,22 +131,22 @@ export default function TeamScreen() {
                     method: 'POST',
                     body: JSON.stringify({ email: inviteEmail.trim(), role: selectedRole }),
                 });
-                Alert.alert('Succès', `Invitation envoyée à ${inviteEmail.trim()}`);
+                toast.success(`Invitation envoyée à ${inviteEmail.trim()}`);
                 setShowModal(false);
                 resetModal();
                 await loadTeam();
             } catch (err) {
-                Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'envoyer l\'invitation'));
+                toast.error(getErrorMessage(err, 'Impossible d\'envoyer l\'invitation'));
             } finally {
                 setSending(false);
             }
         } else {
             if (!createName.trim() || !inviteEmail.trim() || !createPassword.trim()) {
-                Alert.alert('Erreur', 'Nom, email et mot de passe sont requis');
+                toast.error('Nom, email et mot de passe sont requis');
                 return;
             }
             if (createPassword.length < 8) {
-                Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 8 caractères');
+                toast.error('Le mot de passe doit contenir au moins 8 caractères');
                 return;
             }
             setSending(true);
@@ -160,12 +161,12 @@ export default function TeamScreen() {
                         role: selectedRole,
                     }),
                 });
-                Alert.alert('Succès', `Compte créé pour ${createName.trim()}`);
+                toast.success(`Compte créé pour ${createName.trim()}`);
                 setShowModal(false);
                 resetModal();
                 await loadTeam();
             } catch (err) {
-                Alert.alert('Erreur', getErrorMessage(err, 'Impossible de créer le compte'));
+                toast.error(getErrorMessage(err, 'Impossible de créer le compte'));
             } finally {
                 setSending(false);
             }
@@ -187,7 +188,7 @@ export default function TeamScreen() {
                             await apiFetch(`/api/team/${member.id}`, session.access_token, { method: 'DELETE' });
                             await loadTeam();
                         } catch (err) {
-                            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de révoquer ce membre'));
+                            toast.error(getErrorMessage(err, 'Impossible de révoquer ce membre'));
                         }
                     },
                 },

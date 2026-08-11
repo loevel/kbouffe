@@ -8,6 +8,7 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/hooks/use-theme';
 import { Colors } from '@/constants/colors';
 import { Springs } from '@/constants/theme';
 import { View, Text, StyleSheet } from 'react-native';
@@ -43,6 +44,7 @@ const tabLabelStyles = StyleSheet.create({
 });
 
 function TabIcon({ name, color, badge, focused }: { name: TabIconName; color: string; badge?: number; focused: boolean }) {
+    const theme = useTheme();
     const scale = useSharedValue(1);
 
     useEffect(() => {
@@ -59,7 +61,7 @@ function TabIcon({ name, color, badge, focused }: { name: TabIconName; color: st
                 <Ionicons name={name} size={22} color={color} />
             </Animated.View>
             {badge != null && badge > 0 && (
-                <View style={styles.badge}>
+                <View style={[styles.badge, { backgroundColor: theme.error, borderColor: theme.surface }]}>
                     <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
                 </View>
             )}
@@ -78,7 +80,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: -6,
         right: -6,
-        backgroundColor: '#ef4444',
         borderRadius: 10,
         minWidth: 18,
         height: 18,
@@ -86,7 +87,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 4,
         borderWidth: 2,
-        borderColor: '#fff',
     },
     badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
     indicator: {

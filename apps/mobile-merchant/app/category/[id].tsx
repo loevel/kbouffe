@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface Category {
@@ -29,6 +30,7 @@ export default function CategoryDetailScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [category, setCategory] = useState<Category | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -51,9 +53,9 @@ export default function CategoryDetailScreen() {
                     setDescription(found.description ?? '');
                 }
             })
-            .catch((error) => Alert.alert('Erreur', getErrorMessage(error, 'Impossible de charger la catégorie')))
+            .catch((error) => toast.error(getErrorMessage(error, 'Impossible de charger la catégorie')))
             .finally(() => setLoading(false));
-    }, [id, session]);
+    }, [id, session, toast]);
 
     const handleSave = async () => {
         if (!session) {
@@ -61,7 +63,7 @@ export default function CategoryDetailScreen() {
             return;
         }
         if (!name.trim()) {
-            Alert.alert('Validation', 'Le nom de la catégorie est obligatoire.');
+            toast.error('Le nom de la catégorie est obligatoire.');
             return;
         }
 
@@ -74,10 +76,10 @@ export default function CategoryDetailScreen() {
                     description: description.trim() || null,
                 }),
             });
-            Alert.alert('Succès', 'Catégorie mise à jour');
+            toast.success('Catégorie mise à jour');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de mettre à jour la catégorie'));
+            toast.error(getErrorMessage(error, 'Impossible de mettre à jour la catégorie'));
         } finally {
             setSaving(false);
         }

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -17,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface DeliverySettings {
@@ -32,6 +32,7 @@ export default function ZonesSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [newZone, setNewZone] = useState('');
@@ -58,11 +59,11 @@ export default function ZonesSettingsScreen() {
             });
         } catch (err) {
             console.error('Erreur chargement livraison:', err);
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de charger les paramètres de livraison'));
+            toast.error(getErrorMessage(err, 'Impossible de charger les paramètres de livraison'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => { loadSettings(); }, [loadSettings]);
 
@@ -81,9 +82,9 @@ export default function ZonesSettingsScreen() {
                     estimated_delivery_time: form.estimated_delivery_time,
                 }),
             });
-            Alert.alert('Succès', 'Paramètres de livraison enregistrés');
+            toast.success('Paramètres de livraison enregistrés');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'enregistrer'));
+            toast.error(getErrorMessage(err, 'Impossible d\'enregistrer'));
         } finally {
             setSaving(false);
         }
@@ -93,7 +94,7 @@ export default function ZonesSettingsScreen() {
         const name = newZone.trim();
         if (!name) return;
         if (form.delivery_zones.includes(name)) {
-            Alert.alert('Doublon', 'Cette zone existe déjà');
+            toast.error('Cette zone existe déjà');
             return;
         }
         setForm((prev) => ({ ...prev, delivery_zones: [...prev.delivery_zones, name] }));

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     ScrollView,
@@ -17,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
-import { ErrorBanner } from '@/components/ui';
+import { ErrorBanner, useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -42,6 +41,7 @@ export default function GiftCardsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [cards, setCards] = useState<GiftCard[]>([]);
@@ -79,7 +79,7 @@ export default function GiftCardsScreen() {
 
     const handleCreateCard = async () => {
         if (!amount.trim() || parseFloat(amount) <= 0) {
-            Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+            toast.error('Veuillez entrer un montant valide');
             return;
         }
 
@@ -98,13 +98,13 @@ export default function GiftCardsScreen() {
                     }),
                 }
             );
-            Alert.alert('Succès', 'Carte cadeau créée');
+            toast.success('Carte cadeau créée');
             setShowCreateModal(false);
             setAmount('');
             setBeneficiary('');
             await loadCards();
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de créer la carte'));
+            toast.error(getErrorMessage(err, 'Impossible de créer la carte'));
         } finally {
             setSaving(false);
         }

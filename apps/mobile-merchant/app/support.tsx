@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     KeyboardAvoidingView,
     Linking,
@@ -20,7 +19,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
-import { ErrorBanner } from '@/components/ui';
+import { ErrorBanner, useToast } from '@/components/ui';
 import { TouchTarget, hitSlopFor } from '@/constants/theme';
 
 const CLOSE_HIT_SLOP = hitSlopFor(32);
@@ -64,6 +63,7 @@ export default function SupportScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -93,7 +93,7 @@ export default function SupportScreen() {
 
     const handleCreate = async () => {
         if (!subject.trim() || !description.trim()) {
-            Alert.alert('Champs requis', 'Veuillez remplir le sujet et la description');
+            toast.error('Veuillez remplir le sujet et la description');
             return;
         }
         if (!session) return;
@@ -110,7 +110,7 @@ export default function SupportScreen() {
             setPriority('normal');
             await loadTickets();
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de créer le ticket'));
+            toast.error(getErrorMessage(err, 'Impossible de créer le ticket'));
         } finally {
             setSaving(false);
         }

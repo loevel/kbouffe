@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { PermissionGate } from '@/components/PermissionGate';
@@ -35,6 +36,7 @@ interface CashSession {
 export default function CaisseScreen() {
     const { profile, session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [currentSession, setCurrentSession] = useState<CashSession | null>(null);
@@ -114,7 +116,7 @@ export default function CaisseScreen() {
 
     const handleOpenSession = async () => {
         if (!startingCash.trim() || !profile?.restaurantId) {
-            Alert.alert('Erreur', 'Veuillez entrer un montant de départ');
+            toast.error('Veuillez entrer un montant de départ');
             return;
         }
 
@@ -130,13 +132,13 @@ export default function CaisseScreen() {
                 status: 'open',
             });
 
-            Alert.alert('Succès', 'Session de caisse ouverte');
+            toast.success('Session de caisse ouverte');
             setShowOpenModal(false);
             setStartingCash('');
             await loadSession();
         } catch (error) {
             console.error('Erreur:', error);
-            Alert.alert('Erreur', 'Impossible d\'ouvrir la session');
+            toast.error('Impossible d\'ouvrir la session');
         } finally {
             setProcessing(false);
         }
@@ -144,7 +146,7 @@ export default function CaisseScreen() {
 
     const handleCloseSession = async () => {
         if (!actualCash.trim() || !currentSession) {
-            Alert.alert('Erreur', 'Veuillez entrer le montant réel');
+            toast.error('Veuillez entrer le montant réel');
             return;
         }
 
@@ -176,7 +178,7 @@ export default function CaisseScreen() {
             );
         } catch (error) {
             console.error('Erreur:', error);
-            Alert.alert('Erreur', 'Impossible de fermer la session');
+            toast.error('Impossible de fermer la session');
         } finally {
             setProcessing(false);
         }

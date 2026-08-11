@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     RefreshControl,
     StyleSheet,
@@ -16,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
-import { ErrorBanner } from '@/components/ui';
+import { ErrorBanner, useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -50,6 +49,7 @@ function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
 export default function ReviewsScreen() {
     const { session, profile } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
@@ -134,12 +134,12 @@ export default function ReviewsScreen() {
                 body: JSON.stringify({ response: responseText.trim() }),
             });
 
-            Alert.alert('Succès', 'Votre réponse a été enregistrée');
+            toast.success('Votre réponse a été enregistrée');
             setRespondingToId(null);
             setResponseText('');
             await loadReviews();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible d\'enregistrer la réponse'));
+            toast.error(getErrorMessage(error, 'Impossible d\'enregistrer la réponse'));
         } finally {
             setSubmitting(false);
         }

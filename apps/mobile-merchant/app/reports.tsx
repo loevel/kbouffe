@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     RefreshControl,
     ScrollView,
     Share,
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import {
     type DashboardPeriod,
@@ -178,6 +178,7 @@ export default function ReportsScreen() {
     const initialPeriod = toDashboardPeriod(params.period);
     const { session, profile } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [period, setPeriod] = useState<DashboardPeriod>(initialPeriod);
@@ -239,8 +240,8 @@ export default function ReportsScreen() {
 
     const handleCopyCsv = useCallback(async () => {
         await Clipboard.setStringAsync(csvContent);
-        Alert.alert('Export copié', 'Le rapport CSV a été copié dans le presse-papiers.');
-    }, [csvContent]);
+        toast.success('Le rapport CSV a été copié dans le presse-papiers.');
+    }, [csvContent, toast]);
 
     const handleShare = useCallback(async () => {
         await Share.share({

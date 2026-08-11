@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Switch,
@@ -16,12 +15,14 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 export default function SecuritySettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [saving, setSaving] = useState(false);
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -33,17 +34,17 @@ export default function SecuritySettingsScreen() {
 
     const handleChangePassword = async () => {
         if (!currentPassword.trim()) {
-            Alert.alert('Erreur', 'Veuillez entrer votre mot de passe actuel');
+            toast.error('Veuillez entrer votre mot de passe actuel');
             return;
         }
 
         if (!newPassword.trim() || newPassword.length < 8) {
-            Alert.alert('Erreur', 'Le nouveau mot de passe doit contenir au moins 8 caractères');
+            toast.error('Le nouveau mot de passe doit contenir au moins 8 caractères');
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+            toast.error('Les mots de passe ne correspondent pas');
             return;
         }
 
@@ -62,12 +63,12 @@ export default function SecuritySettingsScreen() {
                     }),
                 }
             );
-            Alert.alert('Succès', 'Mot de passe mis à jour');
+            toast.success('Mot de passe mis à jour');
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de mettre à jour le mot de passe'));
+            toast.error(getErrorMessage(err, 'Impossible de mettre à jour le mot de passe'));
         } finally {
             setSaving(false);
         }
@@ -84,9 +85,9 @@ export default function SecuritySettingsScreen() {
                 { method: 'POST' }
             );
             setTwoFactorEnabled(!twoFactorEnabled);
-            Alert.alert('Succès', twoFactorEnabled ? 'Authentification 2FA désactivée' : 'Authentification 2FA activée');
+            toast.success(twoFactorEnabled ? 'Authentification 2FA désactivée' : 'Authentification 2FA activée');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de mettre à jour'));
+            toast.error(getErrorMessage(err, 'Impossible de mettre à jour'));
         } finally {
             setSaving(false);
         }

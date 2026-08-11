@@ -4,3 +4,4 @@ export { ErrorBanner } from './ErrorBanner';
 export { ErrorState } from './ErrorState';
 export { LoadingState } from './LoadingState';
 export { StatusBadge } from './StatusBadge';
+export { ToastProvider, useToast } from './Toast';

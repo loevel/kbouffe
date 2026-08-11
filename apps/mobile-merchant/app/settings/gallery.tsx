@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface GalleryImage {
@@ -30,6 +31,7 @@ export default function GallerySettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [images, setImages] = useState<GalleryImage[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export default function GallerySettingsScreen() {
                         );
                         setImages(images.filter((img) => img.id !== id));
                     } catch (err) {
-                        Alert.alert('Erreur', getErrorMessage(err, 'Impossible de supprimer'));
+                        toast.error(getErrorMessage(err, 'Impossible de supprimer'));
                     }
                 },
             },
@@ -107,7 +109,7 @@ export default function GallerySettingsScreen() {
 
             <ScrollView contentContainerStyle={s.content}>
                 {error && (
-                    <View style={[s.errorBox, { backgroundColor: '#fee2e2', borderColor: '#fca5a5' }]}>
+                    <View style={[s.errorBox, { backgroundColor: `${theme.error}15`, borderColor: theme.error }]}>
                         <Text style={{ color: '#991b1b' }}>{error}</Text>
                     </View>
                 )}

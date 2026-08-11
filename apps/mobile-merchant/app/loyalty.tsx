@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     ScrollView,
     StyleSheet,
@@ -16,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -43,6 +43,7 @@ interface CustomerLoyalty {
 export default function LoyaltyScreen() {
     const { profile, session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [program, setProgram] = useState<LoyaltyProgram | null>(null);
@@ -142,10 +143,10 @@ export default function LoyaltyScreen() {
             }
 
             await loadLoyaltyData();
-            Alert.alert('Succès', 'Programme de fidélité mis à jour');
+            toast.success('Programme de fidélité mis à jour');
         } catch (error) {
             console.error('Erreur lors de la sauvegarde:', error);
-            Alert.alert('Erreur', 'Impossible de mettre à jour le programme');
+            toast.error('Impossible de mettre à jour le programme');
         } finally {
             setSaving(false);
         }

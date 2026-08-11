@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     RefreshControl,
     StyleSheet,
@@ -15,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
-import { ErrorBanner } from '@/components/ui';
+import { ErrorBanner, useToast } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -67,6 +66,7 @@ const STATUS_ACTIONS: Record<string, string[]> = {
 export default function ReservationsScreen() {
     const { session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -170,9 +170,9 @@ export default function ReservationsScreen() {
                     r.id === reservationId ? { ...r, status: newStatus as any } : r
                 )
             );
-            Alert.alert('Succès', 'Le statut a été mis à jour');
+            toast.success('Le statut a été mis à jour');
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de mettre à jour la réservation'));
+            toast.error(getErrorMessage(error, 'Impossible de mettre à jour la réservation'));
         } finally {
             setActioningId(null);
         }

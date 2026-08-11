@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { Button, EmptyState, ErrorBanner, LoadingState, StatusBadge, useToast } from '@/components/ui';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
     NOT_ACTIONABLE_STATUSES,
@@ -17,7 +18,6 @@ import {
     getDeliveryMeta,
     getStatusMeta,
 } from '@/lib/order-status';
-import { Button, EmptyState, ErrorBanner, LoadingState, StatusBadge } from '@/components/ui';
 import type { OrderRow } from '@/lib/types';
 
 function asOrderNumber(row: Record<string, unknown>) {
@@ -89,6 +89,7 @@ function getNextLabel(order: OrderRow): string | null {
 export default function OrdersScreen() {
     const { profile } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const scheme = useColorScheme();
     const router = useRouter();
     const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -188,7 +189,7 @@ export default function OrdersScreen() {
                         }
 
                         if (!appliedStatus) {
-                            Alert.alert('Erreur', lastError ?? 'Impossible de mettre à jour la commande');
+                            toast.error(lastError ?? 'Impossible de mettre à jour la commande');
                             return;
                         }
 
