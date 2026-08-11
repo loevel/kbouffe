@@ -16,7 +16,11 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
+import { TouchTarget, hitSlopFor } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
+
+const CLOSE_HIT_SLOP = hitSlopFor(32);
 
 interface Service {
     id: string;
@@ -86,14 +90,20 @@ export default function MarketplaceScreen() {
     const [purchasing, setPurchasing] = useState(false);
     const [purchaseStatus, setPurchaseStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [paymentStep, setPaymentStep] = useState<'details' | 'pending'>('details');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadServices = useCallback(async () => {
         if (!session) { setLoading(false); return; }
         try {
             const data = await apiFetch<{ services: Service[] }>('/api/marketplace/services', session.access_token);
             setServices(data.services || []);
-        } catch {
+            setErrorMessage(null);
+        } catch (error) {
+            // Previously swallowed silently, rendering the same "Aucun
+            // service disponible" empty state as a genuinely empty catalog —
+            // no way to tell a failed request apart from reality.
             setServices([]);
+            setErrorMessage(getErrorMessage(error, 'Impossible de charger les services'));
         } finally {
             setLoading(false);
         }
@@ -167,12 +177,16 @@ export default function MarketplaceScreen() {
         <PermissionGate permission="store:manage">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Marketplace</Text>
                 <View style={s.backButton} />
             </View>
+
+            {errorMessage && (
+                <ErrorBanner message={errorMessage} onRetry={loadServices} style={s.banner} />
+            )}
 
             <FlatList
                 data={services}
@@ -257,7 +271,13 @@ export default function MarketplaceScreen() {
                                             {paymentStep === 'pending' ? 'Confirmez sur votre téléphone' : 'Activez ce service pour votre restaurant'}
                                         </Text>
                                     </View>
-                                    <TouchableOpacity onPress={closeModal} style={s.closeButton}>
+                                    <TouchableOpacity
+                                        onPress={closeModal}
+                                        style={s.closeButton}
+                                        hitSlop={CLOSE_HIT_SLOP}
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Fermer"
+                                    >
                                         <Ionicons name="close" size={20} color="#fff" />
                                     </TouchableOpacity>
                                 </View>
@@ -429,9 +449,10 @@ const styles = (theme: any) =>
             paddingHorizontal: 16, paddingVertical: 12,
             backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32, gap: 14 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
 
         serviceCard: { borderRadius: 14, padding: 16, gap: 10 },
         cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },

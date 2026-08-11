@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -17,6 +16,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 
 interface DeliverySettings {
     delivery_zones: string[];
@@ -31,6 +32,7 @@ export default function ZonesSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [newZone, setNewZone] = useState('');
@@ -57,10 +59,11 @@ export default function ZonesSettingsScreen() {
             });
         } catch (err) {
             console.error('Erreur chargement livraison:', err);
+            toast.error(getErrorMessage(err, 'Impossible de charger les paramètres de livraison'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => { loadSettings(); }, [loadSettings]);
 
@@ -79,9 +82,9 @@ export default function ZonesSettingsScreen() {
                     estimated_delivery_time: form.estimated_delivery_time,
                 }),
             });
-            Alert.alert('Succès', 'Paramètres de livraison enregistrés');
+            toast.success('Paramètres de livraison enregistrés');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'enregistrer'));
+            toast.error(getErrorMessage(err, 'Impossible d\'enregistrer'));
         } finally {
             setSaving(false);
         }
@@ -91,7 +94,7 @@ export default function ZonesSettingsScreen() {
         const name = newZone.trim();
         if (!name) return;
         if (form.delivery_zones.includes(name)) {
-            Alert.alert('Doublon', 'Cette zone existe déjà');
+            toast.error('Cette zone existe déjà');
             return;
         }
         setForm((prev) => ({ ...prev, delivery_zones: [...prev.delivery_zones, name] }));
@@ -118,7 +121,7 @@ export default function ZonesSettingsScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Zones de livraison</Text>
@@ -269,7 +272,7 @@ const styles = (theme: any) =>
             paddingHorizontal: 16, paddingVertical: 12,
             backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         saveBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
         saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },

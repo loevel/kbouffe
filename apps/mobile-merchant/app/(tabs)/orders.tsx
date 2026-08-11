@@ -1,52 +1,24 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, StyleSheet,
-    RefreshControl, ActivityIndicator, Alert,
+    RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { Button, EmptyState, ErrorBanner, LoadingState, SearchBar, StatusBadge, useToast } from '@/components/ui';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+    NOT_ACTIONABLE_STATUSES,
+    STATUS_FALLBACKS,
+    TERMINAL_STATUSES,
+    getDeliveryMeta,
+    getStatusMeta,
+} from '@/lib/order-status';
 import type { OrderRow } from '@/lib/types';
-
-interface StatusConfig {
-    label: string;
-    color: string;
-    bg: string;
-}
-
-const STATUS_CONFIG: Record<string, StatusConfig> = {
-    draft:            { label: 'Brouillon', color: '#475569', bg: '#e2e8f0' },
-    scheduled:        { label: 'Planifiée', color: '#7c3aed', bg: '#ede9fe' },
-    pending:          { label: 'En attente', color: '#d97706', bg: '#fef3c7' },
-    accepted:         { label: 'Acceptée', color: '#2563eb', bg: '#dbeafe' },
-    preparing:        { label: 'Préparation', color: '#7c3aed', bg: '#ede9fe' },
-    ready:            { label: 'Prête', color: '#16a34a', bg: '#dcfce7' },
-    out_for_delivery: { label: 'En livraison', color: '#0891b2', bg: '#cffafe' },
-    delivering:       { label: 'En livraison', color: '#0891b2', bg: '#cffafe' },
-    delivered:        { label: 'Livrée', color: '#64748b', bg: '#f1f5f9' },
-    completed:        { label: 'Terminée', color: '#64748b', bg: '#f1f5f9' },
-    cancelled:        { label: 'Annulée', color: '#dc2626', bg: '#fee2e2' },
-    refunded:         { label: 'Remboursée', color: '#b45309', bg: '#ffedd5' },
-};
-
-const DEFAULT_STATUS_CONFIG: StatusConfig = { label: 'Statut inconnu', color: '#64748b', bg: '#f1f5f9' };
-
-const TERMINAL_STATUSES = new Set<string>(['delivered', 'completed', 'cancelled', 'refunded']);
-
-// "draft" orders are unsent carts (getNextStatus/getNextLabel return null for
-// them, so they render with no action button at all) — they don't belong
-// mixed into the "En cours" queue alongside orders the merchant can actually
-// act on. Keep them visible under "Toutes" only.
-const NOT_ACTIONABLE_STATUSES = new Set<string>(['draft']);
-
-const STATUS_FALLBACKS: Record<string, string[]> = {
-    out_for_delivery: ['delivering'],
-    delivering: ['out_for_delivery'],
-    delivered: ['completed'],
-    completed: ['delivered'],
-};
 
 function asOrderNumber(row: Record<string, unknown>) {
     const value = row.order_number ?? row.invoice_number;
@@ -76,10 +48,6 @@ function mapOrderRow(row: Record<string, unknown>): OrderRow {
                 ? String(row.table_number)
                 : undefined,
     };
-}
-
-function getStatusConfig(status: string) {
-    return STATUS_CONFIG[status] ?? DEFAULT_STATUS_CONFIG;
 }
 
 function getNextStatus(order: OrderRow): string | null {
@@ -121,12 +89,15 @@ function getNextLabel(order: OrderRow): string | null {
 export default function OrdersScreen() {
     const { profile } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
+    const scheme = useColorScheme();
     const router = useRouter();
     const [orders, setOrders] = useState<OrderRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [filter, setFilter] = useState<'active' | 'all'>('active');
+    const [query, setQuery] = useState('');
 
     const fetchOrders = useCallback(async () => {
         if (!profile?.restaurantId) {
@@ -219,7 +190,7 @@ export default function OrdersScreen() {
                         }
 
                         if (!appliedStatus) {
-                            Alert.alert('Erreur', lastError ?? 'Impossible de mettre à jour la commande');
+                            toast.error(lastError ?? 'Impossible de mettre à jour la commande');
                             return;
                         }
 
@@ -241,52 +212,82 @@ export default function OrdersScreen() {
         }
     };
 
-    const filteredOrders = useMemo(
-        () =>
-            filter === 'active'
-                ? orders.filter(
-                      (order) => !TERMINAL_STATUSES.has(order.status) && !NOT_ACTIONABLE_STATUSES.has(order.status)
-                  )
-                : orders,
-        [filter, orders]
-    );
+    const onRetry = async () => {
+        setLoading(true);
+        try {
+            await fetchOrders();
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les commandes');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredOrders = useMemo(() => {
+        const byStatus = filter === 'active'
+            ? orders.filter(
+                  (order) => !TERMINAL_STATUSES.has(order.status) && !NOT_ACTIONABLE_STATUSES.has(order.status)
+              )
+            : orders;
+
+        const needle = query.trim().toLowerCase();
+        if (!needle) return byStatus;
+
+        // Recherche sur ce qui identifie une commande au comptoir : son numéro,
+        // le nom du client, son téléphone, et le numéro de table en salle.
+        return byStatus.filter((order) =>
+            [order.order_number, order.customer_name, order.customer_phone, order.table_number]
+                .some((field) => field?.toLowerCase().includes(needle))
+        );
+    }, [filter, orders, query]);
 
     const s = styles(theme);
 
     const renderOrder = ({ item }: { item: OrderRow }) => {
-        const cfg = getStatusConfig(item.status);
+        const statusMeta = getStatusMeta(item.status, scheme);
+        const delivery = getDeliveryMeta(item.delivery_type);
         const nextLabel = getNextLabel(item);
         const time = new Date(item.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        const deliveryIcons: Record<string, string> = { delivery: '🛵', pickup: '🏃', dine_in: '🍽️' };
+        // `?? '?'` ne rattrapait pas une chaîne vide : les commandes sur place
+        // sans numéro affichaient « Table » suivi d'un espace orphelin.
+        const tableNumber = item.table_number?.trim();
+        const deliveryLabel = item.delivery_type === 'dine_in'
+            ? (tableNumber ? `Table ${tableNumber}` : delivery.label)
+            : delivery.label;
 
         return (
-            <TouchableOpacity style={s.card} onPress={() => router.push(`/order/${item.id}`)}>
+            <TouchableOpacity
+                style={s.card}
+                onPress={() => router.push(`/order/${item.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`Commande ${item.order_number}, ${statusMeta.label}, ${item.total_amount?.toLocaleString()} FCFA`}
+            >
                 <View style={s.cardHeader}>
                     <View style={s.orderMeta}>
                         <Text style={s.orderNum}>#{item.order_number}</Text>
                         <Text style={s.orderTime}>{time}</Text>
                     </View>
-                    <View style={[s.statusBadge, { backgroundColor: cfg.bg }]}>
-                        <Text style={[s.statusText, { color: cfg.color }]}>{cfg.label}</Text>
-                    </View>
+                    <StatusBadge status={item.status} />
                 </View>
 
                 <View style={s.cardBody}>
                     <Text style={s.customerName}>{item.customer_name ?? 'Client'}</Text>
-                    <Text style={s.deliveryType}>
-                        {deliveryIcons[item.delivery_type] ?? '📦'} {item.delivery_type === 'dine_in' ? `Table ${item.table_number ?? '?'}` : item.delivery_type === 'pickup' ? 'À emporter' : 'Livraison'}
-                    </Text>
+                    <View style={s.deliveryRow}>
+                        <Ionicons name={delivery.icon} size={13} color={theme.textSecondary} />
+                        <Text style={s.deliveryType}>{deliveryLabel}</Text>
+                    </View>
                 </View>
 
                 <View style={s.cardFooter}>
                     <Text style={s.amount}>{item.total_amount?.toLocaleString()} FCFA</Text>
                     {nextLabel && (
-                        <TouchableOpacity
-                            style={[s.advanceBtn, { backgroundColor: cfg.color }]}
+                        <Button
+                            label={nextLabel}
+                            size="small"
                             onPress={() => advanceStatus(item)}
-                        >
-                            <Text style={s.advanceBtnText}>{nextLabel}</Text>
-                        </TouchableOpacity>
+                            style={{ backgroundColor: statusMeta.color, borderColor: statusMeta.color }}
+                            accessibilityLabel={`${nextLabel} — commande ${item.order_number}`}
+                        />
                     )}
                 </View>
             </TouchableOpacity>
@@ -297,14 +298,25 @@ export default function OrdersScreen() {
         <SafeAreaView style={[s.container]} edges={['top']}>
             {/* Header */}
             <View style={s.header}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <View style={s.titleRow}>
                     <Text style={s.title}>Commandes</Text>
-                    <TouchableOpacity onPress={() => router.push('/kitchen')}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: theme.primary + '20', borderRadius: 8 }}>
-                            <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600' }}>👨‍🍳 Cuisine</Text>
-                        </View>
-                    </TouchableOpacity>
+                    <Button
+                        label="Cuisine"
+                        icon="flame-outline"
+                        variant="ghost"
+                        size="small"
+                        onPress={() => router.push('/kitchen')}
+                        accessibilityLabel="Ouvrir l'écran cuisine"
+                    />
                 </View>
+                <SearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="N° de commande, client, téléphone…"
+                    resultCount={filteredOrders.length}
+                    style={s.search}
+                />
+
                 <View style={s.filterRow}>
                     {(['active', 'all'] as const).map((f) => (
                         <TouchableOpacity
@@ -320,8 +332,12 @@ export default function OrdersScreen() {
                 </View>
             </View>
 
+            {/* Le bandeau coiffe la liste : un échec de synchronisation temps réel
+                ne doit pas effacer les commandes déjà chargées. */}
+            {errorMessage && <ErrorBanner message={errorMessage} onRetry={onRetry} style={s.banner} />}
+
             {loading ? (
-                <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+                <LoadingState label="Chargement des commandes" />
             ) : (
                 <FlatList
                     data={filteredOrders}
@@ -330,12 +346,26 @@ export default function OrdersScreen() {
                     contentContainerStyle={s.list}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
                     ListEmptyComponent={
-                        <View style={s.empty}>
-                            <Text style={s.emptyIcon}>📋</Text>
-                            <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-                                {errorMessage ?? (filter === 'active' ? 'Aucune commande en cours' : 'Aucune commande')}
-                            </Text>
-                        </View>
+                        errorMessage ? null : (
+                            query.trim() ? (
+                                <EmptyState
+                                    icon="search-outline"
+                                    title="Aucun résultat"
+                                    message={`Aucune commande ne correspond à « ${query.trim()} ».`}
+                                    action={{ label: 'Effacer la recherche', onPress: () => setQuery('') }}
+                                />
+                            ) : (
+                                <EmptyState
+                                    icon="receipt-outline"
+                                    title={filter === 'active' ? 'Aucune commande en cours' : 'Aucune commande'}
+                                    message={
+                                        filter === 'active'
+                                            ? 'Les nouvelles commandes arrivent ici en temps réel.'
+                                            : 'Aucune commande enregistrée pour le moment.'
+                                    }
+                                />
+                            )
+                        )
                     }
                 />
             )}
@@ -346,7 +376,10 @@ export default function OrdersScreen() {
 const styles = (theme: any) => StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
     header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border },
-    title: { fontSize: 22, fontWeight: '700', color: theme.text, marginBottom: 10 },
+    titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+    title: { fontSize: 22, fontWeight: '700', color: theme.text },
+    banner: { marginHorizontal: 12, marginTop: 12 },
+    search: { marginBottom: 10 },
     filterRow: { flexDirection: 'row', gap: 8 },
     filterBtn: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
     filterBtnActive: { backgroundColor: theme.primary, borderColor: theme.primary },
@@ -358,16 +391,10 @@ const styles = (theme: any) => StyleSheet.create({
     orderMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     orderNum: { fontSize: 15, fontWeight: '700', color: theme.text },
     orderTime: { fontSize: 12, color: theme.textSecondary },
-    statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-    statusText: { fontSize: 11, fontWeight: '700' },
     cardBody: { marginBottom: 10 },
     customerName: { fontSize: 14, fontWeight: '600', color: theme.text },
-    deliveryType: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+    deliveryRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+    deliveryType: { fontSize: 12, color: theme.textSecondary },
     cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     amount: { fontSize: 15, fontWeight: '700', color: theme.text },
-    advanceBtn: { paddingVertical: 7, paddingHorizontal: 14, borderRadius: 10 },
-    advanceBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-    empty: { alignItems: 'center', marginTop: 60 },
-    emptyIcon: { fontSize: 48, marginBottom: 12 },
-    emptyText: { fontSize: 15 },
 });

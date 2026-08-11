@@ -20,6 +20,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner, useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -63,6 +65,7 @@ type InviteMode = 'invite' | 'create';
 export default function TeamScreen() {
     const { session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [members, setMembers] = useState<TeamMember[]>([]);
@@ -77,6 +80,7 @@ export default function TeamScreen() {
     const [createPassword, setCreatePassword] = useState('');
     const [selectedRole, setSelectedRole] = useState<AssignableRole>('cashier');
     const [sending, setSending] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadTeam = useCallback(async () => {
         if (!session) { setLoading(false); return; }
@@ -87,8 +91,10 @@ export default function TeamScreen() {
             );
             setMembers(data.members);
             setCallerRole(data.callerRole);
+            setErrorMessage(null);
         } catch (err) {
             console.error('Erreur chargement équipe:', err);
+            setErrorMessage(getErrorMessage(err, "Impossible de charger l'équipe"));
         } finally {
             setLoading(false);
         }
@@ -116,7 +122,7 @@ export default function TeamScreen() {
 
         if (inviteMode === 'invite') {
             if (!inviteEmail.trim()) {
-                Alert.alert('Erreur', 'Veuillez entrer une adresse email');
+                toast.error('Veuillez entrer une adresse email');
                 return;
             }
             setSending(true);
@@ -125,22 +131,22 @@ export default function TeamScreen() {
                     method: 'POST',
                     body: JSON.stringify({ email: inviteEmail.trim(), role: selectedRole }),
                 });
-                Alert.alert('Succès', `Invitation envoyée à ${inviteEmail.trim()}`);
+                toast.success(`Invitation envoyée à ${inviteEmail.trim()}`);
                 setShowModal(false);
                 resetModal();
                 await loadTeam();
             } catch (err) {
-                Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'envoyer l\'invitation'));
+                toast.error(getErrorMessage(err, 'Impossible d\'envoyer l\'invitation'));
             } finally {
                 setSending(false);
             }
         } else {
             if (!createName.trim() || !inviteEmail.trim() || !createPassword.trim()) {
-                Alert.alert('Erreur', 'Nom, email et mot de passe sont requis');
+                toast.error('Nom, email et mot de passe sont requis');
                 return;
             }
             if (createPassword.length < 8) {
-                Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 8 caractères');
+                toast.error('Le mot de passe doit contenir au moins 8 caractères');
                 return;
             }
             setSending(true);
@@ -155,12 +161,12 @@ export default function TeamScreen() {
                         role: selectedRole,
                     }),
                 });
-                Alert.alert('Succès', `Compte créé pour ${createName.trim()}`);
+                toast.success(`Compte créé pour ${createName.trim()}`);
                 setShowModal(false);
                 resetModal();
                 await loadTeam();
             } catch (err) {
-                Alert.alert('Erreur', getErrorMessage(err, 'Impossible de créer le compte'));
+                toast.error(getErrorMessage(err, 'Impossible de créer le compte'));
             } finally {
                 setSending(false);
             }
@@ -182,7 +188,7 @@ export default function TeamScreen() {
                             await apiFetch(`/api/team/${member.id}`, session.access_token, { method: 'DELETE' });
                             await loadTeam();
                         } catch (err) {
-                            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de révoquer ce membre'));
+                            toast.error(getErrorMessage(err, 'Impossible de révoquer ce membre'));
                         }
                     },
                 },
@@ -272,18 +278,22 @@ export default function TeamScreen() {
         <PermissionGate permission="team:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Équipe</Text>
                 {canInvite ? (
-                    <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton}>
+                    <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Ajouter un membre">
                         <Ionicons name="person-add" size={22} color={theme.primary} />
                     </TouchableOpacity>
                 ) : (
                     <View style={s.backButton} />
                 )}
             </View>
+
+            {errorMessage && (
+                <ErrorBanner message={errorMessage} onRetry={loadTeam} style={s.banner} />
+            )}
 
             <FlatList
                 data={members}
@@ -477,10 +487,11 @@ const styles = (theme: any) =>
             paddingHorizontal: 16, paddingVertical: 12,
             backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
 
         list: { padding: 12, gap: 8, paddingBottom: 24 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         memberCard: {
             flexDirection: 'row', alignItems: 'center', gap: 12,
             borderRadius: 14, padding: 12, borderWidth: 1,

@@ -14,6 +14,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { formatOrderNumber } from '@/lib/order-status';
+import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 interface Order {
@@ -69,13 +71,13 @@ export default function KitchenScreen() {
                 .from('orders')
                 .select(`
                     id,
-                    order_number,
+                    invoice_number,
                     customer_name,
-                    total_amount,
+                    total,
                     status,
                     created_at,
                     order_items(
-                        product_name,
+                        name,
                         quantity
                     )
                 `)
@@ -87,13 +89,13 @@ export default function KitchenScreen() {
 
             const processed: Order[] = (ordersData || []).map((o: any) => ({
                 id: o.id,
-                orderId: o.order_number || o.id.slice(-6).toUpperCase(),
+                orderId: formatOrderNumber(o),
                 customerName: o.customer_name || 'Client',
                 items: (o.order_items || []).map((item: any) => ({
-                    name: item.product_name,
+                    name: item.name,
                     quantity: item.quantity,
                 })),
-                totalAmount: o.total_amount,
+                totalAmount: o.total,
                 status: o.status,
                 createdAt: o.created_at,
             }));
@@ -187,11 +189,11 @@ export default function KitchenScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Écran cuisine</Text>
-                <TouchableOpacity onPress={onRefresh} style={s.backButton}>
+                <TouchableOpacity onPress={onRefresh} style={s.backButton} accessibilityRole="button" accessibilityLabel="Rafraîchir">
                     <Ionicons name="refresh" size={22} color={theme.text} />
                 </TouchableOpacity>
             </View>
@@ -263,8 +265,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomColor: theme.border,
         },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

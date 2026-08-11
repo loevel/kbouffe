@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     RefreshControl,
     StyleSheet,
@@ -16,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner, useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 interface Review {
@@ -48,6 +49,7 @@ function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
 export default function ReviewsScreen() {
     const { session, profile } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
@@ -56,6 +58,7 @@ export default function ReviewsScreen() {
     const [respondingToId, setRespondingToId] = useState<string | null>(null);
     const [responseText, setResponseText] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadReviews = useCallback(async () => {
         if (!session || !profile?.restaurantId) {
@@ -100,8 +103,10 @@ export default function ReviewsScreen() {
             }));
 
             setReviews(processed);
+            setErrorMessage(null);
         } catch (error) {
             console.error('Erreur lors du chargement des avis:', error);
+            setErrorMessage(getErrorMessage(error, 'Impossible de charger les avis'));
         } finally {
             setLoading(false);
         }
@@ -129,12 +134,12 @@ export default function ReviewsScreen() {
                 body: JSON.stringify({ response: responseText.trim() }),
             });
 
-            Alert.alert('Succès', 'Votre réponse a été enregistrée');
+            toast.success('Votre réponse a été enregistrée');
             setRespondingToId(null);
             setResponseText('');
             await loadReviews();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible d\'enregistrer la réponse'));
+            toast.error(getErrorMessage(error, 'Impossible d\'enregistrer la réponse'));
         } finally {
             setSubmitting(false);
         }
@@ -244,7 +249,7 @@ export default function ReviewsScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Avis clients</Text>
@@ -269,6 +274,10 @@ export default function ReviewsScreen() {
                     </TouchableOpacity>
                 ))}
             </View>
+
+            {errorMessage && (
+                <ErrorBanner message={errorMessage} onRetry={loadReviews} style={s.banner} />
+            )}
 
             <FlatList
                 data={filteredReviews}
@@ -302,7 +311,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         filterBar: {
             flexDirection: 'row',
@@ -328,6 +337,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         filterButtonText: { fontSize: 12, fontWeight: '600', color: theme.textSecondary },
         filterButtonTextActive: { color: '#fff' },
         list: { padding: 12, gap: 12, paddingBottom: 24 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         reviewCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 14, gap: 10 },
         reviewHeader: {
             flexDirection: 'row',

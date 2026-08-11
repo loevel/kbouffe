@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -18,6 +17,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 
 interface DineInSettings {
     has_dine_in: boolean;
@@ -32,6 +33,7 @@ export default function DineInSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<DineInSettings>({
@@ -57,10 +59,11 @@ export default function DineInSettingsScreen() {
             });
         } catch (err) {
             console.error('Erreur chargement dine-in:', err);
+            toast.error(getErrorMessage(err, 'Impossible de charger les paramètres sur place'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => { loadSettings(); }, [loadSettings]);
 
@@ -78,9 +81,9 @@ export default function DineInSettingsScreen() {
                     table_numbering_enabled: settings.table_numbering_enabled,
                 }),
             });
-            Alert.alert('Succès', 'Paramètres enregistrés');
+            toast.success('Paramètres enregistrés');
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible d\'enregistrer'));
+            toast.error(getErrorMessage(err, 'Impossible d\'enregistrer'));
         } finally {
             setSaving(false);
         }
@@ -102,7 +105,7 @@ export default function DineInSettingsScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Service sur place</Text>
@@ -279,7 +282,7 @@ const styles = (theme: any) =>
             paddingHorizontal: 16, paddingVertical: 12,
             backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         saveBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
         saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },

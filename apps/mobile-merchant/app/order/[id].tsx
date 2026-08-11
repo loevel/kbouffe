@@ -312,7 +312,7 @@ const styles = (theme: any) => StyleSheet.create({
     itemName: { fontSize: 14, fontWeight: '600' },
     itemOpt: { fontSize: 12, marginTop: 1 },
     itemPrice: { fontSize: 14, fontWeight: '600' },
-    divider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 10 },
+    divider: { height: 1, backgroundColor: theme.border, marginVertical: 10 },
     totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     totalLabel: { fontSize: 15, fontWeight: '700' },
     totalValue: { fontSize: 18, fontWeight: '800' },

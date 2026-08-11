@@ -1,13 +1,15 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
-    Switch, RefreshControl, ActivityIndicator, SectionList,
+    Switch, RefreshControl, SectionList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/lib/api';
+import { EmptyState, ErrorBanner, ErrorState, LoadingState, SearchBar, useToast } from '@/components/ui';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import type { ProductRow } from '@/lib/types';
@@ -21,28 +23,27 @@ interface MenuSection {
 export default function MenuScreen() {
     const { profile } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
     const [sections, setSections] = useState<MenuSection[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [loaded, setLoaded] = useState(false);
+    const [query, setQuery] = useState('');
 
     const fetchMenu = useCallback(async () => {
-        if (!profile?.restaurantId) {
-            console.log('No restaurantId:', profile);
-            return;
-        }
+        if (!profile?.restaurantId) return;
         try {
             const [catsRes, prodsRes] = await Promise.all([
                 supabase.from('categories').select('id, name, sort_order').eq('restaurant_id', profile.restaurantId).order('sort_order'),
                 supabase.from('products').select('id, name, description, price, is_available, image_url, category_id').eq('restaurant_id', profile.restaurantId).order('name'),
             ]);
-            if (catsRes.error) {
-                console.error('Categories error:', catsRes.error);
-            }
-            if (prodsRes.error) {
-                console.error('Products error:', prodsRes.error);
-            }
-            console.log('Loaded categories:', catsRes.data?.length, 'products:', prodsRes.data?.length);
+            // Sans ce contrôle, un menu en échec de chargement était affiché comme
+            // « Aucun produit », indistinguable d'un menu réellement vide.
+            if (catsRes.error) throw new Error(catsRes.error.message);
+            if (prodsRes.error) throw new Error(prodsRes.error.message);
+
             const cats = catsRes.data ?? [];
             const prods = prodsRes.data ?? [];
             const uncategorized = prods.filter((p: ProductRow) => !p.category_id);
@@ -52,8 +53,11 @@ export default function MenuScreen() {
             }));
             if (uncategorized.length > 0) result.push({ id: '_uncategorized', name: 'Sans catégorie', products: uncategorized });
             setSections(result.filter((s) => s.products.length > 0));
+            setErrorMessage(null);
+            setLoaded(true);
         } catch (error) {
-            console.error('Error fetching menu:', error);
+            console.error('Erreur lors du chargement du menu:', error);
+            setErrorMessage(getErrorMessage(error, 'Impossible de charger le menu'));
         }
     }, [profile?.restaurantId]);
 
@@ -61,37 +65,98 @@ export default function MenuScreen() {
 
     const toggleAvailability = async (product: ProductRow) => {
         const newVal = !product.is_available;
-        setSections((prev) =>
-            prev.map((s) => ({
-                ...s,
-                products: s.products.map((p) => p.id === product.id ? { ...p, is_available: newVal } : p),
-            }))
-        );
-        await supabase.from('products').update({ is_available: newVal }).eq('id', product.id);
+        const applyValue = (value: boolean) =>
+            setSections((prev) =>
+                prev.map((s) => ({
+                    ...s,
+                    products: s.products.map((p) => p.id === product.id ? { ...p, is_available: value } : p),
+                }))
+            );
+
+        applyValue(newVal);
+        const { error } = await supabase.from('products').update({ is_available: newVal }).eq('id', product.id);
+        if (error) {
+            // Sans rollback, le switch restait sur une valeur jamais enregistrée :
+            // un plat en rupture pouvait sembler encore disponible à la vente.
+            applyValue(product.is_available);
+            toast.error(`Disponibilité de « ${product.name} » non enregistrée : ${error.message}`);
+        }
     };
 
     const onRefresh = async () => { setRefreshing(true); await fetchMenu(); setRefreshing(false); };
+
+    const onRetry = async () => { setLoading(true); await fetchMenu(); setLoading(false); };
+
+    // La recherche traverse les sections : on filtre les produits puis on retire
+    // les catégories devenues vides, pour ne pas laisser d'en-têtes orphelins.
+    const visibleSections = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        if (!needle) return sections;
+        return sections
+            .map((section) => ({
+                ...section,
+                products: section.products.filter((p) =>
+                    [p.name, p.description].some((field) => field?.toLowerCase().includes(needle))
+                ),
+            }))
+            .filter((section) => section.products.length > 0);
+    }, [sections, query]);
+
+    const resultCount = useMemo(
+        () => visibleSections.reduce((sum, section) => sum + section.products.length, 0),
+        [visibleSections]
+    );
 
     const s = styles(theme);
 
     if (loading) return (
         <SafeAreaView style={s.container} edges={['top']}>
-            <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+            <LoadingState label="Chargement du menu" />
         </SafeAreaView>
     );
 
+    const header = (
+        <View style={s.header}>
+            <Text style={s.title}>Mon Menu</Text>
+            <TouchableOpacity
+                style={[s.addBtn, { backgroundColor: theme.primary }]}
+                onPress={() => router.push('/product/new')}
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter un produit"
+            >
+                <Ionicons name="add" size={20} color="#fff" />
+                <Text style={s.addBtnText}>Produit</Text>
+            </TouchableOpacity>
+        </View>
+    );
+
+    // Jamais chargé avec succès : afficher l'échec plutôt qu'un menu vide trompeur.
+    if (!loaded && errorMessage) {
+        return (
+            <SafeAreaView style={s.container} edges={['top']}>
+                {header}
+                <ErrorState title="Menu indisponible" message={errorMessage} onRetry={onRetry} />
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={s.container} edges={['top']}>
-            <View style={s.header}>
-                <Text style={s.title}>Mon Menu</Text>
-                <TouchableOpacity style={[s.addBtn, { backgroundColor: theme.primary }]} onPress={() => router.push('/product/new')}>
-                    <Ionicons name="add" size={20} color="#fff" />
-                    <Text style={s.addBtnText}>Produit</Text>
-                </TouchableOpacity>
-            </View>
+            {header}
+
+            {/* Rafraîchissement en échec : le menu affiché est celui du dernier chargement réussi. */}
+            {errorMessage && <ErrorBanner message={errorMessage} onRetry={onRetry} style={s.banner} />}
+
+            <SearchBar
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Rechercher un plat…"
+                resultCount={resultCount}
+                style={s.search}
+            />
 
             <SectionList
-                sections={sections.map((s) => ({ title: s.name, data: s.products }))}
+                sections={visibleSections.map((s) => ({ title: s.name, data: s.products }))}
                 keyExtractor={(item) => item.id}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
                 renderSectionHeader={({ section }) => (
@@ -106,7 +171,7 @@ export default function MenuScreen() {
                             <Image source={{ uri: item.image_url }} style={s.productImage} contentFit="cover" />
                         ) : (
                             <View style={[s.productImage, s.productImagePlaceholder]}>
-                                <Text style={s.productImageEmoji}>🍽️</Text>
+                                <Ionicons name="restaurant-outline" size={22} color={theme.textSecondary} />
                             </View>
                         )}
                         <View style={s.productInfo}>
@@ -116,6 +181,7 @@ export default function MenuScreen() {
                         <Switch
                             value={item.is_available}
                             onValueChange={() => toggleAvailability(item)}
+                            accessibilityLabel={`Disponibilité de ${item.name}`}
                             trackColor={{ false: theme.border, true: theme.primary + '80' }}
                             thumbColor={item.is_available ? theme.primary : theme.textSecondary}
                         />
@@ -123,10 +189,21 @@ export default function MenuScreen() {
                 )}
                 contentContainerStyle={s.list}
                 ListEmptyComponent={
-                    <View style={s.empty}>
-                        <Text style={s.emptyIcon}>🍽️</Text>
-                        <Text style={[s.emptyText, { color: theme.textSecondary }]}>Aucun produit dans le menu</Text>
-                    </View>
+                    query.trim() ? (
+                        <EmptyState
+                            icon="search-outline"
+                            title="Aucun résultat"
+                            message={`Aucun plat ne correspond à « ${query.trim()} ».`}
+                            action={{ label: 'Effacer la recherche', onPress: () => setQuery('') }}
+                        />
+                    ) : (
+                        <EmptyState
+                            icon="restaurant-outline"
+                            title="Aucun produit dans le menu"
+                            message="Ajoutez vos plats pour qu'ils soient commandables."
+                            action={{ label: 'Ajouter un produit', onPress: () => router.push('/product/new') }}
+                        />
+                    )
                 }
             />
         </SafeAreaView>
@@ -146,12 +223,10 @@ const styles = (theme: any) => StyleSheet.create({
     productCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.surface, marginHorizontal: 12, marginBottom: 8, borderRadius: 12, padding: 12 },
     productImage: { width: 52, height: 52, borderRadius: 10 },
     productImagePlaceholder: { backgroundColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-    productImageEmoji: { fontSize: 22 },
     productInfo: { flex: 1 },
     productName: { fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: 2 },
     unavailable: { opacity: 0.4 },
     productPrice: { fontSize: 13, fontWeight: '700' },
-    empty: { alignItems: 'center', marginTop: 60 },
-    emptyIcon: { fontSize: 48, marginBottom: 12 },
-    emptyText: { fontSize: 15 },
+    banner: { margin: 12 },
+    search: { marginHorizontal: 12, marginTop: 12 },
 });

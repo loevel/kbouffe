@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     StyleSheet,
     Switch,
     Text,
@@ -14,6 +13,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 
 interface NotificationPreferencesResponse {
     preferences: {
@@ -29,6 +30,7 @@ export default function NotificationSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [inAppEnabled, setInAppEnabled] = useState(true);
@@ -48,11 +50,11 @@ export default function NotificationSettingsScreen() {
             setInAppEnabled(Boolean(preferences.preferences?.notificationsEnabled));
             setSmsEnabled(Boolean(restaurant.sms_notifications_enabled));
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de charger les préférences'));
+            toast.error(getErrorMessage(error, 'Impossible de charger les préférences'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => {
         loadSettings();
@@ -80,10 +82,10 @@ export default function NotificationSettingsScreen() {
                 }),
             });
 
-            Alert.alert('Succès', 'Préférences de notifications mises à jour.');
+            toast.success('Préférences de notifications mises à jour.');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de mettre à jour les préférences'));
+            toast.error(getErrorMessage(error, 'Impossible de mettre à jour les préférences'));
         } finally {
             setSaving(false);
         }
@@ -102,7 +104,7 @@ export default function NotificationSettingsScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Notifications</Text>
@@ -160,8 +162,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomColor: theme.border,
         },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

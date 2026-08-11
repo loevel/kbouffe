@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Switch,
@@ -16,6 +15,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 
 type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
@@ -80,6 +81,7 @@ export default function OpeningHoursScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [hours, setHours] = useState<OpeningHours>(DEFAULT_HOURS);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -94,11 +96,11 @@ export default function OpeningHoursScreen() {
             const restaurant = await apiFetch<RestaurantHoursResponse>('/api/restaurant', session.access_token);
             setHours(normalizeOpeningHours(restaurant.opening_hours));
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de charger les horaires'));
+            toast.error(getErrorMessage(error, 'Impossible de charger les horaires'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => {
         loadHours();
@@ -118,7 +120,7 @@ export default function OpeningHoursScreen() {
             const row = hours[day];
             if (!row.isOpen) continue;
             if (!isValidTime(row.open) || !isValidTime(row.close)) {
-                Alert.alert('Validation', `Heure invalide pour ${DAY_LABELS[day]}. Utilisez le format HH:MM.`);
+                toast.error(`Heure invalide pour ${DAY_LABELS[day]}. Utilisez le format HH:MM.`);
                 return;
             }
         }
@@ -129,10 +131,10 @@ export default function OpeningHoursScreen() {
                 method: 'PATCH',
                 body: JSON.stringify({ opening_hours: hours }),
             });
-            Alert.alert('Succès', 'Horaires mis à jour.');
+            toast.success('Horaires mis à jour.');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de mettre à jour les horaires'));
+            toast.error(getErrorMessage(error, 'Impossible de mettre à jour les horaires'));
         } finally {
             setSaving(false);
         }
@@ -151,7 +153,7 @@ export default function OpeningHoursScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Horaires d&apos;ouverture</Text>
@@ -219,8 +221,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomColor: theme.border,
         },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

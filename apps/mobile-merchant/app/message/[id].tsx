@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 interface Message {
@@ -267,7 +268,7 @@ export default function MessageScreen() {
         return (
             <SafeAreaView style={s.container} edges={['top']}>
                 <View style={s.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                         <Ionicons name="arrow-back" size={22} color={theme.text} />
                     </TouchableOpacity>
                     <Text style={s.title}>Conversation</Text>
@@ -318,7 +319,7 @@ export default function MessageScreen() {
         >
             <SafeAreaView style={s.container} edges={['top']}>
                 <View style={s.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                         <Ionicons name="arrow-back" size={22} color={theme.text} />
                     </TouchableOpacity>
                     <View style={s.headerContent}>
@@ -401,8 +402,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         },
         headerContent: { flex: 1, alignItems: 'center' },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

@@ -16,6 +16,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -40,6 +42,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string
 export default function TablesScreen() {
     const { profile, session } = useAuth();
     const theme = useTheme();
+    const toast = useToast();
     const router = useRouter();
 
     const [tables, setTables] = useState<Table[]>([]);
@@ -125,14 +128,14 @@ export default function TablesScreen() {
                 .update(updateData)
                 .eq('id', table.id);
 
-            Alert.alert('Succès', `Table ${table.number} mise à jour`);
+            toast.success(`Table ${table.number} mise à jour`);
             setShowActionModal(false);
             setCustomerCount('');
             setSelectedTable(null);
             await loadTables();
         } catch (error) {
             console.error('Erreur:', error);
-            Alert.alert('Erreur', 'Impossible de mettre à jour la table');
+            toast.error('Impossible de mettre à jour la table');
         } finally {
             setProcessing(false);
         }
@@ -140,7 +143,7 @@ export default function TablesScreen() {
 
     const handleCreateTable = async () => {
         if (!tableNumber.trim() || !tableCapacity.trim() || !profile?.restaurantId) {
-            Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+            toast.error('Veuillez remplir tous les champs');
             return;
         }
 
@@ -153,14 +156,14 @@ export default function TablesScreen() {
                 status: 'available',
             });
 
-            Alert.alert('Succès', `Table ${tableNumber} créée`);
+            toast.success(`Table ${tableNumber} créée`);
             setShowCreateModal(false);
             setTableNumber('');
             setTableCapacity('');
             await loadTables();
         } catch (error) {
             console.error('Erreur:', error);
-            Alert.alert('Erreur', 'Impossible de créer la table');
+            toast.error('Impossible de créer la table');
         } finally {
             setProcessing(false);
         }
@@ -221,11 +224,11 @@ export default function TablesScreen() {
         <PermissionGate permission="tables:manage">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Tables</Text>
-                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton}>
+                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Ajouter une table">
                     <Ionicons name="add-circle" size={22} color={theme.primary} />
                 </TouchableOpacity>
             </View>
@@ -407,7 +410,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text, flex: 1, textAlign: 'center' },
         list: { padding: 12, gap: 10, paddingBottom: 24 },
         row: { gap: 10 },

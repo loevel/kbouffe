@@ -13,6 +13,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
 interface AnalyticsData {
@@ -30,6 +32,7 @@ export default function AnalyticsScreen() {
     const theme = useTheme();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<AnalyticsData | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadAnalytics = useCallback(async () => {
         if (!session) {
@@ -43,17 +46,13 @@ export default function AnalyticsScreen() {
                 session.access_token
             );
             setData(analytics);
+            setErrorMessage(null);
         } catch (err) {
-            // API non implémentée, afficher données vides
-            console.log('Analytics non disponibles');
-            setData({
-                revenue_14d: 0,
-                orders_count: 0,
-                avg_order_value: 0,
-                peak_hour: '-',
-                cancellation_rate: 0,
-                top_products: [],
-            });
+            // Previously treated every failure as "API non implémentée" and
+            // rendered all-zero data — indistinguishable from a restaurant
+            // that genuinely had 0 CA/commandes over the period.
+            console.error('Erreur lors du chargement des analytics:', err);
+            setErrorMessage(getErrorMessage(err, 'Impossible de charger les analytics'));
         } finally {
             setLoading(false);
         }
@@ -77,7 +76,7 @@ export default function AnalyticsScreen() {
         <PermissionGate permission="finances:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Analytique avancée</Text>
@@ -85,10 +84,14 @@ export default function AnalyticsScreen() {
             </View>
 
             <ScrollView contentContainerStyle={s.content}>
+                {errorMessage && (
+                <ErrorBanner message={errorMessage} onRetry={loadAnalytics} style={s.banner} />
+                )}
+
                 <View style={[s.kpiCard, { backgroundColor: theme.surface }]}>
                     <Text style={[s.kpiLabel, { color: theme.textSecondary }]}>CA 14 derniers jours</Text>
                     <Text style={[s.kpiValue, { color: theme.text }]}>
-                        {(data?.revenue_14d ?? 0).toLocaleString()} F
+                        {(data?.revenue_14d ?? 0).toLocaleString()} FCFA
                     </Text>
                 </View>
 
@@ -100,7 +103,7 @@ export default function AnalyticsScreen() {
                     <View style={[s.metricCard, { backgroundColor: theme.surface }]}>
                         <Text style={[s.metricLabel, { color: theme.textSecondary }]}>Panier moyen</Text>
                         <Text style={[s.metricValue, { color: theme.text }]}>
-                            {(data?.avg_order_value ?? 0).toLocaleString()} F
+                            {(data?.avg_order_value ?? 0).toLocaleString()} FCFA
                         </Text>
                     </View>
                     <View style={[s.metricCard, { backgroundColor: theme.surface }]}>
@@ -122,7 +125,7 @@ export default function AnalyticsScreen() {
                                     <Text style={[s.productName, { color: theme.text }]}>{product.name}</Text>
                                     <Text style={[s.productSold, { color: theme.textSecondary }]}>{product.sold} vendus</Text>
                                 </View>
-                                <Text style={[s.productRevenue, { color: theme.text }]}>{product.revenue.toLocaleString()} F</Text>
+                                <Text style={[s.productRevenue, { color: theme.text }]}>{product.revenue.toLocaleString()} FCFA</Text>
                             </View>
                         ))}
                     </View>
@@ -146,9 +149,10 @@ const styles = (theme: any) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32, gap: 16 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         kpiCard: { borderRadius: 12, padding: 20, alignItems: 'center' },
         kpiLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
         kpiValue: { fontSize: 28, fontWeight: '700' },

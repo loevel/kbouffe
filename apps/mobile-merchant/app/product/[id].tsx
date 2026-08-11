@@ -17,6 +17,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import type { ProductRow, CategoryRow } from '@/lib/types';
 
@@ -25,6 +27,7 @@ export default function ProductDetailScreen() {
     const { session, profile } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [product, setProduct] = useState<ProductRow | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -54,9 +57,9 @@ export default function ProductDetailScreen() {
                 setPrice(String(data.product.price));
                 setSelectedCategoryId(data.product.category_id);
             })
-            .catch((error) => Alert.alert('Erreur', getErrorMessage(error, 'Impossible de charger le produit')))
+            .catch((error) => toast.error(getErrorMessage(error, 'Impossible de charger le produit')))
             .finally(() => setLoading(false));
-    }, [id, session]);
+    }, [id, session, toast]);
 
     // Load categories
     useEffect(() => {
@@ -96,7 +99,7 @@ export default function ProductDetailScreen() {
                 setSelectedImage(result.assets[0].uri);
             }
         } catch (error) {
-            Alert.alert('Erreur', 'Impossible de sélectionner une image');
+            toast.error('Impossible de sélectionner une image');
         }
     };
 
@@ -132,7 +135,7 @@ export default function ProductDetailScreen() {
         }
         const parsedPrice = Number.parseInt(price, 10);
         if (!name.trim() || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
-            Alert.alert('Validation', 'Veuillez renseigner un nom et un prix valide.');
+            toast.error('Veuillez renseigner un nom et un prix valide.');
             return;
         }
 
@@ -155,10 +158,10 @@ export default function ProductDetailScreen() {
                     category_id: selectedCategoryId || null,
                 }),
             });
-            Alert.alert('Succès', 'Produit mis à jour');
+            toast.success('Produit mis à jour');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de mettre à jour le produit'));
+            toast.error(getErrorMessage(error, 'Impossible de mettre à jour le produit'));
         } finally {
             setSaving(false);
         }
@@ -179,7 +182,7 @@ export default function ProductDetailScreen() {
         return (
             <SafeAreaView style={s.container} edges={['top']}>
                 <View style={s.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                         <Ionicons name="arrow-back" size={22} color={theme.text} />
                     </TouchableOpacity>
                     <Text style={s.title}>Produit</Text>
@@ -197,7 +200,7 @@ export default function ProductDetailScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Modifier le produit</Text>
@@ -352,8 +355,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomColor: theme.border,
         },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

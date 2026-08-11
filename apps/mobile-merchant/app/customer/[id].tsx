@@ -12,8 +12,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { formatOrderNumber } from '@/lib/order-status';
+import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 interface Order {
@@ -45,6 +47,7 @@ export default function CustomerScreen() {
     const [customer, setCustomer] = useState<CustomerProfile | null>(null);
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadCustomerData = useCallback(async () => {
         if (!session || !profile?.restaurantId || !id) {
@@ -52,9 +55,16 @@ export default function CustomerScreen() {
             return;
         }
 
-        try {
-            // Fetch customer profile from API
-            const customerResponse = await apiFetch<{
+        setErrorMessage(null);
+
+        // The profile fetch (API) and the order history fetch (Supabase) are
+        // unrelated — previously both lived in one try/catch, so a timeout on
+        // the API call (see lib/api.ts) threw before the Supabase query ever
+        // ran, blanking the order history for a reason that had nothing to do
+        // with it. Run them independently so one failing doesn't take out the
+        // other, and surface a real error instead of a silent empty screen.
+        const [profileResult, ordersResult] = await Promise.allSettled([
+            apiFetch<{
                 customers: Array<{
                     id: string;
                     name: string;
@@ -65,40 +75,43 @@ export default function CustomerScreen() {
                     lastOrderAt: string;
                     createdAt: string;
                 }>;
-            }>(`/api/customers?page=1&limit=1000`, session.access_token);
+            }>(`/api/customers?page=1&limit=1000`, session.access_token),
+            supabase
+                .from('orders')
+                .select('id, invoice_number, total, status, created_at')
+                .eq('restaurant_id', profile.restaurantId)
+                .eq('customer_id', id)
+                .order('created_at', { ascending: false }),
+        ]);
 
-            const customerData = customerResponse.customers.find((c) => c.id === id);
+        if (profileResult.status === 'fulfilled') {
+            const customerData = profileResult.value.customers.find((c) => c.id === id);
             if (customerData) {
                 setCustomer({
                     ...customerData,
                     averageOrderValue: customerData.totalSpent / Math.max(customerData.totalOrders, 1),
                 });
             }
-
-            // Fetch orders from Supabase
-            const { data: ordersData, error } = await supabase
-                .from('orders')
-                .select('id, order_number, total, status, created_at')
-                .eq('restaurant_id', profile.restaurantId)
-                .eq('customer_id', id)
-                .order('created_at', { ascending: false });
-
-            if (!error && ordersData) {
-                setOrders(
-                    ordersData.map((o: any) => ({
-                        id: o.id,
-                        orderNumber: o.order_number || o.id.slice(-6).toUpperCase(),
-                        totalAmount: o.total,
-                        status: o.status,
-                        createdAt: o.created_at,
-                    }))
-                );
-            }
-        } catch (error) {
-            console.error('Erreur lors du chargement du profil client:', error);
-        } finally {
-            setLoading(false);
+        } else {
+            console.error('Erreur lors du chargement du profil client:', profileResult.reason);
+            setErrorMessage(getErrorMessage(profileResult.reason, 'Impossible de charger le profil client'));
         }
+
+        if (ordersResult.status === 'fulfilled' && !ordersResult.value.error && ordersResult.value.data) {
+            setOrders(
+                ordersResult.value.data.map((o: any) => ({
+                    id: o.id,
+                    orderNumber: formatOrderNumber(o),
+                    totalAmount: o.total,
+                    status: o.status,
+                    createdAt: o.created_at,
+                }))
+            );
+        } else if (ordersResult.status === 'rejected') {
+            console.error('Erreur lors du chargement des commandes du client:', ordersResult.reason);
+        }
+
+        setLoading(false);
     }, [session, profile?.restaurantId, id]);
 
     useEffect(() => {
@@ -119,14 +132,19 @@ export default function CustomerScreen() {
         return (
             <SafeAreaView style={s.container} edges={['top']}>
                 <View style={s.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                         <Ionicons name="arrow-back" size={22} color={theme.text} />
                     </TouchableOpacity>
                     <Text style={s.title}>Profil client</Text>
                     <View style={s.backButton} />
                 </View>
                 <View style={s.center}>
-                    <Text style={s.errorText}>Client introuvable</Text>
+                    <Text style={s.errorText}>{errorMessage ?? 'Client introuvable'}</Text>
+                    {errorMessage && (
+                        <TouchableOpacity onPress={loadCustomerData} style={s.retryButton}>
+                            <Text style={s.retryButtonText}>Réessayer</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </SafeAreaView>
         );
@@ -173,7 +191,7 @@ export default function CustomerScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Profil client</Text>
@@ -222,7 +240,7 @@ export default function CustomerScreen() {
                             </Text>
                         </View>
                     </View>
-                    <View style={[s.dateRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTopVertical: 12 }]}>
+                    <View style={[s.dateRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 12 }]}>
                         <Ionicons name="time" size={14} color={theme.textSecondary} />
                         <View>
                             <Text style={s.dateLabel}>Dernière commande</Text>
@@ -266,10 +284,19 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
         errorText: { fontSize: 15, color: theme.textSecondary, textAlign: 'center' },
+        retryButton: {
+            marginTop: 16,
+            paddingVertical: 10,
+            paddingHorizontal: 20,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: theme.primary,
+        },
+        retryButtonText: { color: theme.primary, fontWeight: '700' },
         content: { padding: 16, gap: 16, paddingBottom: 32 },
         infoCard: {
             backgroundColor: theme.surface,

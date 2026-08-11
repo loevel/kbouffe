@@ -5,7 +5,6 @@ import {
     RefreshControl,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -13,8 +12,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { EmptyState, ErrorBanner, SearchBar } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
 interface Customer {
@@ -91,6 +92,7 @@ export default function CustomersScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [page, setPage] = useState(1);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadCustomers = useCallback(
         async (pageNum: number = 1) => {
@@ -113,8 +115,14 @@ export default function CustomersScreen() {
 
                 setCustomers(processed);
                 setPage(pageNum);
+                setErrorMessage(null);
             } catch (error) {
+                // Previously only console.error'd, so a failed fetch rendered
+                // the exact same "Aucun client pour le moment" empty state as
+                // a restaurant that genuinely has zero customers — no way to
+                // tell a broken request apart from reality.
                 console.error('Erreur lors du chargement des clients:', error);
+                setErrorMessage(getErrorMessage(error, 'Impossible de charger les clients'));
             } finally {
                 setLoading(false);
             }
@@ -203,28 +211,23 @@ export default function CustomersScreen() {
         <PermissionGate permission="customers:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Clients</Text>
                 <View style={s.backButton} />
             </View>
 
-            <View style={[s.searchContainer, { backgroundColor: theme.surface }]}>
-                <Ionicons name="search" size={18} color={theme.textSecondary} />
-                <TextInput
-                    style={[s.searchInput, { color: theme.text }]}
-                    placeholder="Rechercher..."
-                    placeholderTextColor={theme.textSecondary}
-                    value={searchText}
-                    onChangeText={setSearchText}
-                />
-                {searchText.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchText('')}>
-                        <Ionicons name="close" size={18} color={theme.textSecondary} />
-                    </TouchableOpacity>
-                )}
-            </View>
+            <SearchBar
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder="Nom, téléphone…"
+                style={s.search}
+            />
+
+            {errorMessage && (
+                <ErrorBanner message={errorMessage} onRetry={() => loadCustomers(page)} style={s.banner} />
+            )}
 
             <FlatList
                 data={customers}
@@ -233,12 +236,16 @@ export default function CustomersScreen() {
                 contentContainerStyle={s.list}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
                 ListEmptyComponent={
-                    <View style={s.empty}>
-                        <Text style={s.emptyIcon}>👥</Text>
-                        <Text style={s.emptyText}>
-                            {searchText ? 'Aucun client trouvé' : 'Aucun client pour le moment'}
-                        </Text>
-                    </View>
+                    searchText ? (
+                        <EmptyState
+                            icon="search-outline"
+                            title="Aucun client trouvé"
+                            message={`Aucun client ne correspond à « ${searchText.trim()} ».`}
+                            action={{ label: 'Effacer la recherche', onPress: () => setSearchText('') }}
+                        />
+                    ) : (
+                        <EmptyState icon="people-outline" title="Aucun client pour le moment" />
+                    )
                 }
             />
         </SafeAreaView>
@@ -259,24 +266,10 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text, flex: 1, textAlign: 'center' },
-        searchContainer: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            marginHorizontal: 12,
-            marginVertical: 8,
-            paddingHorizontal: 12,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: theme.border,
-        },
-        searchInput: {
-            flex: 1,
-            paddingVertical: 10,
-            fontSize: 14,
-        },
+        search: { marginHorizontal: 12, marginTop: 12 },
+        banner: { marginHorizontal: 12, marginBottom: 8 },
         list: { padding: 12, gap: 10, paddingBottom: 24 },
         customerCard: {
             backgroundColor: theme.surface,
@@ -316,7 +309,4 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         metricValue: { fontSize: 13, fontWeight: '700', color: theme.text },
         metricLabel: { fontSize: 10, color: theme.textSecondary },
         metricSeparator: { width: 1, height: 20, backgroundColor: theme.border },
-        empty: { alignItems: 'center', marginTop: 70, paddingHorizontal: 20 },
-        emptyIcon: { fontSize: 46, marginBottom: 10 },
-        emptyText: { fontSize: 14, color: theme.textSecondary, textAlign: 'center' },
     });

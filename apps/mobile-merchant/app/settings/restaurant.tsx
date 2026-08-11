@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -15,6 +14,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 
 interface RestaurantSettings {
     id: string;
@@ -29,6 +30,7 @@ export default function RestaurantSettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
@@ -55,11 +57,11 @@ export default function RestaurantSettingsScreen() {
                 description: restaurant.description ?? '',
             });
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de charger les informations du restaurant'));
+            toast.error(getErrorMessage(error, 'Impossible de charger les informations du restaurant'));
         } finally {
             setLoading(false);
         }
-    }, [session]);
+    }, [session, toast]);
 
     useEffect(() => {
         loadRestaurant();
@@ -72,7 +74,7 @@ export default function RestaurantSettingsScreen() {
     const handleSave = async () => {
         if (!session) return;
         if (!form.name.trim()) {
-            Alert.alert('Validation', 'Le nom du restaurant est obligatoire.');
+            toast.error('Le nom du restaurant est obligatoire.');
             return;
         }
 
@@ -88,10 +90,10 @@ export default function RestaurantSettingsScreen() {
                     description: form.description.trim() || null,
                 }),
             });
-            Alert.alert('Succès', 'Informations du restaurant mises à jour.');
+            toast.success('Informations du restaurant mises à jour.');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de sauvegarder les informations du restaurant'));
+            toast.error(getErrorMessage(error, 'Impossible de sauvegarder les informations du restaurant'));
         } finally {
             setSaving(false);
         }
@@ -110,7 +112,7 @@ export default function RestaurantSettingsScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Informations du restaurant</Text>
@@ -188,8 +190,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomColor: theme.border,
         },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

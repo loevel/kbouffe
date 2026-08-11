@@ -126,6 +126,16 @@ export const TouchTarget = {
   tab:    49,   // Native tab bar item
 } as const;
 
+/**
+ * Étend la zone tappable d'un contrôle plus petit que TouchTarget.min sans
+ * changer son rendu — pour les chips de fermeture 32×32 dont l'agrandissement
+ * visuel déséquilibrerait l'en-tête de modale.
+ */
+export function hitSlopFor(size: number) {
+  const inset = Math.max(0, Math.ceil((TouchTarget.min - size) / 2));
+  return { top: inset, bottom: inset, left: inset, right: inset };
+}
+
 // ─── Opacity states ─────────────────────────────────────────────────────────
 export const Opacity = {
   disabled: 0.38,

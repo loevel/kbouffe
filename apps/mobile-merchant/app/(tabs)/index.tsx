@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -19,13 +18,14 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { usePermission } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
+import { ACTIVE_STATUSES, formatOrderNumber, getDeliveryMeta, type OrderStatus } from '@/lib/order-status';
+import { EmptyState, ErrorBanner, ErrorState, LoadingState, StatusBadge } from '@/components/ui';
 import { Springs } from '@/constants/theme';
-
-type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
 
 interface OverviewOrder {
     id: string;
@@ -47,18 +47,6 @@ interface OverviewData {
     categoriesCount: number;
     recentOrders: OverviewOrder[];
 }
-
-const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'delivering'];
-
-const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
-    pending: { label: 'En attente', color: '#d97706' },
-    accepted: { label: 'Acceptée', color: '#2563eb' },
-    preparing: { label: 'Préparation', color: '#7c3aed' },
-    ready: { label: 'Prête', color: '#16a34a' },
-    delivering: { label: 'Livraison', color: '#0891b2' },
-    delivered: { label: 'Livrée', color: '#64748b' },
-    cancelled: { label: 'Annulée', color: '#dc2626' },
-};
 
 function SpringCard({
     children,
@@ -122,6 +110,7 @@ export default function OverviewScreen() {
     const [overview, setOverview] = useState<OverviewData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const fetchOverview = useCallback(async () => {
         if (!profile?.restaurantId) return;
@@ -129,80 +118,93 @@ export default function OverviewScreen() {
         const start = new Date();
         start.setHours(0, 0, 0, 0);
 
-        const [
-            todayOrdersRes,
-            activeOrdersRes,
-            recentOrdersRes,
-            productsCountRes,
-            unavailableProductsRes,
-            categoriesCountRes,
-        ] = await Promise.all([
-            supabase
-                .from('orders')
-                .select(`
-                    id,
-                    status,
-                    total_amount,
-                    created_at
-                `)
-                .eq('restaurant_id', profile.restaurantId)
-                .gte('created_at', start.toISOString()),
-            supabase
-                .from('orders')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId)
-                .in('status', ACTIVE_STATUSES),
-            supabase
-                .from('orders')
-                .select(`
-                    id,
-                    order_number,
-                    status,
-                    total_amount,
-                    created_at,
-                    delivery_type,
-                    customer_name
-                `)
-                .eq('restaurant_id', profile.restaurantId)
-                .order('created_at', { ascending: false })
-                .limit(4),
-            supabase
-                .from('products')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId),
-            supabase
-                .from('products')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId)
-                .eq('is_available', false),
-            supabase
-                .from('categories')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId),
-        ]);
+        try {
+            const responses = await Promise.all([
+                supabase
+                    .from('orders')
+                    .select(`
+                        id,
+                        status,
+                        total,
+                        created_at
+                    `)
+                    .eq('restaurant_id', profile.restaurantId)
+                    .gte('created_at', start.toISOString()),
+                supabase
+                    .from('orders')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId)
+                    .in('status', ACTIVE_STATUSES),
+                supabase
+                    .from('orders')
+                    .select(`
+                        id,
+                        invoice_number,
+                        status,
+                        total,
+                        created_at,
+                        delivery_type,
+                        customer_name
+                    `)
+                    .eq('restaurant_id', profile.restaurantId)
+                    .order('created_at', { ascending: false })
+                    .limit(4),
+                supabase
+                    .from('products')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId),
+                supabase
+                    .from('products')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId)
+                    .eq('is_available', false),
+                supabase
+                    .from('categories')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId),
+            ]);
 
-        const todayOrders = (todayOrdersRes.data ?? []) as { status: OrderStatus; total_amount: number; created_at: string }[];
-        const deliveredToday = todayOrders.filter((order) => order.status === 'delivered');
-        const recentOrders = (recentOrdersRes.data ?? []) as any[];
+            // Sans ce contrôle, une requête en échec laissait `overview` à des 0,
+            // indistinguables d'un restaurant réellement sans activité.
+            const failed = responses.find((res) => res.error);
+            if (failed?.error) throw new Error(failed.error.message);
 
-        setOverview({
-            todayRevenue: deliveredToday.reduce((sum, order) => sum + (order.total_amount ?? 0), 0),
-            todayOrdersCount: todayOrders.length,
-            activeOrdersCount: activeOrdersRes.count ?? 0,
-            cancelledOrdersCount: todayOrders.filter((order) => order.status === 'cancelled').length,
-            menuItemsCount: productsCountRes.count ?? 0,
-            unavailableItemsCount: unavailableProductsRes.count ?? 0,
-            categoriesCount: categoriesCountRes.count ?? 0,
-            recentOrders: recentOrders.map((order) => ({
-                id: order.id,
-                order_number: order.order_number,
-                status: order.status,
-                total_amount: order.total_amount ?? 0,
-                created_at: order.created_at,
-                delivery_type: order.delivery_type,
-                customer_name: order.customer_name ?? null,
-            })),
-        });
+            const [
+                todayOrdersRes,
+                activeOrdersRes,
+                recentOrdersRes,
+                productsCountRes,
+                unavailableProductsRes,
+                categoriesCountRes,
+            ] = responses;
+
+            const todayOrders = (todayOrdersRes.data ?? []) as { status: OrderStatus; total: number; created_at: string }[];
+            const deliveredToday = todayOrders.filter((order) => order.status === 'delivered');
+            const recentOrders = (recentOrdersRes.data ?? []) as any[];
+
+            setOverview({
+                todayRevenue: deliveredToday.reduce((sum, order) => sum + (order.total ?? 0), 0),
+                todayOrdersCount: todayOrders.length,
+                activeOrdersCount: activeOrdersRes.count ?? 0,
+                cancelledOrdersCount: todayOrders.filter((order) => order.status === 'cancelled').length,
+                menuItemsCount: productsCountRes.count ?? 0,
+                unavailableItemsCount: unavailableProductsRes.count ?? 0,
+                categoriesCount: categoriesCountRes.count ?? 0,
+                recentOrders: recentOrders.map((order) => ({
+                    id: order.id,
+                    order_number: formatOrderNumber(order),
+                    status: order.status,
+                    total_amount: order.total ?? 0,
+                    created_at: order.created_at,
+                    delivery_type: order.delivery_type,
+                    customer_name: order.customer_name ?? null,
+                })),
+            });
+            setErrorMessage(null);
+        } catch (err) {
+            console.error("Erreur lors du chargement de l'aperçu:", err);
+            setErrorMessage(getErrorMessage(err, "Impossible de charger l'aperçu du restaurant"));
+        }
     }, [profile?.restaurantId]);
 
     useEffect(() => {
@@ -255,10 +257,25 @@ export default function OverviewScreen() {
         setRefreshing(false);
     };
 
+    const onRetry = async () => {
+        setLoading(true);
+        await fetchOverview();
+        setLoading(false);
+    };
+
     if (loading) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-                <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+                <LoadingState label="Chargement de l'aperçu" />
+            </SafeAreaView>
+        );
+    }
+
+    // Aucune donnée exploitable : afficher l'échec plutôt qu'un tableau de bord vide.
+    if (!overview && errorMessage) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+                <ErrorState title="Aperçu indisponible" message={errorMessage} onRetry={onRetry} />
             </SafeAreaView>
         );
     }
@@ -269,6 +286,9 @@ export default function OverviewScreen() {
                 contentContainerStyle={styles.scroll}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
             >
+                {/* Rafraîchissement en échec : les chiffres affichés sont ceux du dernier chargement réussi. */}
+                {errorMessage && <ErrorBanner message={errorMessage} onRetry={onRetry} />}
+
                 <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                     <View style={styles.heroHeader}>
                         <View style={[styles.avatar, { backgroundColor: theme.primaryLight }]}>
@@ -370,48 +390,37 @@ export default function OverviewScreen() {
 
                     {overview?.recentOrders.length ? (
                         <View style={styles.orderList}>
-                            {overview.recentOrders.map((order) => {
-                                const statusMeta = STATUS_META[order.status];
-                                const deliveryLabel = order.delivery_type === 'delivery'
-                                    ? 'Livraison'
-                                    : order.delivery_type === 'pickup'
-                                        ? 'À emporter'
-                                        : 'Sur place';
-
-                                return (
-                                    <SpringCard
-                                        key={order.id}
-                                        style={[styles.orderCard, { backgroundColor: theme.surface }]}
-                                        onPress={() => router.push(`/order/${order.id}`)}
-                                    >
-                                        <View style={styles.orderTopRow}>
-                                            <View>
-                                                <Text style={[styles.orderNumber, { color: theme.text }]}>#{order.order_number}</Text>
-                                                <Text style={[styles.orderMeta, { color: theme.textSecondary }]}>
-                                                    {order.customer_name ?? 'Client'} · {deliveryLabel}
-                                                </Text>
-                                            </View>
-                                            <View style={[styles.orderBadge, { backgroundColor: `${statusMeta.color}22` }]}>
-                                                <Text style={[styles.orderBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
-                                            </View>
-                                        </View>
-                                        <View style={styles.orderBottomRow}>
+                            {overview.recentOrders.map((order) => (
+                                <SpringCard
+                                    key={order.id}
+                                    style={[styles.orderCard, { backgroundColor: theme.surface }]}
+                                    onPress={() => router.push(`/order/${order.id}`)}
+                                >
+                                    <View style={styles.orderTopRow}>
+                                        <View style={styles.orderIdentity}>
+                                            <Text style={[styles.orderNumber, { color: theme.text }]}>#{order.order_number}</Text>
                                             <Text style={[styles.orderMeta, { color: theme.textSecondary }]}>
-                                                {new Date(order.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                                {order.customer_name ?? 'Client'} · {getDeliveryMeta(order.delivery_type).label}
                                             </Text>
-                                            <Text style={[styles.orderAmount, { color: theme.text }]}>{order.total_amount.toLocaleString()} FCFA</Text>
                                         </View>
-                                    </SpringCard>
-                                );
-                            })}
+                                        <StatusBadge status={order.status} />
+                                    </View>
+                                    <View style={styles.orderBottomRow}>
+                                        <Text style={[styles.orderMeta, { color: theme.textSecondary }]}>
+                                            {new Date(order.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                        <Text style={[styles.orderAmount, { color: theme.text }]}>{order.total_amount.toLocaleString()} FCFA</Text>
+                                    </View>
+                                </SpringCard>
+                            ))}
                         </View>
                     ) : (
-                        <View style={[styles.emptyState, { backgroundColor: theme.surface }]}>
-                            <Text style={styles.emptyEmoji}>📦</Text>
-                            <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune commande récente</Text>
-                            <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                                Les nouvelles commandes apparaîtront ici pour un suivi rapide.
-                            </Text>
+                        <View style={[styles.emptyCard, { backgroundColor: theme.surface }]}>
+                            <EmptyState
+                                icon="receipt-outline"
+                                title="Aucune commande récente"
+                                message="Les nouvelles commandes apparaîtront ici pour un suivi rapide."
+                            />
                         </View>
                     )}
                 </View>
@@ -518,17 +527,9 @@ const styles = StyleSheet.create({
     },
     orderTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
     orderBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    orderIdentity: { flex: 1 },
     orderNumber: { fontSize: 15, fontWeight: '800' },
     orderMeta: { fontSize: 12, marginTop: 2 },
-    orderBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
-    orderBadgeText: { fontSize: 11, fontWeight: '800' },
     orderAmount: { fontSize: 14, fontWeight: '800' },
-    emptyState: {
-        borderRadius: 16,
-        padding: 24,
-        alignItems: 'center',
-    },
-    emptyEmoji: { fontSize: 38, marginBottom: 10 },
-    emptyTitle: { fontSize: 16, fontWeight: '800', marginBottom: 6 },
-    emptyBody: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+    emptyCard: { borderRadius: 16, overflow: 'hidden' },
 });

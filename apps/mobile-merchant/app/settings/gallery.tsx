@@ -16,6 +16,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { EmptyState, useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 
 interface GalleryImage {
     id: string;
@@ -29,6 +31,7 @@ export default function GallerySettingsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [images, setImages] = useState<GalleryImage[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -44,10 +47,12 @@ export default function GallerySettingsScreen() {
             setImages(data.photos || []);
             setError(null);
         } catch (err) {
-            // API n'existe pas encore, afficher l'écran vide
-            console.log('Galerie non disponible', err);
+            // The /api/restaurant/gallery route exists (see apps/api/src/modules/
+            // store/restaurant.ts) — a fetch failure here is a real error, not
+            // an unimplemented endpoint. Previously masked as an empty gallery.
+            console.error('Erreur lors du chargement de la galerie:', err);
             setImages([]);
-            setError(null);
+            setError(getErrorMessage(err, 'Impossible de charger la galerie'));
         } finally {
             setLoading(false);
         }
@@ -73,7 +78,7 @@ export default function GallerySettingsScreen() {
                         );
                         setImages(images.filter((img) => img.id !== id));
                     } catch (err) {
-                        Alert.alert('Erreur', getErrorMessage(err, 'Impossible de supprimer'));
+                        toast.error(getErrorMessage(err, 'Impossible de supprimer'));
                     }
                 },
             },
@@ -93,28 +98,35 @@ export default function GallerySettingsScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Galerie photos</Text>
-                <TouchableOpacity style={s.backButton}>
+                {/* L'ajout de photo n'est pas encore implémenté côté app : ce bouton
+                    n'avait aucun onPress et ne faisait donc rien du tout. */}
+                <TouchableOpacity
+                    onPress={() => toast.show("L'ajout de photos se fait depuis le tableau de bord web pour le moment.")}
+                    style={s.backButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ajouter une photo"
+                >
                     <Ionicons name="add" size={22} color={theme.primary} />
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={s.content}>
                 {error && (
-                    <View style={[s.errorBox, { backgroundColor: '#fee2e2', borderColor: '#fca5a5' }]}>
-                        <Text style={{ color: '#991b1b' }}>{error}</Text>
+                    <View style={[s.errorBox, { backgroundColor: `${theme.error}15`, borderColor: theme.error }]}>
+                        <Text style={{ color: theme.error }}>{error}</Text>
                     </View>
                 )}
 
                 {images.length === 0 ? (
-                    <View style={s.emptyState}>
-                        <Text style={s.emptyIcon}>🖼️</Text>
-                        <Text style={[s.emptyText, { color: theme.text }]}>Aucune photo pour le moment</Text>
-                        <Text style={[s.emptySubtext, { color: theme.textSecondary }]}>Ajoutez des photos pour montrer votre restaurant</Text>
-                    </View>
+                    <EmptyState
+                        icon="images-outline"
+                        title="Aucune photo pour le moment"
+                        message="Les photos de votre restaurant apparaîtront ici."
+                    />
                 ) : (
                     <FlatList
                         scrollEnabled={false}
@@ -166,7 +178,7 @@ const styles = (theme: any) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 12, paddingBottom: 32 },
         errorBox: { padding: 12, borderRadius: 8, borderWidth: 1, marginBottom: 8 },

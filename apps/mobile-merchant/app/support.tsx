@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     KeyboardAvoidingView,
     Linking,
@@ -20,6 +19,10 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner, useToast } from '@/components/ui';
+import { TouchTarget, hitSlopFor } from '@/constants/theme';
+
+const CLOSE_HIT_SLOP = hitSlopFor(32);
 
 interface Ticket {
     id: string;
@@ -60,6 +63,7 @@ export default function SupportScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -68,14 +72,18 @@ export default function SupportScreen() {
     const [description, setDescription] = useState('');
     const [ticketType, setTicketType] = useState('general');
     const [priority, setPriority] = useState('normal');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadTickets = useCallback(async () => {
         if (!session) { setLoading(false); return; }
         try {
             const data = await apiFetch<{ tickets: Ticket[] }>('/api/restaurant/support/tickets', session.access_token);
             setTickets(data.tickets || []);
-        } catch {
+            setErrorMessage(null);
+        } catch (err) {
+            console.error('Erreur lors du chargement des tickets:', err);
             setTickets([]);
+            setErrorMessage(getErrorMessage(err, 'Impossible de charger les tickets'));
         } finally {
             setLoading(false);
         }
@@ -85,7 +93,7 @@ export default function SupportScreen() {
 
     const handleCreate = async () => {
         if (!subject.trim() || !description.trim()) {
-            Alert.alert('Champs requis', 'Veuillez remplir le sujet et la description');
+            toast.error('Veuillez remplir le sujet et la description');
             return;
         }
         if (!session) return;
@@ -102,7 +110,7 @@ export default function SupportScreen() {
             setPriority('normal');
             await loadTickets();
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de créer le ticket'));
+            toast.error(getErrorMessage(err, 'Impossible de créer le ticket'));
         } finally {
             setSaving(false);
         }
@@ -121,14 +129,18 @@ export default function SupportScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Support</Text>
-                <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton}>
+                <TouchableOpacity onPress={() => setShowModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Nouveau ticket">
                     <Ionicons name="add" size={24} color={theme.primary} />
                 </TouchableOpacity>
             </View>
+
+            {errorMessage && (
+                <ErrorBanner message={errorMessage} onRetry={loadTickets} style={s.banner} />
+            )}
 
             <FlatList
                 data={tickets}
@@ -214,7 +226,13 @@ export default function SupportScreen() {
                         <View style={[s.modalContent, { backgroundColor: theme.surface }]}>
                             <View style={s.modalHeader}>
                                 <Text style={[s.modalTitle, { color: theme.text }]}>Nouveau ticket</Text>
-                                <TouchableOpacity onPress={() => setShowModal(false)} style={s.closeBtn}>
+                                <TouchableOpacity
+                                    onPress={() => setShowModal(false)}
+                                    style={s.closeBtn}
+                                    hitSlop={CLOSE_HIT_SLOP}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Fermer"
+                                >
                                     <Ionicons name="close" size={20} color={theme.text} />
                                 </TouchableOpacity>
                             </View>
@@ -297,10 +315,11 @@ const styles = (theme: any) =>
             paddingHorizontal: 16, paddingVertical: 12,
             backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
 
         list: { padding: 16, gap: 10, paddingBottom: 40 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         listHeader: { gap: 14, marginBottom: 4 },
         sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, paddingHorizontal: 2 },
 

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -13,7 +12,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiFetch, getErrorMessage } from '@/lib/api';
+import { getStatusMeta } from '@/lib/order-status';
+import { LoadingState } from '@/components/ui';
 import {
     type CountBreakdown,
     type DashboardPeriod,
@@ -33,19 +35,6 @@ const EMPTY_STATS: DashboardStatsResponse['stats'] = {
     totalCustomers: 0,
     completionRate: 0,
     cancellationRate: 0,
-};
-
-const STATUS_COLORS: Record<string, string> = {
-    pending: '#d97706',
-    accepted: '#2563eb',
-    preparing: '#7c3aed',
-    ready: '#16a34a',
-    out_for_delivery: '#0891b2',
-    delivering: '#0891b2',
-    delivered: '#64748b',
-    completed: '#64748b',
-    cancelled: '#dc2626',
-    refunded: '#b45309',
 };
 
 function StatCard({
@@ -114,6 +103,7 @@ function StatusBreakdown({
     rows: CountBreakdown[];
 }) {
     const theme = useTheme();
+    const scheme = useColorScheme();
     const s = styles(theme);
 
     return (
@@ -124,7 +114,7 @@ function StatusBreakdown({
             ) : (
                 <View style={s.breakdownList}>
                     {rows.map((row) => {
-                        const color = STATUS_COLORS[row.key] ?? theme.primary;
+                        const color = getStatusMeta(row.key, scheme).color;
                         return (
                             <View key={row.key} style={s.breakdownRow}>
                                 <View style={s.breakdownHeader}>
@@ -353,7 +343,7 @@ export default function StatsScreen() {
                 )}
 
                 {loading ? (
-                    <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+                    <LoadingState label="Chargement des statistiques" />
                 ) : !payload ? (
                     // A failed request must not fall through to zeroed-out
                     // metric cards — "0 FCFA / 0 commandes" reads as "this

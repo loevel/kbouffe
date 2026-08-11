@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -7,6 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { usePermissions } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
+import { EmptyState, SearchBar } from '@/components/ui';
 
 // Phone numbers are stored as raw digits (e.g. "699999999") and rendered
 // as-is, unformatted, next to the role. Group them so they're readable.
@@ -23,6 +25,7 @@ export default function SettingsScreen() {
     const theme = useTheme();
     const router = useRouter();
     const can = usePermissions();
+    const [query, setQuery] = useState('');
 
     const handleSignOut = () => {
         Alert.alert('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
@@ -36,63 +39,86 @@ export default function SettingsScreen() {
     type MenuItem = { label: string; icon: keyof typeof Ionicons.glyphMap; href: string; permission?: Permission };
     type MenuSection = { title: string; items: MenuItem[] };
 
+    /**
+     * Regroupement par moment d'usage plutôt que par taxonomie.
+     * Les 25 entrées vivaient auparavant dans « Opérations / Offres / Outils /
+     * Configuration », qui mettait la Caisse et la Cuisine — consultées chaque
+     * service — au même niveau que la Sécurité ou l'Export de données.
+     */
     const allSections: MenuSection[] = [
         {
-            title: 'Opérations',
+            title: 'Au quotidien',
             items: [
-                { label: 'Statistiques', icon: 'bar-chart-outline', href: '/stats', permission: 'dashboard:read' },
-                { label: 'Rapports', icon: 'document-text-outline', href: '/reports', permission: 'finances:read' },
-                { label: 'Messages', icon: 'chatbubble-ellipses-outline', href: '/messages' },
-                { label: 'Finances', icon: 'cash-outline', href: '/finances', permission: 'finances:read' },
-                { label: 'Réservations', icon: 'calendar-outline', href: '/reservations', permission: 'reservations:read' },
-                { label: 'Équipe', icon: 'people-outline', href: '/team', permission: 'team:read' },
-                { label: 'Avis clients', icon: 'star-outline', href: '/reviews', permission: 'customers:read' },
-                { label: 'Clients', icon: 'people-circle-outline', href: '/customers', permission: 'customers:read' },
                 { label: 'Caisse', icon: 'wallet-outline', href: '/caisse', permission: 'orders:manage' },
-                { label: 'Tables', icon: 'square-outline', href: '/tables', permission: 'tables:manage' },
-                { label: 'Cuisine', icon: 'restaurant-outline', href: '/kitchen', permission: 'orders:read' },
+                { label: 'Cuisine', icon: 'flame-outline', href: '/kitchen', permission: 'orders:read' },
+                { label: 'Tables', icon: 'grid-outline', href: '/tables', permission: 'tables:manage' },
+                { label: 'Réservations', icon: 'calendar-outline', href: '/reservations', permission: 'reservations:read' },
+                { label: 'Messages', icon: 'chatbubble-ellipses-outline', href: '/messages' },
             ],
         },
         {
-            title: 'Offres & Promotions',
+            title: 'Pilotage',
             items: [
+                { label: 'Statistiques', icon: 'bar-chart-outline', href: '/stats', permission: 'dashboard:read' },
+                { label: 'Rapports', icon: 'document-text-outline', href: '/reports', permission: 'finances:read' },
+                { label: 'Analytique avancée', icon: 'trending-up-outline', href: '/analytics', permission: 'finances:read' },
+                { label: 'Finances', icon: 'cash-outline', href: '/finances', permission: 'finances:read' },
+            ],
+        },
+        {
+            title: 'Clients & fidélisation',
+            items: [
+                { label: 'Clients', icon: 'people-circle-outline', href: '/customers', permission: 'customers:read' },
+                { label: 'Avis clients', icon: 'star-outline', href: '/reviews', permission: 'customers:read' },
                 { label: 'Promotions', icon: 'pricetag-outline', href: '/promotions', permission: 'marketing:read' },
                 { label: 'Fidélité', icon: 'heart-outline', href: '/loyalty', permission: 'marketing:read' },
                 { label: 'Cartes cadeaux', icon: 'gift-outline', href: '/gift-cards', permission: 'marketing:read' },
             ],
         },
         {
-            title: 'Outils',
-            items: [
-                { label: 'Analytique', icon: 'bar-chart-outline', href: '/analytics', permission: 'finances:read' },
-                { label: 'Vitrine', icon: 'storefront-outline', href: '/showcase', permission: 'store:manage' },
-                { label: 'Marketplace', icon: 'bag-outline', href: '/marketplace', permission: 'store:manage' },
-                { label: 'Support', icon: 'help-circle-outline', href: '/support' },
-            ],
-        },
-        {
-            title: 'Configuration',
+            title: 'Mon restaurant',
             items: [
                 { label: 'Informations du restaurant', icon: 'business-outline', href: '/settings/restaurant', permission: 'settings:manage' },
                 { label: "Horaires d'ouverture", icon: 'time-outline', href: '/settings/hours', permission: 'settings:manage' },
                 { label: 'Zones de livraison', icon: 'map-outline', href: '/settings/zones', permission: 'settings:manage' },
                 { label: 'Modes de paiement', icon: 'card-outline', href: '/settings/payments', permission: 'settings:manage' },
-                { label: 'Notifications push', icon: 'notifications-outline', href: '/settings/notifications' },
-                { label: 'Identité visuelle', icon: 'color-palette-outline', href: '/settings/branding', permission: 'settings:manage' },
                 { label: 'Service sur place', icon: 'restaurant-outline', href: '/settings/dine-in', permission: 'settings:manage' },
                 { label: 'Galerie photos', icon: 'images-outline', href: '/settings/gallery', permission: 'settings:manage' },
+                { label: 'Identité visuelle', icon: 'color-palette-outline', href: '/settings/branding', permission: 'settings:manage' },
+                { label: 'Vitrine en ligne', icon: 'storefront-outline', href: '/showcase', permission: 'store:manage' },
+            ],
+        },
+        {
+            title: 'Compte & système',
+            items: [
+                { label: 'Équipe', icon: 'people-outline', href: '/team', permission: 'team:read' },
+                { label: 'Notifications push', icon: 'notifications-outline', href: '/settings/notifications' },
                 { label: 'Sécurité', icon: 'shield-checkmark-outline', href: '/settings/security' },
                 { label: 'Données & Export', icon: 'download-outline', href: '/settings/data', permission: 'finances:read' },
+                { label: 'Marketplace', icon: 'bag-outline', href: '/marketplace', permission: 'store:manage' },
+                { label: 'Aide & support', icon: 'help-circle-outline', href: '/support' },
             ],
         },
     ];
 
-    const menuSections = allSections
-        .map((section) => ({
-            ...section,
-            items: section.items.filter((item) => !item.permission || can(item.permission)),
-        }))
-        .filter((section) => section.items.length > 0);
+    const menuSections = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        return allSections
+            .map((section) => ({
+                ...section,
+                items: section.items.filter(
+                    (item) =>
+                        (!item.permission || can(item.permission)) &&
+                        (!needle || item.label.toLowerCase().includes(needle))
+                ),
+            }))
+            .filter((section) => section.items.length > 0);
+        // `allSections` est reconstruit à chaque rendu ; seules la requête et les
+        // permissions changent réellement le résultat.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query, can]);
+
+    const resultCount = menuSections.reduce((sum, section) => sum + section.items.length, 0);
 
     return (
         <SafeAreaView style={s.container} edges={['top']}>
@@ -115,12 +141,26 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
+                <SearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Rechercher un réglage…"
+                    resultCount={resultCount}
+                    style={s.search}
+                />
+
                 {/* Menu sections */}
                 {menuSections.map((section) => (
                     <View key={section.title} style={s.section}>
                         <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>{section.title}</Text>
                         {section.items.map((item) => (
-                            <TouchableOpacity key={item.label} style={s.menuItem} onPress={() => router.push(item.href as never)}>
+                            <TouchableOpacity
+                                key={item.label}
+                                style={s.menuItem}
+                                onPress={() => router.push(item.href as never)}
+                                accessibilityRole="button"
+                                accessibilityLabel={item.label}
+                            >
                                 <Ionicons name={item.icon} size={20} color={theme.primary} />
                                 <Text style={[s.menuLabel, { color: theme.text }]}>{item.label}</Text>
                                 <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
@@ -129,12 +169,28 @@ export default function SettingsScreen() {
                     </View>
                 ))}
 
-                <TouchableOpacity style={[s.menuItem, s.signOutItem]} onPress={handleSignOut}>
-                    <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-                    <Text style={[s.menuLabel, { color: '#dc2626' }]}>Se déconnecter</Text>
+                {query.trim() && menuSections.length === 0 && (
+                    <EmptyState
+                        icon="search-outline"
+                        title="Aucun réglage trouvé"
+                        message={`Rien ne correspond à « ${query.trim()} ».`}
+                        action={{ label: 'Effacer la recherche', onPress: () => setQuery('') }}
+                    />
+                )}
+
+                <TouchableOpacity
+                    style={[s.menuItem, s.signOutItem]}
+                    onPress={handleSignOut}
+                    accessibilityRole="button"
+                    accessibilityLabel="Se déconnecter"
+                >
+                    <Ionicons name="log-out-outline" size={20} color={theme.error} />
+                    <Text style={[s.menuLabel, { color: theme.error }]}>Se déconnecter</Text>
                 </TouchableOpacity>
 
-                <Text style={[s.version, { color: theme.textSecondary }]}>Kbouffe Gestionnaire v1.0.0</Text>
+                <Text style={[s.version, { color: theme.textSecondary }]}>
+                    Kbouffe Gestionnaire v{Constants.expoConfig?.version ?? '—'}
+                </Text>
             </ScrollView>
         </SafeAreaView>
     );
@@ -145,6 +201,7 @@ const styles = (theme: any) => StyleSheet.create({
     header: { padding: 16, backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border },
     title: { fontSize: 22, fontWeight: '700', color: theme.text },
     scroll: { padding: 16 },
+    search: { marginBottom: 20 },
     restaurantCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: theme.surface, borderRadius: 14, padding: 16, marginBottom: 20 },
     restaurantAvatar: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
     restaurantAvatarText: { fontSize: 24, fontWeight: '800' },

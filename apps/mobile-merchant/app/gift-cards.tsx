@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     ScrollView,
@@ -17,6 +16,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner, useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
 interface GiftCard {
@@ -40,6 +41,7 @@ export default function GiftCardsScreen() {
     const { session } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [cards, setCards] = useState<GiftCard[]>([]);
@@ -47,6 +49,7 @@ export default function GiftCardsScreen() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [amount, setAmount] = useState('');
     const [beneficiary, setBeneficiary] = useState('');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadCards = useCallback(async () => {
         if (!session) {
@@ -58,11 +61,13 @@ export default function GiftCardsScreen() {
             const data = await apiFetch<GiftCardsResponse>('/api/gift-cards', session.access_token);
             setCards(data.cards || []);
             setStats(data.stats);
+            setErrorMessage(null);
         } catch (err) {
-            // API non implémentée
-            console.log('Gift cards non disponibles');
-            setCards([]);
-            setStats({ active_count: 0, total_balance: 0 });
+            // Previously treated every failure as "API non implémentée" and
+            // silently reset to all-zero stats — indistinguishable from a
+            // restaurant that genuinely has no gift cards.
+            console.error('Erreur lors du chargement des cartes cadeaux:', err);
+            setErrorMessage(getErrorMessage(err, 'Impossible de charger les cartes cadeaux'));
         } finally {
             setLoading(false);
         }
@@ -74,7 +79,7 @@ export default function GiftCardsScreen() {
 
     const handleCreateCard = async () => {
         if (!amount.trim() || parseFloat(amount) <= 0) {
-            Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+            toast.error('Veuillez entrer un montant valide');
             return;
         }
 
@@ -93,13 +98,13 @@ export default function GiftCardsScreen() {
                     }),
                 }
             );
-            Alert.alert('Succès', 'Carte cadeau créée');
+            toast.success('Carte cadeau créée');
             setShowCreateModal(false);
             setAmount('');
             setBeneficiary('');
             await loadCards();
         } catch (err) {
-            Alert.alert('Erreur', getErrorMessage(err, 'Impossible de créer la carte'));
+            toast.error(getErrorMessage(err, 'Impossible de créer la carte'));
         } finally {
             setSaving(false);
         }
@@ -119,11 +124,11 @@ export default function GiftCardsScreen() {
         <PermissionGate permission="marketing:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Cartes cadeaux</Text>
-                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton}>
+                <TouchableOpacity onPress={() => setShowCreateModal(true)} style={s.backButton} accessibilityRole="button" accessibilityLabel="Nouvelle carte cadeau">
                     <Ionicons name="add" size={22} color={theme.primary} />
                 </TouchableOpacity>
             </View>
@@ -134,6 +139,9 @@ export default function GiftCardsScreen() {
                 contentContainerStyle={s.content}
                 ListHeaderComponent={
                     <>
+                        {errorMessage && (
+                <ErrorBanner message={errorMessage} onRetry={loadCards} style={s.banner} />
+                        )}
                         <View style={[s.statsRow, { gap: 12 }]}>
                             <View style={[s.statCard, { backgroundColor: theme.surface }]}>
                                 <Text style={[s.statLabel, { color: theme.textSecondary }]}>Cartes actives</Text>
@@ -141,7 +149,7 @@ export default function GiftCardsScreen() {
                             </View>
                             <View style={[s.statCard, { backgroundColor: theme.surface }]}>
                                 <Text style={[s.statLabel, { color: theme.textSecondary }]}>Solde total</Text>
-                                <Text style={[s.statValue, { color: theme.text }]}>{stats.total_balance.toLocaleString()} F</Text>
+                                <Text style={[s.statValue, { color: theme.text }]}>{stats.total_balance.toLocaleString()} FCFA</Text>
                             </View>
                         </View>
                     </>
@@ -175,7 +183,7 @@ export default function GiftCardsScreen() {
                                 />
                             </View>
                             <Text style={[s.progressText, { color: theme.text }]}>
-                                {item.balance.toLocaleString()} F / {item.initial_amount.toLocaleString()} F
+                                {item.balance.toLocaleString()} FCFA / {item.initial_amount.toLocaleString()} FCFA
                             </Text>
                         </View>
                     </TouchableOpacity>
@@ -267,9 +275,10 @@ const styles = (theme: any) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         statsRow: { marginBottom: 16, flexDirection: 'row' },
         statCard: { flex: 1, borderRadius: 12, padding: 12 },
         statLabel: { fontSize: 11, fontWeight: '600' },

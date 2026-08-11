@@ -17,6 +17,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/ui';
+import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import type { CategoryRow } from '@/lib/types';
 
@@ -31,6 +33,7 @@ export default function NewProductScreen() {
     const { session, profile } = useAuth();
     const router = useRouter();
     const theme = useTheme();
+    const toast = useToast();
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
@@ -40,6 +43,7 @@ export default function NewProductScreen() {
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
     const [categories, setCategories] = useState<CategoryRow[]>([]);
     const [showCategorySelector, setShowCategorySelector] = useState(false);
+    const [categoriesError, setCategoriesError] = useState<string | null>(null);
 
     const parsedPrice = Number.parseInt(price, 10);
     const canSubmit = name.trim().length > 0 && Number.isFinite(parsedPrice) && parsedPrice > 0 && !saving;
@@ -59,8 +63,13 @@ export default function NewProductScreen() {
 
                 if (error) throw error;
                 setCategories(data || []);
+                setCategoriesError(null);
             } catch (error) {
+                // Previously left categories=[] silently — rendered the same
+                // "Aucune catégorie trouvée" whether the restaurant truly had
+                // none or the query just failed.
                 console.error('Erreur lors du chargement des catégories:', error);
+                setCategoriesError(getErrorMessage(error, 'Impossible de charger les catégories'));
             } finally {
                 setLoading(false);
             }
@@ -82,7 +91,7 @@ export default function NewProductScreen() {
                 setSelectedImage(result.assets[0].uri);
             }
         } catch (error) {
-            Alert.alert('Erreur', 'Impossible de sélectionner une image');
+            toast.error('Impossible de sélectionner une image');
         }
     };
 
@@ -121,7 +130,7 @@ export default function NewProductScreen() {
         const parsedPrice = Number.parseInt(price, 10);
 
         if (!name.trim() || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
-            Alert.alert('Erreur', 'Le nom et le prix sont obligatoires');
+            toast.error('Le nom et le prix sont obligatoires');
             return;
         }
 
@@ -146,10 +155,10 @@ export default function NewProductScreen() {
                 }),
             });
 
-            Alert.alert('Succès', 'Produit créé');
+            toast.success('Produit créé');
             router.back();
         } catch (error) {
-            Alert.alert('Erreur', getErrorMessage(error, 'Impossible de créer le produit'));
+            toast.error(getErrorMessage(error, 'Impossible de créer le produit'));
         } finally {
             setSaving(false);
         }
@@ -161,7 +170,7 @@ export default function NewProductScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Nouveau produit</Text>
@@ -216,7 +225,9 @@ export default function NewProductScreen() {
                     {showCategorySelector && (
                         <View style={s.categoryList}>
                             {categories.length === 0 ? (
-                                <Text style={s.noCategoriesText}>Aucune catégorie trouvée</Text>
+                                <Text style={s.noCategoriesText}>
+                                    {categoriesError ?? 'Aucune catégorie trouvée'}
+                                </Text>
                             ) : (
                                 categories.map(cat => (
                                     <TouchableOpacity
@@ -310,8 +321,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomColor: theme.border,
         },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

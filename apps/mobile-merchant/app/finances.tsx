@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
 interface FinanceSummary {
@@ -125,7 +126,7 @@ export default function FinancesScreen() {
         return (
             <SafeAreaView style={s.container} edges={['top']}>
                 <View style={s.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                         <Ionicons name="arrow-back" size={22} color={theme.text} />
                     </TouchableOpacity>
                     <Text style={s.title}>Finances</Text>
@@ -193,7 +194,7 @@ export default function FinancesScreen() {
         <PermissionGate permission="finances:read">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Finances</Text>
@@ -264,7 +265,7 @@ export default function FinancesScreen() {
                         <Text style={s.statLabel}>Commandes</Text>
                         <Text style={s.statValue}>{finances.summary.transactionCount}</Text>
                     </View>
-                    <View style={[s.statRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTopVertical: 10 }]}>
+                    <View style={[s.statRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 10 }]}>
                         <Text style={s.statLabel}>Panier moyen</Text>
                         <Text style={s.statValue}>{(finances.summary.avgOrderValue / 1000).toFixed(1)}K FCFA</Text>
                     </View>
@@ -312,7 +313,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
         errorText: { fontSize: 15, color: theme.textSecondary, textAlign: 'center' },
