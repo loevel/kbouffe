@@ -19,11 +19,12 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { usePermission } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
-import { Springs } from '@/constants/theme';
+import { Springs, TouchTarget } from '@/constants/theme';
 
 type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
 
@@ -122,6 +123,7 @@ export default function OverviewScreen() {
     const [overview, setOverview] = useState<OverviewData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const fetchOverview = useCallback(async () => {
         if (!profile?.restaurantId) return;
@@ -129,80 +131,93 @@ export default function OverviewScreen() {
         const start = new Date();
         start.setHours(0, 0, 0, 0);
 
-        const [
-            todayOrdersRes,
-            activeOrdersRes,
-            recentOrdersRes,
-            productsCountRes,
-            unavailableProductsRes,
-            categoriesCountRes,
-        ] = await Promise.all([
-            supabase
-                .from('orders')
-                .select(`
-                    id,
-                    status,
-                    total_amount,
-                    created_at
-                `)
-                .eq('restaurant_id', profile.restaurantId)
-                .gte('created_at', start.toISOString()),
-            supabase
-                .from('orders')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId)
-                .in('status', ACTIVE_STATUSES),
-            supabase
-                .from('orders')
-                .select(`
-                    id,
-                    order_number,
-                    status,
-                    total_amount,
-                    created_at,
-                    delivery_type,
-                    customer_name
-                `)
-                .eq('restaurant_id', profile.restaurantId)
-                .order('created_at', { ascending: false })
-                .limit(4),
-            supabase
-                .from('products')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId),
-            supabase
-                .from('products')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId)
-                .eq('is_available', false),
-            supabase
-                .from('categories')
-                .select('id', { count: 'exact', head: true })
-                .eq('restaurant_id', profile.restaurantId),
-        ]);
+        try {
+            const responses = await Promise.all([
+                supabase
+                    .from('orders')
+                    .select(`
+                        id,
+                        status,
+                        total_amount,
+                        created_at
+                    `)
+                    .eq('restaurant_id', profile.restaurantId)
+                    .gte('created_at', start.toISOString()),
+                supabase
+                    .from('orders')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId)
+                    .in('status', ACTIVE_STATUSES),
+                supabase
+                    .from('orders')
+                    .select(`
+                        id,
+                        order_number,
+                        status,
+                        total_amount,
+                        created_at,
+                        delivery_type,
+                        customer_name
+                    `)
+                    .eq('restaurant_id', profile.restaurantId)
+                    .order('created_at', { ascending: false })
+                    .limit(4),
+                supabase
+                    .from('products')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId),
+                supabase
+                    .from('products')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId)
+                    .eq('is_available', false),
+                supabase
+                    .from('categories')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('restaurant_id', profile.restaurantId),
+            ]);
 
-        const todayOrders = (todayOrdersRes.data ?? []) as { status: OrderStatus; total_amount: number; created_at: string }[];
-        const deliveredToday = todayOrders.filter((order) => order.status === 'delivered');
-        const recentOrders = (recentOrdersRes.data ?? []) as any[];
+            // Sans ce contrôle, une requête en échec laissait `overview` à des 0,
+            // indistinguables d'un restaurant réellement sans activité.
+            const failed = responses.find((res) => res.error);
+            if (failed?.error) throw new Error(failed.error.message);
 
-        setOverview({
-            todayRevenue: deliveredToday.reduce((sum, order) => sum + (order.total_amount ?? 0), 0),
-            todayOrdersCount: todayOrders.length,
-            activeOrdersCount: activeOrdersRes.count ?? 0,
-            cancelledOrdersCount: todayOrders.filter((order) => order.status === 'cancelled').length,
-            menuItemsCount: productsCountRes.count ?? 0,
-            unavailableItemsCount: unavailableProductsRes.count ?? 0,
-            categoriesCount: categoriesCountRes.count ?? 0,
-            recentOrders: recentOrders.map((order) => ({
-                id: order.id,
-                order_number: order.order_number,
-                status: order.status,
-                total_amount: order.total_amount ?? 0,
-                created_at: order.created_at,
-                delivery_type: order.delivery_type,
-                customer_name: order.customer_name ?? null,
-            })),
-        });
+            const [
+                todayOrdersRes,
+                activeOrdersRes,
+                recentOrdersRes,
+                productsCountRes,
+                unavailableProductsRes,
+                categoriesCountRes,
+            ] = responses;
+
+            const todayOrders = (todayOrdersRes.data ?? []) as { status: OrderStatus; total_amount: number; created_at: string }[];
+            const deliveredToday = todayOrders.filter((order) => order.status === 'delivered');
+            const recentOrders = (recentOrdersRes.data ?? []) as any[];
+
+            setOverview({
+                todayRevenue: deliveredToday.reduce((sum, order) => sum + (order.total_amount ?? 0), 0),
+                todayOrdersCount: todayOrders.length,
+                activeOrdersCount: activeOrdersRes.count ?? 0,
+                cancelledOrdersCount: todayOrders.filter((order) => order.status === 'cancelled').length,
+                menuItemsCount: productsCountRes.count ?? 0,
+                unavailableItemsCount: unavailableProductsRes.count ?? 0,
+                categoriesCount: categoriesCountRes.count ?? 0,
+                recentOrders: recentOrders.map((order) => ({
+                    id: order.id,
+                    order_number: order.order_number,
+                    status: order.status,
+                    total_amount: order.total_amount ?? 0,
+                    created_at: order.created_at,
+                    delivery_type: order.delivery_type,
+                    customer_name: order.customer_name ?? null,
+                })),
+            });
+            setErrorMessage(null);
+        } catch (err) {
+            console.error("Erreur lors du chargement de l'aperçu:", err);
+            setErrorMessage(getErrorMessage(err, "Impossible de charger l'aperçu du restaurant"));
+        }
     }, [profile?.restaurantId]);
 
     useEffect(() => {
@@ -255,10 +270,37 @@ export default function OverviewScreen() {
         setRefreshing(false);
     };
 
+    const onRetry = async () => {
+        setLoading(true);
+        await fetchOverview();
+        setLoading(false);
+    };
+
     if (loading) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
                 <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+            </SafeAreaView>
+        );
+    }
+
+    // Aucune donnée exploitable : afficher l'échec plutôt qu'un tableau de bord vide.
+    if (!overview && errorMessage) {
+        return (
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+                <View style={styles.errorState}>
+                    <Ionicons name="cloud-offline-outline" size={44} color={theme.error} />
+                    <Text style={[styles.errorTitle, { color: theme.text }]}>Aperçu indisponible</Text>
+                    <Text style={[styles.errorBody, { color: theme.textSecondary }]}>{errorMessage}</Text>
+                    <TouchableOpacity
+                        onPress={onRetry}
+                        style={[styles.retryButton, { borderColor: theme.error }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Réessayer de charger l'aperçu"
+                    >
+                        <Text style={[styles.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
             </SafeAreaView>
         );
     }
@@ -269,6 +311,22 @@ export default function OverviewScreen() {
                 contentContainerStyle={styles.scroll}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
             >
+                {/* Rafraîchissement en échec : les chiffres affichés sont ceux du dernier chargement réussi. */}
+                {errorMessage && (
+                    <View style={[styles.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                        <Ionicons name="alert-circle" size={18} color={theme.error} />
+                        <Text style={[styles.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                        <TouchableOpacity
+                            onPress={onRetry}
+                            style={[styles.retryButton, { borderColor: theme.error }]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Réessayer de charger l'aperçu"
+                        >
+                            <Text style={[styles.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                     <View style={styles.heroHeader}>
                         <View style={[styles.avatar, { backgroundColor: theme.primaryLight }]}>
@@ -531,4 +589,30 @@ const styles = StyleSheet.create({
     emptyEmoji: { fontSize: 38, marginBottom: 10 },
     emptyTitle: { fontSize: 16, fontWeight: '800', marginBottom: 6 },
     emptyBody: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+    errorState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        padding: 32,
+    },
+    errorTitle: { fontSize: 17, fontWeight: '800' },
+    errorBody: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+    errorBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    errorBannerText: { flex: 1, fontSize: 13 },
+    retryButton: {
+        minHeight: TouchTarget.min,
+        justifyContent: 'center',
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        borderWidth: 1,
+    },
+    retryButtonText: { fontSize: 13, fontWeight: '700' },
 });

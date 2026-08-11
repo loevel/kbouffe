@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { TouchTarget } from '@/constants/theme';
 
 type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
@@ -151,7 +152,7 @@ export default function OpeningHoursScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Horaires d&apos;ouverture</Text>
@@ -219,8 +220,8 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             borderBottomColor: theme.border,
         },
         backButton: {
-            width: 36,
-            height: 36,
+            width: TouchTarget.min,
+            height: TouchTarget.min,
             alignItems: 'center',
             justifyContent: 'center',
         },

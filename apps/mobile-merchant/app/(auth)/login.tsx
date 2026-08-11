@@ -1,29 +1,58 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
+    KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+
+/**
+ * Traduit l'erreur Supabase en message actionnable. Auparavant tout échec —
+ * panne réseau, compte suspendu, quota atteint — était présenté comme
+ * « Email ou mot de passe incorrect », envoyant l'utilisateur sur une fausse piste.
+ */
+function describeSignInError(message: string): string {
+    const raw = message.toLowerCase();
+
+    if (raw.includes('invalid login credentials')) {
+        return 'Email ou mot de passe incorrect.';
+    }
+    if (raw.includes('email not confirmed')) {
+        return "Votre adresse email n'a pas encore été confirmée. Vérifiez votre boîte de réception.";
+    }
+    if (raw.includes('network') || raw.includes('failed to fetch') || raw.includes('timeout')) {
+        return 'Connexion au serveur impossible. Vérifiez votre connexion internet et réessayez.';
+    }
+    if (raw.includes('rate limit') || raw.includes('too many requests')) {
+        return 'Trop de tentatives de connexion. Patientez quelques minutes avant de réessayer.';
+    }
+    if (raw.includes('banned') || raw.includes('disabled')) {
+        return "Ce compte est désactivé. Contactez l'équipe KBouffe.";
+    }
+    return message;
+}
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const { signIn } = useAuth();
     const theme = useTheme();
 
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {
-            Alert.alert('Champs requis', 'Veuillez remplir tous les champs.');
+            setErrorMessage('Veuillez renseigner votre email et votre mot de passe.');
             return;
         }
         setLoading(true);
+        setErrorMessage(null);
         const { error } = await signIn(email.trim().toLowerCase(), password);
         setLoading(false);
         if (error) {
-            Alert.alert('Connexion échouée', 'Email ou mot de passe incorrect.');
+            setErrorMessage(describeSignInError(error));
             return;
         }
         // Navigation handled by useEffect in index
@@ -71,7 +100,24 @@ export default function LoginScreen() {
                         secureTextEntry
                     />
 
-                    <TouchableOpacity style={s.btn} onPress={handleLogin} disabled={loading}>
+                    {errorMessage && (
+                        <View
+                            style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}
+                            accessibilityLiveRegion="polite"
+                        >
+                            <Ionicons name="alert-circle" size={18} color={theme.error} />
+                            <Text style={[s.errorText, { color: theme.error }]}>{errorMessage}</Text>
+                        </View>
+                    )}
+
+                    <TouchableOpacity
+                        style={s.btn}
+                        onPress={handleLogin}
+                        disabled={loading}
+                        accessibilityRole="button"
+                        accessibilityLabel="Se connecter"
+                        accessibilityState={{ disabled: loading, busy: loading }}
+                    >
                         {loading ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
@@ -117,5 +163,10 @@ const styles = (theme: any) => StyleSheet.create({
         padding: 16, alignItems: 'center', marginTop: 20,
     },
     btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    errorBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        marginTop: 16, padding: 12, borderRadius: 12, borderWidth: 1,
+    },
+    errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
     hint: { marginTop: 16, textAlign: 'center', fontSize: 12, color: theme.textSecondary, lineHeight: 18 },
 });

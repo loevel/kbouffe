@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { TouchTarget } from '@/constants/theme';
 
 export default function DataSettingsScreen() {
     const { session } = useAuth();
@@ -97,7 +98,7 @@ export default function DataSettingsScreen() {
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Données & Export</Text>
@@ -209,7 +210,7 @@ const styles = (theme: any) =>
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, gap: 16, paddingBottom: 32 },
         section: { gap: 12 },

@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
-    Switch, RefreshControl, ActivityIndicator, SectionList,
+    Switch, RefreshControl, ActivityIndicator, SectionList, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/lib/api';
+import { TouchTarget } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import type { ProductRow } from '@/lib/types';
@@ -25,24 +27,21 @@ export default function MenuScreen() {
     const [sections, setSections] = useState<MenuSection[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [loaded, setLoaded] = useState(false);
 
     const fetchMenu = useCallback(async () => {
-        if (!profile?.restaurantId) {
-            console.log('No restaurantId:', profile);
-            return;
-        }
+        if (!profile?.restaurantId) return;
         try {
             const [catsRes, prodsRes] = await Promise.all([
                 supabase.from('categories').select('id, name, sort_order').eq('restaurant_id', profile.restaurantId).order('sort_order'),
                 supabase.from('products').select('id, name, description, price, is_available, image_url, category_id').eq('restaurant_id', profile.restaurantId).order('name'),
             ]);
-            if (catsRes.error) {
-                console.error('Categories error:', catsRes.error);
-            }
-            if (prodsRes.error) {
-                console.error('Products error:', prodsRes.error);
-            }
-            console.log('Loaded categories:', catsRes.data?.length, 'products:', prodsRes.data?.length);
+            // Sans ce contrôle, un menu en échec de chargement était affiché comme
+            // « Aucun produit », indistinguable d'un menu réellement vide.
+            if (catsRes.error) throw new Error(catsRes.error.message);
+            if (prodsRes.error) throw new Error(prodsRes.error.message);
+
             const cats = catsRes.data ?? [];
             const prods = prodsRes.data ?? [];
             const uncategorized = prods.filter((p: ProductRow) => !p.category_id);
@@ -52,8 +51,11 @@ export default function MenuScreen() {
             }));
             if (uncategorized.length > 0) result.push({ id: '_uncategorized', name: 'Sans catégorie', products: uncategorized });
             setSections(result.filter((s) => s.products.length > 0));
+            setErrorMessage(null);
+            setLoaded(true);
         } catch (error) {
-            console.error('Error fetching menu:', error);
+            console.error('Erreur lors du chargement du menu:', error);
+            setErrorMessage(getErrorMessage(error, 'Impossible de charger le menu'));
         }
     }, [profile?.restaurantId]);
 
@@ -61,16 +63,30 @@ export default function MenuScreen() {
 
     const toggleAvailability = async (product: ProductRow) => {
         const newVal = !product.is_available;
-        setSections((prev) =>
-            prev.map((s) => ({
-                ...s,
-                products: s.products.map((p) => p.id === product.id ? { ...p, is_available: newVal } : p),
-            }))
-        );
-        await supabase.from('products').update({ is_available: newVal }).eq('id', product.id);
+        const applyValue = (value: boolean) =>
+            setSections((prev) =>
+                prev.map((s) => ({
+                    ...s,
+                    products: s.products.map((p) => p.id === product.id ? { ...p, is_available: value } : p),
+                }))
+            );
+
+        applyValue(newVal);
+        const { error } = await supabase.from('products').update({ is_available: newVal }).eq('id', product.id);
+        if (error) {
+            // Sans rollback, le switch restait sur une valeur jamais enregistrée :
+            // un plat en rupture pouvait sembler encore disponible à la vente.
+            applyValue(product.is_available);
+            Alert.alert(
+                'Mise à jour impossible',
+                `La disponibilité de « ${product.name} » n'a pas pu être enregistrée.\n\n${error.message}`
+            );
+        }
     };
 
     const onRefresh = async () => { setRefreshing(true); await fetchMenu(); setRefreshing(false); };
+
+    const onRetry = async () => { setLoading(true); await fetchMenu(); setLoading(false); };
 
     const s = styles(theme);
 
@@ -80,15 +96,62 @@ export default function MenuScreen() {
         </SafeAreaView>
     );
 
+    const header = (
+        <View style={s.header}>
+            <Text style={s.title}>Mon Menu</Text>
+            <TouchableOpacity
+                style={[s.addBtn, { backgroundColor: theme.primary }]}
+                onPress={() => router.push('/product/new')}
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter un produit"
+            >
+                <Ionicons name="add" size={20} color="#fff" />
+                <Text style={s.addBtnText}>Produit</Text>
+            </TouchableOpacity>
+        </View>
+    );
+
+    // Jamais chargé avec succès : afficher l'échec plutôt qu'un menu vide trompeur.
+    if (!loaded && errorMessage) {
+        return (
+            <SafeAreaView style={s.container} edges={['top']}>
+                {header}
+                <View style={s.errorState}>
+                    <Ionicons name="cloud-offline-outline" size={44} color={theme.error} />
+                    <Text style={s.errorTitle}>Menu indisponible</Text>
+                    <Text style={[s.errorBody, { color: theme.textSecondary }]}>{errorMessage}</Text>
+                    <TouchableOpacity
+                        onPress={onRetry}
+                        style={[s.retryButton, { borderColor: theme.error }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Réessayer de charger le menu"
+                    >
+                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={s.container} edges={['top']}>
-            <View style={s.header}>
-                <Text style={s.title}>Mon Menu</Text>
-                <TouchableOpacity style={[s.addBtn, { backgroundColor: theme.primary }]} onPress={() => router.push('/product/new')}>
-                    <Ionicons name="add" size={20} color="#fff" />
-                    <Text style={s.addBtnText}>Produit</Text>
-                </TouchableOpacity>
-            </View>
+            {header}
+
+            {/* Rafraîchissement en échec : le menu affiché est celui du dernier chargement réussi. */}
+            {errorMessage && (
+                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
+                    <Ionicons name="alert-circle" size={18} color={theme.error} />
+                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
+                    <TouchableOpacity
+                        onPress={onRetry}
+                        style={[s.retryButton, { borderColor: theme.error }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Réessayer de charger le menu"
+                    >
+                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <SectionList
                 sections={sections.map((s) => ({ title: s.name, data: s.products }))}
@@ -116,6 +179,7 @@ export default function MenuScreen() {
                         <Switch
                             value={item.is_available}
                             onValueChange={() => toggleAvailability(item)}
+                            accessibilityLabel={`Disponibilité de ${item.name}`}
                             trackColor={{ false: theme.border, true: theme.primary + '80' }}
                             thumbColor={item.is_available ? theme.primary : theme.textSecondary}
                         />
@@ -154,4 +218,11 @@ const styles = (theme: any) => StyleSheet.create({
     empty: { alignItems: 'center', marginTop: 60 },
     emptyIcon: { fontSize: 48, marginBottom: 12 },
     emptyText: { fontSize: 15 },
+    errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
+    errorTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
+    errorBody: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+    errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, margin: 12, borderRadius: 12, borderWidth: 1 },
+    errorBannerText: { flex: 1, fontSize: 13 },
+    retryButton: { minHeight: TouchTarget.min, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, borderWidth: 1 },
+    retryButtonText: { fontSize: 13, fontWeight: '700' },
 });

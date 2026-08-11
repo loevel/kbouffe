@@ -16,7 +16,10 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { TouchTarget, hitSlopFor } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
+
+const CLOSE_HIT_SLOP = hitSlopFor(32);
 
 interface Service {
     id: string;
@@ -173,7 +176,7 @@ export default function MarketplaceScreen() {
         <PermissionGate permission="store:manage">
         <SafeAreaView style={s.container} edges={['top']}>
             <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton} accessibilityRole="button" accessibilityLabel="Retour">
                     <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={s.title}>Marketplace</Text>
@@ -273,7 +276,13 @@ export default function MarketplaceScreen() {
                                             {paymentStep === 'pending' ? 'Confirmez sur votre téléphone' : 'Activez ce service pour votre restaurant'}
                                         </Text>
                                     </View>
-                                    <TouchableOpacity onPress={closeModal} style={s.closeButton}>
+                                    <TouchableOpacity
+                                        onPress={closeModal}
+                                        style={s.closeButton}
+                                        hitSlop={CLOSE_HIT_SLOP}
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Fermer"
+                                    >
                                         <Ionicons name="close" size={20} color="#fff" />
                                     </TouchableOpacity>
                                 </View>
@@ -445,7 +454,7 @@ const styles = (theme: any) =>
             paddingHorizontal: 16, paddingVertical: 12,
             backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border,
         },
-        backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+        backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32, gap: 14 },
         errorBanner: {
