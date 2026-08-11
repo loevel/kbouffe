@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -24,9 +23,9 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import { usePermission } from '@/hooks/use-permission';
 import { getMemberRoleLabel } from '@/lib/member-role';
-import { Springs, TouchTarget } from '@/constants/theme';
-
-type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
+import { ACTIVE_STATUSES, getDeliveryMeta, type OrderStatus } from '@/lib/order-status';
+import { EmptyState, ErrorBanner, ErrorState, LoadingState, StatusBadge } from '@/components/ui';
+import { Springs } from '@/constants/theme';
 
 interface OverviewOrder {
     id: string;
@@ -48,18 +47,6 @@ interface OverviewData {
     categoriesCount: number;
     recentOrders: OverviewOrder[];
 }
-
-const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'delivering'];
-
-const STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
-    pending: { label: 'En attente', color: '#d97706' },
-    accepted: { label: 'Acceptée', color: '#2563eb' },
-    preparing: { label: 'Préparation', color: '#7c3aed' },
-    ready: { label: 'Prête', color: '#16a34a' },
-    delivering: { label: 'Livraison', color: '#0891b2' },
-    delivered: { label: 'Livrée', color: '#64748b' },
-    cancelled: { label: 'Annulée', color: '#dc2626' },
-};
 
 function SpringCard({
     children,
@@ -279,7 +266,7 @@ export default function OverviewScreen() {
     if (loading) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-                <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+                <LoadingState label="Chargement de l'aperçu" />
             </SafeAreaView>
         );
     }
@@ -288,19 +275,7 @@ export default function OverviewScreen() {
     if (!overview && errorMessage) {
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-                <View style={styles.errorState}>
-                    <Ionicons name="cloud-offline-outline" size={44} color={theme.error} />
-                    <Text style={[styles.errorTitle, { color: theme.text }]}>Aperçu indisponible</Text>
-                    <Text style={[styles.errorBody, { color: theme.textSecondary }]}>{errorMessage}</Text>
-                    <TouchableOpacity
-                        onPress={onRetry}
-                        style={[styles.retryButton, { borderColor: theme.error }]}
-                        accessibilityRole="button"
-                        accessibilityLabel="Réessayer de charger l'aperçu"
-                    >
-                        <Text style={[styles.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
+                <ErrorState title="Aperçu indisponible" message={errorMessage} onRetry={onRetry} />
             </SafeAreaView>
         );
     }
@@ -312,20 +287,7 @@ export default function OverviewScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
             >
                 {/* Rafraîchissement en échec : les chiffres affichés sont ceux du dernier chargement réussi. */}
-                {errorMessage && (
-                    <View style={[styles.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                        <Ionicons name="alert-circle" size={18} color={theme.error} />
-                        <Text style={[styles.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                        <TouchableOpacity
-                            onPress={onRetry}
-                            style={[styles.retryButton, { borderColor: theme.error }]}
-                            accessibilityRole="button"
-                            accessibilityLabel="Réessayer de charger l'aperçu"
-                        >
-                            <Text style={[styles.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                {errorMessage && <ErrorBanner message={errorMessage} onRetry={onRetry} />}
 
                 <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                     <View style={styles.heroHeader}>
@@ -428,48 +390,37 @@ export default function OverviewScreen() {
 
                     {overview?.recentOrders.length ? (
                         <View style={styles.orderList}>
-                            {overview.recentOrders.map((order) => {
-                                const statusMeta = STATUS_META[order.status];
-                                const deliveryLabel = order.delivery_type === 'delivery'
-                                    ? 'Livraison'
-                                    : order.delivery_type === 'pickup'
-                                        ? 'À emporter'
-                                        : 'Sur place';
-
-                                return (
-                                    <SpringCard
-                                        key={order.id}
-                                        style={[styles.orderCard, { backgroundColor: theme.surface }]}
-                                        onPress={() => router.push(`/order/${order.id}`)}
-                                    >
-                                        <View style={styles.orderTopRow}>
-                                            <View>
-                                                <Text style={[styles.orderNumber, { color: theme.text }]}>#{order.order_number}</Text>
-                                                <Text style={[styles.orderMeta, { color: theme.textSecondary }]}>
-                                                    {order.customer_name ?? 'Client'} · {deliveryLabel}
-                                                </Text>
-                                            </View>
-                                            <View style={[styles.orderBadge, { backgroundColor: `${statusMeta.color}22` }]}>
-                                                <Text style={[styles.orderBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
-                                            </View>
-                                        </View>
-                                        <View style={styles.orderBottomRow}>
+                            {overview.recentOrders.map((order) => (
+                                <SpringCard
+                                    key={order.id}
+                                    style={[styles.orderCard, { backgroundColor: theme.surface }]}
+                                    onPress={() => router.push(`/order/${order.id}`)}
+                                >
+                                    <View style={styles.orderTopRow}>
+                                        <View style={styles.orderIdentity}>
+                                            <Text style={[styles.orderNumber, { color: theme.text }]}>#{order.order_number}</Text>
                                             <Text style={[styles.orderMeta, { color: theme.textSecondary }]}>
-                                                {new Date(order.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                                {order.customer_name ?? 'Client'} · {getDeliveryMeta(order.delivery_type).label}
                                             </Text>
-                                            <Text style={[styles.orderAmount, { color: theme.text }]}>{order.total_amount.toLocaleString()} FCFA</Text>
                                         </View>
-                                    </SpringCard>
-                                );
-                            })}
+                                        <StatusBadge status={order.status} />
+                                    </View>
+                                    <View style={styles.orderBottomRow}>
+                                        <Text style={[styles.orderMeta, { color: theme.textSecondary }]}>
+                                            {new Date(order.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                        <Text style={[styles.orderAmount, { color: theme.text }]}>{order.total_amount.toLocaleString()} FCFA</Text>
+                                    </View>
+                                </SpringCard>
+                            ))}
                         </View>
                     ) : (
-                        <View style={[styles.emptyState, { backgroundColor: theme.surface }]}>
-                            <Text style={styles.emptyEmoji}>📦</Text>
-                            <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune commande récente</Text>
-                            <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-                                Les nouvelles commandes apparaîtront ici pour un suivi rapide.
-                            </Text>
+                        <View style={[styles.emptyCard, { backgroundColor: theme.surface }]}>
+                            <EmptyState
+                                icon="receipt-outline"
+                                title="Aucune commande récente"
+                                message="Les nouvelles commandes apparaîtront ici pour un suivi rapide."
+                            />
                         </View>
                     )}
                 </View>
@@ -576,43 +527,9 @@ const styles = StyleSheet.create({
     },
     orderTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
     orderBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    orderIdentity: { flex: 1 },
     orderNumber: { fontSize: 15, fontWeight: '800' },
     orderMeta: { fontSize: 12, marginTop: 2 },
-    orderBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
-    orderBadgeText: { fontSize: 11, fontWeight: '800' },
     orderAmount: { fontSize: 14, fontWeight: '800' },
-    emptyState: {
-        borderRadius: 16,
-        padding: 24,
-        alignItems: 'center',
-    },
-    emptyEmoji: { fontSize: 38, marginBottom: 10 },
-    emptyTitle: { fontSize: 16, fontWeight: '800', marginBottom: 6 },
-    emptyBody: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
-    errorState: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        padding: 32,
-    },
-    errorTitle: { fontSize: 17, fontWeight: '800' },
-    errorBody: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
-    errorBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        padding: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-    },
-    errorBannerText: { flex: 1, fontSize: 13 },
-    retryButton: {
-        minHeight: TouchTarget.min,
-        justifyContent: 'center',
-        paddingHorizontal: 14,
-        borderRadius: 10,
-        borderWidth: 1,
-    },
-    retryButtonText: { fontSize: 13, fontWeight: '700' },
+    emptyCard: { borderRadius: 16, overflow: 'hidden' },
 });

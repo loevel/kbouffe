@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
 import { TouchTarget, hitSlopFor } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -184,13 +185,7 @@ export default function MarketplaceScreen() {
             </View>
 
             {errorMessage && (
-                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                    <Ionicons name="alert-circle" size={18} color={theme.error} />
-                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                    <TouchableOpacity onPress={loadServices} style={[s.retryButton, { borderColor: theme.error }]}>
-                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
+                <ErrorBanner message={errorMessage} onRetry={loadServices} style={s.banner} />
             )}
 
             <FlatList
@@ -457,13 +452,7 @@ const styles = (theme: any) =>
         backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32, gap: 14 },
-        errorBanner: {
-            flexDirection: 'row', alignItems: 'center', gap: 8,
-            marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 10, borderWidth: 1,
-        },
-        errorBannerText: { flex: 1, fontSize: 13 },
-        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-        retryButtonText: { fontWeight: '700', fontSize: 13 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
 
         serviceCard: { borderRadius: 14, padding: 16, gap: 10 },
         cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },

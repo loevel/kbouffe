@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -235,13 +236,7 @@ export default function CustomersScreen() {
             </View>
 
             {errorMessage && (
-                <View style={s.errorBanner}>
-                    <Ionicons name="alert-circle" size={18} color={theme.error} />
-                    <Text style={s.errorBannerText}>{errorMessage}</Text>
-                    <TouchableOpacity onPress={() => loadCustomers(page)} style={s.retryButton}>
-                        <Text style={s.retryButtonText}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
+                <ErrorBanner message={errorMessage} onRetry={() => loadCustomers(page)} style={s.banner} />
             )}
 
             <FlatList
@@ -295,27 +290,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
             paddingVertical: 10,
             fontSize: 14,
         },
-        errorBanner: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            marginHorizontal: 12,
-            marginBottom: 8,
-            padding: 12,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: theme.error,
-            backgroundColor: `${theme.error}15`,
-        },
-        errorBannerText: { flex: 1, color: theme.error, fontSize: 13 },
-        retryButton: {
-            paddingVertical: 6,
-            paddingHorizontal: 12,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: theme.error,
-        },
-        retryButtonText: { color: theme.error, fontWeight: '700', fontSize: 13 },
+        banner: { marginHorizontal: 12, marginBottom: 8 },
         list: { padding: 12, gap: 10, paddingBottom: 24 },
         customerCard: {
             backgroundColor: theme.surface,

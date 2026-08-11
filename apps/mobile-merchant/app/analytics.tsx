@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -84,13 +85,7 @@ export default function AnalyticsScreen() {
 
             <ScrollView contentContainerStyle={s.content}>
                 {errorMessage && (
-                    <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                        <Ionicons name="alert-circle" size={18} color={theme.error} />
-                        <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                        <TouchableOpacity onPress={loadAnalytics} style={[s.retryButton, { borderColor: theme.error }]}>
-                            <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                        </TouchableOpacity>
-                    </View>
+                <ErrorBanner message={errorMessage} onRetry={loadAnalytics} style={s.banner} />
                 )}
 
                 <View style={[s.kpiCard, { backgroundColor: theme.surface }]}>
@@ -157,10 +152,7 @@ const styles = (theme: any) =>
         backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32, gap: 16 },
-        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
-        errorBannerText: { flex: 1, fontSize: 13 },
-        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-        retryButtonText: { fontWeight: '700', fontSize: 13 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         kpiCard: { borderRadius: 12, padding: 20, alignItems: 'center' },
         kpiLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
         kpiValue: { fontSize: 28, fontWeight: '700' },

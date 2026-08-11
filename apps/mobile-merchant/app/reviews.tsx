@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -275,13 +276,7 @@ export default function ReviewsScreen() {
             </View>
 
             {errorMessage && (
-                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                    <Ionicons name="alert-circle" size={18} color={theme.error} />
-                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                    <TouchableOpacity onPress={loadReviews} style={[s.retryButton, { borderColor: theme.error }]}>
-                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
+                <ErrorBanner message={errorMessage} onRetry={loadReviews} style={s.banner} />
             )}
 
             <FlatList
@@ -342,10 +337,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         filterButtonText: { fontSize: 12, fontWeight: '600', color: theme.textSecondary },
         filterButtonTextActive: { color: '#fff' },
         list: { padding: 12, gap: 12, paddingBottom: 24 },
-        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
-        errorBannerText: { flex: 1, fontSize: 13 },
-        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-        retryButtonText: { fontWeight: '700', fontSize: 13 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         reviewCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 14, gap: 10 },
         reviewHeader: {
             flexDirection: 'row',

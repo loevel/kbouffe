@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { PermissionGate } from '@/components/PermissionGate';
 
@@ -139,13 +140,7 @@ export default function GiftCardsScreen() {
                 ListHeaderComponent={
                     <>
                         {errorMessage && (
-                            <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                                <Ionicons name="alert-circle" size={18} color={theme.error} />
-                                <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                                <TouchableOpacity onPress={loadCards} style={[s.retryButton, { borderColor: theme.error }]}>
-                                    <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                                </TouchableOpacity>
-                            </View>
+                <ErrorBanner message={errorMessage} onRetry={loadCards} style={s.banner} />
                         )}
                         <View style={[s.statsRow, { gap: 12 }]}>
                             <View style={[s.statCard, { backgroundColor: theme.surface }]}>
@@ -283,10 +278,7 @@ const styles = (theme: any) =>
         backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
         content: { padding: 16, paddingBottom: 32 },
-        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
-        errorBannerText: { flex: 1, fontSize: 13 },
-        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-        retryButtonText: { fontWeight: '700', fontSize: 13 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         statsRow: { marginBottom: 16, flexDirection: 'row' },
         statCard: { flex: 1, borderRadius: 12, padding: 12 },
         statLabel: { fontSize: 11, fontWeight: '600' },

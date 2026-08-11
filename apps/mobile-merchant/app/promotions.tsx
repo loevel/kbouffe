@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 
 interface Coupon {
@@ -263,13 +264,7 @@ export default function PromotionsScreen() {
             </View>
 
             {errorMessage && (
-                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                    <Ionicons name="alert-circle" size={18} color={theme.error} />
-                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                    <TouchableOpacity onPress={loadCoupons} style={[s.retryButton, { borderColor: theme.error }]}>
-                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
+                <ErrorBanner message={errorMessage} onRetry={loadCoupons} style={s.banner} />
             )}
 
             <FlatList
@@ -433,10 +428,7 @@ const styles = (theme: ReturnType<typeof useTheme>) =>
         backButton: { width: TouchTarget.min, height: TouchTarget.min, alignItems: 'center', justifyContent: 'center' },
         title: { fontSize: 17, fontWeight: '700', color: theme.text, flex: 1, textAlign: 'center' },
         list: { padding: 12, gap: 10, paddingBottom: 24 },
-        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
-        errorBannerText: { flex: 1, fontSize: 13 },
-        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-        retryButtonText: { fontWeight: '700', fontSize: 13 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         couponCard: {
             backgroundColor: theme.surface,
             borderRadius: 12,

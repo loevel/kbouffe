@@ -20,6 +20,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { ErrorBanner } from '@/components/ui';
 import { TouchTarget } from '@/constants/theme';
 import { apiFetch, getErrorMessage } from '@/lib/api';
 import { PermissionGate } from '@/components/PermissionGate';
@@ -290,13 +291,7 @@ export default function TeamScreen() {
             </View>
 
             {errorMessage && (
-                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                    <Ionicons name="alert-circle" size={18} color={theme.error} />
-                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                    <TouchableOpacity onPress={loadTeam} style={[s.retryButton, { borderColor: theme.error }]}>
-                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
+                <ErrorBanner message={errorMessage} onRetry={loadTeam} style={s.banner} />
             )}
 
             <FlatList
@@ -495,10 +490,7 @@ const styles = (theme: any) =>
         title: { fontSize: 17, fontWeight: '700', color: theme.text },
 
         list: { padding: 12, gap: 8, paddingBottom: 24 },
-        errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
-        errorBannerText: { flex: 1, fontSize: 13 },
-        retryButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-        retryButtonText: { fontWeight: '700', fontSize: 13 },
+        banner: { marginHorizontal: 12, marginTop: 12 },
         memberCard: {
             flexDirection: 'row', alignItems: 'center', gap: 12,
             borderRadius: 14, padding: 12, borderWidth: 1,

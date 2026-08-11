@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, TouchableOpacity, StyleSheet,
-    Switch, RefreshControl, ActivityIndicator, SectionList, Alert,
+    Switch, RefreshControl, SectionList, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { supabase } from '@/lib/supabase';
 import { getErrorMessage } from '@/lib/api';
-import { TouchTarget } from '@/constants/theme';
+import { EmptyState, ErrorBanner, ErrorState, LoadingState } from '@/components/ui';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
 import type { ProductRow } from '@/lib/types';
@@ -92,7 +92,7 @@ export default function MenuScreen() {
 
     if (loading) return (
         <SafeAreaView style={s.container} edges={['top']}>
-            <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} size="large" />
+            <LoadingState label="Chargement du menu" />
         </SafeAreaView>
     );
 
@@ -116,19 +116,7 @@ export default function MenuScreen() {
         return (
             <SafeAreaView style={s.container} edges={['top']}>
                 {header}
-                <View style={s.errorState}>
-                    <Ionicons name="cloud-offline-outline" size={44} color={theme.error} />
-                    <Text style={s.errorTitle}>Menu indisponible</Text>
-                    <Text style={[s.errorBody, { color: theme.textSecondary }]}>{errorMessage}</Text>
-                    <TouchableOpacity
-                        onPress={onRetry}
-                        style={[s.retryButton, { borderColor: theme.error }]}
-                        accessibilityRole="button"
-                        accessibilityLabel="Réessayer de charger le menu"
-                    >
-                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
+                <ErrorState title="Menu indisponible" message={errorMessage} onRetry={onRetry} />
             </SafeAreaView>
         );
     }
@@ -138,20 +126,7 @@ export default function MenuScreen() {
             {header}
 
             {/* Rafraîchissement en échec : le menu affiché est celui du dernier chargement réussi. */}
-            {errorMessage && (
-                <View style={[s.errorBanner, { borderColor: theme.error, backgroundColor: `${theme.error}15` }]}>
-                    <Ionicons name="alert-circle" size={18} color={theme.error} />
-                    <Text style={[s.errorBannerText, { color: theme.error }]}>{errorMessage}</Text>
-                    <TouchableOpacity
-                        onPress={onRetry}
-                        style={[s.retryButton, { borderColor: theme.error }]}
-                        accessibilityRole="button"
-                        accessibilityLabel="Réessayer de charger le menu"
-                    >
-                        <Text style={[s.retryButtonText, { color: theme.error }]}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
+            {errorMessage && <ErrorBanner message={errorMessage} onRetry={onRetry} style={s.banner} />}
 
             <SectionList
                 sections={sections.map((s) => ({ title: s.name, data: s.products }))}
@@ -169,7 +144,7 @@ export default function MenuScreen() {
                             <Image source={{ uri: item.image_url }} style={s.productImage} contentFit="cover" />
                         ) : (
                             <View style={[s.productImage, s.productImagePlaceholder]}>
-                                <Text style={s.productImageEmoji}>🍽️</Text>
+                                <Ionicons name="restaurant-outline" size={22} color={theme.textSecondary} />
                             </View>
                         )}
                         <View style={s.productInfo}>
@@ -187,10 +162,12 @@ export default function MenuScreen() {
                 )}
                 contentContainerStyle={s.list}
                 ListEmptyComponent={
-                    <View style={s.empty}>
-                        <Text style={s.emptyIcon}>🍽️</Text>
-                        <Text style={[s.emptyText, { color: theme.textSecondary }]}>Aucun produit dans le menu</Text>
-                    </View>
+                    <EmptyState
+                        icon="restaurant-outline"
+                        title="Aucun produit dans le menu"
+                        message="Ajoutez vos plats pour qu'ils soient commandables."
+                        action={{ label: 'Ajouter un produit', onPress: () => router.push('/product/new') }}
+                    />
                 }
             />
         </SafeAreaView>
@@ -210,19 +187,9 @@ const styles = (theme: any) => StyleSheet.create({
     productCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.surface, marginHorizontal: 12, marginBottom: 8, borderRadius: 12, padding: 12 },
     productImage: { width: 52, height: 52, borderRadius: 10 },
     productImagePlaceholder: { backgroundColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-    productImageEmoji: { fontSize: 22 },
     productInfo: { flex: 1 },
     productName: { fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: 2 },
     unavailable: { opacity: 0.4 },
     productPrice: { fontSize: 13, fontWeight: '700' },
-    empty: { alignItems: 'center', marginTop: 60 },
-    emptyIcon: { fontSize: 48, marginBottom: 12 },
-    emptyText: { fontSize: 15 },
-    errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
-    errorTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
-    errorBody: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
-    errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, margin: 12, borderRadius: 12, borderWidth: 1 },
-    errorBannerText: { flex: 1, fontSize: 13 },
-    retryButton: { minHeight: TouchTarget.min, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, borderWidth: 1 },
-    retryButtonText: { fontSize: 13, fontWeight: '700' },
+    banner: { margin: 12 },
 });
