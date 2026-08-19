@@ -19,6 +19,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useRestaurantCache } from '@/contexts/restaurant-context';
+import { useCart } from '@/contexts/cart-context';
 import { useHomepage } from '@/hooks/use-homepage';
 import type { HomepageSection, SectionRestaurant, MobileRestaurant } from '@/lib/api';
 
@@ -162,9 +163,17 @@ const CardsSection = memo(function CardsSection({ section, theme, onPress }: { s
                                     </>
                                 ) : null}
                             </View>
-                            <Text style={[styles.deliveryInfo, { color: theme.icon }]}>
-                                <Ionicons name="time-outline" size={11} color={theme.icon} /> {r.estimatedDeliveryTime ?? 30} min • Frais: {r.deliveryFee ?? 500} FCFA
-                            </Text>
+                            {/* Les replis « 30 min » et « 500 FCFA » s'affichaient pour
+                                tous les restaurants : ces champs n'existaient pas dans la
+                                réponse. On n'annonce plus qu'un tarif ou un délai réel. */}
+                            {(r.preparationTimeMinutes != null || r.deliveryFee != null) && (
+                                <Text style={[styles.deliveryInfo, { color: theme.icon }]}>
+                                    <Ionicons name="time-outline" size={11} color={theme.icon} />
+                                    {r.preparationTimeMinutes != null ? ` ${r.preparationTimeMinutes} min` : ''}
+                                    {r.preparationTimeMinutes != null && r.deliveryFee != null ? ' • ' : ''}
+                                    {r.deliveryFee != null ? `Frais: ${r.deliveryFee.toLocaleString('fr-FR')} FCFA` : ''}
+                                </Text>
+                            )}
                         </View>
                     </Pressable>
                 ))}
@@ -185,7 +194,15 @@ export default function HomeScreen() {
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [activePromo, setActivePromo] = useState(0);
 
-    const { categories, sections, loading } = useHomepage(activeCuisine);
+    const { categories, sections, loading, error, refresh } = useHomepage(activeCuisine);
+    const { itemCount } = useCart();
+
+    // handleOpenExplore était référencé par l'état « aucun résultat » sans avoir
+    // jamais été défini : afficher cette carte levait une ReferenceError.
+    const handleOpenExplore = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push('/(tabs)/explore');
+    }, [router]);
 
     // Flat lookup map slug → restaurant for instant preview on navigation
     const restaurantBySlug = useMemo(() => {
@@ -241,14 +258,22 @@ export default function HomeScreen() {
                     <Text style={[styles.headerSmallText, { color: theme.icon }]}>KBOUFFE</Text>
                     <Text style={[styles.headerLargeText, { color: theme.text }]}>Bonjour</Text>
                 </View>
+                {/* Le badge affichait « 2 » en dur, panier vide compris, et l'icône
+                    du panier ouvrait la liste des commandes. */}
                 <Pressable
                     style={[styles.cartButton, { backgroundColor: theme.primaryLight }]}
-                    onPress={() => router.push('/(tabs)/orders')}
+                    onPress={() => router.push('/cart')}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                        itemCount > 0 ? `Panier, ${itemCount} article${itemCount > 1 ? 's' : ''}` : 'Panier vide'
+                    }
                 >
                     <Ionicons name="cart" size={20} color={theme.primary} />
-                    <View style={[styles.cartBadge, { backgroundColor: theme.primary }]}>
-                        <Text style={styles.cartBadgeText}>2</Text>
-                    </View>
+                    {itemCount > 0 && (
+                        <View style={[styles.cartBadge, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.cartBadgeText}>{itemCount > 9 ? '9+' : itemCount}</Text>
+                        </View>
+                    )}
                 </Pressable>
             </View>
 
@@ -383,6 +408,46 @@ export default function HomeScreen() {
                     {/* Filter out empty sections and check if any restaurants exist */}
                     {(() => {
                         const nonEmptySections = sections.filter(s => s.restaurants && s.restaurants.length > 0);
+
+                        // Sans filtre de cuisine, zéro section ne déclenchait aucun état :
+                        // la page finissait blanche sous l'en-tête, sans un mot ni un
+                        // moyen de réessayer. Un échec réseau se lisait alors comme
+                        // « il n'y a rien près de chez vous ».
+                        if (nonEmptySections.length === 0 && error) {
+                            return (
+                                <EmptyState
+                                    icon="cloud-offline-outline"
+                                    title="Chargement impossible"
+                                    subtitle={"Les restaurants n'ont pas pu être chargés.\nVérifiez votre connexion et réessayez."}
+                                    primaryAction={{
+                                        label: 'Réessayer',
+                                        onPress: () => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            void refresh();
+                                        },
+                                    }}
+                                />
+                            );
+                        }
+
+                        if (nonEmptySections.length === 0 && !activeCuisine) {
+                            return (
+                                <EmptyState
+                                    icon="storefront-outline"
+                                    title="Aucun restaurant disponible"
+                                    subtitle={"Aucun restaurant n'est ouvert près de chez vous pour le moment.\nRéessayez dans quelques minutes."}
+                                    primaryAction={{
+                                        label: 'Actualiser',
+                                        onPress: () => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            void refresh();
+                                        },
+                                    }}
+                                    secondaryAction={{ label: 'Explorer', onPress: handleOpenExplore }}
+                                />
+                            );
+                        }
+
                         const hasNoResults = nonEmptySections.length === 0 && activeCuisine;
 
                         if (hasNoResults) {
@@ -447,21 +512,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    cartBadge: {
-        position: 'absolute',
-        top: -4,
-        right: -4,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    cartBadgeText: {
-        color: '#fff',
-        fontSize: 11,
-        fontWeight: '700',
     },
     headerTop: {
         flexDirection: 'row',

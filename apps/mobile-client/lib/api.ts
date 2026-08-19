@@ -286,6 +286,10 @@ export interface SectionRestaurant {
     isVerified: boolean;
     isPremium: boolean;
     isSponsored: boolean;
+    /** Frais de livraison du restaurant, en FCFA. null si l'API ne l'a pas renvoyé. */
+    deliveryFee: number | null;
+    /** Temps de préparation annoncé, en minutes. null si le restaurant ne l'a pas renseigné. */
+    preparationTimeMinutes: number | null;
 }
 
 export interface HomepageSection {
@@ -760,10 +764,13 @@ export async function getAccountOrders(): Promise<OrderTracking[]> {
  * Cancel an order by its ID.
  * The backend only allows cancellation when the order status is "pending".
  * Requires the user to be authenticated (uses the Supabase session token).
- * POST /api/auth/orders/{orderId}/cancel
+ * POST /api/account/orders/{orderId}/cancel
+ *
+ * Le chemin passait par /api/auth/, où cette route n'a jamais existé : toute
+ * annulation repartait en 404, y compris depuis l'écran d'attente de paiement.
  */
 export async function cancelOrder(orderId: string): Promise<{ success: boolean }> {
-    return apiFetch<{ success: boolean }>(`/api/auth/orders/${orderId}/cancel`, {
+    return apiFetch<{ success: boolean }>(`/api/account/orders/${orderId}/cancel`, {
         method: 'POST',
     });
 }
