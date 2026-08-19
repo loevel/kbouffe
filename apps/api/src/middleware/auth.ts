@@ -69,6 +69,28 @@ export const authMiddleware = createMiddleware<{
         memberRole = ((memberData as any)?.role as TeamRole) ?? null;
     }
 
+    // Dernier recours : la propriété du restaurant elle-même. L'inscription crée
+    // le restaurant, puis met à jour users.restaurant_id, puis insère la ligne
+    // d'équipe — sans transaction. Si l'une des deux dernières étapes échoue, le
+    // restaurant existe et reste publié pendant que son propriétaire est renvoyé
+    // en 404 sur toute l'API. La RLS « restaurants: propriétaire CRUD » autorise
+    // déjà cette lecture, et un propriétaire ne doit jamais perdre l'accès à son
+    // propre établissement pour une jointure manquante.
+    if (!restaurantId) {
+        const { data: owned } = await supabase
+            .from("restaurants")
+            .select("id")
+            .eq("owner_id", userId)
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        if ((owned as any)?.id) {
+            restaurantId = (owned as any).id;
+            memberRole = "owner";
+        }
+    }
+
     if (!restaurantId) {
         return c.json({ error: "Restaurant non trouvé ou accès non autorisé" }, 404);
     }

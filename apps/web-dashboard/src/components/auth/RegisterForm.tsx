@@ -8,6 +8,7 @@ import { useState, type FormEvent } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useLocale, Turnstile } from "@kbouffe/module-core/ui";
 import { RoleSelector, type UserRole } from "./RoleSelector";
+import { verifierTurnstile } from "@/lib/auth/turnstile";
 
 interface FormData {
     firstName: string;
@@ -82,6 +83,13 @@ export function RegisterForm({ defaultRole }: RegisterFormProps = {}) {
             return;
         }
 
+        // Le jeton doit être validé par le serveur : sans cet appel, le widget
+        // n'est qu'un décor qu'un robot contourne en appelant l'API directement.
+        if (!(await verifierTurnstile(turnstileToken))) {
+            setError(t.auth.captchaRequired ?? "Vérification anti-robot échouée. Réessayez.");
+            return;
+        }
+
         if (!isSupabaseConfigured()) {
             setError(t.auth.registerServiceNotConfigured);
             return;
@@ -112,6 +120,7 @@ export function RegisterForm({ defaultRole }: RegisterFormProps = {}) {
                 password: form.password,
                 options: {
                     data: metadata,
+                    ...(turnstileToken ? { captchaToken: turnstileToken } : {}),
                 },
             });
 

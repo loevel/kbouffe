@@ -62,6 +62,22 @@ export async function withAuth(): Promise<
     restaurantId = (memberData as { restaurant_id?: string } | null)?.restaurant_id ?? undefined;
   }
 
+  // Dernier recours : la propriété. L'inscription pose users.restaurant_id et la
+  // ligne d'équipe en écritures séparées ; si elles échouent, le restaurant reste
+  // publié pendant que son propriétaire est traité comme n'en ayant aucun. Le
+  // .order().limit(1) évite l'erreur de maybeSingle() sur plusieurs restaurants.
+  if (!restaurantId) {
+    const { data: owned } = await supabase
+      .from("restaurants")
+      .select("id")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    restaurantId = (owned as { id?: string } | null)?.id ?? undefined;
+  }
+
   if (!restaurantId) {
     return {
       error: NextResponse.json(

@@ -60,6 +60,25 @@ export async function GET(request: NextRequest) {
             teamRole = (memberData as any)?.role ?? "owner";
         }
 
+        // Dernier recours : la propriété. L'inscription pose users.restaurant_id
+        // et la ligne d'équipe en deux écritures séparées, sans transaction ; si
+        // elles échouent, le restaurant existe et reste publié pendant que son
+        // propriétaire est traité comme n'en ayant aucun. Même repli que
+        // apps/api/src/middleware/auth.ts, avec lequel cette résolution doit
+        // rester cohérente.
+        if (!restaurantId) {
+            const { data: owned } = await supabase
+                .from("restaurants")
+                .select("id")
+                .eq("owner_id", authUser.id)
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+            restaurantId = (owned as any)?.id ?? null;
+            if (restaurantId) teamRole = "owner";
+        }
+
         if (!restaurantId) {
             console.warn("[sync-user] No restaurant found for user", { userId: authUser.id });
             return NextResponse.json({
@@ -191,6 +210,24 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Repli sur la propriété avant d'en créer un : sans lui, un propriétaire
+        // dont le rattachement a échoué se voyait créer un second restaurant
+        // « Mon Restaurant » à côté du sien, déjà publié.
+        if (!restaurant) {
+            const { data: owned } = await supabase
+                .from("restaurants")
+                .select("*")
+                .eq("owner_id", authUser.id)
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+            if (owned) {
+                restaurant = owned;
+                restaurantId = (owned as any).id;
+            }
+        }
+
         if (!restaurant) {
             const { data: newRestaurant } = await supabase
                 .from("restaurants")
@@ -211,6 +248,16 @@ export async function POST(request: NextRequest) {
 
             restaurant = newRestaurant;
             restaurantId = newRestaurant?.id;
+        }
+
+        // Poser le rattachement : c'est users.restaurant_id que lit le middleware
+        // de l'API. Sans cette écriture, la réponse contenait un restaurant que
+        // toutes les autres routes déclaraient ensuite introuvable.
+        if (restaurantId && (user as any)?.restaurant_id !== restaurantId) {
+            await supabase
+                .from("users")
+                .update({ restaurant_id: restaurantId, role: "merchant" })
+                .eq("id", authUser.id);
         }
 
         // Récupérer les modules actifs

@@ -83,6 +83,57 @@ async function checkMsisdnActive(env: CoreEnv, phone: string): Promise<{ active:
 
 // ── Restaurant Registration ─────────────────────────────────────
 
+/**
+ * Pose les deux liens dont dépend l'accès au tableau de bord : users.restaurant_id
+ * (chemin principal d'authMiddleware) et la ligne restaurant_members (son repli).
+ * Renvoie l'erreur bloquante s'il y en a une, null si le propriétaire est rattaché.
+ *
+ * L'appartenance à l'équipe est réinsérée sans erreur si elle existe déjà, pour
+ * que la fonction reste rejouable après un échec partiel.
+ */
+async function rattacherProprietaire(
+    supabase: any,
+    userId: string,
+    restaurantId: string
+): Promise<unknown | null> {
+    const { error: userError } = await supabase
+        .from("users")
+        .update({ restaurant_id: restaurantId, role: "merchant" })
+        .eq("id", userId);
+
+    if (userError) return userError;
+
+    // Pas d'upsert : restaurant_members n'a pas de contrainte unique sur
+    // (restaurant_id, user_id), donc onConflict échouerait. On vérifie d'abord.
+    const { data: dejaMembre } = await supabase
+        .from("restaurant_members")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+
+    const { error: memberError } = dejaMembre?.id
+        ? await supabase
+              .from("restaurant_members")
+              .update({ role: "owner", status: "active" })
+              .eq("id", dejaMembre.id)
+        : await supabase.from("restaurant_members").insert({
+              restaurant_id: restaurantId,
+              user_id: userId,
+              role: "owner",
+              status: "active",
+          });
+
+    // L'appartenance n'est qu'un repli : users.restaurant_id étant posé, son échec
+    // ne bloque pas le propriétaire. On le trace sans annuler l'inscription.
+    if (memberError) {
+        console.error("Register restaurant: appartenance équipe non créée", memberError);
+    }
+
+    return null;
+}
+
 authRoutes.post("/", async (c) => {
     try {
         const supabase = c.var.supabase;
@@ -110,58 +161,83 @@ authRoutes.post("/", async (c) => {
         if (!restaurantName?.trim()) return c.json({ error: "Nom du restaurant requis" }, 400);
         if (!phone?.trim()) return c.json({ error: "Téléphone requis" }, 400);
 
-        const slug = `${slugify(restaurantName)}-${Date.now().toString(36)}`;
-        
         const latitude = lat || 4.0511;
         const longitude = lng || 9.7679;
+
+        // Ce que le restaurateur vient de déclarer dans le formulaire.
+        const donneesSaisies = {
+            name: restaurantName.trim(),
+            phone: phone.trim(),
+            address: address || "À définir",
+            city: city || "Douala",
+            country: "CM",
+            cuisine_type: cuisineType || "Autre",
+            description: description || null,
+            opening_hours: openingHours || null,
+            payment_config: {
+                provider: paymentProvider,
+                momo_number: paymentMomoNumber,
+                momo_name: paymentMomoName
+            },
+            saas_plan: saasPlanId || "starter",
+            is_premium: !!isPremium,
+            lat: latitude,
+            lng: longitude,
+            geohash: encodeGeohash(latitude, longitude),
+        };
+
+        // Le formulaire peut être renvoyé après un échec partiel — ou après qu'un
+        // restaurant vide a été créé automatiquement à la première connexion. On
+        // reprend celui qui existe et on lui applique la saisie, plutôt que d'en
+        // créer un second qui laisserait un doublon publié derrière lui.
+        const { data: dejaProprietaire } = await supabase
+            .from("restaurants")
+            .select("id")
+            .eq("owner_id", user.id)
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        if (dejaProprietaire?.id) {
+            await supabase
+                .from("restaurants")
+                .update(donneesSaisies)
+                .eq("id", dejaProprietaire.id);
+            await rattacherProprietaire(supabase, user.id, dejaProprietaire.id);
+            return c.json({ success: true, restaurantId: dejaProprietaire.id, repaired: true });
+        }
+
+        const slug = `${slugify(restaurantName)}-${Date.now().toString(36)}`;
 
         // 1. Create Restaurant
         const { data: restaurant, error: restaurantError } = await supabase
             .from("restaurants")
             .insert({
                 owner_id: user.id,
-                name: restaurantName.trim(),
                 slug,
-                phone: phone.trim(),
-                address: address || "À définir",
-                city: city || "Douala",
-                country: "CM",
-                cuisine_type: cuisineType || "Autre",
-                description: description || null,
-                opening_hours: openingHours || null,
-                payment_config: {
-                    provider: paymentProvider,
-                    momo_number: paymentMomoNumber,
-                    momo_name: paymentMomoName
-                },
-                saas_plan: saasPlanId || "starter",
-                is_premium: !!isPremium,
                 is_published: true,
                 is_verified: false,
-                lat: latitude,
-                lng: longitude,
-                geohash: encodeGeohash(latitude, longitude),
+                ...donneesSaisies,
             })
             .select()
             .single();
 
         if (restaurantError) throw restaurantError;
 
-        // 2. Update User
-        const { error: userError } = await supabase
-            .from("users")
-            .update({ restaurant_id: restaurant.id, role: "merchant" })
-            .eq("id", user.id);
+        // 2 + 3. Rattacher le propriétaire. Sans ce rattachement, authMiddleware
+        // renvoie 404 sur toute l'API alors que le restaurant est déjà publié :
+        // on préfère annuler la création plutôt que laisser un établissement
+        // orphelin, visible des clients et inaccessible à son propriétaire.
+        const erreurRattachement = await rattacherProprietaire(supabase, user.id, restaurant.id);
 
-        if (userError) throw userError;
-
-        // 3. Add as member
-        await supabase.from("restaurant_members").insert({
-            restaurant_id: restaurant.id,
-            user_id: user.id,
-            role: "owner",
-            status: "active"
-        });
+        if (erreurRattachement) {
+            await supabase.from("restaurants").delete().eq("id", restaurant.id);
+            console.error("Register restaurant: rattachement échoué, création annulée", erreurRattachement);
+            return c.json(
+                { error: "Le restaurant n'a pas pu être rattaché à votre compte. Réessayez." },
+                500
+            );
+        }
 
         return c.json({ success: true, restaurantId: restaurant.id });
     } catch (error: any) {

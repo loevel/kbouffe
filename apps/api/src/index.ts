@@ -64,6 +64,7 @@ import { chatApi } from "@kbouffe/module-chat";
 const { chatRoutes } = chatApi;
 import { notificationsRoutes } from "./modules/core/notifications";
 import { kycDocumentsRoutes } from "./modules/core/kyc-documents";
+import { verifyTurnstileRoutes } from "./modules/core/verify-turnstile";
 import { loyaltyRoutes } from "./modules/store/loyalty";
 import { upsellRoutes } from "./modules/store/upsell";
 import { galleryRoutes } from "./modules/store/gallery";
@@ -193,7 +194,11 @@ const authRateLimiter = async (c: any, next: any) => {
 api.use("/auth/*", authRateLimiter);
 api.use("/auth", authRateLimiter);
 api.route("/auth", authRoutes);
-api.route("/verify-turnstile", authRoutes); // Combined in authRoutes
+// Le module dédié, et non authRoutes : monté sur authRoutes, POST
+// /verify-turnstile tombait sur authRoutes.post("/"), c'est-à-dire la création
+// de restaurant, et le vrai vérificateur n'était joignable qu'en
+// /verify-turnstile/verify-turnstile.
+api.route("/verify-turnstile", verifyTurnstileRoutes);
 api.route("/sync-user", authRoutes);       // Combined in authRoutes
 
 // ── Marketplace — routes publiques (annuaire fournisseurs, inscription, services) ─
@@ -215,6 +220,13 @@ api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
 api.use("/supplier/*", userAuthMiddleware);
 api.use("/supplier", userAuthMiddleware);
 
+// Création du restaurant — userAuthMiddleware obligatoire : authMiddleware exige
+// un restaurant déjà rattaché au compte et répond 404 sinon, ce qui est l'état de
+// tout restaurateur qui s'inscrit. La route qui crée le restaurant ne peut pas
+// exiger qu'il existe déjà : l'onboarding échouait sur « Restaurant non trouvé ».
+api.use("/register-restaurant", userAuthMiddleware);
+api.use("/register-restaurant/*", userAuthMiddleware);
+
 // Upload de fichiers — userAuthMiddleware pour la même raison : la route n'utilise
 // que c.var.userId et ne touche à aucune donnée de restaurant. Sous authMiddleware
 // elle répondait 404 à tout compte sans restaurant, ce qu'est un fournisseur par
@@ -235,7 +247,7 @@ api.route("/marketplace/messages", marketplaceMessagesRoutes);  // messagerie B2
 const merchantPaths = [
     "/orders", "/categories", "/products", "/reservations",
     "/dashboard", "/coupons", "/gift-cards", "/tables", "/restaurant",
-    "/customers", "/register-restaurant",
+    "/customers",
     "/marketing", "/notifications", "/payouts", "/sms",
     "/payments/mtn", "/kyc", "/ads", "/team", "/zones",
     "/restaurant/brands", "/restaurant/kyc",
