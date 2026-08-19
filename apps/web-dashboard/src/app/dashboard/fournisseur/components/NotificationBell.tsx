@@ -76,29 +76,31 @@ export function NotificationBell() {
                 });
             } else {
                 console.warn(
-                    "NotificationBell: /api/marketplace/suppliers/me/dashboard indisponible -- donnees mock"
+                    "NotificationBell: /api/marketplace/suppliers/me/dashboard indisponible"
                 );
+                // Compteurs à zéro plutôt qu'inventés : une pastille rouge
+                // permanente sur des alertes qui n'existent pas apprend au
+                // fournisseur à ignorer la cloche. Seul le KYC, connu
+                // localement, reste signalé.
                 setAlerts({
-                    unreadMessages: 3,
-                    lowStockCount: 2,
+                    unreadMessages: 0,
+                    lowStockCount: 0,
                     kycIncomplete:
                         supplier.kyc_status !== "approved" &&
                         supplier.kyc_status !== "documents_submitted",
-                    newRatings: 1,
+                    newRatings: 0,
                 });
             }
         } catch {
-            console.warn(
-                "NotificationBell: erreur fetch -- donnees mock"
-            );
+            console.warn("NotificationBell: erreur reseau");
             setAlerts({
-                unreadMessages: 3,
-                lowStockCount: 2,
+                unreadMessages: 0,
+                lowStockCount: 0,
                 kycIncomplete:
                     !!supplier &&
                     supplier.kyc_status !== "approved" &&
                     supplier.kyc_status !== "documents_submitted",
-                newRatings: 1,
+                newRatings: 0,
             });
         }
     }, [supplier]);

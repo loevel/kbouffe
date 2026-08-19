@@ -259,21 +259,15 @@ export default function FournisseurDashboardPage() {
                         setActivitiesLoading(false);
                     }
                 } else {
-                    // API endpoint missing -- use mock data
-                    console.warn("API endpoint /api/marketplace/suppliers/me/dashboard manquant -- utilisation de donnees mock");
-                    setAlerts({
-                        unreadMessages: 3,
-                        lowStockCount: 2,
-                        newRatings: 1,
-                    });
+                    // Compteurs à zéro plutôt qu'inventés : afficher « 3 messages
+                    // non lus » à quelqu'un qui n'en a aucun le pousse à cliquer
+                    // dans le vide, puis à ne plus croire aucune alerte.
+                    console.warn("/api/marketplace/suppliers/me/dashboard indisponible");
+                    setAlerts({ unreadMessages: 0, lowStockCount: 0, newRatings: 0 });
                 }
             } catch {
-                console.warn("API endpoint /api/marketplace/suppliers/me/dashboard manquant -- utilisation de donnees mock");
-                setAlerts({
-                    unreadMessages: 3,
-                    lowStockCount: 2,
-                    newRatings: 1,
-                });
+                console.warn("/api/marketplace/suppliers/me/dashboard : erreur reseau");
+                setAlerts({ unreadMessages: 0, lowStockCount: 0, newRatings: 0 });
             }
         }
 

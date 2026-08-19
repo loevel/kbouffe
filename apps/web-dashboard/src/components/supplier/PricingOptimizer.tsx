@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePriceSuggestions, formatFCFA, formatPercent } from "./hooks";
-import { TrendingUp, Check, AlertCircle } from "lucide-react";
+import { TrendingUp, Check, AlertCircle, Info } from "lucide-react";
 
 interface PricingOptimizerProps {
   supplierId: string;
@@ -14,9 +14,25 @@ export function PricingOptimizer({ supplierId, onPriceUpdate }: PricingOptimizer
   const { suggestions, isLoading } = usePriceSuggestions(supplierId, targetMargin);
   const [applying, setApplying] = useState(false);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
+  const [applyError, setApplyError] = useState<string | null>(null);
 
-  const handleApplyPrice = async (productId: string, newPrice: number) => {
+  const handleApplyPrice = async (
+    productId: string,
+    productName: string,
+    currentPrice: number,
+    newPrice: number
+  ) => {
+    // Ce bouton change un prix de vente réel à partir d'une marge calculée sur
+    // un coût estimé. Une confirmation explicite évite qu'un clic curieux ne
+    // rogne durablement la marge du fournisseur.
+    const confirmed = window.confirm(
+      `Appliquer ${formatFCFA(newPrice)} à « ${productName} » ? Le prix actuel est ${formatFCFA(currentPrice)}.\n\n` +
+        `Si le coût de revient de ce produit n'est pas renseigné, la marge visée repose sur une estimation. Le changement est immédiat pour les restaurants.`
+    );
+    if (!confirmed) return;
+
     setApplying(true);
+    setApplyError(null);
     try {
       const res = await fetch("/api/supplier/apply-price-change", {
         method: "POST",
@@ -30,9 +46,14 @@ export function PricingOptimizer({ supplierId, onPriceUpdate }: PricingOptimizer
       if (res.ok) {
         setAppliedIds((prev) => new Set([...prev, productId]));
         onPriceUpdate?.(productId, newPrice);
+      } else {
+        // Sans ce message, un échec serveur laissait le bouton inchangé : le
+        // fournisseur repartait convaincu que son prix avait été modifié.
+        setApplyError(`Le prix de « ${productName} » n'a pas pu être modifié. Réessayez.`);
       }
     } catch (error) {
       console.error("Error applying price:", error);
+      setApplyError(`Le prix de « ${productName} » n'a pas pu être modifié. Vérifiez votre connexion.`);
     } finally {
       setApplying(false);
     }
@@ -57,11 +78,32 @@ export function PricingOptimizer({ supplierId, onPriceUpdate }: PricingOptimizer
           min="10"
           max="50"
           value={targetMargin}
-          onChange={(e) => setTargetMargin(parseInt(e.target.value))}
+          onChange={(e) => {
+            // Champ vidé → parseInt renvoie NaN, qui se propage dans toutes les
+            // suggestions et affiche « NaN FCFA ».
+            const parsed = parseInt(e.target.value, 10);
+            setTargetMargin(Number.isNaN(parsed) ? 0 : Math.min(50, Math.max(0, parsed)));
+          }}
           className="w-16 px-2 py-1 bg-surface-800 border border-surface-600 rounded text-sm text-surface-100"
         />
         <span className="text-sm text-surface-500">%</span>
       </div>
+
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+        <Info size={14} className="shrink-0 mt-0.5" />
+        <p>
+          Pour les produits sans coût de revient renseigné, la marge est calculée
+          sur une estimation à 60&nbsp;% du prix. Saisissez vos coûts réels dans la
+          fiche produit pour des suggestions fiables.
+        </p>
+      </div>
+
+      {applyError && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <AlertCircle size={14} className="shrink-0 mt-0.5" />
+          <p>{applyError}</p>
+        </div>
+      )}
 
       {suggestions.length === 0 ? (
         <div className="text-center py-8 text-surface-400 text-sm">
@@ -90,7 +132,14 @@ export function PricingOptimizer({ supplierId, onPriceUpdate }: PricingOptimizer
               </div>
 
               <button
-                onClick={() => handleApplyPrice(suggestion.productId, suggestion.suggestedPrice)}
+                onClick={() =>
+                  handleApplyPrice(
+                    suggestion.productId,
+                    suggestion.productName,
+                    suggestion.currentPrice,
+                    suggestion.suggestedPrice
+                  )
+                }
                 disabled={applying || appliedIds.has(suggestion.productId)}
                 className={`ml-3 px-3 py-1 rounded text-xs font-medium transition ${
                   appliedIds.has(suggestion.productId)

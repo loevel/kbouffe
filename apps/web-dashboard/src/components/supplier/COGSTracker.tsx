@@ -1,7 +1,7 @@
 "use client";
 
 import { useCOGSAnalysis, formatFCFA, formatPercent } from "./hooks";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { Info, TrendingUp, TrendingDown } from "lucide-react";
 
 interface COGSTrackerProps {
   supplierId: string;
@@ -31,6 +31,18 @@ export function COGSTracker({ supplierId }: COGSTrackerProps) {
 
   return (
     <div className="space-y-4">
+      {/* Le backend utilise supplier_products.cost_per_unit quand il est
+          renseigné, sinon un repli à 60 % du prix. Les produits sans coût saisi
+          affichent donc une marge estimée, indiscernable d'une marge réelle. */}
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+        <Info size={14} className="shrink-0 mt-0.5" />
+        <p>
+          Pour les produits dont le coût de revient n&apos;est pas renseigné, il
+          est approché à 60&nbsp;% du prix de vente : leur marge est estimée, pas
+          mesurée. Saisissez le coût dans la fiche produit pour un chiffre exact.
+        </p>
+      </div>
+
       {/* ── Summary Stats ────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-2 text-xs mb-4">
         <div className="bg-surface-800 rounded-lg p-2">

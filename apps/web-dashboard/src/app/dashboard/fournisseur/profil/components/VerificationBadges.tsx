@@ -61,13 +61,17 @@ interface UpgradeTier {
     benefits: string[];
 }
 
-// ── Mock metrics (fallback) ───────────────────────────────────────────────
+// ── Valeurs par défaut ────────────────────────────────────────────────────
 
-const MOCK_METRICS: BadgeMetrics = {
-    organic_pct: 35,
-    delivery_rate: 92,
-    response_time_hours: 1.5,
-    rating: 4.3,
+// Ces métriques pilotent la progression des badges affichés aux restaurants.
+// Partir de valeurs flatteuses ferait apparaître des badges non mérités tant
+// que l'API ne répond pas : on part donc de zéro, et un badge ne s'allume que
+// sur une donnée réellement reçue.
+const EMPTY_METRICS: BadgeMetrics = {
+    organic_pct: 0,
+    delivery_rate: 0,
+    response_time_hours: 0,
+    rating: 0,
 };
 
 // ── Badge configurations ──────────────────────────────────────────────────
@@ -306,7 +310,7 @@ function UpgradeCard({ tier }: { tier: UpgradeTier }) {
 // ── Main component ────────────────────────────────────────────────────────
 
 export function VerificationBadges({ supplier }: { supplier: SupplierProfile }) {
-    const [metrics, setMetrics] = useState<BadgeMetrics>(MOCK_METRICS);
+    const [metrics, setMetrics] = useState<BadgeMetrics>(EMPTY_METRICS);
 
     // Try to fetch real metrics
     useEffect(() => {
@@ -317,10 +321,10 @@ export function VerificationBadges({ supplier }: { supplier: SupplierProfile }) 
                     const data = await res.json();
                     const m = data.metrics ?? data;
                     setMetrics({
-                        organic_pct: m.organic_pct ?? MOCK_METRICS.organic_pct,
-                        delivery_rate: m.delivery_rate ?? MOCK_METRICS.delivery_rate,
-                        response_time_hours: m.response_time?.current ?? MOCK_METRICS.response_time_hours,
-                        rating: m.ratings?.current ?? MOCK_METRICS.rating,
+                        organic_pct: m.organic_pct ?? EMPTY_METRICS.organic_pct,
+                        delivery_rate: m.delivery_rate ?? EMPTY_METRICS.delivery_rate,
+                        response_time_hours: m.response_time?.current ?? EMPTY_METRICS.response_time_hours,
+                        rating: m.ratings?.current ?? EMPTY_METRICS.rating,
                     });
                 }
             } catch {

@@ -15,7 +15,7 @@
  *   Redirige vers /dashboard/fournisseur en cas de succès
  */
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -169,6 +169,48 @@ export default function FournisseurRegisterPage() {
     // Step state: 0 = auth form, 1 = supplier profile form, 2 = KYC (individual_farmer only)
     const [currentStep, setCurrentStep] = useState(0);
     const [supplierType, setSupplierType] = useState<SupplierType | null>(null);
+    // Le compte Auth est créé dès l'étape 1, mais la ligne `suppliers` seulement
+    // à la fin de l'étape 2. Qui abandonne entre les deux revient ici avec une
+    // session valide et aucun profil : lui redemander de créer un compte le
+    // condamne à un 409 sans issue. On détecte donc la session au montage pour
+    // le reposer à l'étape où il s'était arrêté.
+    const [checkingSession, setCheckingSession] = useState(true);
+    const [resumed, setResumed] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function resumeExistingSignup() {
+            try {
+                const { data: { session } } = await getSupabaseClient().auth.getSession();
+                if (cancelled) return;
+                if (!session) return; // visiteur : parcours normal depuis l'étape 1
+
+                const res = await authFetch("/api/marketplace/suppliers/me");
+                if (cancelled) return;
+
+                if (res.ok) {
+                    // Profil déjà complet : rien à refaire ici.
+                    router.replace("/dashboard/fournisseur");
+                    return;
+                }
+
+                // 404 (profil absent) comme toute autre erreur : le compte existe
+                // déjà, repasser par l'étape 1 ne produirait qu'un 409.
+                setCurrentStep(1);
+                setResumed(true);
+            } catch (err) {
+                console.error("Reprise d'inscription fournisseur:", err);
+            } finally {
+                if (!cancelled) setCheckingSession(false);
+            }
+        }
+
+        resumeExistingSignup();
+        return () => {
+            cancelled = true;
+        };
+    }, [router]);
 
     // Step 1 form state
     const [form, setForm] = useState<Step1Form>({
@@ -264,8 +306,14 @@ export default function FournisseurRegisterPage() {
             const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: form.password });
 
             if (signInError) {
-                // Account created but sign-in failed — rare, but proceed to step 2 anyway
+                // L'étape 2 appelle une route authentifiée : sans session elle
+                // renverra 401. Avancer quand même enfermerait le fournisseur
+                // dans un formulaire qui ne peut pas aboutir.
                 console.warn("Auto sign-in failed:", signInError.message);
+                setError(
+                    "Votre compte a bien été créé, mais la connexion automatique a échoué. Connectez-vous pour compléter votre profil."
+                );
+                return;
             }
 
             // 3. Move to supplier profile step
@@ -496,8 +544,18 @@ export default function FournisseurRegisterPage() {
                         </div>
                     </motion.div>
 
+                    {/* Vérification d'une inscription déjà entamée : évite de
+                        montrer le formulaire de création de compte à quelqu'un
+                        qui en a déjà un. */}
+                    {checkingSession && (
+                        <div className="flex flex-col items-center justify-center py-16 gap-3">
+                            <Loader2 size={28} className="animate-spin text-brand-500" />
+                            <p className="text-surface-400 text-sm">Vérification de votre compte…</p>
+                        </div>
+                    )}
+
                     {/* ── Step 1: Auth form ──────────────────────────────── */}
-                    {currentStep === 0 && (
+                    {!checkingSession && currentStep === 0 && (
                         <motion.div
                             key="step1"
                             variants={pageVariants}
@@ -706,10 +764,15 @@ export default function FournisseurRegisterPage() {
                             <div className="flex items-center gap-3 mb-5 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm">
                                 <CheckCircle2 size={18} className="shrink-0" />
                                 <div>
-                                    <p className="font-semibold">Compte créé avec succès !</p>
+                                    <p className="font-semibold">
+                                        {resumed
+                                            ? "Votre compte existe déjà"
+                                            : "Compte créé avec succès !"}
+                                    </p>
                                     <p className="text-emerald-400/80 text-xs mt-0.5">
-                                        Complétez maintenant votre profil fournisseur pour accéder à
-                                        la marketplace.
+                                        {resumed
+                                            ? "Il ne vous reste qu&apos;à compléter votre profil fournisseur pour accéder à la marketplace."
+                                            : "Complétez maintenant votre profil fournisseur pour accéder à la marketplace."}
                                     </p>
                                 </div>
                             </div>
