@@ -28,9 +28,13 @@ export default function OrderConfirmationScreen() {
 
                 <Animated.View entering={FadeInDown.delay(400).duration(500)} style={[styles.estimateCard, { borderColor: theme.border }]}>
                     <Ionicons name="time-outline" size={24} color={theme.primary} />
-                    <View>
-                        <Text style={[styles.estimateLabel, { color: theme.icon }]}>Duree estimee</Text>
-                        <Text style={[styles.estimateValue, { color: theme.text }]}>25 - 35 min</Text>
+                    <View style={{ flex: 1 }}>
+                        {/* Le « 25 - 35 min » affiché ici était une constante : l'écran ne
+                            connaît que l'identifiant de la commande, jamais le délai du
+                            restaurant. Annoncer une heure qu'on ignore se paie en attente
+                            déçue — c'est le restaurant qui la confirme. */}
+                        <Text style={[styles.estimateLabel, { color: theme.icon }]}>Delai de preparation</Text>
+                        <Text style={[styles.estimateValue, { color: theme.text }]}>Confirme par le restaurant</Text>
                     </View>
                 </Animated.View>
 

@@ -9,9 +9,13 @@ import type { Env, Variables } from "../types";
  */
 export const homepageSectionsPublicRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+// delivery_fee et preparation_time_minutes : les cartes de l'accueil mobile les
+// affichent. Sans eux, elles retombaient sur « 30 min • 500 FCFA » pour tous les
+// restaurants — un tarif inventé, annoncé au client avant qu'il commande.
 const RESTAURANT_SELECT = `
     id, name, slug, logo_url, banner_url, cuisine_type,
-    rating, review_count, is_verified, is_premium, is_sponsored, compliance_status
+    rating, review_count, is_verified, is_premium, is_sponsored, compliance_status,
+    delivery_fee, preparation_time_minutes
 `;
 
 function mapRestaurant(row: any) {
@@ -27,6 +31,8 @@ function mapRestaurant(row: any) {
         isVerified: row.is_verified,
         isPremium: row.is_premium,
         isSponsored: row.is_sponsored,
+        deliveryFee: row.delivery_fee ?? null,
+        preparationTimeMinutes: row.preparation_time_minutes ?? null,
     };
 }
 

@@ -16,6 +16,14 @@ export function useOrdersRealtime() {
     const notifiedRef = useRef<Set<string>>(new Set());
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
+    // Les commandes sont lues dans le callback, jamais surveillées par l'effet :
+    // les garder en dépendance faisait fermer puis rouvrir le canal à chaque mise
+    // à jour reçue — y compris celle que le callback venait d'appliquer. Le suivi
+    // en direct pouvait donc rater le changement de statut suivant, pendant la
+    // reconnexion, alors que c'est toute la raison d'être de l'écran.
+    const ordersRef = useRef(orders);
+    ordersRef.current = orders;
+
     useEffect(() => {
         if (!isAuthenticated || !user?.id) return;
 
@@ -35,7 +43,7 @@ export function useOrdersRealtime() {
                     const newStatus = mapApiOrderStatus(updated.status);
 
                     // Find the matching order in state
-                    const order = orders.find((o) => o.id === updated.id);
+                    const order = ordersRef.current.find((o) => o.id === updated.id);
                     if (order && newStatus === order.status) return;
 
                     updateOrderStatus(updated.id, newStatus);
@@ -64,5 +72,5 @@ export function useOrdersRealtime() {
             void supabase.removeChannel(channel);
             channelRef.current = null;
         };
-    }, [isAuthenticated, user?.id, orders, updateOrderStatus, refreshOrders]);
+    }, [isAuthenticated, user?.id, updateOrderStatus, refreshOrders]);
 }

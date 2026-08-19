@@ -19,7 +19,10 @@ type PaymentType = 'momo_mtn' | 'momo_orange' | 'cash';
 
 const paymentMethods = [
     { id: 'momo_mtn' as PaymentType, label: 'MTN Mobile Money', icon: 'phone-portrait-outline' as const, color: '#f4c80f' },
-    { id: 'momo_orange' as PaymentType, label: 'Orange Money', icon: 'phone-portrait-outline' as const, color: '#f97316' },
+    // Orange Money n'est pas encore encaissé : seul MTN déclenche une demande de
+    // paiement côté serveur. Présenter les deux à l'identique laissait le client
+    // repartir avec un écran de confirmation en croyant avoir payé.
+    { id: 'momo_orange' as PaymentType, label: 'Orange Money', icon: 'phone-portrait-outline' as const, color: '#f97316', note: 'Aucune demande de paiement ne part encore : vous réglerez à la remise.' },
     { id: 'cash' as PaymentType, label: 'Especes a la livraison', icon: 'cash-outline' as const, color: '#10b981' },
 ];
 
@@ -305,7 +308,12 @@ export default function CheckoutScreen() {
                         <View style={[styles.paymentIcon, { backgroundColor: pm.color + '20' }]}>
                             <Ionicons name={pm.icon} size={20} color={pm.color} />
                         </View>
-                        <Text style={[styles.paymentLabel, { color: theme.text }]}>{pm.label}</Text>
+                        <View style={styles.paymentTexts}>
+                            <Text style={[styles.paymentLabel, { color: theme.text }]}>{pm.label}</Text>
+                            {'note' in pm && pm.note ? (
+                                <Text style={[styles.paymentNote, { color: theme.icon }]}>{pm.note}</Text>
+                            ) : null}
+                        </View>
                         {paymentMethod === pm.id && (
                             <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
                         )}
@@ -455,7 +463,9 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.sm,
     },
     paymentIcon: { width: 40, height: 40, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center' },
-    paymentLabel: { ...Typography.body, fontWeight: '500', flex: 1 },
+    paymentTexts: { flex: 1 },
+    paymentLabel: { ...Typography.body, fontWeight: '500' },
+    paymentNote: { ...Typography.caption, marginTop: 2, lineHeight: 16 },
     notesInput: {
         borderWidth: 1,
         borderRadius: Radii.lg,
