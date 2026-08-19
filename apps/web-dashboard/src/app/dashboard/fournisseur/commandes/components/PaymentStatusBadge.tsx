@@ -63,12 +63,21 @@ const STATUS_CONFIG: Record<
 export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
     const [showTooltip, setShowTooltip] = useState(false);
 
-    const normalizedStatus: PaymentStatus =
-        status && status in STATUS_CONFIG
-            ? (status as PaymentStatus)
-            : "pending";
+    // Aucun statut transmis = information absente, pas « en attente ». Afficher
+    // « En attente de paiement » sur une commande déjà réglée fait relancer le
+    // fournisseur pour rien, et lui fait douter de tous les autres badges.
+    if (!status || !(status in STATUS_CONFIG)) {
+        return (
+            <span
+                className="text-surface-500 text-sm"
+                title="Statut de paiement non communiqué"
+            >
+                —
+            </span>
+        );
+    }
 
-    const cfg = STATUS_CONFIG[normalizedStatus];
+    const cfg = STATUS_CONFIG[status as PaymentStatus];
 
     return (
         <div

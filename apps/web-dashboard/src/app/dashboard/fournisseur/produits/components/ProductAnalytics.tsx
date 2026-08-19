@@ -141,6 +141,7 @@ interface ProductAnalyticsProps {
 export function ProductAnalytics({ products }: ProductAnalyticsProps) {
     const [analyticsData, setAnalyticsData] = useState<ProductAnalyticsData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [unavailable, setUnavailable] = useState(false);
     const [sortField, setSortField] = useState<SortField>("total_revenue");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -148,6 +149,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
     useEffect(() => {
         async function fetchAnalytics() {
             setLoading(true);
+            setUnavailable(false);
             try {
                 const res = await authFetch("/api/marketplace/suppliers/me/products/analytics");
                 if (res.ok) {
@@ -161,18 +163,14 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
                 }
             } catch (err) {
                 console.warn(
-                    "[ProductAnalytics] API /api/marketplace/suppliers/me/products/analytics non disponible, utilisation des mock data.",
+                    "[ProductAnalytics] /api/marketplace/suppliers/me/products/analytics indisponible.",
                     err
                 );
-                // Generate mock analytics from products
-                const mock: ProductAnalyticsData[] = products.map((p) => ({
-                    product_id: p.id,
-                    order_count: Math.floor(Math.random() * 50),
-                    total_revenue: Math.floor(Math.random() * 500000),
-                    avg_rating: Math.random() > 0.3 ? +(3 + Math.random() * 2).toFixed(1) : null,
-                    rating_count: Math.floor(Math.random() * 20),
-                }));
-                setAnalyticsData(mock);
+                // Aucune donnée inventée ici : ce tableau sert à décider quels
+                // produits pousser ou retirer. Des ventes et des notes tirées au
+                // hasard sont pires qu'un tableau vide.
+                setAnalyticsData([]);
+                setUnavailable(true);
             } finally {
                 setLoading(false);
             }
@@ -278,6 +276,22 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
                 <p className="text-white font-semibold mb-1">Pas encore de donnees</p>
                 <p className="text-sm text-surface-500 max-w-xs">
                     Les analytics apparaitront une fois que vous aurez des produits et des commandes.
+                </p>
+            </div>
+        );
+    }
+
+    if (unavailable && !loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-surface-800 border border-white/8 flex items-center justify-center mb-4">
+                    <BarChart3 size={24} className="text-surface-500" />
+                </div>
+                <p className="text-white font-semibold mb-1">Statistiques de vente indisponibles</p>
+                <p className="text-sm text-surface-500 max-w-sm">
+                    Le service qui calcule les ventes par produit ne répond pas. Plutôt que
+                    d&apos;afficher des chiffres approximatifs, nous préférons ne rien afficher :
+                    réessayez plus tard.
                 </p>
             </div>
         );

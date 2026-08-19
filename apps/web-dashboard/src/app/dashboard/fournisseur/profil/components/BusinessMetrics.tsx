@@ -57,49 +57,6 @@ interface MetricCardConfig {
     unit?: string;
 }
 
-// ── Mock data for when API is unavailable ─────────────────────────────────
-
-function generateMockTrend(base: number, variance: number): { date: string; value: number }[] {
-    const data: { date: string; value: number }[] = [];
-    const now = new Date();
-    for (let i = 29; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        data.push({
-            date: d.toISOString().slice(0, 10),
-            value: Math.max(0, base + (Math.random() - 0.5) * variance),
-        });
-    }
-    return data;
-}
-
-const MOCK_METRICS: MetricsResponse = {
-    ratings: {
-        current: 4.3,
-        previous: 4.1,
-        trend: generateMockTrend(4.2, 0.6),
-        extra: "28 avis",
-    },
-    response_time: {
-        current: 1.8,
-        previous: 2.3,
-        trend: generateMockTrend(2.0, 1.2),
-        extra: "moy. 30j",
-    },
-    conversion_rate: {
-        current: 67,
-        previous: 62,
-        trend: generateMockTrend(65, 15),
-        extra: "RFQ -> Commande",
-    },
-    restaurants_served: {
-        current: 14,
-        previous: 11,
-        trend: generateMockTrend(12, 4),
-        extra: "actifs ce mois",
-    },
-};
-
 // ── Card configurations ───────────────────────────────────────────────────
 
 const METRIC_CARDS: MetricCardConfig[] = [
@@ -274,6 +231,7 @@ function MetricCard({
 export function BusinessMetrics() {
     const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
     const [loading, setLoading] = useState(true);
+    const [unavailable, setUnavailable] = useState(false);
 
     useEffect(() => {
         async function fetchMetrics() {
@@ -284,12 +242,16 @@ export function BusinessMetrics() {
                     const data = await res.json();
                     setMetrics(data.metrics ?? data);
                 } else {
-                    // Fallback to mock data
-                    setMetrics(MOCK_METRICS);
+                    // Ces quatre chiffres (note, délai de réponse, taux de
+                    // conversion, restaurants servis) sont ceux que le
+                    // fournisseur met en avant auprès des restaurants. Les
+                    // inventer lui fait promettre ce qu'il ne tient pas.
+                    setMetrics(null);
+                    setUnavailable(true);
                 }
             } catch {
-                // Fallback to mock data
-                setMetrics(MOCK_METRICS);
+                setMetrics(null);
+                setUnavailable(true);
             } finally {
                 setLoading(false);
             }
@@ -297,7 +259,6 @@ export function BusinessMetrics() {
         fetchMetrics();
     }, []);
 
-    const data = metrics ?? MOCK_METRICS;
 
     return (
         <motion.div
@@ -315,17 +276,29 @@ export function BusinessMetrics() {
                 )}
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {METRIC_CARDS.map((config, i) => (
-                    <MetricCard
-                        key={config.key}
-                        config={config}
-                        data={data[config.key]}
-                        loading={loading}
-                        delay={i * 0.06}
-                    />
-                ))}
-            </div>
+            {unavailable && !loading ? (
+                <div className="rounded-2xl bg-surface-900 border border-white/8 px-5 py-8 text-center">
+                    <p className="text-sm text-surface-400">
+                        Métriques indisponibles pour le moment
+                    </p>
+                    <p className="text-xs text-surface-600 mt-1 max-w-sm mx-auto">
+                        Ces chiffres servent à convaincre les restaurants : nous préférons ne rien
+                        afficher plutôt qu&apos;une estimation.
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {METRIC_CARDS.map((config, i) => (
+                        <MetricCard
+                            key={config.key}
+                            config={config}
+                            data={metrics?.[config.key]}
+                            loading={loading}
+                            delay={i * 0.06}
+                        />
+                    ))}
+                </div>
+            )}
         </motion.div>
     );
 }

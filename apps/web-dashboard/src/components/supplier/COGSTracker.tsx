@@ -1,7 +1,7 @@
 "use client";
 
 import { useCOGSAnalysis, formatFCFA, formatPercent } from "./hooks";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { Info, TrendingUp, TrendingDown } from "lucide-react";
 
 interface COGSTrackerProps {
   supplierId: string;
@@ -31,6 +31,18 @@ export function COGSTracker({ supplierId }: COGSTrackerProps) {
 
   return (
     <div className="space-y-4">
+      {/* Le coût de revient n'existe pas en base : le backend l'estime à 60 % du
+          prix de vente. Tant que le fournisseur ne saisit pas ses vrais coûts,
+          marges et profits sont des ordres de grandeur, pas de la comptabilité. */}
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+        <Info size={14} className="shrink-0 mt-0.5" />
+        <p>
+          Coûts estimés, pas mesurés : faute de coût de revient saisi, il est
+          approché à 60&nbsp;% du prix de vente. Marges et profits sont donc
+          indicatifs.
+        </p>
+      </div>
+
       {/* ── Summary Stats ────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-2 text-xs mb-4">
         <div className="bg-surface-800 rounded-lg p-2">

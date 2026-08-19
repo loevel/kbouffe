@@ -65,47 +65,6 @@ function deviceLabel(device: LoginEvent["device"]): string {
     }
 }
 
-// ── Mock data generator ────────────────────────────────────────────────────
-
-function generateMockLogins(): LoginEvent[] {
-    const devices: LoginEvent["device"][] = ["desktop", "mobile", "tablet"];
-    const locations = [
-        "Douala, CM",
-        "Yaounde, CM",
-        "Bafoussam, CM",
-        "Bamenda, CM",
-        "Garoua, CM",
-        "Maroua, CM",
-    ];
-    const uas = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3) Safari/605.1.15",
-        "Mozilla/5.0 (iPad; CPU OS 17_2) Safari/605.1.15",
-        "Mozilla/5.0 (Linux; Android 14) Chrome/122.0",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) Firefox/123.0",
-    ];
-
-    const now = Date.now();
-    const logins: LoginEvent[] = [];
-
-    for (let i = 0; i < 20; i++) {
-        const hoursAgo = i * 3 + Math.floor(Math.random() * 3);
-        const device = devices[Math.floor(Math.random() * devices.length)];
-        logins.push({
-            id: `login-${i}`,
-            date: new Date(now - hoursAgo * 3600_000).toISOString(),
-            device,
-            ip: `${102 + Math.floor(Math.random() * 50)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`,
-            location: locations[Math.floor(Math.random() * locations.length)],
-            status: i < 18 ? "success" : "failed",
-            user_agent: uas[Math.floor(Math.random() * uas.length)],
-            is_current: i === 0,
-        });
-    }
-
-    return logins;
-}
-
 // ── Expandable row ─────────────────────────────────────────────────────────
 
 function LoginRow({ login }: { login: LoginEvent }) {
@@ -244,9 +203,11 @@ function LoginRow({ login }: { login: LoginEvent }) {
 export function LoginActivityLog() {
     const [logins, setLogins] = useState<LoginEvent[]>([]);
     const [loading, setLoading] = useState(true);
+    const [unavailable, setUnavailable] = useState(false);
 
     const fetchLogins = useCallback(async () => {
         setLoading(true);
+        setUnavailable(false);
         try {
             const res = await authFetch(
                 "/api/marketplace/suppliers/me/login-history?limit=20"
@@ -263,16 +224,20 @@ export function LoginActivityLog() {
                 );
                 setLogins(items);
             } else {
+                // Page de sécurité : inventer un historique de connexion est le
+                // pire mensonge possible ici. Le fournisseur s'en sert pour
+                // repérer un accès frauduleux — de fausses IP et de fausses
+                // villes le rassurent ou l'affolent sans aucun fondement.
                 console.warn(
-                    "LoginActivityLog: API /api/marketplace/suppliers/me/login-history indisponible -- donnees mock"
+                    "LoginActivityLog: /api/marketplace/suppliers/me/login-history indisponible"
                 );
-                setLogins(generateMockLogins());
+                setLogins([]);
+                setUnavailable(true);
             }
         } catch {
-            console.warn(
-                "LoginActivityLog: erreur fetch -- donnees mock"
-            );
-            setLogins(generateMockLogins());
+            console.warn("LoginActivityLog: erreur reseau");
+            setLogins([]);
+            setUnavailable(true);
         } finally {
             setLoading(false);
         }
@@ -355,7 +320,9 @@ export function LoginActivityLog() {
                         className="mx-auto text-surface-600 mb-2"
                     />
                     <p className="text-sm text-surface-500">
-                        Aucun historique de connexion
+                        {unavailable
+                            ? "Historique de connexion indisponible pour le moment"
+                            : "Aucun historique de connexion"}
                     </p>
                 </div>
             ) : (
