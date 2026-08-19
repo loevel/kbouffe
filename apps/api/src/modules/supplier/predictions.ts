@@ -7,14 +7,21 @@ import type { Env, Variables } from "../../types";
  *
  * Demand forecasting, price optimization, margin alerts and COGS tracking for
  * the marketplace supplier dashboard. The supplier is resolved from the
- * authenticated user (suppliers.user_id); data comes from supplier_products /
- * supplier_order_items.
+ * authenticated user (suppliers.user_id) ; les ventes viennent de
+ * supplier_order_traces (voir TABLE_VENTES) et les produits de
+ * supplier_products.
  *
- * NOTE: supplier_products has no real cost column yet, so cost is estimated at
- * 60% of the selling price (a heuristic) for margin/COGS calculations.
+ * NOTE : le coût vient de supplier_products.cost_per_unit quand il est
+ * renseigné, sinon il est estimé à 60 % du prix de vente (COST_RATIO).
  */
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+/**
+ * Même source que les analytics : supplier_order_traces est la seule table
+ * alimentée par le parcours d'achat (une ligne = un produit acheté).
+ */
+const TABLE_VENTES = "supplier_order_traces";
 
 const COST_RATIO = 0.6; // fallback when cost_per_unit is not set
 
@@ -90,7 +97,7 @@ function daysAgo(n: number): string {
   return d.toISOString();
 }
 
-/** Aggregate supplier_order_items (revenue + units) per product for a supplier. */
+/** Agrège les ventes (CA + unités) par produit sur les 30 derniers jours. */
 async function productSales(
   supabase: SupabaseClient,
   productIds: string[]
@@ -98,9 +105,10 @@ async function productSales(
   const stats = new Map<string, { revenue: number; units: number }>();
   if (productIds.length === 0) return stats;
   const { data: items } = await supabase
-    .from("supplier_order_items")
+    .from(TABLE_VENTES)
     .select("product_id, quantity, total_price, created_at")
     .in("product_id", productIds)
+    .neq("delivery_status", "cancelled")
     .gte("created_at", daysAgo(30));
   for (const item of items ?? []) {
     const pid = (item as any).product_id;
@@ -132,9 +140,10 @@ router.get("/forecast", async (c: any) => {
 
     const productIds = products.map((p: any) => p.id);
     const { data: orderItems } = await supabase
-      .from("supplier_order_items")
+      .from(TABLE_VENTES)
       .select("product_id, quantity, created_at")
       .in("product_id", productIds)
+      .neq("delivery_status", "cancelled")
       .gte("created_at", daysAgo(30));
 
     const productDemand = new Map<string, number>();

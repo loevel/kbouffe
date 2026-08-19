@@ -41,6 +41,7 @@ interface ProfileFormState {
 }
 import { authFetch } from "@kbouffe/module-core/ui";
 import { useSupplier, type SupplierProfile } from "../SupplierContext";
+import { useUploadImage } from "@/hooks/use-upload-image";
 import type { KYCResult } from "@/components/kyc/FaceLivenessKYC";
 import { ProfileEditor } from "./ProfileEditor";
 import { ProfilePreview } from "./components/ProfilePreview";
@@ -542,6 +543,121 @@ function FaceKycSection({ supplier }: { supplier: SupplierProfile }) {
 }
 
 // ── KYC section ────────────────────────────────────────────────────────────
+//
+// Le dossier KYC était en lecture seule : la seule voie pour transmettre une
+// pièce était un mailto vers le support, alors que la progression KYC est
+// affichée partout comme une étape du parcours. Le dépôt se fait maintenant ici.
+
+function KycDocumentUpload({
+    label,
+    hint,
+    field,
+    currentUrl,
+    disabled,
+}: {
+    label: string;
+    hint: string;
+    field: "identity_doc_url" | "minader_cert_url";
+    currentUrl: string | null;
+    disabled: boolean;
+}) {
+    const { refresh } = useSupplier();
+    const { upload, uploading } = useUploadImage();
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [done, setDone] = useState(false);
+
+    async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+        event.target.value = ""; // permet de re-choisir le même fichier après un échec
+        if (!file) return;
+
+        setError(null);
+        setDone(false);
+
+        const result = await upload(file);
+        if (!result) {
+            setError("L'envoi du fichier a échoué. Réessayez.");
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const res = await authFetch("/api/marketplace/suppliers/me", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ [field]: result.url }),
+            });
+            if (!res.ok) {
+                setError("Le document a été envoyé mais n'a pas pu être enregistré.");
+                return;
+            }
+            setDone(true);
+            await refresh();
+        } catch {
+            setError("Le document a été envoyé mais n'a pas pu être enregistré.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    const busy = uploading || saving;
+    const inputId = `kyc-${field}`;
+
+    return (
+        <div className="rounded-xl border border-white/8 p-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white">{label}</p>
+                    <p className="text-xs text-surface-500 mt-0.5">{hint}</p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                    {currentUrl && (
+                        <a
+                            href={currentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300 transition-colors"
+                        >
+                            Voir <ExternalLink size={12} />
+                        </a>
+                    )}
+                    <label
+                        htmlFor={inputId}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                            disabled || busy
+                                ? "bg-surface-800 text-surface-600 cursor-not-allowed"
+                                : "bg-brand-500 hover:bg-brand-600 text-white cursor-pointer"
+                        }`}
+                    >
+                        {busy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                        {busy ? "Envoi…" : currentUrl ? "Remplacer" : "Déposer"}
+                    </label>
+                    <input
+                        id={inputId}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        disabled={disabled || busy}
+                        onChange={handleFile}
+                    />
+                </div>
+            </div>
+
+            {error && (
+                <p className="mt-2 text-xs text-red-400" role="alert">
+                    {error}
+                </p>
+            )}
+            {done && !error && (
+                <p className="mt-2 text-xs text-emerald-400">
+                    Document enregistré. Votre dossier passe en vérification.
+                </p>
+            )}
+        </div>
+    );
+}
 
 function KycSection({ supplier }: { supplier: SupplierProfile }) {
     return (
@@ -611,11 +727,31 @@ function KycSection({ supplier }: { supplier: SupplierProfile }) {
                 </div>
             </div>
 
+            {/* Dépôt des pièces */}
+            <div className="space-y-3">
+                <h3 className="text-sm font-bold text-white">Déposer mes pièces</h3>
+                <KycDocumentUpload
+                    label="Pièce d'identité"
+                    hint="Photo lisible de votre CNI ou passeport (JPEG, PNG ou WebP, 5 Mo max)."
+                    field="identity_doc_url"
+                    currentUrl={supplier.identity_doc_url}
+                    disabled={supplier.kyc_status === "approved"}
+                />
+                <KycDocumentUpload
+                    label="Certificat MINADER"
+                    hint="Facultatif — requis pour les producteurs agricoles certifiés."
+                    field="minader_cert_url"
+                    currentUrl={supplier.minader_cert_url}
+                    disabled={supplier.kyc_status === "approved"}
+                />
+            </div>
+
             {/* Contact support notice */}
             <div className="flex items-start gap-3 p-4 rounded-xl bg-surface-800 border border-white/8 text-sm text-surface-400">
                 <Info size={16} className="text-surface-500 shrink-0 mt-0.5" />
                 <p>
-                    Pour mettre à jour vos documents KYC ou contester un refus, contactez{" "}
+                    Pour contester un refus ou transmettre une pièce dans un autre format,
+                    contactez{" "}
                     <a
                         href="mailto:support@kbouffe.com"
                         className="text-brand-400 hover:text-brand-300 font-medium transition-colors"

@@ -6,9 +6,9 @@ import type { Env, Variables } from "../../types";
  * Supplier Analytics Routes
  *
  * Metrics for the marketplace supplier dashboard. The supplier is resolved from
- * the authenticated user (suppliers.user_id), NOT from a restaurant. Data comes
- * from the supplier_* tables (supplier_orders, supplier_order_items,
- * supplier_products) — buyers are RESTAURANTS purchasing from the supplier.
+ * the authenticated user (suppliers.user_id), NOT from a restaurant. Les ventes
+ * sont lues dans supplier_order_traces (voir TABLE_VENTES ci-dessous) et les
+ * produits dans supplier_products — les acheteurs sont des RESTAURANTS.
  *
  * - GET /api/supplier/metrics        — Overview KPIs (sales, orders, buyers)
  * - GET /api/supplier/products       — Product performance (revenue, units)
@@ -17,11 +17,29 @@ import type { Env, Variables } from "../../types";
  * - GET /api/supplier/sales-velocity — Orders trend (day/week/month)
  * - GET /api/supplier/stock          — Inventory levels + low stock alerts
  *
- * NOTE: supplier_products has no cost field, so margin/ROI cannot be derived
- * and are returned as 0 (revenue / units / sales counts are real).
+ * NOTE : la marge s'appuie sur supplier_products.cost_per_unit quand il est
+ * renseigné, sinon sur l'estimation COST_RATIO.
  */
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+/**
+ * Les ventes réelles vivent dans supplier_order_traces : la trace est saisie à
+ * l'achat (produit, restaurant, quantité, prix) et c'est la seule table écrite
+ * par le parcours d'achat. supplier_orders / supplier_order_items n'ont aucun
+ * écrivain dans le dépôt et sont vides en base — s'appuyer dessus laissait tout
+ * le pilotage fournisseur à zéro alors que l'accueil affichait un vrai CA.
+ */
+const TABLE_VENTES = "supplier_order_traces";
+
+/**
+ * Une trace vaut une ligne produit, pas une commande : compter les lignes
+ * gonflerait le nombre de commandes et écraserait le panier moyen. Le panier
+ * est donc reconstitué par (restaurant, jour d'achat).
+ */
+function clePanier(ligne: any): string {
+  return `${ligne?.restaurant_id ?? "?"}|${String(ligne?.created_at ?? "").slice(0, 10)}`;
+}
 
 interface SupplierMetrics {
   totalSales: number;
@@ -110,27 +128,23 @@ router.get("/metrics", async (c: any) => {
     const supplierId = await resolveSupplierId(c, supabase);
     if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
-    const { data: orders } = await supabase
-      .from("supplier_orders")
-      .select("id, total_amount, restaurant_id, status, created_at")
+    const { data: lignes } = await supabase
+      .from(TABLE_VENTES)
+      .select("product_id, restaurant_id, quantity, total_price, delivery_status, created_at")
       .eq("supplier_id", supplierId)
+      .neq("delivery_status", "cancelled")
       .gte("created_at", daysAgo(30));
 
-    const valid = (orders ?? []).filter((o: any) => o.status !== "cancelled");
-    const totalSales = valid.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
-    const totalOrders = valid.length;
+    const valid = lignes ?? [];
+    const totalSales = valid.reduce((sum: number, l: any) => sum + (l.total_price || 0), 0);
+    const totalOrders = new Set(valid.map(clePanier)).size;
     const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
-    const totalCustomers = new Set(valid.map((o: any) => o.restaurant_id)).size;
+    const totalCustomers = new Set(valid.map((l: any) => l.restaurant_id)).size;
 
     // Overall margin from real (or estimated) unit costs.
     let avgMargin = 0;
-    const orderIds = valid.map((o: any) => o.id);
-    if (orderIds.length > 0 && totalSales > 0) {
-      const { data: items } = await supabase
-        .from("supplier_order_items")
-        .select("product_id, quantity")
-        .in("order_id", orderIds);
-      const productIds = [...new Set((items ?? []).map((i: any) => i.product_id).filter(Boolean))];
+    if (valid.length > 0 && totalSales > 0) {
+      const productIds = [...new Set(valid.map((l: any) => l.product_id).filter(Boolean))];
       const costMap = new Map<string, { cost: number | null; price: number }>();
       if (productIds.length > 0) {
         const { data: prods } = await supabase
@@ -142,10 +156,10 @@ router.get("/metrics", async (c: any) => {
         }
       }
       let totalCost = 0;
-      for (const it of items ?? []) {
-        const cm = costMap.get((it as any).product_id);
+      for (const l of valid) {
+        const cm = costMap.get((l as any).product_id);
         if (!cm) continue;
-        totalCost += effectiveCost(cm.cost, cm.price) * (Number((it as any).quantity) || 0);
+        totalCost += effectiveCost(cm.cost, cm.price) * (Number((l as any).quantity) || 0);
       }
       avgMargin = Math.max(0, Math.round(((totalSales - totalCost) / totalSales) * 100));
     }
@@ -184,31 +198,22 @@ router.get("/products", async (c: any) => {
 
     if (!products || products.length === 0) return c.json([]);
 
-    // Order items belonging to this supplier's orders in the last 30 days.
-    const { data: orders } = await supabase
-      .from("supplier_orders")
-      .select("id")
+    // Ventes de ce fournisseur sur les 30 derniers jours.
+    const { data: lignes } = await supabase
+      .from(TABLE_VENTES)
+      .select("product_id, quantity, total_price")
       .eq("supplier_id", supplierId)
-      .neq("status", "cancelled")
+      .neq("delivery_status", "cancelled")
       .gte("created_at", daysAgo(30));
 
-    const orderIds = (orders ?? []).map((o: any) => o.id);
-
     const stats = new Map<string, { revenue: number; units: number }>();
-    if (orderIds.length > 0) {
-      const { data: items } = await supabase
-        .from("supplier_order_items")
-        .select("product_id, quantity, total_price, order_id")
-        .in("order_id", orderIds);
-
-      for (const item of items ?? []) {
-        const pid = (item as any).product_id;
-        if (!pid) continue;
-        if (!stats.has(pid)) stats.set(pid, { revenue: 0, units: 0 });
-        const s = stats.get(pid)!;
-        s.revenue += (item as any).total_price || 0;
-        s.units += Number((item as any).quantity) || 0;
-      }
+    for (const item of lignes ?? []) {
+      const pid = (item as any).product_id;
+      if (!pid) continue;
+      if (!stats.has(pid)) stats.set(pid, { revenue: 0, units: 0 });
+      const s = stats.get(pid)!;
+      s.revenue += (item as any).total_price || 0;
+      s.units += Number((item as any).quantity) || 0;
     }
 
     const result: ProductPerformance[] = products.map((p: any) => {
@@ -247,23 +252,30 @@ router.get("/buyers", async (c: any) => {
     if (!supplierId) return c.json({ error: "Fournisseur introuvable" }, 404);
 
     const { data: orders } = await supabase
-      .from("supplier_orders")
-      .select("restaurant_id, total_amount, status, created_at")
+      .from(TABLE_VENTES)
+      .select("restaurant_id, total_price, delivery_status, created_at")
       .eq("supplier_id", supplierId)
-      .neq("status", "cancelled")
+      .neq("delivery_status", "cancelled")
       .gte("created_at", daysAgo(30))
       .order("created_at", { ascending: false });
 
-    const buyerMap = new Map<string, { orders: number; total: number; lastOrder: string }>();
+    const buyerMap = new Map<
+      string,
+      { paniers: Set<string>; total: number; lastOrder: string }
+    >();
     for (const order of orders ?? []) {
       const rid = (order as any).restaurant_id;
       if (!rid) continue;
       if (!buyerMap.has(rid)) {
-        buyerMap.set(rid, { orders: 0, total: 0, lastOrder: (order as any).created_at });
+        buyerMap.set(rid, {
+          paniers: new Set<string>(),
+          total: 0,
+          lastOrder: (order as any).created_at,
+        });
       }
       const b = buyerMap.get(rid)!;
-      b.orders += 1;
-      b.total += (order as any).total_amount || 0;
+      b.paniers.add(clePanier(order));
+      b.total += (order as any).total_price || 0;
       // orders are sorted desc, so the first seen is the most recent
     }
 
@@ -281,7 +293,8 @@ router.get("/buyers", async (c: any) => {
     }
 
     const result: BuyerSegment[] = Array.from(buyerMap.entries()).map(([rid, data]) => {
-      const repeatRate = Math.min(Math.round((data.orders / 10) * 100), 100);
+      const commandes = data.paniers.size;
+      const repeatRate = Math.min(Math.round((commandes / 10) * 100), 100);
       const daysSinceLastOrder = Math.floor(
         (Date.now() - new Date(data.lastOrder).getTime()) / (1000 * 60 * 60 * 24)
       );
@@ -290,7 +303,7 @@ router.get("/buyers", async (c: any) => {
       return {
         id: rid,
         name: nameMap.get(rid) || "Restaurant " + rid.slice(0, 8),
-        totalOrders: data.orders,
+        totalOrders: commandes,
         repeatRate,
         ltv: data.total,
         churnRisk,
@@ -333,28 +346,20 @@ router.get("/categories", async (c: any) => {
       categoryMap.get(cat)!.products.add((p as any).id);
     }
 
-    // Sales per product from this supplier's recent order items.
-    const { data: orders } = await supabase
-      .from("supplier_orders")
-      .select("id")
+    // Ventes par produit sur les 30 derniers jours.
+    const { data: items } = await supabase
+      .from(TABLE_VENTES)
+      .select("product_id, quantity, total_price")
       .eq("supplier_id", supplierId)
-      .neq("status", "cancelled")
+      .neq("delivery_status", "cancelled")
       .gte("created_at", daysAgo(30));
 
-    const orderIds = (orders ?? []).map((o: any) => o.id);
-    if (orderIds.length > 0) {
-      const { data: items } = await supabase
-        .from("supplier_order_items")
-        .select("product_id, quantity, total_price, order_id")
-        .in("order_id", orderIds);
-
-      for (const item of items ?? []) {
-        const info = productInfo.get((item as any).product_id);
-        if (info && categoryMap.has(info.category)) {
-          const agg = categoryMap.get(info.category)!;
-          agg.sales += (item as any).total_price || 0;
-          agg.cost += info.cost * (Number((item as any).quantity) || 0);
-        }
+    for (const item of items ?? []) {
+      const info = productInfo.get((item as any).product_id);
+      if (info && categoryMap.has(info.category)) {
+        const agg = categoryMap.get(info.category)!;
+        agg.sales += (item as any).total_price || 0;
+        agg.cost += info.cost * (Number((item as any).quantity) || 0);
       }
     }
 
@@ -395,14 +400,14 @@ router.get("/sales-velocity", async (c: any) => {
     startDate.setDate(startDate.getDate() - daysBack);
 
     const { data: orders } = await supabase
-      .from("supplier_orders")
-      .select("id, total_amount, status, created_at")
+      .from(TABLE_VENTES)
+      .select("restaurant_id, total_price, delivery_status, created_at")
       .eq("supplier_id", supplierId)
-      .neq("status", "cancelled")
+      .neq("delivery_status", "cancelled")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true });
 
-    const velocityMap = new Map<string, { orders: number; revenue: number }>();
+    const velocityMap = new Map<string, { paniers: Set<string>; revenue: number }>();
 
     for (const order of orders ?? []) {
       const created = new Date((order as any).created_at);
@@ -418,18 +423,19 @@ router.get("/sales-velocity", async (c: any) => {
         dateKey = created.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
       }
 
-      if (!velocityMap.has(dateKey)) velocityMap.set(dateKey, { orders: 0, revenue: 0 });
+      if (!velocityMap.has(dateKey))
+        velocityMap.set(dateKey, { paniers: new Set<string>(), revenue: 0 });
       const v = velocityMap.get(dateKey)!;
-      v.orders += 1;
-      v.revenue += (order as any).total_amount || 0;
+      v.paniers.add(clePanier(order));
+      v.revenue += (order as any).total_price || 0;
     }
 
     const result: SalesVelocity[] = Array.from(velocityMap.entries())
       .map(([date, data]) => ({
         date,
-        orders: data.orders,
+        orders: data.paniers.size,
         revenue: data.revenue,
-        avgOrder: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
+        avgOrder: data.paniers.size > 0 ? Math.round(data.revenue / data.paniers.size) : 0,
       }))
       .slice(-14);
 

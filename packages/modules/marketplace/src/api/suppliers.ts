@@ -165,6 +165,9 @@ suppliersRoutes.patch('/me', async (c) => {
       'delivery_delay_days', 'specialties', 'processing_delay_days',
       // Résultats KYC face liveness (scores uniquement — pas de biométrie brute)
       'kyc_face_verified', 'kyc_face_score', 'kyc_name_match', 'kyc_confidence',
+      // Pièces justificatives KYC. Sans elles, le fournisseur n'avait aucun moyen
+      // de déposer ses documents depuis le web : le seul chemin était un mailto.
+      'identity_doc_url', 'minader_cert_url', 'rccm', 'nif', 'cooperative_number',
     ];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
@@ -173,6 +176,22 @@ suppliersRoutes.patch('/me', async (c) => {
 
     if (Object.keys(updates).length === 0) {
       return c.json({ error: 'Aucune modification fournie' }, 400);
+    }
+
+    // Le statut KYC n'est jamais accepté depuis le client : il est dérivé ici.
+    // Déposer une pièce d'identité fait passer un dossier en attente ou refusé à
+    // « documents soumis » ; un dossier déjà approuvé n'est jamais rétrogradé.
+    if (typeof updates.identity_doc_url === 'string' && updates.identity_doc_url.trim()) {
+      const { data: current } = await supabase
+        .from('suppliers')
+        .select('kyc_status')
+        .eq('user_id', userId)
+        .single();
+      const statut = String(current?.kyc_status ?? '');
+      if (statut !== 'approved' && statut !== 'documents_submitted') {
+        updates.kyc_status = 'documents_submitted';
+        updates.kyc_rejection_reason = null;
+      }
     }
 
     const { data, error } = await supabase

@@ -215,6 +215,14 @@ api.use("/marketplace/suppliers/supplier-products/*", userAuthMiddleware);
 api.use("/supplier/*", userAuthMiddleware);
 api.use("/supplier", userAuthMiddleware);
 
+// Upload de fichiers — userAuthMiddleware pour la même raison : la route n'utilise
+// que c.var.userId et ne touche à aucune donnée de restaurant. Sous authMiddleware
+// elle répondait 404 à tout compte sans restaurant, ce qu'est un fournisseur par
+// construction — aucun fournisseur ne pouvait donc publier un produit, la photo
+// étant obligatoire à la création.
+api.use("/upload", userAuthMiddleware);
+api.use("/upload/*", userAuthMiddleware);
+
 // Messagerie fournisseur — userAuthMiddleware : fonctionne pour le fournisseur
 // (résolu via user_id) ET le restaurant (restaurantId résolu si propriétaire).
 api.use("/marketplace/messages", userAuthMiddleware);
@@ -229,7 +237,7 @@ const merchantPaths = [
     "/dashboard", "/coupons", "/gift-cards", "/tables", "/restaurant",
     "/customers", "/register-restaurant",
     "/marketing", "/notifications", "/payouts", "/sms",
-    "/payments/mtn", "/kyc", "/ads", "/team", "/zones", "/upload",
+    "/payments/mtn", "/kyc", "/ads", "/team", "/zones",
     "/restaurant/brands", "/restaurant/kyc",
     "/payouts/payroll-report",
     "/caisse", "/analytics", "/finances",
