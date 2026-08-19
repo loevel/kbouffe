@@ -237,12 +237,14 @@ export async function updateSession(request: NextRequest) {
     if (requiresAuth) {
         if (!user) {
             const url = request.nextUrl.clone();
-            // L'espace /stores est réservé aux clients : les y renvoyer
+            // Chaque espace a sa page de connexion dédiée : y renvoyer
             // directement évite l'écran intermédiaire de choix de profil.
             url.pathname = pathname.startsWith("/admin")
                 ? "/admin/login"
                 : pathname.startsWith("/stores")
                 ? "/login/client"
+                : pathname.startsWith("/dashboard/fournisseur")
+                ? "/login/fournisseur"
                 : "/login";
             url.searchParams.set("redirectTo", pathname);
             return NextResponse.redirect(url);

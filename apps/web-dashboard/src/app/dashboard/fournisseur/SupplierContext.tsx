@@ -115,7 +115,7 @@ export function SupplierProvider({ children }: { children: ReactNode }) {
             } = await supabase.auth.getSession();
 
             if (!session) {
-                router.replace("/login");
+                router.replace("/login/fournisseur?redirectTo=%2Fdashboard%2Ffournisseur");
                 return;
             }
 
