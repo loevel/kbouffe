@@ -17,7 +17,9 @@ import {
     SearchX,
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
-import { useSearchStore, usePreferencesStore } from "@/store/client-store";
+import { formatCFA } from "@kbouffe/module-core/ui";
+import { DELIVERY_FEES } from "@/lib/store/pricing";
+import { useSearchStore, usePreferencesStore, useUserSession } from "@/store/client-store";
 import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 import type { TranslationKeys } from "@/lib/i18n";
 
@@ -308,6 +310,8 @@ function PromoCarousel() {
 function RestaurantCard({ r }: { r: RestaurantItem }) {
     const { t } = useDashboardLocale();
     const d = t.clientDiscovery;
+    const router = useRouter();
+    const { session } = useUserSession();
     const { preferences, updatePreferences } = usePreferencesStore();
     const favorites = preferences.favoriteRestaurants || [];
     const isFavorite = favorites.includes(r.slug);
@@ -317,6 +321,12 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
     const toggleFavorite = async (ev: React.MouseEvent) => {
         ev.preventDefault();
         ev.stopPropagation();
+        // Sans compte, l'appel API échouait en silence et le cœur restait actif
+        // localement sans rien enregistrer : mieux vaut proposer la connexion.
+        if (!session) {
+            router.push(`/login/client?redirectTo=${encodeURIComponent("/stores")}`);
+            return;
+        }
         try {
             if (isFavorite) {
                 await fetch(`/api/auth/favorites/${r.id}`, { method: "DELETE" });
@@ -386,9 +396,10 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
                 <span>{eta}</span>
             </div>
 
-            {/* Delivery fee */}
+            {/* Delivery fee — montant issu de la tarification partagée : la carte
+                annonçait 1 500 FCFA alors que le checkout en facture 1 000. */}
             <p className="text-xs text-surface-500 dark:text-surface-400">
-                {d.deliveryFeeFrom}
+                {d.deliveryFeeFrom} {formatCFA(DELIVERY_FEES.delivery)}
             </p>
         </Link>
     );

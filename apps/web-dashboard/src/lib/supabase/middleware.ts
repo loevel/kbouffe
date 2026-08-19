@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { CRAWLABLE_API_PATHS, PRIVATE_API_PATHS } from "@/lib/seo/site";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/supabase/types";
 
@@ -47,6 +48,28 @@ async function resolveCustomSubdomainSlug(
     return (data as unknown as string | null) ?? null;
 }
 
+// Espace client : la découverte et la commande sont ouvertes aux invités.
+// Seules les pages de compte (commandes, adresses, profil…) exigent une session.
+const PUBLIC_STORE_PATHS = new Set([
+    "/stores",
+    "/stores/search",
+    "/stores/offers",
+    "/stores/cart",
+    "/stores/checkout",
+    "/stores/confirmation",
+    // La liste des commandes retombe sur le stockage local quand l'API refuse :
+    // un invité y retrouve la commande qu'il vient de passer.
+    "/stores/orders",
+]);
+
+function isPublicStorePath(pathname: string): boolean {
+    const clean = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+    if (PUBLIC_STORE_PATHS.has(clean)) return true;
+    // Suivi d'une commande précise : l'UUID fait office de jeton, ce qui permet
+    // à un invité de suivre la commande qu'il vient de passer.
+    return /^\/stores\/orders\/[^/]+$/.test(clean);
+}
+
 function resolveRoleHomePath(role: string | undefined) {
     if (role === "admin") return "/admin";
     if (role === "merchant") return "/dashboard";
@@ -85,6 +108,29 @@ function withAdminRewrite(
     return rewritten;
 }
 
+// robots.txt servi directement par le proxy sur les hôtes dont tous les
+// chemins sont réécrits (admin.kbouffe.com, sous-domaines restaurant) : sans
+// ça la requête part vers /admin/robots.txt ou /r/<slug>/robots.txt → 404.
+// robots.txt d'un sous-domaine restaurant. Construit à partir des mêmes
+// constantes que /robots.txt (app/robots.ts) pour que les deux hôtes ne
+// divergent pas.
+function storefrontRobotsTxt() {
+    const lines = ["User-agent: *", "Allow: /"];
+    CRAWLABLE_API_PATHS.forEach((path) => lines.push(`Allow: ${path}`));
+    lines.push("Disallow: /api/");
+    PRIVATE_API_PATHS.forEach((path) => lines.push(`Disallow: ${path}`));
+    return `${lines.join("\n")}\n`;
+}
+
+function robotsResponse(body: string) {
+    return new NextResponse(body, {
+        headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "cache-control": "public, max-age=3600",
+        },
+    });
+}
+
 export async function updateSession(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -93,6 +139,10 @@ export async function updateSession(request: NextRequest) {
     if (!supabaseUrl || !supabaseAnonKey) {
         const { realPathname, pathname } = resolveLogicalPathname(request);
         return withAdminRewrite(request, NextResponse.next({ request }), realPathname, pathname);
+    }
+
+    if (request.nextUrl.pathname === "/robots.txt" && (request.headers.get("host") ?? "") === ADMIN_HOST) {
+        return robotsResponse("User-agent: *\nDisallow: /\n");
     }
 
     let supabaseResponse = NextResponse.next({ request });
@@ -127,7 +177,22 @@ export async function updateSession(request: NextRequest) {
     if (candidateSubdomain) {
         const slug = await resolveCustomSubdomainSlug(supabase, candidateSubdomain);
         if (slug) {
+            if (request.nextUrl.pathname === "/robots.txt") {
+                // La vitrine premium est publique ; le sitemap, lui, reste sur
+                // le domaine canonique qui référence déjà /r/<slug>. Les routes
+                // API publiques restent autorisées : la vitrine n'a aucun
+                // contenu serveur, tout vient d'un fetch client vers /api/store/.
+                return robotsResponse(storefrontRobotsTxt());
+            }
             const realPathname = request.nextUrl.pathname;
+            // Les routes API et les assets Next ne sont pas propres au restaurant.
+            // La vitrine les appelle en relatif (fetch(`/api/store/${slug}`)) : les
+            // préfixer donnerait /r/<slug>/api/store/<slug>, qui n'existe pas, donc
+            // 404 et vitrine vide sur le sous-domaine. Même exemption que la branche
+            // admin (voir resolveLogicalPathname).
+            if (realPathname.startsWith("/api") || realPathname.startsWith("/_next")) {
+                return supabaseResponse;
+            }
             const url = request.nextUrl.clone();
             url.pathname = `/r/${slug}${realPathname === "/" ? "" : realPathname}`;
             const rewritten = NextResponse.rewrite(url, { request });
@@ -162,10 +227,23 @@ export async function updateSession(request: NextRequest) {
 
     // Routes protégées → rediriger vers /admin/login si non connecté sur /admin
     // ou vers /login pour les autres routes protégées
-    if (pathname.startsWith("/admin") || pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding") || pathname.startsWith("/stores") || pathname.startsWith("/driver")) {
+    const requiresAuth =
+        pathname.startsWith("/admin") ||
+        pathname.startsWith("/dashboard") ||
+        pathname.startsWith("/onboarding") ||
+        pathname.startsWith("/driver") ||
+        (pathname.startsWith("/stores") && !isPublicStorePath(pathname));
+
+    if (requiresAuth) {
         if (!user) {
             const url = request.nextUrl.clone();
-            url.pathname = pathname.startsWith("/admin") ? "/admin/login" : "/login";
+            // L'espace /stores est réservé aux clients : les y renvoyer
+            // directement évite l'écran intermédiaire de choix de profil.
+            url.pathname = pathname.startsWith("/admin")
+                ? "/admin/login"
+                : pathname.startsWith("/stores")
+                ? "/login/client"
+                : "/login";
             url.searchParams.set("redirectTo", pathname);
             return NextResponse.redirect(url);
         }
