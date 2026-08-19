@@ -276,8 +276,11 @@ export function OrderTrackingClient() {
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${id}` },
                 (payload) => {
-                    const updated = payload.new as OrderDetail;
-                    setOrder(updated);
+                    // payload.new ne contient que les colonnes de `orders` : la
+                    // relation `restaurants` (nom du resto, envoi d'avis) serait
+                    // perdue si on remplaçait l'objet au lieu de le fusionner.
+                    const updated = payload.new as Partial<OrderDetail> & { id: string; status: string };
+                    setOrder((prev) => (prev ? { ...prev, ...updated } : prev));
                     updateOrderStatus(updated.id, updated.status as Parameters<typeof updateOrderStatus>[1]);
                 },
             )

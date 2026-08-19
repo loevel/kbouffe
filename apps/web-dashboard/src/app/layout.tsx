@@ -5,6 +5,7 @@ import { CartProvider } from "@/contexts/cart-context";
 import { ClientAppProvider } from "@/components/providers/ClientAppProvider";
 import { PushNotificationManagerLazy } from "@/components/providers/PushNotificationManagerLazy";
 import { PwaInstallPrompt } from "@/components/shared/PwaInstallPrompt";
+import { SITE_URL } from "@/lib/seo/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,7 +19,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://kbouffe.com"),
+  metadataBase: new URL(SITE_URL),
+  // Canonical par défaut = l'URL de la page sur le domaine canonique. Évite que
+  // www.kbouffe.com, l'URL *.workers.dev ou un sous-domaine réécrit soient
+  // indexés comme des pages distinctes. Les pages qui définissent leur propre
+  // `alternates` (vitrines /r/<slug>) gardent la main.
+  alternates: {
+    canonical: "./",
+  },
   title: {
     default: "Kbouffe — Votre restaurant en ligne au Cameroun",
     template: "%s | Kbouffe",

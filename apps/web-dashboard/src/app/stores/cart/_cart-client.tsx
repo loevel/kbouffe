@@ -20,17 +20,20 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { UpsellModal } from "@/components/store/UpsellModal";
+import {
+    DELIVERY_DESCRIPTIONS,
+    DELIVERY_FEES,
+    DELIVERY_LABELS,
+    computeOrderTotals,
+    type DeliveryType,
+} from "@/lib/store/pricing";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type DeliveryType = "delivery" | "pickup" | "dine_in";
-
-const DELIVERY_OPTIONS: { id: DeliveryType; label: string; desc: string; icon: React.ReactNode; fee: number }[] = [
-    { id: "delivery", label: "Livraison",   desc: "Livraison à domicile",  icon: <MapPin   size={18} />, fee: 1000 },
-    { id: "pickup",   label: "À emporter",  desc: "Récupérer au restaurant", icon: <Package  size={18} />, fee: 0    },
-    { id: "dine_in",  label: "Sur place",   desc: "Manger dans le restaurant", icon: <Utensils size={18} />, fee: 0 },
+const DELIVERY_OPTIONS: { id: DeliveryType; icon: React.ReactNode }[] = [
+    { id: "delivery", icon: <MapPin   size={18} /> },
+    { id: "pickup",   icon: <Package  size={18} /> },
+    { id: "dine_in",  icon: <Utensils size={18} /> },
 ];
-
-const SERVICE_FEE = 250; // FCFA fixe
 
 // ── Cart item row ─────────────────────────────────────────────────────────────
 function CartItemRow({
@@ -138,41 +141,70 @@ function EmptyCart() {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function CartPageClient() {
     const router = useRouter();
-    const { restaurant, items, subtotal, updateQty, removeItem, clear } = useCart();
+    const { restaurant, items, subtotal, hydrated, updateQty, removeItem, clear } = useCart();
 
     const [deliveryType, setDeliveryType]     = useState<DeliveryType>("delivery");
     const [promoCode, setPromoCode]           = useState("");
-    const [promoDiscount, setPromoDiscount]   = useState(0);
+    const [appliedPromo, setAppliedPromo]     = useState<{ code: string; discount: number; subtotal: number } | null>(null);
     const [promoError, setPromoError]         = useState<string | null>(null);
     const [promoLoading, setPromoLoading]     = useState(false);
     const [showUpsell, setShowUpsell]         = useState(false);
+    const [confirmClear, setConfirmClear]     = useState(false);
 
-    const deliveryFee = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.fee ?? 0;
-    const total       = subtotal + deliveryFee + SERVICE_FEE - promoDiscount;
+    // Une remise en pourcentage dépend du sous-total : si le panier change après
+    // l'application du code, le montant calculé n'est plus valable.
+    const promoStale = appliedPromo !== null && appliedPromo.subtotal !== subtotal;
+    const promoDiscount = appliedPromo && !promoStale ? appliedPromo.discount : 0;
+    const totals = computeOrderTotals({ subtotal, deliveryType, discount: promoDiscount });
+    const { deliveryFee, serviceFee, total } = totals;
 
     // ── Promo code validation ─────────────────────────────────────────────
-    const validatePromo = async () => {
-        if (!promoCode.trim()) return;
+    // L'endpoint attend { code, restaurant_id, order_subtotal, delivery_type } :
+    // l'ancien payload { code, subtotal } était systématiquement rejeté en 400.
+    const validatePromo = async (rawCode?: string) => {
+        const code = (rawCode ?? promoCode).trim().toUpperCase();
+        if (!code || promoLoading) return;
+        if (!restaurant) {
+            setPromoError("Ajoutez d'abord des articles à votre panier.");
+            return;
+        }
         setPromoError(null);
         setPromoLoading(true);
         try {
             const res = await fetch("/api/coupons/validate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: promoCode.trim(), subtotal }),
+                body: JSON.stringify({
+                    code,
+                    restaurant_id: restaurant.id,
+                    order_subtotal: subtotal,
+                    delivery_type: deliveryType,
+                }),
             });
-            const data = await res.json();
-            if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.valid) {
                 setPromoError(data.error ?? "Code invalide");
-                setPromoDiscount(0);
-            } else {
-                setPromoDiscount(data.discount ?? 0);
+                setAppliedPromo(null);
+                return;
             }
+            const discount = Number(data.discount ?? 0);
+            if (!Number.isFinite(discount) || discount <= 0) {
+                setPromoError("Ce code ne donne aucune réduction sur ce panier.");
+                setAppliedPromo(null);
+                return;
+            }
+            setAppliedPromo({ code, discount, subtotal });
         } catch {
             setPromoError("Impossible de valider le code");
         } finally {
             setPromoLoading(false);
         }
+    };
+
+    const removePromo = () => {
+        setAppliedPromo(null);
+        setPromoCode("");
+        setPromoError(null);
     };
 
     const handleCheckout = () => {
@@ -182,8 +214,25 @@ export function CartPageClient() {
 
     const handleProceedToCheckout = () => {
         setShowUpsell(false);
-        router.push(`/stores/checkout?deliveryType=${deliveryType}`);
+        // Le code promo doit suivre jusqu'au checkout, sinon la réduction
+        // affichée ici disparaît silencieusement du total facturé.
+        const params = new URLSearchParams({ deliveryType });
+        if (appliedPromo && !promoStale) {
+            params.set("promoCode", appliedPromo.code);
+            params.set("promoDiscount", String(appliedPromo.discount));
+        }
+        router.push(`/stores/checkout?${params.toString()}`);
     };
+
+    // Avant hydratation du localStorage le panier est vide : afficher l'écran
+    // "panier vide" ferait clignoter un faux état au rechargement de la page.
+    if (!hydrated) {
+        return (
+            <div className="min-h-screen bg-white dark:bg-surface-950 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" aria-label="Chargement du panier" role="status" />
+            </div>
+        );
+    }
 
     if (items.length === 0) return (
         <div className="min-h-screen bg-white dark:bg-surface-950">
@@ -218,12 +267,30 @@ export function CartPageClient() {
                             )}
                         </div>
                     </div>
-                    <button
-                        onClick={clear}
-                        className="text-xs text-surface-400 hover:text-red-500 transition-colors"
-                    >
-                        Vider le panier
-                    </button>
+                    {confirmClear ? (
+                        <span className="flex items-center gap-2 text-xs">
+                            <span className="text-surface-500 dark:text-surface-400">Tout supprimer ?</span>
+                            <button
+                                onClick={() => { clear(); setConfirmClear(false); }}
+                                className="font-semibold text-red-500 hover:text-red-600 transition-colors"
+                            >
+                                Oui
+                            </button>
+                            <button
+                                onClick={() => setConfirmClear(false)}
+                                className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 transition-colors"
+                            >
+                                Annuler
+                            </button>
+                        </span>
+                    ) : (
+                        <button
+                            onClick={() => setConfirmClear(true)}
+                            className="text-xs text-surface-400 hover:text-red-500 transition-colors"
+                        >
+                            Vider le panier
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -268,11 +335,11 @@ export function CartPageClient() {
                                     {opt.icon}
                                 </span>
                                 <div className="flex-1">
-                                    <p className="font-semibold text-sm">{opt.label}</p>
-                                    <p className="text-xs text-surface-500 dark:text-surface-400">{opt.desc}</p>
+                                    <p className="font-semibold text-sm">{DELIVERY_LABELS[opt.id]}</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">{DELIVERY_DESCRIPTIONS[opt.id]}</p>
                                 </div>
                                 <span className="text-sm font-bold">
-                                    {opt.fee === 0 ? "Gratuit" : formatCFA(opt.fee)}
+                                    {DELIVERY_FEES[opt.id] === 0 ? "Gratuit" : formatCFA(DELIVERY_FEES[opt.id])}
                                 </span>
                             </button>
                         ))}
@@ -284,29 +351,61 @@ export function CartPageClient() {
                     <h2 className="font-bold text-surface-900 dark:text-white mb-3 flex items-center gap-2">
                         <Tag size={16} className="text-surface-400" /> Code promo
                     </h2>
-                    <div className="flex gap-2">
-                        <input
-                            value={promoCode}
-                            onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(null); setPromoDiscount(0); }}
-                            placeholder="KBOUFFE20"
-                            className="flex-1 h-10 px-4 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition uppercase"
-                        />
-                        <button
-                            onClick={validatePromo}
-                            disabled={!promoCode.trim() || promoLoading}
-                            className="px-4 h-10 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-                        >
-                            {promoLoading ? "…" : "Appliquer"}
-                        </button>
-                    </div>
-                    {promoError && (
-                        <p className="mt-2 text-sm text-red-500 flex items-center gap-1.5">
-                            <AlertCircle size={13} /> {promoError}
-                        </p>
+                    {appliedPromo ? (
+                        <div className={`flex items-center justify-between gap-3 px-4 h-11 rounded-xl border ${
+                            promoStale
+                                ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20"
+                                : "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/20"
+                        }`}>
+                            <p className={`text-sm font-semibold truncate ${promoStale ? "text-amber-700 dark:text-amber-400" : "text-green-700 dark:text-green-400"}`}>
+                                {promoStale
+                                    ? `${appliedPromo.code} · panier modifié`
+                                    : `${appliedPromo.code} · − ${formatCFA(appliedPromo.discount)}`}
+                            </p>
+                            <div className="flex items-center gap-3 shrink-0">
+                                {promoStale && (
+                                    <button
+                                        onClick={() => void validatePromo(appliedPromo.code)}
+                                        disabled={promoLoading}
+                                        className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50"
+                                    >
+                                        {promoLoading ? "…" : "Revalider"}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={removePromo}
+                                    className="text-xs font-semibold text-surface-500 hover:text-red-500 transition-colors"
+                                >
+                                    Retirer
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <label htmlFor="promo-code" className="sr-only">Code promo</label>
+                            <input
+                                id="promo-code"
+                                value={promoCode}
+                                onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(null); }}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void validatePromo(); } }}
+                                placeholder="KBOUFFE20"
+                                autoComplete="off"
+                                autoCapitalize="characters"
+                                aria-invalid={Boolean(promoError)}
+                                className="flex-1 h-10 px-4 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition uppercase"
+                            />
+                            <button
+                                onClick={() => void validatePromo()}
+                                disabled={!promoCode.trim() || promoLoading}
+                                className="px-4 h-10 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                            >
+                                {promoLoading ? "…" : "Appliquer"}
+                            </button>
+                        </div>
                     )}
-                    {promoDiscount > 0 && (
-                        <p className="mt-2 text-sm text-green-600 dark:text-green-400 font-medium">
-                            ✓ Réduction de {formatCFA(promoDiscount)} appliquée
+                    {promoError && (
+                        <p className="mt-2 text-sm text-red-500 flex items-center gap-1.5" role="alert">
+                            <AlertCircle size={13} /> {promoError}
                         </p>
                     )}
                 </section>
@@ -327,11 +426,11 @@ export function CartPageClient() {
                         </div>
                         <div className="flex justify-between text-surface-600 dark:text-surface-400">
                             <span>Frais de service</span>
-                            <span className="font-medium text-surface-900 dark:text-white">{formatCFA(SERVICE_FEE)}</span>
+                            <span className="font-medium text-surface-900 dark:text-white">{formatCFA(serviceFee)}</span>
                         </div>
                         {promoDiscount > 0 && (
                             <div className="flex justify-between text-green-600 dark:text-green-400">
-                                <span>Réduction promo</span>
+                                <span>Réduction promo{appliedPromo ? ` (${appliedPromo.code})` : ""}</span>
                                 <span className="font-bold">- {formatCFA(promoDiscount)}</span>
                             </div>
                         )}

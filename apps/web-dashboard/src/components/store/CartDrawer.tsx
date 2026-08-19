@@ -22,16 +22,21 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
+import {
+    DELIVERY_FEES,
+    DELIVERY_LABELS,
+    computeOrderTotals,
+    type DeliveryType,
+} from "@/lib/store/pricing";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type DeliveryType = "delivery" | "pickup" | "dine_in";
 type PaymentMethod = "cash" | "mobile_money_mtn" | "mobile_money_orange";
 
 const DELIVERY_OPTIONS: { id: DeliveryType; label: string; icon: React.ReactNode; fee: number }[] = [
-    { id: "delivery", label: "Livraison",      icon: <MapPin   size={16} />, fee: 1000 },
-    { id: "pickup",   label: "À emporter",     icon: <Package  size={16} />, fee: 0    },
-    { id: "dine_in",  label: "Sur place",      icon: <Utensils size={16} />, fee: 0    },
+    { id: "delivery", label: DELIVERY_LABELS.delivery, icon: <MapPin   size={16} />, fee: DELIVERY_FEES.delivery },
+    { id: "pickup",   label: DELIVERY_LABELS.pickup,   icon: <Package  size={16} />, fee: DELIVERY_FEES.pickup   },
+    { id: "dine_in",  label: DELIVERY_LABELS.dine_in,  icon: <Utensils size={16} />, fee: DELIVERY_FEES.dine_in  },
 ];
 
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
@@ -105,15 +110,17 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
         prevOpen.current = open;
     }, [open]);
 
-    const deliveryFee = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.fee ?? 0;
-    const total = subtotal + deliveryFee - giftCardAmount;
+    // Même tarification que le tunnel /stores/checkout — le frais de service
+    // n'était appliqué que sur l'un des deux parcours.
+    const totals = computeOrderTotals({ subtotal, deliveryType, giftCardAmount });
+    const { deliveryFee, serviceFee, total } = totals;
 
     const handleApplyGiftCard = async () => {
         if (!giftCardCode.trim()) return;
         setGiftCardError(null);
         setGiftCardLoading(true);
         try {
-            const orderTotal = subtotal + deliveryFee;
+            const orderTotal = computeOrderTotals({ subtotal, deliveryType }).total;
             const res = await fetch("/api/store/gift-cards/validate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -152,6 +159,11 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
         setError(null);
         if (!customerName.trim()) { setError("Votre nom est requis."); return; }
         if (!customerPhone.trim()) { setError("Votre numéro de téléphone est requis."); return; }
+        // Même règle que l'API : évite un rejet serveur après remplissage complet.
+        if (!/^(\+?237|0)?[679]\d{8}$/.test(customerPhone.replace(/[\s.-]/g, ""))) {
+            setError("Numéro invalide. Format attendu : 6XX XXX XXX ou +237 6XX XXX XXX.");
+            return;
+        }
         if (deliveryType === "delivery" && !deliveryAddress.trim()) {
             setError("L'adresse de livraison est requise."); return;
         }
@@ -188,6 +200,7 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                     paymentMethod,
                     subtotal,
                     deliveryFee,
+                    serviceFee,
                     total,
                     customerId: userId ?? undefined,
                     giftCardCode: giftCardApplied ? giftCardCode.trim().toUpperCase() : undefined,
@@ -595,6 +608,10 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                         <span>{formatCFA(deliveryFee)}</span>
                                     </div>
                                 )}
+                                <div className="flex justify-between text-surface-600 dark:text-surface-400">
+                                    <span>Frais de service</span>
+                                    <span>{formatCFA(serviceFee)}</span>
+                                </div>
                                 {giftCardApplied && giftCardAmount > 0 && (
                                     <div className="flex justify-between text-green-600 dark:text-green-400">
                                         <span className="flex items-center gap-1">

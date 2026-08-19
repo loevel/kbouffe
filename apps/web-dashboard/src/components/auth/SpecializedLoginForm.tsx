@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, User, Shield, CheckCircle2 } from "lucide-react";
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useLocale } from "@kbouffe/module-core/ui";
 import { motion } from "framer-motion";
@@ -16,8 +16,16 @@ interface SpecializedLoginFormProps {
     type: UserType;
 }
 
+/** Destinations autorisées pour ?redirectTo (chemin interne uniquement). */
+function safeRedirect(target: string | null): string | null {
+    if (!target) return null;
+    if (!target.startsWith("/") || target.startsWith("//")) return null;
+    return target;
+}
+
 export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { t } = useLocale();
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
@@ -83,6 +91,11 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
 
             const userRole = data?.user?.user_metadata?.role;
 
+            // Le middleware ajoute ?redirectTo=… quand il intercepte une page
+            // protégée (panier, checkout, suivi de commande…). Sans ça le client
+            // était renvoyé sur /stores et devait retrouver son parcours seul.
+            const requestedRedirect = safeRedirect(searchParams.get("redirectTo"));
+
             let redirectPath = "/stores";
             if (userRole === "merchant" || userRole === "admin") {
                 redirectPath = "/dashboard";
@@ -97,8 +110,13 @@ export function SpecializedLoginForm({ type }: SpecializedLoginFormProps) {
                 setRedirectMessage(t.auth.redirectingStores);
             }
 
+            const isClientRole = !userRole || userRole === "client";
+            const finalPath = requestedRedirect && (isClientRole || requestedRedirect.startsWith(redirectPath))
+                ? requestedRedirect
+                : redirectPath;
+
             setTimeout(() => {
-                router.push(redirectPath);
+                router.push(finalPath);
             }, 500);
         } catch {
             setError(t.auth.unexpectedError);

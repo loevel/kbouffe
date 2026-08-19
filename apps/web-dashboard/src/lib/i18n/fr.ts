@@ -1801,7 +1801,7 @@ export const fr = {
         addToFavorites: "Ajouter aux favoris",
         removeFromFavorites: "Retirer des favoris",
         sponsoredBadge: "Meilleure offre · Achetez-en 1, recevez-en...",
-        deliveryFeeFrom: "Frais de livraison à 1 500 FCFA",
+        deliveryFeeFrom: "Frais de livraison à partir de",
         retry: "Réessayer",
         resetFilters: "Réinitialiser les filtres",
         noResultsTitle: "Aucun restaurant trouvé",

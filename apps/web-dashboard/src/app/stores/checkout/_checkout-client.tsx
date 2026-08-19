@@ -26,18 +26,23 @@ import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useRecentOrders } from "@/store/client-store";
 import { createClient } from "@/lib/supabase/client";
+import {
+    DELIVERY_LABELS,
+    computeOrderTotals,
+    isDeliveryType,
+    type DeliveryType,
+} from "@/lib/store/pricing";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type DeliveryType    = "delivery" | "pickup" | "dine_in";
 type PaymentMethod   = "cash" | "mobile_money_mtn" | "mobile_money_orange" | "gift_card";
 
-const SERVICE_FEE = 250;
+// Même règle que l'API (/api/store/order) : un numéro refusé côté serveur après
+// trois étapes de formulaire est la première cause d'abandon du tunnel.
+const PHONE_REGEX = /^(\+?237|0)?[679]\d{8}$/;
 
-const DELIVERY_FEES: Record<DeliveryType, number> = {
-    delivery: 1000,
-    pickup:   0,
-    dine_in:  0,
-};
+function isValidPhone(phone: string): boolean {
+    return PHONE_REGEX.test(phone.replace(/[\s.-]/g, ""));
+}
 
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; desc: string; icon: React.ReactNode }[] = [
     {
@@ -91,12 +96,6 @@ interface AddressRow {
 
 const CHECKOUT_DRAFT_KEY = "kbouffe-store-checkout-draft-v1";
 
-const DELIVERY_LABELS: Record<DeliveryType, string> = {
-    delivery: "Livraison",
-    pickup:   "À emporter",
-    dine_in:  "Sur place",
-};
-
 function formatAddressRow(address: AddressRow): string {
     const parts: string[] = [];
     if (address.address?.trim()) parts.push(address.address.trim());
@@ -147,12 +146,22 @@ function StepIndicator({ step }: { step: "info" | "payment" | "review" }) {
 export function CheckoutPageClient() {
     const router       = useRouter();
     const searchParams = useSearchParams();
-    const { restaurant, items, subtotal, clear } = useCart();
+    const { restaurant, items, subtotal, hydrated, clear } = useCart();
     const addOrder     = useRecentOrders((s) => s.addOrder);
 
-    const deliveryType = (searchParams.get("deliveryType") as DeliveryType) ?? "delivery";
-    const deliveryFee  = DELIVERY_FEES[deliveryType] ?? 0;
-    const total        = subtotal + deliveryFee + SERVICE_FEE;
+    const deliveryTypeParam = searchParams.get("deliveryType");
+    const deliveryType: DeliveryType = isDeliveryType(deliveryTypeParam) ? deliveryTypeParam : "delivery";
+
+    // Code promo transmis par la page panier — sans ça la réduction affichée
+    // dans le panier disparaissait du total réellement facturé.
+    const promoCode = searchParams.get("promoCode")?.trim().toUpperCase() || null;
+    const promoDiscountParam = Number(searchParams.get("promoDiscount") ?? 0);
+    const promoDiscount = promoCode && Number.isFinite(promoDiscountParam) && promoDiscountParam > 0
+        ? Math.round(promoDiscountParam)
+        : 0;
+
+    const totals = computeOrderTotals({ subtotal, deliveryType, discount: promoDiscount });
+    const { deliveryFee, serviceFee, discount, total } = totals;
 
     // ── Form state ─────────────────────────────────────────────────────────
     const [step, setStep]                     = useState<"info" | "payment" | "review">("info");
@@ -164,7 +173,10 @@ export function CheckoutPageClient() {
     const [paymentMethod, setPaymentMethod]   = useState<PaymentMethod>("cash");
     const [submitting, setSubmitting]         = useState(false);
     const [error, setError]                   = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors]       = useState<{ name?: string; phone?: string; address?: string }>({});
     const [isLocating, setIsLocating]         = useState(false);
+    const [payingLabel, setPayingLabel]       = useState<string | null>(null);
+    const [authChecked, setAuthChecked]       = useState(false);
 
     // ── Scheduled order state ────────────────────────────────────────────
     const [isScheduled, setIsScheduled]         = useState(false);
@@ -258,6 +270,8 @@ export function CheckoutPageClient() {
                 }
             } catch (err) {
                 console.error("[Checkout] Failed to load user data:", err);
+            } finally {
+                setAuthChecked(true);
             }
         };
 
@@ -359,6 +373,16 @@ export function CheckoutPageClient() {
     };
 
     // ── Empty cart guard ───────────────────────────────────────────────────
+    // Le panier vient du localStorage : avant hydratation il est vide et
+    // l'écran "Panier vide" s'affichait une fraction de seconde au rechargement.
+    if (!hydrated) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-surface-950">
+                <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+            </div>
+        );
+    }
+
     if (items.length === 0) {
         return (
             <div className="min-h-screen bg-white dark:bg-surface-950 flex flex-col items-center justify-center px-4 gap-4">
@@ -374,12 +398,27 @@ export function CheckoutPageClient() {
 
     // ── Step 1 validation ──────────────────────────────────────────────────
     const validateStep1 = () => {
-        if (!customerName.trim()) { setError("Votre nom est requis."); return false; }
-        if (!customerPhone.trim()) { setError("Votre téléphone est requis."); return false; }
+        const nextErrors: { name?: string; phone?: string; address?: string } = {};
+
+        if (customerName.trim().length < 2) {
+            nextErrors.name = "Indiquez votre nom complet.";
+        }
+        if (!customerPhone.trim()) {
+            nextErrors.phone = "Votre téléphone est requis.";
+        } else if (!isValidPhone(customerPhone)) {
+            // Refusé par l'API : mieux vaut le dire ici que trois étapes plus loin.
+            nextErrors.phone = "Numéro invalide. Format attendu : 6XX XXX XXX ou +237 6XX XXX XXX.";
+        }
         if (deliveryType === "delivery" && !deliveryAddress.trim()) {
-            setError("L'adresse de livraison est requise.");
+            nextErrors.address = "L'adresse de livraison est requise.";
+        }
+
+        setFieldErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0) {
+            setError("Vérifiez les champs signalés avant de continuer.");
             return false;
         }
+
         if (isScheduled) {
             if (!scheduledDate || !scheduledTime) {
                 setError("Veuillez choisir une date et une heure pour la commande programmée.");
@@ -480,6 +519,46 @@ export function CheckoutPageClient() {
         }
     };
 
+    // ── Paiement MTN Mobile Money ──────────────────────────────────────────
+    // Même parcours que la vitrine /r/[slug] : on déclenche le request-to-pay
+    // puis on suit le statut ~30 s. Au-delà, la commande reste en attente et le
+    // suivi de commande prendra le relais — on ne bloque jamais le client.
+    const requestMtnPayment = async (
+        createdOrderId: string,
+        payerMsisdn: string,
+    ): Promise<"pending" | "paid" | "failed"> => {
+        setPayingLabel("Demande de paiement MTN envoyée — validez sur votre téléphone…");
+        try {
+            const res = await fetch("/api/store/payment/mtn/request-to-pay", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orderId: createdOrderId,
+                    payerMsisdn,
+                    payerMessage: "Paiement commande Kbouffe",
+                    payeeNote: `Commande ${createdOrderId}`,
+                }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) return "failed";
+
+            const referenceId = json?.payment?.referenceId as string | undefined;
+            if (!referenceId) return "pending";
+
+            for (let attempt = 0; attempt < 6; attempt += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+                const statusRes = await fetch(`/api/store/payment/mtn/status/${referenceId}`);
+                if (!statusRes.ok) break;
+                const statusJson = await statusRes.json().catch(() => ({}));
+                const status = statusJson?.payment?.status as "pending" | "paid" | "failed" | undefined;
+                if (status === "paid" || status === "failed") return status;
+            }
+            return "pending";
+        } catch {
+            return "failed";
+        }
+    };
+
     // ── Submit order ───────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!restaurant) { setError("Restaurant introuvable."); return; }
@@ -492,7 +571,22 @@ export function CheckoutPageClient() {
         try {
             const body = {
                 restaurantId:    restaurant.id,
-                items:           items.map((i) => ({ productId: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+                // Options et notes doivent suivre jusqu'en cuisine : sans elles
+                // le restaurant reçoit "Poulet DG" sans le "sans piment".
+                items:           items.map((i) => ({
+                    productId:   i.id,
+                    name:        i.name,
+                    productName: i.name,
+                    price:       i.price,
+                    unitPrice:   i.price,
+                    quantity:    i.quantity,
+                    options:     i.selectedOptions?.map((o) => ({
+                        name:             o.name,
+                        value:            o.choice,
+                        price_adjustment: o.extra_price,
+                    })),
+                    notes:       i.notes,
+                })),
                 deliveryType,
                 deliveryAddress: deliveryType === "delivery" ? deliveryAddress.trim() : undefined,
                 tableNumber:     deliveryType === "dine_in"  ? tableNumber.trim() : undefined,
@@ -502,6 +596,9 @@ export function CheckoutPageClient() {
                 giftCardCode:   !isSplitPayment && paymentMethod === "gift_card" ? giftCardCode.trim().toUpperCase() : undefined,
                 subtotal,
                 deliveryFee,
+                serviceFee,
+                discount:        discount > 0 ? discount : undefined,
+                couponCode:      discount > 0 ? promoCode ?? undefined : undefined,
                 total,
                 customerId:      userId ?? undefined,
                 scheduledFor:    scheduledIso,
@@ -552,17 +649,30 @@ export function CheckoutPageClient() {
                     createdAt:      new Date().toISOString(),
                 });
             }
+            // ── Mobile Money : déclencher réellement le paiement ──────────
+            // Choisir "MTN Mobile Money" ne lançait aucune demande de paiement :
+            // la commande partait comme une commande non payée, sans que le
+            // client ne reçoive jamais de code USSD.
+            let paymentState: "pending" | "paid" | "failed" | null = null;
+            if (orderId && paymentMethod === "mobile_money_mtn" && !isSplitPayment && totalDueNow > 0) {
+                paymentState = await requestMtnPayment(orderId, customerPhone.trim());
+            }
+
             clear();
             const confirmUrl = new URL("/stores/confirmation", window.location.origin);
             confirmUrl.searchParams.set("orderId", orderId);
             confirmUrl.searchParams.set("restaurant", restaurant.name);
             confirmUrl.searchParams.set("total", String(totalDueNow));
+            confirmUrl.searchParams.set("deliveryType", deliveryType);
+            if (data.deliveryCode) confirmUrl.searchParams.set("deliveryCode", String(data.deliveryCode));
+            if (paymentState) confirmUrl.searchParams.set("payment", paymentState);
             if (confirmedScheduledFor) confirmUrl.searchParams.set("scheduledFor", confirmedScheduledFor);
             router.push(confirmUrl.pathname + confirmUrl.search);
         } catch {
             setError("Impossible de passer la commande. Vérifiez votre connexion.");
         } finally {
             setSubmitting(false);
+            setPayingLabel(null);
         }
     };
 
@@ -599,31 +709,70 @@ export function CheckoutPageClient() {
                 {/* ── Step 1 : Customer info ────────────────────────────── */}
                 {step === "info" && (
                     <div className="space-y-4">
+                        {/* Commande invité : proposer la connexion sans l'imposer —
+                            elle pré-remplit nom, téléphone et adresse enregistrés. */}
+                        {authChecked && !userId && (
+                            <section className="bg-brand-50 dark:bg-brand-500/10 rounded-2xl border border-brand-200 dark:border-brand-500/20 p-4 flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-sm text-brand-700 dark:text-brand-300">
+                                    <strong>Déjà client ?</strong> Connectez-vous pour retrouver vos adresses et suivre vos commandes.
+                                </p>
+                                <Link
+                                    href={`/login/client?redirectTo=${encodeURIComponent(`/stores/checkout?${searchParams.toString()}`)}`}
+                                    className="px-4 h-9 inline-flex items-center rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors"
+                                >
+                                    Se connecter
+                                </Link>
+                            </section>
+                        )}
+
                         <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
                             <h2 className="font-bold text-surface-900 dark:text-white mb-4">Vos coordonnées</h2>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-1.5">
+                                    <label htmlFor="customer-name" className="block text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-1.5">
                                         Nom complet *
                                     </label>
                                     <input
+                                        id="customer-name"
+                                        name="name"
                                         value={customerName}
-                                        onChange={(e) => setCustomerName(e.target.value)}
+                                        onChange={(e) => { setCustomerName(e.target.value); setFieldErrors((prev) => ({ ...prev, name: undefined })); }}
                                         placeholder="Jean-Paul Mbida"
-                                        className="w-full h-11 px-4 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition"
+                                        autoComplete="name"
+                                        required
+                                        aria-invalid={Boolean(fieldErrors.name)}
+                                        aria-describedby={fieldErrors.name ? "customer-name-error" : undefined}
+                                        className={`w-full h-11 px-4 rounded-xl bg-surface-100 dark:bg-surface-800 border text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition ${fieldErrors.name ? "border-red-400 dark:border-red-500" : "border-surface-200 dark:border-surface-700"}`}
                                     />
+                                    {fieldErrors.name && (
+                                        <p id="customer-name-error" role="alert" className="mt-1.5 text-xs text-red-500">{fieldErrors.name}</p>
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-1.5">
+                                    <label htmlFor="customer-phone" className="block text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wide mb-1.5">
                                         Téléphone *
                                     </label>
                                     <input
+                                        id="customer-phone"
+                                        name="tel"
                                         value={customerPhone}
-                                        onChange={(e) => setCustomerPhone(e.target.value)}
+                                        onChange={(e) => { setCustomerPhone(e.target.value); setFieldErrors((prev) => ({ ...prev, phone: undefined })); }}
                                         type="tel"
+                                        inputMode="tel"
+                                        autoComplete="tel"
+                                        required
                                         placeholder="6XX XXX XXX"
-                                        className="w-full h-11 px-4 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition"
+                                        aria-invalid={Boolean(fieldErrors.phone)}
+                                        aria-describedby={fieldErrors.phone ? "customer-phone-error" : "customer-phone-hint"}
+                                        className={`w-full h-11 px-4 rounded-xl bg-surface-100 dark:bg-surface-800 border text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition ${fieldErrors.phone ? "border-red-400 dark:border-red-500" : "border-surface-200 dark:border-surface-700"}`}
                                     />
+                                    {fieldErrors.phone ? (
+                                        <p id="customer-phone-error" role="alert" className="mt-1.5 text-xs text-red-500">{fieldErrors.phone}</p>
+                                    ) : (
+                                        <p id="customer-phone-hint" className="mt-1.5 text-xs text-surface-400">
+                                            Le restaurant et le livreur vous appelleront sur ce numéro.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </section>
@@ -633,7 +782,9 @@ export function CheckoutPageClient() {
                             <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5">
                                 <div className="flex items-center justify-between mb-4">
                                     <h2 className="font-bold text-surface-900 dark:text-white flex items-center gap-2">
-                                        <MapPin size={16} className="text-brand-500" /> Adresse de livraison
+                                        <label htmlFor="delivery-address" className="flex items-center gap-2 cursor-text">
+                                            <MapPin size={16} className="text-brand-500" /> Adresse de livraison
+                                        </label>
                                     </h2>
                                     <button
                                         onClick={handleUseCurrentLocation}
@@ -655,12 +806,19 @@ export function CheckoutPageClient() {
                                     </button>
                                 </div>
                                 <textarea
+                                    id="delivery-address"
                                     value={deliveryAddress}
-                                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                                    onChange={(e) => { setDeliveryAddress(e.target.value); setFieldErrors((prev) => ({ ...prev, address: undefined })); }}
                                     placeholder="Quartier, rue, point de repère…"
                                     rows={3}
-                                    className="w-full px-4 py-3 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition resize-none"
+                                    autoComplete="street-address"
+                                    aria-invalid={Boolean(fieldErrors.address)}
+                                    aria-describedby={fieldErrors.address ? "delivery-address-error" : undefined}
+                                    className={`w-full px-4 py-3 rounded-xl bg-surface-100 dark:bg-surface-800 border text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition resize-none ${fieldErrors.address ? "border-red-400 dark:border-red-500" : "border-surface-200 dark:border-surface-700"}`}
                                 />
+                                {fieldErrors.address && (
+                                    <p id="delivery-address-error" role="alert" className="mt-1.5 text-xs text-red-500">{fieldErrors.address}</p>
+                                )}
                             </section>
                         )}
 
@@ -670,9 +828,11 @@ export function CheckoutPageClient() {
                                     <Utensils size={16} className="text-brand-500" /> Numéro de table
                                 </h2>
                                 <input
+                                    id="table-number"
                                     value={tableNumber}
                                     onChange={(e) => setTableNumber(e.target.value)}
                                     placeholder="Ex: Table 5"
+                                    aria-label="Numéro de table"
                                     className="w-full h-11 px-4 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 text-surface-900 dark:text-white text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition"
                                 />
                             </section>
@@ -1033,8 +1193,14 @@ export function CheckoutPageClient() {
                                 </div>
                                 <div className="flex justify-between text-surface-600 dark:text-surface-400">
                                     <span>Frais de service</span>
-                                    <span className="font-medium text-surface-900 dark:text-white">{formatCFA(SERVICE_FEE)}</span>
+                                    <span className="font-medium text-surface-900 dark:text-white">{formatCFA(serviceFee)}</span>
                                 </div>
+                                {discount > 0 && (
+                                    <div className="flex justify-between text-green-600 dark:text-green-400">
+                                        <span>Réduction promo{promoCode ? ` (${promoCode})` : ""}</span>
+                                        <span className="font-bold">- {formatCFA(discount)}</span>
+                                    </div>
+                                )}
                                 {paymentMethod === "gift_card" && giftCardValidation && (
                                     <>
                                         <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
@@ -1060,7 +1226,7 @@ export function CheckoutPageClient() {
                             className="w-full h-14 flex items-center justify-center gap-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-70 text-white font-bold text-base rounded-2xl shadow-lg shadow-brand-500/25 transition-colors"
                         >
                             {submitting ? (
-                                <><Loader2 size={18} className="animate-spin" /> Envoi en cours…</>
+                                <><Loader2 size={18} className="animate-spin" /> {payingLabel ?? "Envoi en cours…"}</>
                             ) : (
                                 <>
                                     <CheckCircle2 size={18} />

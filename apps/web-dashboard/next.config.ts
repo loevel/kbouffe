@@ -60,6 +60,18 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  async headers() {
+    return [
+      {
+        // Le sitemap est généré dynamiquement (catalogue restaurants) : le
+        // laisser en cache une heure évite une requête base à chaque crawl.
+        source: "/sitemap.xml",
+        headers: [
+          { key: "cache-control", value: "public, max-age=3600, s-maxage=3600" },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     return {
       beforeFiles: [],

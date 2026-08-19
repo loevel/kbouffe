@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ShowcasePageClient } from "./showcase-client";
+import { SITE_URL } from "@/lib/seo/site";
 
 interface Props {
     params: Promise<{ slug: string }>;
@@ -17,6 +18,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         openGraph: {
             title: `${formattedName} — Kbouffe`,
             description: `Découvrez ${formattedName} sur Kbouffe`,
+            url: `${SITE_URL}/r/${slug}/vitrine`,
+        },
+        // Également atteignable via <perso>.kbouffe.com/vitrine (réécriture proxy).
+        alternates: {
+            canonical: `${SITE_URL}/r/${slug}/vitrine`,
         },
     };
 }

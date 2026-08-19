@@ -5,11 +5,13 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/supabase/types";
 import { pushOrderStatusChange } from "@/lib/firebase/order-push";
 
 const ALLOWED_DELIVERY_TYPES = ["delivery", "pickup", "dine_in"] as const;
 const ALLOWED_PAYMENT_METHODS = ["cash", "mobile_money_mtn", "mobile_money_orange", "gift_card"] as const;
 const PHONE_REGEX = /^(\+?237|0)?[679]\d{8}$/; // Cameroon phone format
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type DeliveryType = (typeof ALLOWED_DELIVERY_TYPES)[number];
 type PaymentMethod = (typeof ALLOWED_PAYMENT_METHODS)[number];
@@ -23,6 +25,8 @@ interface OrderItem {
     name: string;
     price: number;
     quantity: number;
+    options?: Array<{ name: string; value: string; price_adjustment?: number }>;
+    notes?: string;
 }
 
 interface OrderBody {
@@ -37,10 +41,60 @@ interface OrderBody {
     giftCardCode?: string;
     subtotal: number;
     deliveryFee: number;
+    /** Frais de service Kbouffe (FCFA) — était perdu et enregistré à 0. */
+    serviceFee?: number;
+    /** Remise code promo déjà validée côté client (revalidée ici). */
+    discount?: number;
+    couponCode?: string;
     total: number;
     customerId?: string;
     scheduledFor?: string; // ISO 8601 — null/absent = commande immédiate
     notes?: string;
+}
+
+/**
+ * Recalcule la remise réellement accordée par un code promo.
+ * Le client envoie le montant affiché au panier ; on ne lui fait jamais
+ * confiance : la remise appliquée est bornée par ce que le coupon autorise.
+ */
+async function resolveCouponDiscount(
+    supabase: Awaited<ReturnType<typeof createAdminClient>>,
+    restaurantId: string,
+    code: string,
+    subtotal: number,
+    requestedDiscount: number,
+): Promise<number> {
+    // restaurantId part dans un filtre PostgREST textuel : n'accepter qu'un UUID.
+    if (!UUID_REGEX.test(restaurantId)) return 0;
+
+    const { data: coupons, error } = await supabase
+        .from("coupons")
+        .select("id, kind, value, max_discount, min_order, min_order_amount, starts_at, expires_at, max_uses, current_uses, restaurant_id")
+        .eq("code", code)
+        .eq("is_active", true)
+        .or(`restaurant_id.eq.${restaurantId},restaurant_id.is.null`)
+        .limit(2);
+
+    if (error || !coupons?.length) return 0;
+    // Un coupon propre au restaurant prime sur un coupon global de même code.
+    const coupon = coupons.find((c) => c.restaurant_id === restaurantId) ?? coupons[0];
+
+    const now = new Date();
+    if (coupon.starts_at && new Date(coupon.starts_at) > now) return 0;
+    if (coupon.expires_at && new Date(coupon.expires_at) < now) return 0;
+    if (coupon.max_uses != null && (coupon.current_uses ?? 0) >= coupon.max_uses) return 0;
+
+    const minOrder = coupon.min_order_amount ?? coupon.min_order ?? 0;
+    if (subtotal < minOrder) return 0;
+
+    const kind = String(coupon.kind ?? "").toLowerCase();
+    const value = Number(coupon.value ?? 0);
+    let maxDiscount = kind.includes("percent")
+        ? Math.round((subtotal * value) / 100)
+        : Math.round(value);
+    if (coupon.max_discount != null) maxDiscount = Math.min(maxDiscount, coupon.max_discount);
+
+    return Math.max(0, Math.min(requestedDiscount, maxDiscount, subtotal));
 }
 
 export async function POST(request: NextRequest) {
@@ -97,9 +151,35 @@ export async function POST(request: NextRequest) {
 
         const supabase = await createAdminClient();
 
+        // ── Totaux recalculés côté serveur ──────────────────────────────────
+        // Le total était repris tel quel du client, et le frais de service
+        // facturé au client était enregistré à 0 dans la commande.
+        const subtotal    = Math.max(0, Math.round(Number(body.subtotal) || 0));
+        const deliveryFee = Math.max(0, Math.round(Number(body.deliveryFee) || 0));
+        const serviceFee  = Math.max(0, Math.round(Number(body.serviceFee) || 0));
+
+        const requestedDiscount = Math.max(0, Math.round(Number(body.discount) || 0));
+        let discount = 0;
+        if (requestedDiscount > 0 && body.couponCode?.trim()) {
+            discount = await resolveCouponDiscount(
+                supabase,
+                body.restaurantId,
+                body.couponCode.trim().toUpperCase(),
+                subtotal,
+                requestedDiscount,
+            );
+        }
+
+        const orderTotal = Math.max(0, subtotal + deliveryFee + serviceFee - discount);
+        if (Number.isFinite(body.total) && Math.abs(Number(body.total) - orderTotal) > 1) {
+            console.warn(
+                `[POST /api/store/order] Total client (${body.total}) != total recalculé (${orderTotal}) — le total serveur fait foi.`,
+            );
+        }
+
         let giftCardContext: { id: string; current_balance: number } | null = null;
         let giftCardAppliedAmount = 0;
-        let remainingToPay = body.total;
+        let remainingToPay = orderTotal;
         let finalPaymentMethod: PaymentMethod | "mixed" = body.paymentMethod;
         let finalPaymentStatus: "pending" | "paid" = "pending";
 
@@ -127,15 +207,20 @@ export async function POST(request: NextRequest) {
                 id: giftCard.id,
                 current_balance: giftCard.current_balance ?? 0,
             };
-            giftCardAppliedAmount = Math.min(giftCardContext.current_balance, body.total);
-            remainingToPay = Math.max(0, body.total - giftCardAppliedAmount);
+            giftCardAppliedAmount = Math.min(giftCardContext.current_balance, orderTotal);
+            remainingToPay = Math.max(0, orderTotal - giftCardAppliedAmount);
             finalPaymentMethod = remainingToPay > 0 ? "mixed" : "gift_card";
             finalPaymentStatus = remainingToPay > 0 ? "pending" : "paid";
         }
-        const finalOrderTotal = Math.max(0, body.total - giftCardAppliedAmount);
+        const finalOrderTotal = Math.max(0, orderTotal - giftCardAppliedAmount);
 
         // ── Insert order ───────────────────────────────────────────────────
         const mergedNotes = [body.notes?.trim() || null];
+        if (discount > 0) {
+            // orders n'a pas de colonne remise : on la trace dans les notes pour
+            // que le restaurant comprenne l'écart entre sous-total et total.
+            mergedNotes.push(`Code promo ${body.couponCode?.trim().toUpperCase()}: -${discount} FCFA.`);
+        }
         if (body.paymentMethod === "gift_card" && remainingToPay > 0) {
             mergedNotes.push(`Carte cadeau appliquée: ${giftCardAppliedAmount} FCFA. Reste à payer: ${remainingToPay} FCFA.`);
         }
@@ -146,10 +231,12 @@ export async function POST(request: NextRequest) {
                 customer_id: body.customerId ?? null,
                 customer_name: body.customerName.trim(),
                 customer_phone: body.customerPhone.trim(),
-                items: body.items,
-                subtotal: body.subtotal,
-                delivery_fee: body.deliveryFee,
-                service_fee: 0,
+                // items est une colonne jsonb : le type OrderItem (options
+                // imbriquées) doit être élargi explicitement.
+                items: body.items as unknown as Json,
+                subtotal,
+                delivery_fee: deliveryFee,
+                service_fee: serviceFee,
                 corkage_fee: 0,
                 tip_amount: 0,
                 total: finalOrderTotal,
@@ -250,6 +337,9 @@ export async function POST(request: NextRequest) {
             {
                 success: true,
                 orderId: createdOrder.id,
+                total: finalOrderTotal,
+                discount,
+                serviceFee,
                 isScheduled: !!scheduledFor,
                 scheduledFor,
                 giftCardAppliedAmount,

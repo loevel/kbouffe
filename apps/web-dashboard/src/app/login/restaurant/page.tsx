@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { SpecializedLoginForm } from "@/components/auth/SpecializedLoginForm";
 import type { Metadata } from "next";
 
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function RestaurantLoginPage() {
-    return <SpecializedLoginForm type="restaurant" />;
+    // Suspense requis : le formulaire lit ?redirectTo via useSearchParams.
+    return (
+        <Suspense fallback={null}>
+            <SpecializedLoginForm type="restaurant" />
+        </Suspense>
+    );
 }

@@ -1803,7 +1803,7 @@ export const en: TranslationKeys = {
         addToFavorites: "Add to favorites",
         removeFromFavorites: "Remove from favorites",
         sponsoredBadge: "Best deal · Buy 1, get...",
-        deliveryFeeFrom: "Delivery fee from 1,500 FCFA",
+        deliveryFeeFrom: "Delivery fee from",
         retry: "Retry",
         resetFilters: "Reset filters",
         noResultsTitle: "No restaurant found",

@@ -2,8 +2,8 @@
 
 import { useUserSession } from "@/store/client-store";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
-import { LogOut, User, ChevronDown, Settings } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LogIn, LogOut, User, ChevronDown, Settings } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -11,6 +11,7 @@ import Link from "next/link";
 export function UserMenu() {
     const { session, logout } = useUserSession();
     const router = useRouter();
+    const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +37,20 @@ export function UserMenu() {
         router.refresh();
     };
 
-    if (!session) return null;
+    // Invité : /stores est ouvert sans compte, il faut donc une porte d'entrée
+    // vers la connexion — et revenir là où on était après.
+    if (!session) {
+        const redirectTo = pathname && pathname.startsWith("/stores") ? pathname : "/stores";
+        return (
+            <Link
+                href={`/login/client?redirectTo=${encodeURIComponent(redirectTo)}`}
+                className="flex items-center gap-2 px-3 h-9 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold transition-colors"
+            >
+                <LogIn size={16} />
+                <span className="hidden sm:inline">Se connecter</span>
+            </Link>
+        );
+    }
 
     return (
         <div className="relative" ref={containerRef}>

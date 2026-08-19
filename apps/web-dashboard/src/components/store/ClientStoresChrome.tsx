@@ -17,6 +17,7 @@ import {
     LifeBuoy,
     Loader2,
     Lock,
+    LogIn,
     LogOut,
     MapPin,
     Menu,
@@ -562,9 +563,30 @@ export function ClientStoresChrome({
                             </div>
 
                             <div className="pt-6 border-t border-surface-100 dark:border-white/5 space-y-4">
-                                <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl text-sm font-black text-rose-500 bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 transition-all hover:scale-[1.02]">
-                                    <LogOut size={20} /> DÉCONNEXION
-                                </button>
+                                {session ? (
+                                    <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl text-sm font-black text-rose-500 bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 transition-all hover:scale-[1.02]">
+                                        <LogOut size={20} /> DÉCONNEXION
+                                    </button>
+                                ) : (
+                                    // Invité : les sections de compte ci-dessus renvoient vers la
+                                    // connexion, autant proposer l'entrée directement ici.
+                                    <>
+                                        <Link
+                                            href={`/login/client?redirectTo=${encodeURIComponent(clientSectionPath[activeSection] ?? "/stores")}`}
+                                            onClick={() => setIsAccountDrawerOpen(false)}
+                                            className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl text-sm font-black text-white bg-brand-500 hover:bg-brand-600 transition-all hover:scale-[1.02]"
+                                        >
+                                            <LogIn size={20} /> SE CONNECTER
+                                        </Link>
+                                        <Link
+                                            href="/register/client"
+                                            onClick={() => setIsAccountDrawerOpen(false)}
+                                            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl text-sm font-black text-surface-700 dark:text-surface-300 border border-surface-200 dark:border-surface-700 transition-all"
+                                        >
+                                            CRÉER UN COMPTE
+                                        </Link>
+                                    </>
+                                )}
                             </div>
                         </motion.aside>
                     </div>

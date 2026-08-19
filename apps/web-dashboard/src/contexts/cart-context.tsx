@@ -5,6 +5,7 @@ import {
     useContext,
     useReducer,
     useEffect,
+    useState,
     useCallback,
     useMemo,
     type ReactNode,
@@ -51,6 +52,8 @@ type CartAction =
 interface CartContextValue {
     restaurant: CartRestaurant | null;
     items: CartItem[];
+    /** false tant que le panier localStorage n'a pas été relu (évite le flash "panier vide"). */
+    hydrated: boolean;
     itemCount: number;
     subtotal: number;
     addItem: (restaurant: CartRestaurant, item: Omit<CartItem, "quantity">) => void;
@@ -117,6 +120,7 @@ const STORAGE_KEY = "kbouffe_web_cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(reducer, EMPTY);
+    const [hydrated, setHydrated] = useState(false);
 
     // Hydrate from localStorage
     useEffect(() => {
@@ -129,14 +133,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 }
             }
         } catch {}
+        finally {
+            setHydrated(true);
+        }
     }, []);
 
-    // Persist to localStorage
+    // Persist to localStorage — jamais avant l'hydratation, sinon le premier
+    // rendu (panier vide) écrase le panier réellement stocké.
     useEffect(() => {
+        if (!hydrated) return;
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch {}
-    }, [state]);
+    }, [state, hydrated]);
 
     const addItem = useCallback(
         (restaurant: CartRestaurant, item: Omit<CartItem, "quantity">) => {
@@ -169,6 +178,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         () => ({
             restaurant: state.restaurant,
             items: state.items,
+            hydrated,
             itemCount,
             subtotal,
             addItem,
@@ -176,7 +186,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             updateQty,
             clear,
         }),
-        [state, itemCount, subtotal, addItem, removeItem, updateQty, clear],
+        [state, hydrated, itemCount, subtotal, addItem, removeItem, updateQty, clear],
     );
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
