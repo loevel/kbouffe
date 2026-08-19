@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertCircle, Star, ShoppingBag, X } from "lucide-react";
-import { Badge, Button, Card, Spinner, adminFetch, authFetch } from "@kbouffe/module-core/ui";
+import { authFetch } from "@kbouffe/module-core/ui";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Alert {
@@ -11,6 +11,17 @@ interface Alert {
     message: string;
     created_at: string;
     metadata: any;
+}
+
+/** « Il y a 4320 minutes » ne se lit pas : on passe à l'unité qui convient. */
+function depuis(iso: string): string {
+    const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    if (minutes < 1) return "À l'instant";
+    if (minutes < 60) return `Il y a ${minutes} minute${minutes > 1 ? "s" : ""}`;
+    const heures = Math.round(minutes / 60);
+    if (heures < 24) return `Il y a ${heures} heure${heures > 1 ? "s" : ""}`;
+    const jours = Math.round(heures / 24);
+    return `Il y a ${jours} jour${jours > 1 ? "s" : ""}`;
 }
 
 export function OperationalAlerts() {
@@ -71,7 +82,7 @@ export function OperationalAlerts() {
                                     {alert.message}
                                 </p>
                                 <p className="text-xs opacity-70 font-medium">
-                                    Il y a {Math.round((Date.now() - new Date(alert.created_at).getTime()) / 60000)} minutes
+                                    {depuis(alert.created_at)}
                                 </p>
                             </div>
 

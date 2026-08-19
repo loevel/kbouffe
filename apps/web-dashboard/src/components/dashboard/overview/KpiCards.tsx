@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, ShoppingBag, TrendingUp, Users, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { DollarSign, ShoppingBag, TrendingUp, Users, ArrowUpRight, ArrowDownRight, AlertCircle } from "lucide-react";
 import { Card } from "@kbouffe/module-core/ui";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useLocale } from "@kbouffe/module-core/ui";
@@ -8,7 +8,7 @@ import { useDashboardStats } from "@/hooks/use-data";
 
 export function KpiCards() {
     const { t } = useLocale();
-    const { stats, isLoading } = useDashboardStats();
+    const { stats, isLoading, error } = useDashboardStats();
 
     if (isLoading) {
         return (
@@ -23,6 +23,28 @@ export function KpiCards() {
                     </Card>
                 ))}
             </div>
+        );
+    }
+
+    // En cas d'échec de l'API, le hook retombe sur des zéros. Un « 0 FCFA »
+    // affiché comme un chiffre réel est pire qu'un blanc : il fait croire à une
+    // journée sans vente. On dit ce qui se passe.
+    if (error) {
+        return (
+            <Card padding="md">
+                <div className="flex items-start gap-3">
+                    <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-sm font-semibold text-surface-900 dark:text-white">
+                            Indicateurs indisponibles
+                        </p>
+                        <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
+                            Vos chiffres n&apos;ont pas pu être chargés. Rechargez la page dans un
+                            instant — aucune donnée n&apos;est perdue.
+                        </p>
+                    </div>
+                </div>
+            </Card>
         );
     }
 

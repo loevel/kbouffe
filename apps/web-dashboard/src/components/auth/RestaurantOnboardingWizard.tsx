@@ -9,6 +9,7 @@ import { Mail, Lock, User, Phone, Eye, EyeOff, Store, Loader2, ArrowRight, Arrow
 import { KbouffeLogo } from "@/components/brand/Logo";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useLocale, Turnstile } from "@kbouffe/module-core/ui";
+import { verifierTurnstile } from "@/lib/auth/turnstile";
 
 interface FormData {
     firstName: string;
@@ -88,6 +89,13 @@ export function RestaurantOnboardingWizard() {
             return;
         }
 
+        // Le jeton doit être validé par le serveur : sans cet appel, le widget
+        // n'est qu'un décor qu'un robot contourne en appelant l'API directement.
+        if (!(await verifierTurnstile(turnstileToken))) {
+            setError(t.auth.captchaRequired ?? "Vérification anti-robot échouée. Réessayez.");
+            return;
+        }
+
         if (!isSupabaseConfigured()) {
             setError(t.auth.registerServiceNotConfigured);
             return;
@@ -114,6 +122,7 @@ export function RestaurantOnboardingWizard() {
                 password: form.password,
                 options: {
                     data: metadata,
+                    ...(turnstileToken ? { captchaToken: turnstileToken } : {}),
                 },
             });
 

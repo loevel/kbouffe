@@ -8,6 +8,7 @@ import { useNavBadges } from "@/hooks/use-data";
 import { useDashboardNotifications } from "@/hooks/use-dashboard-notifications";
 import { PosOperatorProvider } from "@/contexts/PosOperatorContext";
 import { GlobalSearch } from "@/components/dashboard/GlobalSearch";
+import { OnboardingGuard } from "@/components/dashboard/OnboardingGuard";
 import { HelpModal } from "@/components/dashboard/HelpModal";
 
 /**
@@ -40,6 +41,7 @@ export function DashboardShellWrapper({ children }: { children: React.ReactNode 
 
     return (
         <PosOperatorProvider>
+            <OnboardingGuard />
             <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
             <DashboardShell 
                 pendingOrderCount={pendingCount} 

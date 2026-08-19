@@ -111,7 +111,23 @@ export default function OnboardingPage() {
                 if (!supabase) return;
 
                 const { data: { session } } = await supabase.auth.getSession();
-                
+
+                // Un restaurateur déjà installé n'a rien à refaire ici : le
+                // renvoyer évite qu'un retour en arrière ou un signet réécrase
+                // sa fiche avec un formulaire à moitié rempli.
+                try {
+                    const res = await fetch("/api/sync-user");
+                    if (res.ok) {
+                        const data = (await res.json()) as { restaurant?: unknown };
+                        if (data?.restaurant) {
+                            router.replace("/dashboard");
+                            return;
+                        }
+                    }
+                } catch {
+                    // Indisponible : on laisse le formulaire s'afficher.
+                }
+
                 if (session?.user?.user_metadata) {
                     const meta = session.user.user_metadata;
                     setForm(prev => ({
@@ -127,7 +143,7 @@ export default function OnboardingPage() {
             }
         }
         loadUserData();
-    }, []);
+    }, [router]);
 
     // KYC verification state
     const [kycStatus, setKycStatus] = useState<"idle" | "checking" | "active" | "inactive" | "error">("idle");
