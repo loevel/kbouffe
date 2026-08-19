@@ -4,13 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+    AlertCircle,
     CalendarClock,
     CheckCircle2,
     ChefHat,
     Clock,
     ClipboardList,
     Home,
+    KeyRound,
     RotateCcw,
+    Smartphone,
     Sparkles,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
@@ -66,6 +69,8 @@ export function ConfirmationPageClient() {
     const total            = totalParam ? parseInt(totalParam, 10) : null;
     const deliveryType     = searchParams.get("deliveryType") ?? "delivery";
     const scheduledForParam = searchParams.get("scheduledFor");
+    const deliveryCode     = searchParams.get("deliveryCode");
+    const paymentState     = searchParams.get("payment"); // pending | paid | failed (Mobile Money)
 
     // Parse and validate scheduledFor date
     let scheduledFor: Date | null = null;
@@ -170,6 +175,61 @@ export function ConfirmationPageClient() {
                         </div>
                     )}
                 </div>
+
+                {/* ── Statut du paiement Mobile Money ──────────────────── */}
+                {paymentState && (
+                    <div
+                        className={`mb-6 flex items-start gap-3 rounded-2xl border px-5 py-4 ${
+                            paymentState === "paid"
+                                ? "border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/10"
+                                : paymentState === "failed"
+                                ? "border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10"
+                                : "border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10"
+                        }`}
+                    >
+                        {paymentState === "paid" ? (
+                            <CheckCircle2 size={18} className="text-green-600 shrink-0 mt-0.5" />
+                        ) : paymentState === "failed" ? (
+                            <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
+                        ) : (
+                            <Smartphone size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                        )}
+                        <div className="text-sm">
+                            <p className="font-bold text-surface-900 dark:text-white">
+                                {paymentState === "paid"
+                                    ? "Paiement Mobile Money confirmé"
+                                    : paymentState === "failed"
+                                    ? "Paiement Mobile Money non abouti"
+                                    : "Paiement Mobile Money en attente"}
+                            </p>
+                            <p className="text-surface-600 dark:text-surface-400 mt-0.5">
+                                {paymentState === "paid"
+                                    ? "Votre commande est réglée. Le restaurant a été notifié."
+                                    : paymentState === "failed"
+                                    ? "Votre commande est bien enregistrée : réglez à la remise, ou contactez le restaurant pour relancer le paiement."
+                                    : "Validez la demande reçue sur votre téléphone. Le statut se met à jour dans le suivi de commande."}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Code de confirmation de livraison ─────────────────── */}
+                {deliveryCode && deliveryType === "delivery" && (
+                    <div className="mb-6 rounded-2xl border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/40 px-5 py-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <KeyRound size={16} className="text-orange-500 shrink-0" />
+                            <p className="text-sm font-bold text-orange-700 dark:text-orange-300">
+                                Code de confirmation de livraison
+                            </p>
+                        </div>
+                        <p className="text-4xl font-mono font-black tracking-[0.45em] text-orange-600 dark:text-orange-400 text-center py-2">
+                            {deliveryCode}
+                        </p>
+                        <p className="text-xs text-orange-600/80 dark:text-orange-400/70 text-center mt-1">
+                            Communiquez-le au livreur au moment de la remise.
+                        </p>
+                    </div>
+                )}
 
                 {/* ── Status timeline ──────────────────────────────────── */}
                 <section className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-6 mb-6">

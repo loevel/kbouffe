@@ -81,6 +81,9 @@ export function UpsellModal({ isOpen, onClose, onProceed }: UpsellModalProps) {
             { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
             {
                 id: suggestion.product.id,
+                // cartKey manquant : l'article arrivait au panier sans clé, donc
+                // impossible à modifier ou supprimer ensuite.
+                cartKey: suggestion.product.id,
                 name: suggestion.product.name,
                 price: suggestion.product.discountedPrice,
                 imageUrl: suggestion.product.imageUrl,
