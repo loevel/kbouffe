@@ -76,6 +76,7 @@ import {
     publicRestaurantReviewRoutes,
 } from "./modules/reviews";
 import supplierAnalyticsRouter from "./modules/supplier/analytics";
+import { driverRoutes } from "./modules/driver";
 import { predictionsRouter, profitabilityRouter } from "./modules/supplier";
 
 // ── Admin routes ─────────────────────────────────────────────────────
@@ -242,6 +243,12 @@ api.use("/marketplace/messages/*", userAuthMiddleware);
 
 api.route("/marketplace/suppliers", suppliersRoutes);      // annuaire + inscription
 api.route("/marketplace/messages", marketplaceMessagesRoutes);  // messagerie B2B
+
+// Espace livreur (/driver/*) — userAuthMiddleware : un livreur n'a pas de
+// restaurant, authMiddleware le rejetterait donc en 404. Les handlers filtrent
+// eux-mêmes chaque requête sur driver_id = userId.
+api.use("/driver/*", userAuthMiddleware);
+api.use("/driver", userAuthMiddleware);
 
 // ── Auth middleware for merchant routes ───────────────────────────────
 const merchantPaths = [
@@ -410,6 +417,9 @@ api.route("/restaurant/product-reviews", merchantProductReviewRoutes);
 api.route("/supplier", supplierAnalyticsRouter);
 api.route("/supplier", predictionsRouter);
 api.route("/supplier", profitabilityRouter);
+
+// ── Espace livreur (app mobile) ───────────────────────────────────────────
+api.route("/driver", driverRoutes);
 
 // ── Dark Kitchens / Multi-Marques + KYC ─────────────────────────────
 api.route("/restaurant/brands", brandsRoutes);
