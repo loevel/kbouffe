@@ -31,15 +31,15 @@ export function COGSTracker({ supplierId }: COGSTrackerProps) {
 
   return (
     <div className="space-y-4">
-      {/* Le coût de revient n'existe pas en base : le backend l'estime à 60 % du
-          prix de vente. Tant que le fournisseur ne saisit pas ses vrais coûts,
-          marges et profits sont des ordres de grandeur, pas de la comptabilité. */}
+      {/* Le backend utilise supplier_products.cost_per_unit quand il est
+          renseigné, sinon un repli à 60 % du prix. Les produits sans coût saisi
+          affichent donc une marge estimée, indiscernable d'une marge réelle. */}
       <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
         <Info size={14} className="shrink-0 mt-0.5" />
         <p>
-          Coûts estimés, pas mesurés : faute de coût de revient saisi, il est
-          approché à 60&nbsp;% du prix de vente. Marges et profits sont donc
-          indicatifs.
+          Pour les produits dont le coût de revient n&apos;est pas renseigné, il
+          est approché à 60&nbsp;% du prix de vente : leur marge est estimée, pas
+          mesurée. Saisissez le coût dans la fiche produit pour un chiffre exact.
         </p>
       </div>
 

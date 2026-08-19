@@ -27,7 +27,7 @@ export function PricingOptimizer({ supplierId, onPriceUpdate }: PricingOptimizer
     // rogne durablement la marge du fournisseur.
     const confirmed = window.confirm(
       `Appliquer ${formatFCFA(newPrice)} à « ${productName} » ? Le prix actuel est ${formatFCFA(currentPrice)}.\n\n` +
-        `Cette suggestion repose sur un coût de revient estimé, pas sur vos coûts réels. Vérifiez qu'elle vous convient : le changement est immédiat pour les restaurants.`
+        `Si le coût de revient de ce produit n'est pas renseigné, la marge visée repose sur une estimation. Le changement est immédiat pour les restaurants.`
     );
     if (!confirmed) return;
 
@@ -92,9 +92,9 @@ export function PricingOptimizer({ supplierId, onPriceUpdate }: PricingOptimizer
       <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
         <Info size={14} className="shrink-0 mt-0.5" />
         <p>
-          Suggestions indicatives : faute de coût de revient saisi, il est approché
-          à 60&nbsp;% du prix de vente. Recoupez avec vos coûts réels avant
-          d&apos;appliquer un prix.
+          Pour les produits sans coût de revient renseigné, la marge est calculée
+          sur une estimation à 60&nbsp;% du prix. Saisissez vos coûts réels dans la
+          fiche produit pour des suggestions fiables.
         </p>
       </div>
 
