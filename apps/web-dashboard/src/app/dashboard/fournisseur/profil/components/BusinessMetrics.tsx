@@ -169,11 +169,14 @@ function MetricCard({
     delay,
 }: {
     config: MetricCardConfig;
-    data: MetricData;
+    data?: MetricData;
     loading: boolean;
     delay: number;
 }) {
     const Icon = config.icon;
+    // L'API peut ne renvoyer qu'une partie des métriques : on affiche un tiret
+    // plutôt qu'un chiffre inventé, et on masque tendance et courbe.
+    const absente = !data;
 
     return (
         <motion.div
@@ -189,22 +192,24 @@ function MetricCard({
                     </p>
                     {loading ? (
                         <div className="h-7 w-16 rounded-lg bg-surface-800 animate-pulse" />
+                    ) : absente ? (
+                        <span className="text-xl font-bold text-surface-600">—</span>
                     ) : (
                         <div className="flex items-baseline gap-1.5">
                             <span className="text-xl font-bold text-white">
-                                {config.format(data.current)}
+                                {config.format(data!.current)}
                             </span>
                             {config.unit && (
                                 <span className="text-xs text-surface-500">{config.unit}</span>
                             )}
                             <TrendBadge
-                                current={data.current}
-                                previous={data.previous}
+                                current={data!.current}
+                                previous={data!.previous}
                                 invertColor={config.key === "response_time"}
                             />
                         </div>
                     )}
-                    {data.extra && !loading && (
+                    {data?.extra && !loading && (
                         <p className="text-[10px] text-surface-600 mt-0.5">{data.extra}</p>
                     )}
                 </div>
@@ -217,9 +222,9 @@ function MetricCard({
             </div>
 
             {/* Sparkline */}
-            {!loading && data.trend.length > 0 && (
+            {!loading && (data?.trend?.length ?? 0) > 0 && (
                 <div className="mt-auto -mx-1 -mb-1">
-                    <Sparkline data={data.trend} color={config.chartColor} />
+                    <Sparkline data={data!.trend} color={config.chartColor} />
                 </div>
             )}
         </motion.div>

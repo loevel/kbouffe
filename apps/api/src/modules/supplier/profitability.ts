@@ -6,14 +6,22 @@ import type { Env, Variables } from "../../types";
  * Supplier Phase 3 — Profitability & Growth APIs
  *
  * Margin heatmap, pricing rules, cross-sell and market intelligence for the
- * marketplace supplier dashboard. Supplier resolved via suppliers.user_id; data
- * from supplier_products / supplier_orders / supplier_order_items. Buyers are
- * the RESTAURANTS purchasing from the supplier.
+ * marketplace supplier dashboard. Supplier resolved via suppliers.user_id; les
+ * ventes viennent de supplier_order_traces (voir TABLE_VENTES) et les produits
+ * de supplier_products. Buyers are the RESTAURANTS purchasing from the supplier.
  *
- * NOTE: no real cost column exists, so cost is estimated at 60% of price.
+ * NOTE : le coût vient de supplier_products.cost_per_unit quand il est
+ * renseigné, sinon il est estimé à 60 % du prix de vente (COST_RATIO).
  */
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+/**
+ * Même source que les analytics : supplier_order_traces est la seule table
+ * alimentée par le parcours d'achat. Une ligne = un produit acheté par un
+ * restaurant, prix compris — il n'y a donc pas d'en-tête de commande séparé.
+ */
+const TABLE_VENTES = "supplier_order_traces";
 
 const COST_RATIO = 0.6; // fallback when cost_per_unit is not set
 
@@ -109,24 +117,20 @@ router.get("/margin-heatmap", async (c: any) => {
     );
     const nameMap = new Map(products.map((p: any) => [p.id, p.name]));
 
-    const { data: orders } = await supabase
-      .from("supplier_orders")
-      .select("id, restaurant_id, created_at")
+    // Une trace porte déjà l'acheteur, le produit, la quantité et le prix.
+    const { data: orderItems } = await supabase
+      .from(TABLE_VENTES)
+      .select("restaurant_id, product_id, quantity, total_price")
       .eq("supplier_id", supplierId)
-      .neq("status", "cancelled")
+      .neq("delivery_status", "cancelled")
       .gte("created_at", daysAgo(30));
 
-    const orderIds = (orders ?? []).map((o: any) => o.id);
-    if (orderIds.length === 0) return c.json([]);
-    const orderBuyer = new Map((orders ?? []).map((o: any) => [o.id, o.restaurant_id]));
-
-    const { data: orderItems } = await supabase
-      .from("supplier_order_items")
-      .select("order_id, product_id, quantity, total_price")
-      .in("order_id", orderIds);
+    if (!orderItems || orderItems.length === 0) return c.json([]);
 
     // Resolve buyer (restaurant) names.
-    const buyerIds = [...new Set((orders ?? []).map((o: any) => o.restaurant_id).filter(Boolean))];
+    const buyerIds = [
+      ...new Set(orderItems.map((o: any) => o.restaurant_id).filter(Boolean)),
+    ];
     const buyerName = new Map<string, string>();
     if (buyerIds.length > 0) {
       const { data: restaurants } = await supabase
@@ -139,7 +143,7 @@ router.get("/margin-heatmap", async (c: any) => {
     // Aggregate per buyer × product.
     const cells = new Map<string, MarginHeatmapCell>();
     for (const item of orderItems ?? []) {
-      const buyerId = orderBuyer.get((item as any).order_id);
+      const buyerId = (item as any).restaurant_id;
       const pid = (item as any).product_id;
       if (!buyerId || !pid) continue;
       const key = `${buyerId}|${pid}`;
@@ -240,26 +244,27 @@ router.get("/cross-sell", async (c: any) => {
     if (!products || products.length === 0) return c.json([]);
     const nameMap = new Map(products.map((p: any) => [p.id, p.name]));
 
-    const { data: orders } = await supabase
-      .from("supplier_orders")
-      .select("id")
+    const { data: orderItems } = await supabase
+      .from(TABLE_VENTES)
+      .select("restaurant_id, product_id, created_at")
       .eq("supplier_id", supplierId)
-      .neq("status", "cancelled")
+      .neq("delivery_status", "cancelled")
       .gte("created_at", daysAgo(30));
 
-    const orderIds = (orders ?? []).map((o: any) => o.id);
-    if (orderIds.length === 0) return c.json([]);
+    if (!orderItems || orderItems.length === 0) return c.json([]);
 
-    const { data: orderItems } = await supabase
-      .from("supplier_order_items")
-      .select("order_id, product_id")
-      .in("order_id", orderIds);
-
+    // Les traces n'ont pas d'en-tête de commande : le panier est reconstitué
+    // par (restaurant, jour d'achat), ce qui regroupe les produits pris
+    // ensemble lors d'un même réassort.
     const orderProducts = new Map<string, string[]>();
-    for (const item of orderItems ?? []) {
-      const oid = (item as any).order_id;
+    for (const item of orderItems) {
+      const buyerId = (item as any).restaurant_id;
+      const pid = (item as any).product_id;
+      if (!buyerId || !pid) continue;
+      const jour = String((item as any).created_at ?? "").slice(0, 10);
+      const oid = `${buyerId}|${jour}`;
       if (!orderProducts.has(oid)) orderProducts.set(oid, []);
-      orderProducts.get(oid)!.push((item as any).product_id);
+      orderProducts.get(oid)!.push(pid);
     }
 
     const coSell = new Map<string, number>();
