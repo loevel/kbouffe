@@ -177,7 +177,13 @@ function FilterChips({
     const [sortOpen, setSortOpen] = useState(false);
 
     return (
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 sm:-mx-6 px-4 sm:px-6">
+        <div className="flex items-center gap-2">
+            {/* Seules les puces défilent. Le sélecteur de tri était dans ce
+                conteneur : `overflow-x-auto` force le navigateur à passer
+                `overflow-y` à `auto` lui aussi, et son menu déroulant, en
+                position absolue sous le bouton, se retrouvait rogné à la
+                hauteur de la rangée. On cliquait, il ne s'affichait pas. */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 min-w-0 -ml-4 sm:-ml-6 pl-4 sm:pl-6 pr-2">
             {filterChips.map((chip) =>
                 (chip as any).href ? (
                     <Link
@@ -201,6 +207,8 @@ function FilterChips({
                     </button>
                 )
             )}
+
+            </div>
 
             <div className="relative shrink-0">
                 <button
@@ -647,7 +655,18 @@ export function ClientDiscovery() {
                     activeFilters={activeFilters}
                     onToggle={toggleFilter}
                     sortBy={filters.sortBy ?? "recommended"}
-                    onSort={(s) => updateFilters({ sortBy: s as "recommended" | "rating" | "orders" | "newest" })}
+                    // Cette page est faite de sections éditorialisées
+                    // (« Nouveautés », « Populaires ») que /api/homepage-sections
+                    // ordonne chacune selon sa propre règle : elle n'accepte pas
+                    // de paramètre `sort`, et n'en accepterait pas sans vider
+                    // les sections de leur sens. Le sélecteur mettait donc
+                    // seulement le filtre à jour et s'affichait comme actif,
+                    // sans que rien ne bouge à l'écran. Il envoie désormais vers
+                    // la liste à plat, qui sait trier.
+                    onSort={(s) => {
+                        updateFilters({ sortBy: s as "recommended" | "rating" | "orders" | "newest" });
+                        router.push(`/stores/search?sort=${encodeURIComponent(s)}`);
+                    }}
                 />
             </div>
 

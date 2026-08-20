@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { termeDeRecherche } from "@kbouffe/module-core/search";
+import { colonnesDeTri, comparerRestaurants, ordreDemande } from "@kbouffe/module-core/ranking";
 
 /**
  * GET /api/stores
@@ -9,7 +10,7 @@ import { termeDeRecherche } from "@kbouffe/module-core/search";
  *   ?q       — search name ou city (optionnel)
  *   ?cuisine — filtre par cuisine type (optionnel)
  *   ?city    — filtre par ville (optionnel)
- *   ?sort    — "rating" | "orders" | "newest" (défaut: sponsored d'abord puis rating)
+ *   ?sort    — "rating" | "orders" | "newest" (défaut "recommended": sponsorisés puis premium puis note)
  *   ?limit   — max résultats (défaut: 60)
  */
 export async function GET(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
         const cuisine = searchParams.get("cuisine")?.trim() ?? "";
         const city = searchParams.get("city")?.trim() ?? "";
         const mode = searchParams.get("mode")?.trim() ?? "delivery";
-        const sort = searchParams.get("sort") ?? "recommended";
+        const ordre = ordreDemande(searchParams.get("sort"));
         const limit = Math.min(parseInt(searchParams.get("limit") ?? "60"), 100);
 
         const supabase = await createClient();
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
                 id, name, slug, description, logo_url, banner_url, address, city,
                 cuisine_type, price_range, rating, review_count, order_count,
                 is_verified, is_premium, is_sponsored, has_dine_in, has_reservations,
-                delivery_fee, estimated_delivery_time
+                delivery_fee, estimated_delivery_time, created_at
             `)
             .eq("is_published", true);
 
@@ -81,32 +82,26 @@ export async function GET(request: NextRequest) {
                 : query.ilike("recherche_normalisee", `%${terme}%`);
         }
 
-        const { data: rows, error } = await query
-            .order("rating", { ascending: false })
-            .limit(limit);
+        // L'ordre appliqué en base doit correspondre au tri demandé : c'est lui
+        // qui décide quels restaurants le `.limit()` retient. Trier ensuite sur
+        // un autre critère ferait disparaître des restaurants qui avaient leur
+        // place dans la liste.
+        for (const { colonne, ascendant } of colonnesDeTri(ordre)) {
+            query = query.order(colonne, { ascending: ascendant, nullsFirst: false });
+        }
+
+        const { data: rows, error } = await query.limit(limit);
 
         if (error) {
             console.error("[GET /api/stores] Supabase error:", error);
             return NextResponse.json({ error: "Erreur lors de la récupération des restaurants" }, { status: 500 });
         }
 
-        let results = (rows as any[]) || [];
-
-        // Client-side sort overrides
-        if (sort === "rating") {
-            results = results.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-        } else if (sort === "orders") {
-            results = results.sort((a, b) => (b.order_count ?? 0) - (a.order_count ?? 0));
-        } else {
-            // "recommended": sponsored first, then premium, then by rating
-            results = results.sort((a, b) => {
-                if (a.is_sponsored && !b.is_sponsored) return -1;
-                if (!a.is_sponsored && b.is_sponsored) return 1;
-                if (a.is_premium && !b.is_premium) return -1;
-                if (!a.is_premium && b.is_premium) return 1;
-                return (b.rating ?? 0) - (a.rating ?? 0);
-            });
-        }
+        // Classement final. Il départage ce que la base laisse à égalité —
+        // 91 des 93 restaurants publiés n'ont ni avis ni commande — et pondère
+        // la note par le nombre d'avis, pour qu'un 5,0 sur un seul avis ne
+        // coiffe pas un 4,7 sur deux cents.
+        const results = ((rows as any[]) || []).sort(comparerRestaurants(ordre));
 
         // When searching by keyword, fetch matching products for each restaurant in results
         let matchedProductsByRestaurant: Record<string, { id: string; name: string; price: number; image_url: string | null }[]> = {};
