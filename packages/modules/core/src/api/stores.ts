@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { CoreEnv, CoreVariables } from "./types";
 import { termeDeRecherche, echapperPourFiltre } from "../search/normalize";
+import { colonnesDeTri, comparerRestaurants, ordreDemande } from "../ranking/restaurants";
 
 export const storesRoutes = new Hono<{ Bindings: CoreEnv; Variables: CoreVariables }>();
 
@@ -19,7 +20,7 @@ storesRoutes.get("/", async (c) => {
     const terme   = termeDeRecherche(c.req.query("q"));
     const cuisine = (c.req.query("cuisine")?.trim() ?? "").slice(0, 100);
     const city    = echapperPourFiltre((c.req.query("city")?.trim() ?? "").slice(0, 100));
-    const sort  = c.req.query("sort") ?? "recommended";
+    const ordre = ordreDemande(c.req.query("sort"));
     const limit = Math.min(parseInt(c.req.query("limit") ?? "60"), 100);
 
     const supabase = c.get("supabase");
@@ -32,7 +33,7 @@ storesRoutes.get("/", async (c) => {
             cuisine_type, price_range, rating, review_count, order_count,
             is_verified, is_premium, is_sponsored, has_dine_in,
             delivery_base_fee, delivery_per_km_fee, max_delivery_radius_km,
-            lat, lng
+            lat, lng, created_at
         `)
         .eq("is_published", true);
 
@@ -74,32 +75,22 @@ storesRoutes.get("/", async (c) => {
             : query.ilike("recherche_normalisee", `%${terme}%`);
     }
 
-    const { data: rows, error } = await query
-        .order("rating", { ascending: false })
-        .limit(limit);
+    // L'ordre appliqué en base doit correspondre au tri demandé : c'est lui qui
+    // décide quels restaurants le `.limit()` retient.
+    for (const { colonne, ascendant } of colonnesDeTri(ordre)) {
+        query = query.order(colonne, { ascending: ascendant, nullsFirst: false });
+    }
+
+    const { data: rows, error } = await query.limit(limit);
 
     if (error) {
         console.error("Stores listing error:", error);
         return c.json({ error: "Erreur lors de la récupération des restaurants" }, 500);
     }
 
-    let results = (rows as any[]) || [];
-
-    // Client-side sort overrides to match legacy behavior
-    if (sort === "rating") {
-        results = results.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-    } else if (sort === "orders") {
-        results = results.sort((a, b) => (b.order_count ?? 0) - (a.order_count ?? 0));
-    } else {
-        // "recommended": sponsored first, then premium, then by rating
-        results = results.sort((a, b) => {
-            if (a.is_sponsored && !b.is_sponsored) return -1;
-            if (!a.is_sponsored && b.is_sponsored) return 1;
-            if (a.is_premium && !b.is_premium) return -1;
-            if (!a.is_premium && b.is_premium) return 1;
-            return (b.rating ?? 0) - (a.rating ?? 0);
-        });
-    }
+    // Classement final : départage les ex æquo que la base laisse dans un ordre
+    // non garanti, et pondère la note par le nombre d'avis.
+    const results = ((rows as any[]) || []).sort(comparerRestaurants(ordre));
 
     // Cache publicly: 1 min browser, 5 mins edge limit
     c.header("Cache-Control", "public, s-maxage=300, stale-while-revalidate=60");
