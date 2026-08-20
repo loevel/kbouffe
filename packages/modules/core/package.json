@@ -5,7 +5,8 @@
     "types": "./src/api/index.ts",
     "exports": {
         ".": "./src/api/index.ts",
-        "./ui": "./src/ui/index.ts"
+        "./ui": "./src/ui/index.ts",
+        "./search": "./src/search/normalize.ts"
     },
     "scripts": {
         "build": "tsc",

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { CoreEnv, CoreVariables } from "./types";
+import { termeDeRecherche, echapperPourFiltre } from "../search/normalize";
 
 export const storesRoutes = new Hono<{ Bindings: CoreEnv; Variables: CoreVariables }>();
 
@@ -8,13 +9,16 @@ export const storesRoutes = new Hono<{ Bindings: CoreEnv; Variables: CoreVariabl
  * Public restaurant listing (explore / search)
  */
 storesRoutes.get("/", async (c) => {
-    // SEC-013: Strip characters that are significant in PostgREST filter syntax
-    // to prevent query injection via .or() filter strings.
-    const sanitize = (s: string) => s.replace(/[%,.()\[\]!<>&|*;]/g, "").slice(0, 100);
-
-    const q       = sanitize(c.req.query("q")?.trim() ?? "");
-    const cuisine = sanitize(c.req.query("cuisine")?.trim() ?? "");
-    const city    = sanitize(c.req.query("city")?.trim() ?? "");
+    // SEC-013 : les caractères significatifs de la grammaire PostgREST doivent
+    // être neutralisés, sinon une virgule ou une parenthèse dans `q` ajoute des
+    // conditions au filtre `.or()`. On les échappe désormais au lieu de les
+    // supprimer : la protection est la même, mais « 4.7% » reste « 4.7% » au
+    // lieu de devenir « 47 ». Ne pas revenir au strip.
+    // `termeDeRecherche` normalise aussi la casse et les accents, pour se
+    // comparer à la colonne générée `recherche_normalisee`.
+    const terme   = termeDeRecherche(c.req.query("q"));
+    const cuisine = (c.req.query("cuisine")?.trim() ?? "").slice(0, 100);
+    const city    = echapperPourFiltre((c.req.query("city")?.trim() ?? "").slice(0, 100));
     const sort  = c.req.query("sort") ?? "recommended";
     const limit = Math.min(parseInt(c.req.query("limit") ?? "60"), 100);
 
@@ -38,8 +42,36 @@ storesRoutes.get("/", async (c) => {
     if (city) {
         query = query.ilike("city", `%${city}%`);
     }
-    if (q) {
-        query = query.or(`name.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%`);
+    // La recherche portait sur `name`, `city` et `cuisine_type` bruts, en ilike :
+    // « ndolé » remontait des restaurants, « ndole » aucun — or c'est la forme
+    // sans accent qu'on tape sur un clavier de téléphone. Et elle ignorait les
+    // plats, donc chercher « poulet » ne renvoyait rien du tout, aucun
+    // restaurant ne s'appelant ainsi. On interroge la colonne normalisée, et on
+    // rattache les restaurants dont un plat correspond.
+    if (terme) {
+        const PLAFOND_PRODUITS = 2000;
+        const { data: prodRows } = await supabase
+            .from("products")
+            .select("restaurant_id")
+            .ilike("recherche_normalisee", `%${terme}%`)
+            .eq("is_available", true)
+            .limit(PLAFOND_PRODUITS);
+
+        if ((prodRows?.length ?? 0) >= PLAFOND_PRODUITS) {
+            console.warn(
+                `[GET /stores] « ${terme} » atteint le plafond de ${PLAFOND_PRODUITS} produits : des restaurants peuvent manquer.`,
+            );
+        }
+
+        const idsParProduit = [
+            ...new Set((prodRows ?? []).map((p: any) => p.restaurant_id).filter(Boolean)),
+        ];
+
+        query = idsParProduit.length > 0
+            ? query.or(
+                `recherche_normalisee.ilike.%${terme}%,id.in.(${idsParProduit.join(",")})`,
+              )
+            : query.ilike("recherche_normalisee", `%${terme}%`);
     }
 
     const { data: rows, error } = await query

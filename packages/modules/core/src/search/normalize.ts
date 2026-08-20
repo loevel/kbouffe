@@ -1,6 +1,10 @@
 /**
  * Normalisation et échappement des termes de recherche.
  *
+ * Partagé par la vitrine web (`/api/stores`) et l'API Hono (`/api/stores`,
+ * servie à l'app mobile) : les deux comparent à la même colonne, donc une
+ * seule implémentation, sinon elles divergent.
+ *
  * `normaliserRecherche` doit rester le pendant exact de la fonction SQL
  * `public.sans_accents(text)` : les colonnes `recherche_normalisee` de
  * `restaurants` et `products` sont générées avec elle, et une requête
@@ -32,7 +36,9 @@ export function normaliserRecherche(terme: string): string {
  * cassent la requête ou en détournent la portée. On échappe plutôt que de
  * supprimer, pour qu'une recherche sur « 50% » trouve bien « 50% ».
  *
- * Même logique que `escapeIlike` dans apps/api/src/lib/search.ts.
+ * Remplace le `sanitize` qui supprimait les caractères significatifs : il
+ * protégeait bien la grammaire, mais amputait aussi les termes légitimes —
+ * « 4.7% » devenait « 47 ». L'échappement protège autant sans rien perdre.
  */
 export function echapperPourFiltre(terme: string): string {
     return terme
