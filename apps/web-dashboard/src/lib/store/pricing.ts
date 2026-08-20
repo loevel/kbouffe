@@ -9,7 +9,14 @@
 
 export type DeliveryType = "delivery" | "pickup" | "dine_in";
 
-/** Frais de livraison par mode de récupération (FCFA). */
+/**
+ * Frais de livraison par mode de récupération (FCFA).
+ *
+ * Pour la livraison, ce montant n'est qu'un repli : le tarif facturé est celui
+ * du restaurant (`restaurants.delivery_fee`), que le restaurateur renseigne et
+ * que les 93 établissements publiés portent tous. Le forfait ne s'applique que
+ * si ce tarif est inconnu — panier persisté d'avant ce changement, par exemple.
+ */
 export const DELIVERY_FEES: Record<DeliveryType, number> = {
     delivery: 1000,
     pickup: 0,
@@ -35,8 +42,23 @@ export function isDeliveryType(value: unknown): value is DeliveryType {
     return value === "delivery" || value === "pickup" || value === "dine_in";
 }
 
-export function getDeliveryFee(deliveryType: DeliveryType): number {
-    return DELIVERY_FEES[deliveryType] ?? 0;
+/**
+ * Frais de livraison à facturer.
+ *
+ * `restaurantDeliveryFee` est le tarif propre au restaurant. Il fait foi pour
+ * une livraison, y compris quand il vaut 0 — un restaurant qui offre la
+ * livraison doit pouvoir l'offrir. Retirer et manger sur place restent
+ * gratuits quel que soit ce tarif.
+ */
+export function getDeliveryFee(
+    deliveryType: DeliveryType,
+    restaurantDeliveryFee?: number | null,
+): number {
+    if (deliveryType !== "delivery") return DELIVERY_FEES[deliveryType] ?? 0;
+    if (typeof restaurantDeliveryFee === "number" && Number.isFinite(restaurantDeliveryFee)) {
+        return Math.max(0, Math.round(restaurantDeliveryFee));
+    }
+    return DELIVERY_FEES.delivery;
 }
 
 export interface OrderTotalsInput {
@@ -46,6 +68,8 @@ export interface OrderTotalsInput {
     discount?: number;
     /** Montant couvert par une carte cadeau (FCFA). */
     giftCardAmount?: number;
+    /** Tarif de livraison du restaurant (FCFA). Prioritaire sur le forfait. */
+    restaurantDeliveryFee?: number | null;
 }
 
 export interface OrderTotals {
@@ -67,8 +91,9 @@ export function computeOrderTotals({
     deliveryType,
     discount = 0,
     giftCardAmount = 0,
+    restaurantDeliveryFee,
 }: OrderTotalsInput): OrderTotals {
-    const deliveryFee = getDeliveryFee(deliveryType);
+    const deliveryFee = getDeliveryFee(deliveryType, restaurantDeliveryFee);
     const gross = subtotal + deliveryFee + SERVICE_FEE;
     const safeDiscount = Math.max(0, Math.min(discount, gross));
     const afterDiscount = gross - safeDiscount;

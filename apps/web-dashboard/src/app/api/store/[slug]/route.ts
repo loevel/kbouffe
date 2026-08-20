@@ -24,6 +24,9 @@ const RESTAURANT_COLUMNS = [
     "loyalty_min_redeem_points", "loyalty_reward_tiers",
     "meta_pixel_id", "google_analytics_id", "theme_layout",
     "delivery_base_fee", "delivery_per_km_fee", "max_delivery_radius_km",
+    // Délai moyen saisi par le restaurateur : l'en-tête de la vitrine
+    // affichait « 30–50 min » déduit du nombre de commandes.
+    "estimated_delivery_time",
 ].join(", ");
 
 export async function GET(_request: NextRequest, { params }: Params) {
@@ -169,6 +172,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
                 hasReservations: rest.has_reservations,
                 totalTables: rest.total_tables,
                 deliveryFee: rest.delivery_fee,
+                estimatedDeliveryMinutes: rest.estimated_delivery_time ?? null,
                 minOrderAmount: rest.min_order_amount,
                 dineInServiceFee: rest.dine_in_service_fee ?? 0,
                 corkageFeeAmount: rest.corkage_fee_amount ?? 0,

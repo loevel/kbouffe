@@ -74,7 +74,12 @@ function ProductCard({
         e.stopPropagation();
         setAdding(true);
         addItem(
-            { id: restaurant.restaurantId, name: restaurant.restaurantName, slug: restaurant.restaurantSlug },
+            {
+                id: restaurant.restaurantId,
+                name: restaurant.restaurantName,
+                slug: restaurant.restaurantSlug,
+                deliveryFee: restaurant.deliveryFee,
+            },
             { id: product.id, cartKey: product.id, name: product.name, price: product.price, imageUrl: product.imageUrl }
         );
         toast.success(`${product.name} ${t.clientOffers.addedToCart}`, { duration: 1500 });

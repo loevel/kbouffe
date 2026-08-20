@@ -22,7 +22,7 @@ const RESTAURANT_SELECT = `
     id, name, slug, logo_url, banner_url, city,
     cuisine_type, price_range, rating, review_count, order_count,
     is_verified, is_premium, is_sponsored, has_dine_in,
-    estimated_delivery_time
+    estimated_delivery_time, delivery_fee
 `;
 
 function mapRestaurant(row: any) {
@@ -43,6 +43,7 @@ function mapRestaurant(row: any) {
         isSponsored: row.is_sponsored,
         hasDineIn: row.has_dine_in,
         estimatedDeliveryMinutes: row.estimated_delivery_time ?? null,
+        deliveryFee: row.delivery_fee ?? null,
     };
 }
 

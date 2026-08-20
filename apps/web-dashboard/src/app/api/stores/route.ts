@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
             .select(`
                 id, name, slug, description, logo_url, banner_url, address, city,
                 cuisine_type, price_range, rating, review_count, order_count,
-                is_verified, is_premium, is_sponsored, has_dine_in, has_reservations
+                is_verified, is_premium, is_sponsored, has_dine_in, has_reservations,
+                delivery_fee, estimated_delivery_time
             `)
             .eq("is_published", true);
 
@@ -131,6 +132,11 @@ export async function GET(request: NextRequest) {
             isSponsored: row.is_sponsored,
             hasDineIn: row.has_dine_in,
             hasReservations: row.has_reservations,
+            // Tarif et délai réels du restaurant : les cartes qui consomment
+            // cette route annonçaient « Livraison dès 1 500 FCFA » et un délai
+            // deviné à partir du nombre de commandes, deux chiffres inventés.
+            deliveryFee: row.delivery_fee ?? null,
+            estimatedDeliveryMinutes: row.estimated_delivery_time ?? null,
             matchedProducts: matchedProductsByRestaurant[row.id] ?? [],
         }));
 

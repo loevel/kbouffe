@@ -1803,6 +1803,7 @@ export const fr = {
         sponsoredBadge: "Meilleure offre · Achetez-en 1, recevez-en...",
         deliveryFeeFrom: "Frais de livraison à partir de",
         newRestaurant: "Nouveau",
+        freeDelivery: "Livraison gratuite",
         retry: "Réessayer",
         resetFilters: "Réinitialiser les filtres",
         noResultsTitle: "Aucun restaurant trouvé",
