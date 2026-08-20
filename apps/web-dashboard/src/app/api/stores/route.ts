@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { termeDeRecherche } from "@/lib/search/normalize";
+import { termeDeRecherche } from "@kbouffe/module-core/search";
 
 /**
  * GET /api/stores
