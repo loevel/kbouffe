@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { termeDeRecherche } from "@/lib/search/normalize";
 
 /**
  * GET /api/stores
@@ -43,27 +44,41 @@ export async function GET(request: NextRequest) {
         if (mode === "reservation") {
             query = query.eq("has_reservations", true);
         }
-        if (q) {
-            // Search products (name + description) to find matching restaurants
+        // La recherche se fait sur les colonnes `recherche_normalisee`, générées
+        // en base sans accents ni majuscules. Avant, le `ilike` portait sur les
+        // colonnes brutes : « ndolé » remontait 58 restaurants, « ndole » un
+        // seul — or c'est la seconde forme qu'on tape sur un clavier de
+        // téléphone. Le terme est normalisé ici avec les mêmes règles.
+        const terme = termeDeRecherche(q);
+
+        if (terme) {
+            // Les restaurants dont un plat correspond. La limite est là pour
+            // borner la requête, mais elle tronquait en silence : avec plus de
+            // mille produits, un terme courant la dépasse et des restaurants
+            // disparaissaient des résultats sans que rien ne le signale.
+            const PLAFOND_PRODUITS = 2000;
             const { data: prodRows } = await supabase
                 .from("products")
                 .select("restaurant_id")
-                .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+                .ilike("recherche_normalisee", `%${terme}%`)
                 .eq("is_available", true)
-                .limit(100);
+                .limit(PLAFOND_PRODUITS);
+
+            if ((prodRows?.length ?? 0) >= PLAFOND_PRODUITS) {
+                console.warn(
+                    `[GET /api/stores] « ${terme} » atteint le plafond de ${PLAFOND_PRODUITS} produits : des restaurants peuvent manquer.`,
+                );
+            }
 
             const productRestaurantIds = [
                 ...new Set((prodRows ?? []).map((p: any) => p.restaurant_id).filter(Boolean))
             ];
 
-            if (productRestaurantIds.length > 0) {
-                // Restaurants matching by name/city/cuisine OR that contain a matching product
-                query = query.or(
-                    `name.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%,id.in.(${productRestaurantIds.join(",")})`
-                );
-            } else {
-                query = query.or(`name.ilike.%${q}%,city.ilike.%${q}%,cuisine_type.ilike.%${q}%`);
-            }
+            query = productRestaurantIds.length > 0
+                ? query.or(
+                    `recherche_normalisee.ilike.%${terme}%,id.in.(${productRestaurantIds.join(",")})`
+                  )
+                : query.ilike("recherche_normalisee", `%${terme}%`);
         }
 
         const { data: rows, error } = await query
@@ -95,15 +110,18 @@ export async function GET(request: NextRequest) {
 
         // When searching by keyword, fetch matching products for each restaurant in results
         let matchedProductsByRestaurant: Record<string, { id: string; name: string; price: number; image_url: string | null }[]> = {};
-        if (q && results.length > 0) {
+        if (terme && results.length > 0) {
             const restaurantIds = results.map((r: any) => r.id);
+            // Même colonne normalisée que la recherche principale : sinon la
+            // carte d'un restaurant trouvé par « ndole » n'affichait aucun plat
+            // correspondant, le second filtre étant resté sensible aux accents.
             const { data: matchedProds } = await supabase
                 .from("products")
                 .select("id, name, price, image_url, restaurant_id")
-                .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+                .ilike("recherche_normalisee", `%${terme}%`)
                 .eq("is_available", true)
                 .in("restaurant_id", restaurantIds)
-                .limit(50);
+                .limit(200);
 
             for (const p of (matchedProds ?? [])) {
                 if (!matchedProductsByRestaurant[p.restaurant_id]) {
