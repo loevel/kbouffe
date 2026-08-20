@@ -9,13 +9,24 @@ import type { Env, Variables } from "../types";
  */
 export const homepageSectionsPublicRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-// delivery_fee et preparation_time_minutes : les cartes de l'accueil mobile les
-// affichent. Sans eux, elles retombaient sur « 30 min • 500 FCFA » pour tous les
-// restaurants — un tarif inventé, annoncé au client avant qu'il commande.
+/**
+ * Colonnes des cartes de l'accueil mobile.
+ *
+ * `delivery_fee` et `estimated_delivery_time` : sans eux, les cartes
+ * retombaient sur « 30 min • 500 FCFA » pour tous les restaurants — un tarif
+ * inventé, annoncé au client avant qu'il commande. Le délai est bien
+ * `estimated_delivery_time`, le « Délai moyen (min) » que saisit le
+ * restaurateur ; `preparation_time_minutes` n'existe pas en base.
+ *
+ * `compliance_status` a été retiré : cette colonne n'existe dans aucune table du
+ * schéma. La sélectionner et filtrer dessus faisait échouer chaque requête, donc
+ * l'accueil ne montrait aucun restaurant — six sections vides, sans erreur
+ * visible. La visibilité repose désormais sur `is_published` seul.
+ */
 const RESTAURANT_SELECT = `
     id, name, slug, logo_url, banner_url, cuisine_type,
-    rating, review_count, is_verified, is_premium, is_sponsored, compliance_status,
-    delivery_fee, preparation_time_minutes
+    rating, review_count, is_verified, is_premium, is_sponsored,
+    delivery_fee, estimated_delivery_time
 `;
 
 function mapRestaurant(row: any) {
@@ -32,21 +43,23 @@ function mapRestaurant(row: any) {
         isPremium: row.is_premium,
         isSponsored: row.is_sponsored,
         deliveryFee: row.delivery_fee ?? null,
-        preparationTimeMinutes: row.preparation_time_minutes ?? null,
+        estimatedDeliveryMinutes: row.estimated_delivery_time ?? null,
     };
 }
 
 async function resolveSection(supabase: any, section: any, cuisine: string): Promise<any[]> {
     try {
         if (section.type === "manual" && section.restaurant_ids?.length) {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from("restaurants")
                 .select(RESTAURANT_SELECT)
                 .eq("is_published", true)
-                .eq("compliance_status", "compliant")
                 .in("id", section.restaurant_ids)
                 .limit(20);
 
+            // Une section vide et une requête en échec se ressemblaient : c'est
+            // ce silence qui a laissé l'accueil vide sans que rien ne le signale.
+            if (error) console.error("[Homepage] section manuelle:", error);
             if (!data) return [];
             const byId = Object.fromEntries(data.map((r: any) => [r.id, r]));
             return section.restaurant_ids
@@ -58,8 +71,7 @@ async function resolveSection(supabase: any, section: any, cuisine: string): Pro
         let query = supabase
             .from("restaurants")
             .select(RESTAURANT_SELECT)
-            .eq("is_published", true)
-            .eq("compliance_status", "compliant");
+            .eq("is_published", true);
 
         if (cuisine) query = query.eq("cuisine_type", cuisine);
 
@@ -88,7 +100,8 @@ async function resolveSection(supabase: any, section: any, cuisine: string): Pro
                 query = query.order("rating", { ascending: false });
         }
 
-        const { data } = await query.limit(12);
+        const { data, error } = await query.limit(12);
+        if (error) console.error("[Homepage] section automatique:", error);
         return (data ?? []).map(mapRestaurant);
     } catch {
         return [];

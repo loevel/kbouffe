@@ -20,8 +20,10 @@ storeInfoRoutes.get("/:slug", async (c) => {
             .from("restaurants")
             .select("*")
             .eq("slug", slug)
+            // Pas de filtre sur `compliance_status` : cette colonne n'existe
+            // dans aucune table. La requête échouait, et cette route répondait
+            // « Restaurant non trouvé » pour toutes les boutiques publiées.
             .eq("is_published", true)
-            .eq("compliance_status", "compliant")
             .limit(1);
 
         if (restError || !results || results.length === 0) {
