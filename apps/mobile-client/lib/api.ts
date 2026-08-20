@@ -289,7 +289,7 @@ export interface SectionRestaurant {
     /** Frais de livraison du restaurant, en FCFA. null si l'API ne l'a pas renvoyé. */
     deliveryFee: number | null;
     /** Temps de préparation annoncé, en minutes. null si le restaurant ne l'a pas renseigné. */
-    preparationTimeMinutes: number | null;
+    estimatedDeliveryMinutes: number | null;
 }
 
 export interface HomepageSection {

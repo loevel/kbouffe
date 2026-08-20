@@ -166,11 +166,11 @@ const CardsSection = memo(function CardsSection({ section, theme, onPress }: { s
                             {/* Les replis « 30 min » et « 500 FCFA » s'affichaient pour
                                 tous les restaurants : ces champs n'existaient pas dans la
                                 réponse. On n'annonce plus qu'un tarif ou un délai réel. */}
-                            {(r.preparationTimeMinutes != null || r.deliveryFee != null) && (
+                            {(r.estimatedDeliveryMinutes != null || r.deliveryFee != null) && (
                                 <Text style={[styles.deliveryInfo, { color: theme.icon }]}>
                                     <Ionicons name="time-outline" size={11} color={theme.icon} />
-                                    {r.preparationTimeMinutes != null ? ` ${r.preparationTimeMinutes} min` : ''}
-                                    {r.preparationTimeMinutes != null && r.deliveryFee != null ? ' • ' : ''}
+                                    {r.estimatedDeliveryMinutes != null ? ` ${r.estimatedDeliveryMinutes} min` : ''}
+                                    {r.estimatedDeliveryMinutes != null && r.deliveryFee != null ? ' • ' : ''}
                                     {r.deliveryFee != null ? `Frais: ${r.deliveryFee.toLocaleString('fr-FR')} FCFA` : ''}
                                 </Text>
                             )}
