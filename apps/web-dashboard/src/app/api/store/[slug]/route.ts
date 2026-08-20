@@ -113,15 +113,19 @@ export async function GET(_request: NextRequest, { params }: Params) {
         const reviewData = reviewsRes.data ?? [];
         const memberRows = membersRes.data ?? [];
 
-        // review_count / rating sur `restaurants` sont des compteurs dénormalisés qui ne sont
-        // jamais mis à jour à l'insertion d'un avis (pas de trigger côté DB) — on recalcule
-        // donc à la volée depuis la table `reviews` pour éviter d'afficher "0 avis" alors
-        // que des avis existent bel et bien.
+        // On recalcule depuis `reviews` plutôt que de lire `restaurants.rating`
+        // et `review_count`. Le trigger `trg_avis_maj_compteurs` entretient
+        // désormais ces colonnes, mais cette page charge déjà les avis : les
+        // recompter ici ne coûte rien et reste juste même si le cache dérive.
+        //
+        // Le repli quand il n'y a aucun avis est 0, plus `rest.rating` : cette
+        // colonne portait les notes des données de démonstration, et s'y rabattre
+        // affichait « 4,4 · 0 avis » — une note sans un seul avis derrière.
         const reviewStats = reviewStatsRes.data ?? [];
         const liveReviewCount = reviewStatsRes.count ?? reviewStats.length;
         const liveRating = reviewStats.length > 0
             ? reviewStats.reduce((sum: number, r: any) => sum + (r.rating ?? 0), 0) / reviewStats.length
-            : rest.rating ?? 0;
+            : 0;
 
         const customerIds = [...new Set(reviewData.map((r: any) => r.customer_id).filter(Boolean))] as string[];
         const memberUserIds = [...new Set(memberRows.map((m: any) => m.user_id).filter(Boolean))] as string[];

@@ -29,6 +29,7 @@ import {
     Utensils,
     Search,
     Heart,
+    Sparkles,
 } from "lucide-react";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { useCart } from "@/contexts/cart-context";
@@ -912,7 +913,10 @@ function ExploreMoreSection({ currentId, cuisineType }: { currentId: string; cui
                     className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide -mx-4 sm:-mx-6 px-4 sm:px-6"
                 >
                     {items.map((r) => {
-                        const rating = r.rating?.toFixed(1) ?? null;
+                        // `r.rating ? …` et non `r.rating?.toFixed()` : la note
+                        // vaut 0 quand le restaurant n'a aucun avis, et
+                        // l'optional chaining laissait passer « 0.0 ».
+                        const rating = r.rating ? r.rating.toFixed(1) : null;
                         // Le délai et le tarif viennent du restaurant. Ils
                         // étaient auparavant déduits du nombre de commandes et
                         // figés à 1 500 FCFA : les mêmes deux valeurs pour tout
@@ -1624,13 +1628,26 @@ export function StorePageClient({ slug }: { slug: string }) {
 
                         {/* Horizontal Info Bar */}
                         <div className="grid grid-cols-3 items-center gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-3 mt-6 py-4 border-y border-surface-100 dark:border-surface-800/60">
+                            {/* Sans avis, pas d'étoile ni de note : l'en-tête
+                                affichait « 4,4 · 0 avis », une note que rien
+                                ne soutenait. */}
                             <div className="flex items-center gap-2">
-                                <div className="p-2 bg-amber-500/10 rounded-xl">
-                                    <Star size={16} className="text-amber-500 fill-amber-500" />
+                                <div className={`p-2 rounded-xl ${restaurant.reviewCount > 0 ? "bg-amber-500/10" : "bg-surface-500/10"}`}>
+                                    {restaurant.reviewCount > 0 ? (
+                                        <Star size={16} className="text-amber-500 fill-amber-500" />
+                                    ) : (
+                                        <Sparkles size={16} className="text-surface-600 dark:text-surface-400" />
+                                    )}
                                 </div>
                                 <div>
-                                    <p className="text-sm font-bold text-surface-900 dark:text-white leading-none">{avgRating}</p>
-                                    <p className="text-[11px] text-surface-400 mt-1 font-medium">{restaurant.reviewCount} avis</p>
+                                    <p className="text-sm font-bold text-surface-900 dark:text-white leading-none">
+                                        {restaurant.reviewCount > 0 ? avgRating : "Nouveau"}
+                                    </p>
+                                    <p className="text-[11px] text-surface-400 mt-1 font-medium">
+                                        {restaurant.reviewCount > 0
+                                            ? `${restaurant.reviewCount} avis`
+                                            : "Pas encore d'avis"}
+                                    </p>
                                 </div>
                             </div>
 

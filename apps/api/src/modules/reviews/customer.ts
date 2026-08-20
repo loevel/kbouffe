@@ -99,23 +99,13 @@ customerReviewRoutes.post("/", async (c) => {
             return c.json({ error: "Erreur lors de l'envoi de l'avis" }, 500);
         }
 
-        // ── Update denormalized rating & review_count ────────────
-        const { data: stats } = await supabase
-            .from("reviews")
-            .select("rating")
-            .eq("restaurant_id", body.restaurantId)
-            .eq("is_visible", true);
-
-        if (stats && stats.length > 0) {
-            const avg = stats.reduce((sum, r) => sum + r.rating, 0) / stats.length;
-            await supabase
-                .from("restaurants")
-                .update({
-                    rating: Math.round(avg * 10) / 10,
-                    review_count: stats.length,
-                })
-                .eq("id", body.restaurantId);
-        }
+        // `restaurants.rating` et `review_count` sont maintenant entretenus par
+        // le trigger `trg_avis_maj_compteurs`, qui couvre aussi la suppression
+        // d'un avis et son masquage par la modération. Le recalcul qui se
+        // trouvait ici ne se déclenchait qu'à la création, et son garde
+        // `stats.length > 0` empêchait de repasser à zéro : supprimer le
+        // dernier avis laissait le compteur à 1. Ne pas le remettre — deux
+        // écritures concurrentes sur les mêmes colonnes finissent par diverger.
 
         return c.json({ success: true, review }, 201);
     } catch (error) {
