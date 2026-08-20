@@ -27,7 +27,7 @@ import type { Env, Variables } from "../../types";
  * - PATCH /driver/orders/:id            — prise en charge / livraison (code)
  * - GET   /driver/history               — courses terminées, paginées
  * - GET   /driver/earnings              — gains agrégés
- * - POST  /driver/tracking/:orderId     — position GPS pendant la course
+ * - POST  /driver/tracking/:orderId     — position GPS (ouvre le suivi au besoin)
  */
 
 const router = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -434,7 +434,7 @@ router.post("/tracking/:orderId", async (c: any) => {
         // concerne pas, ou continuer à émettre après l'avoir terminée.
         const { data: order } = await db
             .from("orders")
-            .select("id")
+            .select("id, restaurant_id, delivery_address")
             .eq("id", orderId)
             .eq("driver_id", userId)
             .in("status", STATUTS_ACTIFS as unknown as string[])
@@ -443,14 +443,56 @@ router.post("/tracking/:orderId", async (c: any) => {
         if (!order) return c.json({ error: "Course introuvable ou déjà terminée" }, 404);
 
         const maintenant = new Date().toISOString();
-        const { error } = await db
+        const { data: misAJour, error: erreurMaj } = await db
             .from("delivery_tracking")
             .update({ deliverer_lat: lat, deliverer_lng: lng, updated_at: maintenant })
-            .eq("order_id", orderId);
+            .eq("order_id", orderId)
+            .select("id");
 
-        if (error) {
-            console.error("[Driver API] tracking error:", error);
+        if (erreurMaj) {
+            console.error("[Driver API] tracking error:", erreurMaj);
             return c.json({ error: "Position non enregistrée" }, 500);
+        }
+
+        // Rien à mettre à jour : la ligne de suivi n'existe pas encore. C'est le
+        // cas normal de la première position d'une course, et c'était le trou —
+        // un UPDATE sans ligne cible ne renvoie pas d'erreur, la route répondait
+        // donc « enregistré » alors que rien ne l'était, et la carte du client
+        // restait vide toute la livraison. Côté web, seul le PUT de démarrage de
+        // session créait cette ligne ; l'app mobile n'a pas d'équivalent, donc la
+        // route se charge elle-même de l'ouvrir.
+        if (!misAJour?.length) {
+            const { data: profil } = await db
+                .from("users")
+                .select("full_name, email")
+                .eq("id", userId)
+                .maybeSingle();
+
+            // `upsert` plutôt qu'`insert` : deux positions envoyées coup sur coup
+            // arriveraient toutes deux ici, et la seconde violerait la contrainte
+            // d'unicité sur `order_id`. Le conflit se résout en mise à jour.
+            const { error: erreurCreation } = await db
+                .from("delivery_tracking")
+                .upsert(
+                    {
+                        order_id: orderId,
+                        restaurant_id: (order as any).restaurant_id,
+                        client_address: (order as any).delivery_address ?? null,
+                        deliverer_name:
+                            (profil as any)?.full_name ?? (profil as any)?.email ?? "Livreur",
+                        deliverer_lat: lat,
+                        deliverer_lng: lng,
+                        status: "active",
+                        started_at: maintenant,
+                        updated_at: maintenant,
+                    },
+                    { onConflict: "order_id" },
+                );
+
+            if (erreurCreation) {
+                console.error("[Driver API] tracking session error:", erreurCreation);
+                return c.json({ error: "Position non enregistrée" }, 500);
+            }
         }
 
         return c.json({ success: true });

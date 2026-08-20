@@ -86,7 +86,10 @@ export function DeliveryTracker({
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          // "*" et non "UPDATE" : la toute première position du livreur
+          // crée la ligne de suivi (INSERT). En n'écoutant que les mises à
+          // jour, la carte attendait la position suivante pour l'afficher.
+          event: "*",
           schema: "public",
           table: "delivery_tracking",
           filter: `order_id=eq.${orderId}`,

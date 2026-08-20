@@ -125,7 +125,9 @@ export function DriverDeliveryTracker({ orderId, deliveryAddress, customerName, 
             .channel(`delivery_tracking:${orderId}`)
             .on(
                 "postgres_changes",
-                { event: "UPDATE", schema: "public", table: "delivery_tracking", filter: `order_id=eq.${orderId}` },
+                // "*" et non "UPDATE" : quand c'est l'app mobile qui ouvre le
+                // suivi, la première position est un INSERT.
+                { event: "*", schema: "public", table: "delivery_tracking", filter: `order_id=eq.${orderId}` },
                 (payload) => setSession(payload.new as TrackingSession)
             )
             .subscribe((status) => setIsConnected(status === "SUBSCRIBED"));
