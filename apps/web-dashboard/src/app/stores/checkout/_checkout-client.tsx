@@ -160,7 +160,12 @@ export function CheckoutPageClient() {
         ? Math.round(promoDiscountParam)
         : 0;
 
-    const totals = computeOrderTotals({ subtotal, deliveryType, discount: promoDiscount });
+    const totals = computeOrderTotals({
+        subtotal,
+        deliveryType,
+        discount: promoDiscount,
+        restaurantDeliveryFee: restaurant?.deliveryFee,
+    });
     const { deliveryFee, serviceFee, discount, total } = totals;
 
     // ── Form state ─────────────────────────────────────────────────────────

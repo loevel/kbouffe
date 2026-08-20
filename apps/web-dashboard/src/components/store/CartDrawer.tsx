@@ -23,7 +23,7 @@ import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
 import { createClient } from "@/lib/supabase/client";
 import {
-    DELIVERY_FEES,
+    getDeliveryFee,
     DELIVERY_LABELS,
     computeOrderTotals,
     type DeliveryType,
@@ -33,10 +33,13 @@ import {
 
 type PaymentMethod = "cash" | "mobile_money_mtn" | "mobile_money_orange";
 
-const DELIVERY_OPTIONS: { id: DeliveryType; label: string; icon: React.ReactNode; fee: number }[] = [
-    { id: "delivery", label: DELIVERY_LABELS.delivery, icon: <MapPin   size={16} />, fee: DELIVERY_FEES.delivery },
-    { id: "pickup",   label: DELIVERY_LABELS.pickup,   icon: <Package  size={16} />, fee: DELIVERY_FEES.pickup   },
-    { id: "dine_in",  label: DELIVERY_LABELS.dine_in,  icon: <Utensils size={16} />, fee: DELIVERY_FEES.dine_in  },
+// Le tarif n'est plus figé sur l'option : il dépend du restaurant du panier et
+// se calcule au rendu, sinon le sélecteur annonce un montant que le checkout
+// ne facturera pas.
+const DELIVERY_OPTIONS: { id: DeliveryType; label: string; icon: React.ReactNode }[] = [
+    { id: "delivery", label: DELIVERY_LABELS.delivery, icon: <MapPin   size={16} /> },
+    { id: "pickup",   label: DELIVERY_LABELS.pickup,   icon: <Package  size={16} /> },
+    { id: "dine_in",  label: DELIVERY_LABELS.dine_in,  icon: <Utensils size={16} /> },
 ];
 
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
@@ -112,7 +115,12 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
 
     // Même tarification que le tunnel /stores/checkout — le frais de service
     // n'était appliqué que sur l'un des deux parcours.
-    const totals = computeOrderTotals({ subtotal, deliveryType, giftCardAmount });
+    const totals = computeOrderTotals({
+        subtotal,
+        deliveryType,
+        giftCardAmount,
+        restaurantDeliveryFee: restaurant?.deliveryFee,
+    });
     const { deliveryFee, serviceFee, total } = totals;
 
     const handleApplyGiftCard = async () => {
@@ -120,7 +128,11 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
         setGiftCardError(null);
         setGiftCardLoading(true);
         try {
-            const orderTotal = computeOrderTotals({ subtotal, deliveryType }).total;
+            const orderTotal = computeOrderTotals({
+                subtotal,
+                deliveryType,
+                restaurantDeliveryFee: restaurant?.deliveryFee,
+            }).total;
             const res = await fetch("/api/store/gift-cards/validate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -462,8 +474,10 @@ export function CartDrawer({ open, onClose, initialDeliveryType, initialTableNum
                                         >
                                             {opt.icon}
                                             {opt.label}
-                                            {opt.fee > 0 && (
-                                                <span className="text-surface-400 font-normal">+{formatCFA(opt.fee)}</span>
+                                            {getDeliveryFee(opt.id, restaurant?.deliveryFee) > 0 && (
+                                                <span className="text-surface-400 font-normal">
+                                                    +{formatCFA(getDeliveryFee(opt.id, restaurant?.deliveryFee))}
+                                                </span>
                                             )}
                                         </button>
                                     ))}

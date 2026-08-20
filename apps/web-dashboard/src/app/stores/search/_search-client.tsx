@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
+import { getDeliveryFee } from "@/lib/store/pricing";
 import { useSearchStore } from "@/store/client-store";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -39,6 +40,9 @@ interface RestaurantItem {
     city: string;
     isVerified?: boolean;
     isPremium?: boolean;
+    /** Tarif et délai propres au restaurant, servis par /api/stores. */
+    deliveryFee?: number | null;
+    estimatedDeliveryMinutes?: number | null;
     matchedProducts?: MatchedProduct[];
 }
 
@@ -79,8 +83,12 @@ const gradientFor = (id: string) =>
 
 // ── Restaurant card ───────────────────────────────────────────────────────────
 function RestaurantCard({ r }: { r: RestaurantItem }) {
-    const rating = r.rating?.toFixed(1) ?? "—";
-    const eta = (r.orderCount ?? 0) > 300 ? "13 min" : "28 min";
+    const rating = r.rating ? r.rating.toFixed(1) : null;
+    // Délai et tarif du restaurant : le délai était déduit du nombre de
+    // commandes et le tarif figé à 1 500 FCFA, alors que le checkout facture
+    // celui que le restaurateur a saisi.
+    const eta = r.estimatedDeliveryMinutes != null ? `${r.estimatedDeliveryMinutes} min` : null;
+    const deliveryFee = getDeliveryFee("delivery", r.deliveryFee);
 
     return (
         <Link href={`/r/${r.slug}`} className="group block">
@@ -124,13 +132,23 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
                     </p>
                 </div>
             </div>
+            {/* Une étoile pleine à 0,0 sur 0 avis annonce une mauvaise note là
+                où il n'y en a simplement aucune. */}
             <p className="text-xs mt-1 flex items-center gap-1 text-surface-700 dark:text-surface-300">
-                <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
-                <span className="font-semibold">{rating}</span>
-                <span className="text-surface-400">({r.reviewCount ?? 0}+) • {eta}</span>
+                {rating ? (
+                    <>
+                        <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
+                        <span className="font-semibold">{rating}</span>
+                        <span className="text-surface-400">
+                            ({r.reviewCount ?? 0}+){eta ? ` • ${eta}` : ""}
+                        </span>
+                    </>
+                ) : (
+                    <span className="text-surface-400">Nouveau{eta ? ` • ${eta}` : ""}</span>
+                )}
             </p>
             <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-                Livraison dès {formatCFA(1500)}
+                {deliveryFee === 0 ? "Livraison gratuite" : `Livraison dès ${formatCFA(deliveryFee)}`}
             </p>
         </Link>
     );

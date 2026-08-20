@@ -22,7 +22,7 @@ import { formatCFA } from "@kbouffe/module-core/ui";
 import { UpsellModal } from "@/components/store/UpsellModal";
 import {
     DELIVERY_DESCRIPTIONS,
-    DELIVERY_FEES,
+    getDeliveryFee,
     DELIVERY_LABELS,
     computeOrderTotals,
     type DeliveryType,
@@ -155,7 +155,12 @@ export function CartPageClient() {
     // l'application du code, le montant calculé n'est plus valable.
     const promoStale = appliedPromo !== null && appliedPromo.subtotal !== subtotal;
     const promoDiscount = appliedPromo && !promoStale ? appliedPromo.discount : 0;
-    const totals = computeOrderTotals({ subtotal, deliveryType, discount: promoDiscount });
+    const totals = computeOrderTotals({
+        subtotal,
+        deliveryType,
+        discount: promoDiscount,
+        restaurantDeliveryFee: restaurant?.deliveryFee,
+    });
     const { deliveryFee, serviceFee, total } = totals;
 
     // ── Promo code validation ─────────────────────────────────────────────
@@ -339,7 +344,9 @@ export function CartPageClient() {
                                     <p className="text-xs text-surface-500 dark:text-surface-400">{DELIVERY_DESCRIPTIONS[opt.id]}</p>
                                 </div>
                                 <span className="text-sm font-bold">
-                                    {DELIVERY_FEES[opt.id] === 0 ? "Gratuit" : formatCFA(DELIVERY_FEES[opt.id])}
+                                    {getDeliveryFee(opt.id, restaurant?.deliveryFee) === 0
+                                        ? "Gratuit"
+                                        : formatCFA(getDeliveryFee(opt.id, restaurant?.deliveryFee))}
                                 </span>
                             </button>
                         ))}

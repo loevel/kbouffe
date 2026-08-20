@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { formatCFA } from "@kbouffe/module-core/ui";
-import { DELIVERY_FEES } from "@/lib/store/pricing";
+import { getDeliveryFee } from "@/lib/store/pricing";
 import { useSearchStore, usePreferencesStore, useUserSession } from "@/store/client-store";
 import { useDashboardLocale } from "@/hooks/use-dashboard-locale";
 import type { TranslationKeys } from "@/lib/i18n";
@@ -49,6 +49,8 @@ interface RestaurantItem {
     orderCount?: number | null;
     /** Délai moyen saisi par le restaurateur, en minutes. */
     estimatedDeliveryMinutes?: number | null;
+    /** Tarif de livraison du restaurant (FCFA). */
+    deliveryFee?: number | null;
 }
 
 interface CuisineCategory {
@@ -417,10 +419,13 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
                 )}
             </div>
 
-            {/* Delivery fee — montant issu de la tarification partagée : la carte
-                annonçait 1 500 FCFA alors que le checkout en facture 1 000. */}
+            {/* Le tarif est celui du restaurant, exactement ce que le checkout
+                facture. La carte annonçait auparavant le forfait de la
+                plateforme, identique partout. */}
             <p className="text-xs text-surface-500 dark:text-surface-400">
-                {d.deliveryFeeFrom} {formatCFA(DELIVERY_FEES.delivery)}
+                {getDeliveryFee("delivery", r.deliveryFee) === 0
+                    ? d.freeDelivery
+                    : `${d.deliveryFeeFrom} ${formatCFA(getDeliveryFee("delivery", r.deliveryFee))}`}
             </p>
         </Link>
     );

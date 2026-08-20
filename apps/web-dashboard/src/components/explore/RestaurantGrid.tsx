@@ -14,6 +14,8 @@ import {
     Sparkles,
     Utensils,
 } from "lucide-react";
+import { formatCFA } from "@kbouffe/module-core/ui";
+import { getDeliveryFee } from "@/lib/store/pricing";
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface MatchedProduct {
@@ -41,6 +43,9 @@ interface RestaurantItem {
     isPremium: boolean;
     isSponsored: boolean;
     hasDineIn: boolean;
+    /** Tarif et délai propres au restaurant, servis par /api/stores. */
+    deliveryFee?: number | null;
+    estimatedDeliveryMinutes?: number | null;
     matchedProducts?: MatchedProduct[];
 }
 
@@ -65,10 +70,15 @@ const SORT_OPTIONS = [
     { id: "orders", label: "Populaires" },
 ];
 
-const DELIVERY_ESTIMATE = (orderCount: number | null) => {
-    const n = orderCount ?? 0;
-    return n > 500 ? "15–25 min" : n > 100 ? "20–35 min" : "30–50 min";
-};
+/**
+ * Délai affiché sur la carte.
+ *
+ * Il était déduit du nombre de commandes — « 15–25 min » à partir de 500
+ * commandes — c'est-à-dire inventé. C'est `estimated_delivery_time`, le délai
+ * moyen que saisit le restaurateur, qui fait foi ; sans lui, on n'annonce rien.
+ */
+const DELIVERY_ESTIMATE = (minutes: number | null | undefined) =>
+    minutes != null ? `${minutes} min` : null;
 
 const PLACEHOLDER_GRADIENTS = [
     "from-orange-400 to-red-500",
@@ -86,8 +96,9 @@ const gradientFor = (id: string) =>
 
 // ── Restaurant Card ────────────────────────────────────────────────────
 function RestaurantCard({ r }: { r: RestaurantItem }) {
-    const time = DELIVERY_ESTIMATE(r.orderCount);
-    const rating = r.rating?.toFixed(1) ?? "—";
+    const time = DELIVERY_ESTIMATE(r.estimatedDeliveryMinutes);
+    const deliveryFee = getDeliveryFee("delivery", r.deliveryFee);
+    const rating = r.rating ? r.rating.toFixed(1) : null;
     const reviews = r.reviewCount ?? 0;
 
     return (
@@ -133,11 +144,18 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
                     )}
                 </div>
 
-                {/* Rating badge bottom-right */}
+                {/* Rating badge bottom-right — une étoile pleine sans note
+                    derrière annonce un avis qui n'existe pas. */}
                 <div className="absolute bottom-3 right-3">
                     <span className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-surface-900 rounded-full text-xs font-bold text-surface-900 dark:text-white shadow">
-                        <Star size={11} className="text-amber-500 fill-amber-500" />
-                        {rating}
+                        {rating ? (
+                            <>
+                                <Star size={11} className="text-amber-500 fill-amber-500" />
+                                {rating}
+                            </>
+                        ) : (
+                            "Nouveau"
+                        )}
                     </span>
                 </div>
 
@@ -170,13 +188,15 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
                 </p>
 
                 <div className="flex items-center gap-4 text-xs text-surface-500 dark:text-surface-400">
-                    <span className="flex items-center gap-1">
-                        <Clock size={12} className="text-brand-500" />
-                        {time}
-                    </span>
+                    {time && (
+                        <span className="flex items-center gap-1">
+                            <Clock size={12} className="text-brand-500" />
+                            {time}
+                        </span>
+                    )}
                     <span className="flex items-center gap-1">
                         <Bike size={12} className="text-brand-500" />
-                        Livraison
+                        {deliveryFee === 0 ? "Gratuite" : formatCFA(deliveryFee)}
                     </span>
                     <span className="flex items-center gap-1 ml-auto">
                         <MapPin size={12} className="text-surface-400" />

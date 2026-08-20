@@ -35,6 +35,12 @@ interface CartRestaurant {
     id: string;
     name: string;
     slug: string;
+    /**
+     * Tarif de livraison du restaurant (FCFA). Absent des paniers enregistrés
+     * avant son introduction : le forfait sert alors de repli, et le serveur
+     * tranche de toute façon à la création de la commande.
+     */
+    deliveryFee?: number | null;
 }
 
 interface CartState {

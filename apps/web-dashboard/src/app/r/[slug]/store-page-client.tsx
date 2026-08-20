@@ -41,6 +41,7 @@ import { GridTheme } from "@/components/store/themes/GridTheme";
 import { LuxuryTheme } from "@/components/store/themes/LuxuryTheme";
 import { StoryTheme } from "@/components/store/themes/StoryTheme";
 import { trackEvent } from "@/lib/tracking";
+import { getDeliveryFee } from "@/lib/store/pricing";
 import type { ThemeProps } from "@/components/store/themes/types";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -62,6 +63,9 @@ interface Restaurant {
     city: string;
     cuisineType: string;
     priceRange: number;
+    /** Tarif et délai propres au restaurant, servis par /api/store/:slug. */
+    deliveryFee: number | null;
+    estimatedDeliveryMinutes: number | null;
     rating: number;
     reviewCount: number;
     orderCount: number;
@@ -147,8 +151,14 @@ const cuisineLabels: Record<string, string> = {
     patisserie: "Pâtisserie",
 };
 
-const deliveryTime = (orderCount: number) =>
-    orderCount > 500 ? "15–25 min" : orderCount > 100 ? "20–35 min" : "30–50 min";
+/**
+ * Délai de livraison annoncé dans l'en-tête.
+ *
+ * Il était déduit du nombre de commandes — « 30–50 min » en dessous de cent —
+ * donc inventé. C'est `estimated_delivery_time`, le « Délai moyen (min) » que
+ * saisit le restaurateur, qui fait foi ; sans lui, on n'annonce pas de délai.
+ */
+const deliveryTime = (minutes: number | null) => (minutes != null ? `${minutes} min` : null);
 
 const cancellationPolicyLabels: Record<Restaurant["reservationCancelPolicy"], string> = {
     flexible: "Flexible",
@@ -281,7 +291,7 @@ function ProductDetailModal({
     reduceMotion = false,
 }: {
     product: Product;
-    restaurant: { id: string; name: string; slug: string };
+    restaurant: { id: string; name: string; slug: string; deliveryFee?: number | null };
     onClose: () => void;
     onAdd: (selectedOptions: Record<string, string>, notes: string, finalPrice: number) => void;
     relatedProducts?: Product[];
@@ -828,6 +838,8 @@ interface ExploreItem {
     cuisineType: string; rating: number | null;
     reviewCount: number | null; orderCount: number | null;
     isPremium: boolean; isSponsored: boolean;
+    /** Tarif et délai propres au restaurant, servis par /api/stores. */
+    deliveryFee: number | null; estimatedDeliveryMinutes: number | null;
 }
 
 const EXPLORE_GRADIENTS = [
@@ -901,7 +913,16 @@ function ExploreMoreSection({ currentId, cuisineType }: { currentId: string; cui
                 >
                     {items.map((r) => {
                         const rating = r.rating?.toFixed(1) ?? null;
-                        const eta = (r.orderCount ?? 0) > 300 ? "13 min" : (r.orderCount ?? 0) > 100 ? "28 min" : "45 min";
+                        // Le délai et le tarif viennent du restaurant. Ils
+                        // étaient auparavant déduits du nombre de commandes et
+                        // figés à 1 500 FCFA : les mêmes deux valeurs pour tout
+                        // le monde, annoncées au client avant qu'il commande.
+                        const eta = r.estimatedDeliveryMinutes != null ? `${r.estimatedDeliveryMinutes} min` : null;
+                        const fee = getDeliveryFee("delivery", r.deliveryFee);
+                        const sousTitre = [
+                            fee === 0 ? "Livraison gratuite" : `Livraison dès ${formatCFA(fee)}`,
+                            eta,
+                        ].filter(Boolean).join(" · ");
                         const isLiked = liked.has(r.id);
 
                         return (
@@ -955,7 +976,7 @@ function ExploreMoreSection({ currentId, cuisineType }: { currentId: string; cui
                                 {/* Info */}
                                 <p className="text-sm font-semibold text-surface-900 dark:text-white truncate leading-snug">{r.name}</p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">
-                                    Livraison dès 1 500 FCFA · {eta}
+                                    {sousTitre}
                                 </p>
                             </Link>
                         );
@@ -1418,7 +1439,7 @@ export function StorePageClient({ slug }: { slug: string }) {
             : undefined;
 
         addItem(
-            { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
+            { id: restaurant.id, name: restaurant.name, slug: restaurant.slug, deliveryFee: restaurant.deliveryFee },
             {
                 id: product.id,
                 cartKey,
@@ -1613,17 +1634,21 @@ export function StorePageClient({ slug }: { slug: string }) {
                                 </div>
                             </div>
 
-                            <div className="w-px h-8 bg-surface-100 dark:bg-surface-800 hidden sm:block" />
+                            {deliveryTime(restaurant.estimatedDeliveryMinutes) && (
+                                <>
+                                    <div className="w-px h-8 bg-surface-100 dark:bg-surface-800 hidden sm:block" />
 
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 bg-brand-500/10 rounded-xl">
-                                    <Clock size={16} className="text-brand-500" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-surface-900 dark:text-white leading-none">{deliveryTime(restaurant.orderCount)}</p>
-                                    <p className="text-[11px] text-surface-400 mt-1 font-medium">Livraison</p>
-                                </div>
-                            </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-2 bg-brand-500/10 rounded-xl">
+                                            <Clock size={16} className="text-brand-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-surface-900 dark:text-white leading-none">{deliveryTime(restaurant.estimatedDeliveryMinutes)}</p>
+                                            <p className="text-[11px] text-surface-400 mt-1 font-medium">Livraison</p>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
                             <div className="w-px h-8 bg-surface-100 dark:bg-surface-800 hidden sm:block" />
 
@@ -2498,7 +2523,7 @@ export function StorePageClient({ slug }: { slug: string }) {
             {selectedProduct && (
                 <ProductDetailModal
                     product={selectedProduct}
-                    restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
+                    restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug, deliveryFee: restaurant.deliveryFee }}
                     reduceMotion={shouldReduceMotion}
                     onClose={() => setSelectedProduct(null)}
                     onAdd={(selectedOpts, notes, finalPrice) => {

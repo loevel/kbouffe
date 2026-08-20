@@ -1805,6 +1805,7 @@ export const en: TranslationKeys = {
         sponsoredBadge: "Best deal · Buy 1, get...",
         deliveryFeeFrom: "Delivery fee from",
         newRestaurant: "New",
+        freeDelivery: "Free delivery",
         retry: "Retry",
         resetFilters: "Reset filters",
         noResultsTitle: "No restaurant found",

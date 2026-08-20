@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { pushOrderStatusChange } from "@/lib/firebase/order-push";
+import { getDeliveryFee } from "@/lib/store/pricing";
 
 const ALLOWED_DELIVERY_TYPES = ["delivery", "pickup", "dine_in"] as const;
 const ALLOWED_PAYMENT_METHODS = ["cash", "mobile_money_mtn", "mobile_money_orange", "gift_card"] as const;
@@ -155,8 +156,30 @@ export async function POST(request: NextRequest) {
         // Le total était repris tel quel du client, et le frais de service
         // facturé au client était enregistré à 0 dans la commande.
         const subtotal    = Math.max(0, Math.round(Number(body.subtotal) || 0));
-        const deliveryFee = Math.max(0, Math.round(Number(body.deliveryFee) || 0));
         const serviceFee  = Math.max(0, Math.round(Number(body.serviceFee) || 0));
+
+        // Les frais de livraison viennent du restaurant, jamais du client. Ils
+        // étaient repris tels quels du corps de la requête : n'importe quel
+        // appelant pouvait donc se facturer une livraison à 0. Le tarif est
+        // désormais lu en base, et le forfait ne sert que si le restaurant n'en
+        // a pas défini — auquel cas retirer et manger sur place restent
+        // gratuits, comme avant.
+        const { data: restoTarif } = await supabase
+            .from("restaurants")
+            .select("delivery_fee")
+            .eq("id", body.restaurantId)
+            .maybeSingle();
+
+        const deliveryFee = getDeliveryFee(
+            body.deliveryType,
+            (restoTarif as { delivery_fee: number | null } | null)?.delivery_fee,
+        );
+
+        if (Number.isFinite(body.deliveryFee) && Math.abs(Number(body.deliveryFee) - deliveryFee) > 1) {
+            console.warn(
+                `[POST /api/store/order] Frais client (${body.deliveryFee}) != tarif du restaurant (${deliveryFee}) — le serveur fait foi.`,
+            );
+        }
 
         const requestedDiscount = Math.max(0, Math.round(Number(body.discount) || 0));
         let discount = 0;
