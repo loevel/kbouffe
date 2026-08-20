@@ -47,6 +47,8 @@ interface RestaurantItem {
     isPremium?: boolean;
     isSponsored?: boolean;
     orderCount?: number | null;
+    /** Délai moyen saisi par le restaurateur, en minutes. */
+    estimatedDeliveryMinutes?: number | null;
 }
 
 interface CuisineCategory {
@@ -315,7 +317,12 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
     const { preferences, updatePreferences } = usePreferencesStore();
     const favorites = preferences.favoriteRestaurants || [];
     const isFavorite = favorites.includes(r.slug);
-    const eta = (r.orderCount ?? 0) > 300 ? "15-20 min" : "25-35 min";
+    // Le délai est celui que le restaurateur a saisi (« Délai moyen »), servi
+    // par /api/homepage-sections. Il était auparavant déduit du nombre de
+    // commandes — deux paliers, « 15-20 » ou « 25-35 », que personne n'avait
+    // renseignés et qui s'affichaient identiques sur toutes les cartes.
+    // Sans valeur connue, on n'affiche rien plutôt qu'une estimation inventée.
+    const eta = r.estimatedDeliveryMinutes != null ? `${r.estimatedDeliveryMinutes} min` : null;
     const reviews = r.reviewCount ? `(${r.reviewCount > 999 ? `${Math.floor(r.reviewCount / 100) / 10}k` : r.reviewCount}+)` : "";
 
     const toggleFavorite = async (ev: React.MouseEvent) => {
@@ -389,11 +396,25 @@ function RestaurantCard({ r }: { r: RestaurantItem }) {
 
             {/* Rating · eta compact */}
             <div className="flex items-center gap-1 text-xs text-surface-500 dark:text-surface-400 mb-0.5">
-                <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
-                <span className="font-semibold text-surface-700 dark:text-surface-300">{r.rating?.toFixed(1) ?? "4.2"}</span>
-                {reviews && <span>{reviews}</span>}
-                <span>·</span>
-                <span>{eta}</span>
+                {/* Une note absente ne vaut pas 4,2 : un restaurant sans avis est
+                    annoncé comme nouveau, il n'emprunte pas la réputation d'un
+                    autre. Une note à 0 est le même cas — aucun avis, pas un zéro
+                    mérité — et se lisait « 0.0 » sur la carte. */}
+                {r.rating ? (
+                    <>
+                        <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
+                        <span className="font-semibold text-surface-700 dark:text-surface-300">{r.rating!.toFixed(1)}</span>
+                        {reviews && <span>{reviews}</span>}
+                    </>
+                ) : (
+                    <span className="font-semibold text-surface-700 dark:text-surface-300">{d.newRestaurant}</span>
+                )}
+                {eta && (
+                    <>
+                        <span>·</span>
+                        <span>{eta}</span>
+                    </>
+                )}
             </div>
 
             {/* Delivery fee — montant issu de la tarification partagée : la carte
