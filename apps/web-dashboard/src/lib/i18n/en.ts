@@ -1804,6 +1804,7 @@ export const en: TranslationKeys = {
         removeFromFavorites: "Remove from favorites",
         sponsoredBadge: "Best deal · Buy 1, get...",
         deliveryFeeFrom: "Delivery fee from",
+        newRestaurant: "New",
         retry: "Retry",
         resetFilters: "Reset filters",
         noResultsTitle: "No restaurant found",

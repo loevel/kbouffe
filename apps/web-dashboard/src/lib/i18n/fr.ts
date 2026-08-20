@@ -1802,6 +1802,7 @@ export const fr = {
         removeFromFavorites: "Retirer des favoris",
         sponsoredBadge: "Meilleure offre · Achetez-en 1, recevez-en...",
         deliveryFeeFrom: "Frais de livraison à partir de",
+        newRestaurant: "Nouveau",
         retry: "Réessayer",
         resetFilters: "Réinitialiser les filtres",
         noResultsTitle: "Aucun restaurant trouvé",
