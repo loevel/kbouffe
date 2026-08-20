@@ -19,9 +19,11 @@
 -- déplacement, suppression). Seuls les avis visibles comptent, pour qu'un avis
 -- masqué disparaisse aussi de la moyenne.
 --
--- L'état d'avant est conservé par la migration précédente : le recalcul remet
--- 91 restaurants à 0 avis et 0 de note, et les cartes les présentent alors
--- comme « Nouveau ».
+-- Le recalcul remet 91 restaurants à 0 avis et 0 de note ; les cartes les
+-- présentent alors comme « Nouveau ». Ces valeurs avaient été sauvegardées le
+-- temps de valider le changement, puis la sauvegarde a été supprimée : les
+-- compteurs se reconstruisent maintenant depuis `reviews`, ce que les chiffres
+-- de démonstration, eux, ne permettaient pas.
 
 CREATE OR REPLACE FUNCTION public.recalculer_avis_restaurant(p_restaurant_id uuid)
 RETURNS void
