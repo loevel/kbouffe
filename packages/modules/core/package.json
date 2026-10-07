@@ -6,7 +6,8 @@
     "exports": {
         ".": "./src/api/index.ts",
         "./ui": "./src/ui/index.ts",
-        "./search": "./src/search/normalize.ts"
+        "./search": "./src/search/normalize.ts",
+        "./ranking": "./src/ranking/restaurants.ts"
     },
     "scripts": {
         "build": "tsc",
